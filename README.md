@@ -36,6 +36,7 @@ Environment variables:
 - `ZAI_MODEL` - Optional. Model name (default: `glm-4.7`)
 - `SBY_PORT` - Optional. Server port (default: `3000`)
 - `SBY_HOST` - Optional. Server hostname (default: `0.0.0.0`)
+- `SBY_ACCENT_COLOR` - Optional. UI accent color as hex (default: `#39ff14` phosphor green)
 
 ## Project Structure
 

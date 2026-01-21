@@ -46,6 +46,87 @@ function formatDate(date: Date | string): string {
 }
 
 // =============================================================================
+// Accent Color Override
+// =============================================================================
+
+/**
+ * Parse a hex color to RGB components.
+ */
+function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16),
+      }
+    : null;
+}
+
+/**
+ * Convert RGB to hex.
+ */
+function rgbToHex(r: number, g: number, b: number): string {
+  return "#" + [r, g, b].map((x) => {
+    const hex = Math.max(0, Math.min(255, Math.round(x))).toString(16);
+    return hex.length === 1 ? "0" + hex : hex;
+  }).join("");
+}
+
+/**
+ * Lighten a color by a percentage.
+ */
+function lighten(hex: string, percent: number): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  return rgbToHex(
+    rgb.r + (255 - rgb.r) * percent,
+    rgb.g + (255 - rgb.g) * percent,
+    rgb.b + (255 - rgb.b) * percent
+  );
+}
+
+/**
+ * Darken a color by a percentage.
+ */
+function darken(hex: string, percent: number): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  return rgbToHex(
+    rgb.r * (1 - percent),
+    rgb.g * (1 - percent),
+    rgb.b * (1 - percent)
+  );
+}
+
+/**
+ * Generate CSS override for accent color from env var.
+ * Returns empty string if no override is set.
+ */
+function getAccentColorOverride(): string {
+  const accentColor = Deno.env.get("SBY_ACCENT_COLOR");
+  if (!accentColor) return "";
+
+  const rgb = hexToRgb(accentColor);
+  if (!rgb) return "";
+
+  const hover = lighten(accentColor, 0.2);
+  const muted = darken(accentColor, 0.4);
+  const subtle = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.08)`;
+  const glow = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`;
+
+  return `<style>
+  :root {
+    --c-accent: ${accentColor};
+    --c-accent-hover: ${hover};
+    --c-accent-muted: ${muted};
+    --c-accent-subtle: ${subtle};
+    --c-accent-glow: ${glow};
+  }
+</style>`;
+}
+
+// =============================================================================
 // Page Templates
 // =============================================================================
 
@@ -59,11 +140,12 @@ export function renderAppShell(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#121416">
+  <meta name="theme-color" content="#000000">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>SBy</title>
-  <link rel="stylesheet" href="/css/main.css?v=5">
+  <link rel="stylesheet" href="/css/main.css?v=6">
+  ${getAccentColorOverride()}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.svg">
@@ -82,7 +164,7 @@ export function renderAppShell(): string {
       </div>
     </div>
   </div>
-  <script type="module" src="/js/sby.js?v=5"></script>
+  <script type="module" src="/js/sby.js?v=6"></script>
 </body>
 </html>`;
 }
@@ -100,7 +182,6 @@ export function renderHeader(): string {
     </button>
     <div class="logo">SBy<span class="logo-sub">Strauberry Tavern</span></div>
   </div>
-  <button class="btn btn--primary" onclick="SBy.newConversation()">+ New</button>
 </header>`;
 }
 
@@ -111,6 +192,7 @@ export function renderSidebar(conversations: Conversation[]): string {
   return `<aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <span class="sidebar-title">Conversations</span>
+    <button class="btn btn--primary btn--sm" onclick="SBy.newConversation()">+ New</button>
   </div>
   <nav class="conv-list" id="conv-list" hx-get="/fragments/conv-list" hx-trigger="load" hx-swap="innerHTML">
     ${renderConversationList(conversations)}

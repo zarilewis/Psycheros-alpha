@@ -1,35 +1,46 @@
 /**
  * Design Tokens
- * All CSS custom properties for the SBy interface.
- * Neutral, functional aesthetic - content-focused.
+ * Phosphor Terminal aesthetic - OLED-friendly with distinctive green accent.
  */
 
 :root {
-  /* Backgrounds - softer dark base */
-  --c-bg: #121416;
-  --c-bg-raised: #1a1d20;
-  --c-bg-sunken: #0c0d0e;
-  --c-bg-hover: #1f2327;
+  /* Backgrounds - true black for OLED */
+  --c-bg: #000000;
+  --c-bg-raised: #0a0a0a;
+  --c-bg-sunken: #050505;
+  --c-bg-hover: #111111;
 
-  /* Foregrounds - clear hierarchy */
-  --c-fg: #e1e4e8;
-  --c-fg-muted: #8b949e;
-  --c-fg-strong: #fff;
-  --c-fg-subtle: #484f58;
-  --c-fg-label: #9198a1;
+  /* Foregrounds - high contrast */
+  --c-fg: #e8e8e8;
+  --c-fg-muted: #888888;
+  --c-fg-strong: #ffffff;
+  --c-fg-subtle: #555555;
+  --c-fg-label: #888888;
 
-  /* Single accent for interactive elements */
-  --c-accent: #4d9fff;
-  --c-accent-hover: #6bb0ff;
-  --c-accent-subtle: rgba(77, 159, 255, 0.15);
+  /* Primary accent - phosphor green
+     To change accent color, update these 5 values together:
+     - --c-accent: main color (hex)
+     - --c-accent-hover: lighter variant (hex)
+     - --c-accent-muted: darker variant (hex)
+     - --c-accent-subtle: 8% opacity (rgba)
+     - --c-accent-glow: 25% opacity (rgba) */
+  --c-accent: #39ff14;
+  --c-accent-hover: #5fff3f;
+  --c-accent-muted: #1a8f0a;
+  --c-accent-subtle: rgba(57, 255, 20, 0.08);
+  --c-accent-glow: rgba(57, 255, 20, 0.25);
+
+  /* Secondary - muted for thinking/secondary elements */
+  --c-muted: #666666;
+  --c-muted-subtle: rgba(102, 102, 102, 0.1);
 
   /* Semantic colors */
-  --c-error: #f85149;
-  --c-success: #3fb950;
+  --c-error: #ff4444;
+  --c-success: var(--c-accent);
 
   /* Borders */
-  --c-border: #21262d;
-  --c-border-strong: #30363d;
+  --c-border: #1a1a1a;
+  --c-border-strong: #2a2a2a;
 
   /* Spacing (4px base scale) */
   --sp-1: 4px;
@@ -40,24 +51,25 @@
   --sp-8: 32px;
 
   /* Typography */
-  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", "Consolas", "Liberation Mono", monospace;
+  --font-sans: "IBM Plex Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", "SF Mono", "Fira Code", "Consolas", monospace;
 
   --font-size-xs: 11px;
   --font-size-sm: 13px;
-  --font-size-base: 15px;
-  --font-size-lg: 17px;
+  --font-size-base: 16px;
+  --font-size-lg: 18px;
   --font-size-xl: 20px;
 
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
 
-  --line-height: 1.6;
+  --line-height: 1.7;
   --line-height-tight: 1.4;
 
   /* Effects */
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+  --glow-accent: 0 0 12px var(--c-accent-glow);
   --transition: 150ms ease;
 
   /* Layout */

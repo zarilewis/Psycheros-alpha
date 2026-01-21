@@ -115,11 +115,16 @@ async function newConversation() {
     // Reload conversation list
     htmx.trigger('#conv-list', 'load');
 
-    // Clear chat and show empty input area
+    // Clear chat and show empty state with input area
     const chat = document.getElementById('chat');
     if (chat) {
       chat.innerHTML = `
-        <div class="messages" id="messages"></div>
+        <div class="messages" id="messages">
+          <div class="empty-state" id="empty-state">
+            <div class="empty-title">SBy</div>
+            <p class="empty-text">What's on your mind?</p>
+          </div>
+        </div>
         <div class="input-area">
           <div class="input-container">
             <textarea
@@ -136,11 +141,19 @@ async function newConversation() {
       `;
     }
 
-    // Focus input
-    document.getElementById('message-input')?.focus();
-
     // Update URL
     history.pushState({}, '', `/c/${conversation.id}`);
+
+    // Close sidebar
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.querySelector('.sidebar-overlay');
+    if (sidebar?.classList.contains('open')) {
+      sidebar.classList.remove('open');
+      overlay?.classList.remove('open');
+    }
+
+    // Focus input
+    document.getElementById('message-input')?.focus();
 
   } catch (error) {
     console.error('Failed to create conversation:', error);

@@ -1,6 +1,6 @@
 /**
  * Base Styles
- * Global styles, scrollbars, focus states, selection.
+ * Global styles, scrollbars, focus states, selection - Phosphor Terminal aesthetic.
  */
 
 html,
@@ -18,23 +18,23 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Focus states - visible keyboard focus */
+/* Focus states - phosphor glow */
 :focus-visible {
-  outline: 2px solid var(--c-accent);
-  outline-offset: 2px;
+  outline: none;
+  box-shadow: 0 0 0 2px var(--c-accent), var(--glow-accent);
 }
 
 :focus:not(:focus-visible) {
   outline: none;
 }
 
-/* Selection */
+/* Selection - phosphor green */
 ::selection {
   background-color: var(--c-accent);
   color: var(--c-bg);
 }
 
-/* Scrollbars - thin and subtle */
+/* Scrollbars - green phosphor accent */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -45,18 +45,18 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--c-border-strong);
+  background: var(--c-accent-muted);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--c-fg-muted);
+  background: var(--c-accent);
 }
 
 /* Firefox scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--c-border-strong) var(--c-bg-sunken);
+  scrollbar-color: var(--c-accent-muted) var(--c-bg-sunken);
 }
 
 /* Links */
@@ -75,4 +75,10 @@ pre {
   overflow-x: auto;
   white-space: pre-wrap;
   word-wrap: break-word;
+}
+
+/* Green caret for inputs */
+input,
+textarea {
+  caret-color: var(--c-accent);
 }
