@@ -68,19 +68,14 @@ export class EntityTurn {
     conversationId: string,
     userMessage: string,
   ): AsyncGenerator<EntityYield, void, unknown> {
-    // Ensure conversation exists - if not, create one with the correct ID
+    // Ensure conversation exists - if not, create one and use its ID
     let conversation = this.db.getConversation(conversationId);
     if (!conversation) {
       conversation = this.db.createConversation();
-      // NOTE: The new conversation will have a different ID than conversationId.
-      // This is a design issue - we should either:
-      // 1. Accept the new ID and return it to the caller
-      // 2. Create the conversation with the specified ID
-      // For now, we'll use the provided conversationId and trust the caller
-      // created it beforehand. This branch handles lazy creation.
+      // Use the newly created conversation's ID for all subsequent operations
+      conversationId = conversation.id;
       console.warn(
-        `EntityTurn: Conversation ${conversationId} not found. Created new conversation ${conversation.id}. ` +
-          "Consider pre-creating conversations before calling process().",
+        `EntityTurn: Requested conversation not found. Created new conversation ${conversationId}.`,
       );
     }
 

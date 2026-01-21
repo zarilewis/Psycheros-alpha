@@ -6,18 +6,8 @@
  * throughout the SBy daemon.
  */
 
-// Re-export types
-export type {
-  APIError,
-  ChatChoice,
-  ChatDelta,
-  ChatMessage,
-  ChatRequest,
-  ChatResponse,
-  ChatResponseChunk,
-  LLMConfig,
-  StreamChunk,
-} from "./types.ts";
+// Re-export types (only those used externally)
+export type { ChatMessage, LLMConfig, StreamChunk } from "./types.ts";
 
 export { LLMError } from "./types.ts";
 

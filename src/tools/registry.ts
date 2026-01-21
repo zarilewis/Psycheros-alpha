@@ -48,15 +48,6 @@ export class ToolRegistry {
   }
 
   /**
-   * Get the names of all registered tools.
-   *
-   * @returns Array of tool names
-   */
-  getToolNames(): string[] {
-    return Array.from(this.tools.keys());
-  }
-
-  /**
    * Get all tool definitions for sending to the LLM.
    *
    * @returns Array of tool definitions
@@ -80,9 +71,10 @@ export class ToolRegistry {
 
     // Handle unknown tool
     if (!tool) {
+      const availableTools = Array.from(this.tools.keys()).join(", ") || "(none)";
       return {
         toolCallId: toolCall.id,
-        content: `Error: Unknown tool '${toolName}'. Available tools: ${this.getToolNames().join(", ") || "(none)"}`,
+        content: `Error: Unknown tool '${toolName}'. Available tools: ${availableTools}`,
         isError: true,
       };
     }

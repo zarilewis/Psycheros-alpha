@@ -5,4 +5,4 @@
  */
 
 export { DBClient } from "./client.ts";
-export { SCHEMA, initializeSchema } from "./schema.ts";
+export { initializeSchema } from "./schema.ts";

@@ -20,12 +20,8 @@
  * ```
  */
 
-// Re-export SSE utilities
-export {
-  createSSEEncoder,
-  createSSEResponse,
-  encodeSSEEvent,
-} from "./sse.ts";
+// Re-export SSE utilities (only those used externally)
+export { createSSEEncoder, createSSEResponse } from "./sse.ts";
 
 // Re-export route handlers and types
 export type { RouteContext } from "./routes.ts";

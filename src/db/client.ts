@@ -281,31 +281,6 @@ export class DBClient {
   }
 
   /**
-   * Retrieves the most recent messages for a conversation.
-   *
-   * @param conversationId - The conversation ID
-   * @param limit - Maximum number of messages to retrieve
-   * @returns Array of messages ordered by creation time (oldest first)
-   */
-  getRecentMessages(conversationId: string, limit: number): Message[] {
-    // Get the most recent N messages, then reverse to get chronological order
-    const stmt = this.db.prepare(
-      `SELECT id, conversation_id, role, content, reasoning_content,
-              tool_call_id, tool_calls, created_at
-       FROM messages
-       WHERE conversation_id = ?
-       ORDER BY created_at DESC
-       LIMIT ?`
-    );
-
-    const rows = stmt.all<MessageRow>(conversationId, limit);
-    stmt.finalize();
-
-    // Reverse to get chronological order (oldest first)
-    return rows.reverse().map((row) => this.rowToMessage(row));
-  }
-
-  /**
    * Converts a database row to a Message object.
    *
    * @throws Error if the row contains invalid data (corrupted role or tool_calls)

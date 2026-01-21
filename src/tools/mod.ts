@@ -28,8 +28,8 @@
  * ```
  */
 
-// Re-export types
-export type { Tool, ToolExecutor, ShellToolArgs } from "./types.ts";
+// Re-export types (only those used externally)
+export type { Tool, ShellToolArgs } from "./types.ts";
 
 // Re-export registry
 export { ToolRegistry, createDefaultRegistry } from "./registry.ts";
