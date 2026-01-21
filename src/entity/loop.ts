@@ -26,9 +26,10 @@
 import type { LLMClient, StreamChunk, ChatMessage } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
-import type { ToolCall, ToolResult, Message, UIUpdate } from "../types.ts";
+import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics } from "../types.ts";
 import { loadSByMd, buildSystemMessage } from "./context.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
+import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
 
 /**
  * Configuration for the entity turn processor.
@@ -46,12 +47,13 @@ export interface EntityConfig {
 const DEFAULT_MAX_TOOL_ITERATIONS = 10;
 
 /**
- * Extended yield type that includes tool results and UI updates.
+ * Extended yield type that includes tool results, UI updates, and metrics.
  */
 export type EntityYield =
   | StreamChunk
   | { type: "tool_result"; result: ToolResult }
-  | { type: "dom_update"; update: UIUpdate };
+  | { type: "dom_update"; update: UIUpdate }
+  | { type: "metrics"; metrics: TurnMetrics };
 
 /**
  * Represents a single turn in the conversation.
@@ -132,15 +134,21 @@ export class EntityTurn {
     while (iteration < this.maxToolIterations) {
       iteration++;
 
+      // Create metrics collector for this iteration
+      const metricsCollector = createCollector(conversationId);
+
       // Accumulate the assistant's response
       let assistantContent = "";
       let assistantReasoning = "";
       const toolCalls: ToolCall[] = [];
       let streamError: Error | null = null;
+      let finishReason = "stop";
 
       // Stream LLM response with error handling
       try {
-        for await (const chunk of this.llm.chatStream(messages, toolDefinitions)) {
+        for await (const chunk of this.llm.chatStream(messages, toolDefinitions, {
+          metricsCollector,
+        })) {
           // Yield all chunks to the caller
           yield chunk;
 
@@ -156,7 +164,9 @@ export class EntityTurn {
               toolCalls.push(chunk.toolCall);
               break;
             case "done":
-              // Stream finished for this iteration
+              // Stream finished for this iteration - capture finish reason
+              finishReason = chunk.finishReason;
+              setFinishReason(metricsCollector, chunk.finishReason);
               break;
           }
         }
@@ -164,7 +174,13 @@ export class EntityTurn {
         // Capture the error but continue to persist what we have
         streamError = error instanceof Error ? error : new Error(String(error));
         console.error("EntityTurn: LLM stream error:", streamError.message);
+        finishReason = "error";
       }
+
+      // Finalize and persist metrics (non-fatal)
+      const metrics = finalize(metricsCollector, finishReason);
+      this.db.addTurnMetrics(metrics);
+      yield { type: "metrics", metrics };
 
       // Persist the assistant message (even partial content on error)
       // This ensures we don't lose content that was already streamed

@@ -39,6 +39,24 @@ export const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_conversations_updated_at
     ON conversations(updated_at);
+
+  CREATE TABLE IF NOT EXISTS turn_metrics (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    request_started_at TEXT NOT NULL,
+    ttfb INTEGER,
+    ttfc INTEGER,
+    max_chunk_gap INTEGER,
+    slow_chunk_count INTEGER NOT NULL DEFAULT 0,
+    total_duration INTEGER,
+    chunk_count INTEGER NOT NULL DEFAULT 0,
+    finish_reason TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_turn_metrics_conversation
+    ON turn_metrics(conversation_id, created_at DESC);
 `;
 
 /**

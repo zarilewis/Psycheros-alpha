@@ -23,7 +23,8 @@ open http://localhost:3000
 |----------|----------|---------|-------------|
 | `ZAI_API_KEY` | Yes | - | Your Z.ai API key |
 | `ZAI_BASE_URL` | No | Z.ai endpoint | API endpoint URL |
-| `ZAI_MODEL` | No | `glm-4.7` | Model name |
+| `ZAI_MODEL` | No | `glm-4.7` | Main model for chat |
+| `ZAI_WORKER_MODEL` | No | `GLM-4.5-Air` | Lightweight model for background tasks |
 | `SBY_PORT` | No | `3000` | Server port |
 | `SBY_HOST` | No | `0.0.0.0` | Server hostname |
 | `SBY_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
@@ -62,7 +63,12 @@ src/
 │   ├── mod.ts
 │   ├── registry.ts   # Tool registration
 │   ├── shell.ts      # Command execution
-│   └── update-title.ts
+│   ├── update_title.ts
+│   └── get_metrics.ts # Streaming performance metrics tool
+├── metrics/          # Performance instrumentation
+│   ├── mod.ts
+│   ├── types.ts      # MetricsCollector interface
+│   └── collector.ts  # Timing collection functions
 ├── entity/           # Agentic loop
 │   ├── mod.ts
 │   ├── loop.ts       # EntityTurn orchestration
@@ -85,8 +91,8 @@ Two SSE channels serve different purposes:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  POST /api/chat (per-request, closes when done)         │
-│  thinking → content → tool_call → tool_result → done    │
-│  Also: dom_update for synchronous tool-based UI changes │
+│  thinking → content → tool_call → tool_result → metrics │
+│  → done. Also: dom_update for tool-based UI changes     │
 └─────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────┐
@@ -97,14 +103,14 @@ Two SSE channels serve different purposes:
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Chat Stream** (`/api/chat`): Per-request SSE for the active conversation. Streams thinking, content, tool calls/results. Closes when the response completes.
+**Chat Stream** (`/api/chat`): Per-request SSE for the active conversation. Streams thinking, content, tool calls/results, and performance metrics. Closes when the response completes.
 
 **Persistent Channel** (`/api/events`): Long-lived SSE connection opened on page load. Receives `dom_update` events from background operations like auto-title generation. Stays open across multiple chat requests.
 
 ### SSE Event Types
 
 ```typescript
-type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "done"
+type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "metrics" | "done"
 ```
 
 ### Key Patterns

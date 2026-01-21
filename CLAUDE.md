@@ -27,6 +27,7 @@ cp .env.example .env   # Then set ZAI_API_KEY
 | `src/server/broadcaster.ts` | Persistent SSE for background updates |
 | `src/server/state-changes.ts` | Unified state mutations |
 | `src/tools/registry.ts` | Tool registration |
+| `src/metrics/mod.ts` | Streaming performance metrics |
 | `web/js/sby.js` | Client-side SSE handling |
 
 ## Patterns
@@ -44,5 +45,5 @@ cp .env.example .env   # Then set ZAI_API_KEY
 3. Background: call `getBroadcaster().broadcastUpdates()` directly
 
 **SSE Channels**:
-- `/api/chat` - Per-request stream (thinking, content, tool calls)
+- `/api/chat` - Per-request stream (thinking, content, tool calls, metrics)
 - `/api/events` - Persistent channel (background dom_update events)

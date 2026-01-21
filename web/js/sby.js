@@ -536,6 +536,19 @@ function handleSSEEvent(eventType, data, messageEl, state) {
       break;
     }
 
+    case 'metrics':
+      try {
+        const metrics = JSON.parse(data);
+        const indicator = createMetricsIndicator(metrics);
+        const header = messageEl.querySelector('.msg-header');
+        if (header) {
+          header.appendChild(indicator);
+        }
+      } catch (e) {
+        console.error('Failed to parse metrics:', e);
+      }
+      break;
+
     case 'done':
       // Collapse all thinking and tool sections after streaming completes
       contentContainer.querySelectorAll('.thinking.expanded, .tool.expanded').forEach(el => {
@@ -640,6 +653,105 @@ function showToast(message) {
   document.body.appendChild(toast);
 
   setTimeout(() => toast.remove(), 5000);
+}
+
+// =============================================================================
+// Metrics Display
+// =============================================================================
+
+/**
+ * Format milliseconds as a human-readable string.
+ * @param {number|null} ms - Milliseconds to format
+ * @returns {string} Formatted string (e.g., "1.2s", "850ms", "-")
+ */
+function formatMs(ms) {
+  if (ms === null || ms === undefined) return '-';
+  if (ms >= 1000) {
+    return (ms / 1000).toFixed(1) + 's';
+  }
+  return Math.round(ms) + 'ms';
+}
+
+/**
+ * Get CSS class for a metric value based on thresholds.
+ * @param {string} metric - Metric name
+ * @param {number|null} value - Metric value
+ * @returns {string} CSS class name
+ */
+function getMetricClass(metric, value) {
+  if (value === null || value === undefined) return '';
+
+  switch (metric) {
+    case 'ttfb':
+      if (value > 2000) return 'slow';
+      if (value > 1000) return 'warning';
+      return '';
+    case 'ttfc':
+      if (value > 3000) return 'slow';
+      if (value > 2000) return 'warning';
+      return '';
+    case 'maxChunkGap':
+      if (value > 1000) return 'slow';
+      if (value > 500) return 'warning';
+      return '';
+    case 'slowChunkCount':
+      if (value > 5) return 'slow';
+      if (value > 0) return 'warning';
+      return '';
+    default:
+      return '';
+  }
+}
+
+/**
+ * Create the metrics indicator element with tooltip.
+ * @param {Object} metrics - The TurnMetrics object
+ * @returns {HTMLElement} The metrics indicator element
+ */
+function createMetricsIndicator(metrics) {
+  const indicator = document.createElement('div');
+  indicator.className = 'metrics-indicator';
+  indicator.onclick = (e) => {
+    e.stopPropagation();
+    indicator.classList.toggle('expanded');
+  };
+
+  // Close tooltip when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!indicator.contains(e.target)) {
+      indicator.classList.remove('expanded');
+    }
+  }, { once: true });
+
+  // Summary shows total duration
+  const summary = formatMs(metrics.totalDuration);
+
+  // Build tooltip rows
+  const rows = [
+    { label: 'TTFB', value: metrics.ttfb, metric: 'ttfb' },
+    { label: 'TTFC', value: metrics.ttfc, metric: 'ttfc' },
+    { label: 'Max Gap', value: metrics.maxChunkGap, metric: 'maxChunkGap' },
+    { label: 'Slow Chunks', value: metrics.slowChunkCount, metric: 'slowChunkCount', raw: true },
+    { label: 'Total', value: metrics.totalDuration, metric: 'total' },
+    { label: 'Chunks', value: metrics.chunkCount, metric: 'chunks', raw: true },
+  ];
+
+  const tooltipRows = rows.map(row => {
+    const valueClass = getMetricClass(row.metric, row.value);
+    const displayValue = row.raw ? (row.value ?? '-') : formatMs(row.value);
+    return `<div class="metrics-row">
+      <span class="metrics-label">${row.label}</span>
+      <span class="metrics-value ${valueClass}">${displayValue}</span>
+    </div>`;
+  }).join('');
+
+  indicator.innerHTML = `
+    <span class="metrics-indicator-icon">&#9201;</span>
+    <span class="metrics-indicator-summary">${summary}</span>
+    <div class="metrics-tooltip">${tooltipRows}</div>
+  `;
+
+  return indicator;
 }
 
 // =============================================================================

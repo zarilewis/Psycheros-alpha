@@ -9,6 +9,7 @@ import type { ToolCall, ToolDefinition, ToolResult } from "../types.ts";
 import type { Tool, ToolContext } from "./types.ts";
 import { shellTool } from "./shell.ts";
 import { updateTitleTool } from "./update_title.ts";
+import { getMetricsTool } from "./get_metrics.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -21,6 +22,7 @@ import { updateTitleTool } from "./update_title.ts";
 const AVAILABLE_TOOLS: Record<string, Tool> = {
   shell: shellTool,
   update_title: updateTitleTool,
+  get_metrics: getMetricsTool,
 };
 
 /**

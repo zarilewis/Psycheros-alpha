@@ -15,6 +15,8 @@ import type {
   StreamChunk,
 } from "./types.ts";
 import { LLMError } from "./types.ts";
+import type { MetricsCollector } from "../metrics/mod.ts";
+import { recordFirstByte, recordChunk } from "../metrics/mod.ts";
 
 /**
  * Accumulator for building tool calls from streamed chunks.
@@ -68,16 +70,25 @@ export class LLMClient {
    *
    * @param messages - The conversation messages
    * @param tools - Optional tool definitions
-   * @param options - Optional request parameters
+   * @param options - Optional request parameters including metrics collector
    * @yields StreamChunk objects with classified content
    */
   async *chatStream(
     messages: ChatMessage[],
     tools?: ToolDefinition[],
-    options?: { temperature?: number; maxTokens?: number },
+    options?: {
+      temperature?: number;
+      maxTokens?: number;
+      metricsCollector?: MetricsCollector;
+    },
   ): AsyncGenerator<StreamChunk, void, unknown> {
     const request = this.buildRequest(messages, tools, true, options);
     const response = await this.makeRequest(request);
+
+    // Record first byte timing if metrics collector is provided
+    if (options?.metricsCollector) {
+      recordFirstByte(options.metricsCollector);
+    }
 
     if (!response.ok) {
       await this.handleErrorResponse(response);
@@ -144,6 +155,11 @@ export class LLMClient {
               // Don't yield the done chunk here - we'll emit it when we see [DONE]
               continue;
             }
+            // Record chunk timing for metrics
+            if (options?.metricsCollector) {
+              const isContent = streamChunk.type === "content" || streamChunk.type === "thinking";
+              recordChunk(options.metricsCollector, isContent);
+            }
             yield streamChunk;
           }
         }
@@ -160,6 +176,11 @@ export class LLMClient {
             if (streamChunk.type === "done") {
               lastFinishReason = streamChunk.finishReason;
               continue;
+            }
+            // Record chunk timing for metrics
+            if (options?.metricsCollector) {
+              const isContent = streamChunk.type === "content" || streamChunk.type === "thinking";
+              recordChunk(options.metricsCollector, isContent);
             }
             yield streamChunk;
           }

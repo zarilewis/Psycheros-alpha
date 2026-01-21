@@ -7,7 +7,7 @@
 
 import { Database } from "@db/sqlite";
 import { initializeSchema } from "./schema.ts";
-import type { Conversation, Message, ToolCall } from "../types.ts";
+import type { Conversation, Message, ToolCall, TurnMetrics } from "../types.ts";
 
 /**
  * Valid message roles that can be stored in the database.
@@ -35,6 +35,23 @@ interface MessageRow {
   reasoning_content: string | null;
   tool_call_id: string | null;
   tool_calls: string | null;
+  created_at: string;
+}
+
+/**
+ * Row type for turn_metrics as stored in SQLite.
+ */
+interface TurnMetricsRow {
+  id: string;
+  conversation_id: string;
+  request_started_at: string;
+  ttfb: number | null;
+  ttfc: number | null;
+  max_chunk_gap: number | null;
+  slow_chunk_count: number;
+  total_duration: number | null;
+  chunk_count: number;
+  finish_reason: string | null;
   created_at: string;
 }
 
@@ -346,6 +363,104 @@ export class DBClient {
       toolCallId: row.tool_call_id ?? undefined,
       toolCalls,
       createdAt: new Date(row.created_at),
+    };
+  }
+
+  // ===========================================================================
+  // Metrics Operations
+  // ===========================================================================
+
+  /**
+   * Adds turn metrics to the database.
+   *
+   * Non-fatal on error - logs warning and returns false.
+   * Metrics are nice-to-have, not critical for operation.
+   *
+   * @param metrics - The metrics to persist
+   * @returns true if successful, false on error
+   */
+  addTurnMetrics(metrics: TurnMetrics): boolean {
+    try {
+      this.db.exec(
+        `INSERT INTO turn_metrics
+         (id, conversation_id, request_started_at, ttfb, ttfc, max_chunk_gap,
+          slow_chunk_count, total_duration, chunk_count, finish_reason, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          metrics.id,
+          metrics.conversationId,
+          metrics.requestStartedAt,
+          metrics.ttfb,
+          metrics.ttfc,
+          metrics.maxChunkGap,
+          metrics.slowChunkCount,
+          metrics.totalDuration,
+          metrics.chunkCount,
+          metrics.finishReason,
+          metrics.createdAt,
+        ]
+      );
+      return true;
+    } catch (error) {
+      console.warn(
+        "Failed to persist turn metrics:",
+        error instanceof Error ? error.message : String(error)
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Retrieves recent turn metrics for a conversation.
+   *
+   * @param conversationId - The conversation ID
+   * @param limit - Maximum number of metrics to return (default 10)
+   * @returns Array of metrics, newest first
+   */
+  getTurnMetrics(conversationId: string, limit = 10): TurnMetrics[] {
+    const stmt = this.db.prepare(
+      `SELECT id, conversation_id, request_started_at, ttfb, ttfc,
+              max_chunk_gap, slow_chunk_count, total_duration, chunk_count,
+              finish_reason, created_at
+       FROM turn_metrics
+       WHERE conversation_id = ?
+       ORDER BY created_at DESC
+       LIMIT ?`
+    );
+
+    const rows = stmt.all<TurnMetricsRow>(conversationId, limit);
+    stmt.finalize();
+
+    return rows.map((row) => this.rowToTurnMetrics(row));
+  }
+
+  /**
+   * Retrieves the most recent turn metrics for a conversation.
+   *
+   * @param conversationId - The conversation ID
+   * @returns The latest metrics or null if none exist
+   */
+  getLatestTurnMetrics(conversationId: string): TurnMetrics | null {
+    const metrics = this.getTurnMetrics(conversationId, 1);
+    return metrics.length > 0 ? metrics[0] : null;
+  }
+
+  /**
+   * Converts a database row to a TurnMetrics object.
+   */
+  private rowToTurnMetrics(row: TurnMetricsRow): TurnMetrics {
+    return {
+      id: row.id,
+      conversationId: row.conversation_id,
+      requestStartedAt: row.request_started_at,
+      ttfb: row.ttfb,
+      ttfc: row.ttfc,
+      maxChunkGap: row.max_chunk_gap,
+      slowChunkCount: row.slow_chunk_count,
+      totalDuration: row.total_duration,
+      chunkCount: row.chunk_count,
+      finishReason: row.finish_reason,
+      createdAt: row.created_at,
     };
   }
 

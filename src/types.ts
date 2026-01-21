@@ -88,10 +88,11 @@ export interface UIUpdate {
  * - tool_result: Result from tool execution
  * - dom_update: Reactive UI update with HTML fragment and swap target
  * - status: Status updates (e.g., "processing", "complete")
+ * - metrics: Streaming performance metrics for the turn
  * - done: Stream completion signal
  */
 export interface SSEEvent {
-  type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "done";
+  type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "metrics" | "done";
   data: string;
 }
 
@@ -107,5 +108,36 @@ export interface Conversation {
   title?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// =============================================================================
+// Metrics Types
+// =============================================================================
+
+/**
+ * Streaming performance metrics for a single conversation turn.
+ * Captures timing data to diagnose API latency issues.
+ */
+export interface TurnMetrics {
+  id: string;
+  conversationId: string;
+  /** ISO timestamp of when the request started */
+  requestStartedAt: string;
+  /** Time to first byte from API (ms) */
+  ttfb: number | null;
+  /** Time to first content token (ms) */
+  ttfc: number | null;
+  /** Largest delay between chunks (ms) */
+  maxChunkGap: number | null;
+  /** Number of chunk gaps exceeding 500ms threshold */
+  slowChunkCount: number;
+  /** End-to-end stream time (ms) */
+  totalDuration: number | null;
+  /** Total chunks received */
+  chunkCount: number;
+  /** Why the stream ended (stop, tool_calls, etc.) */
+  finishReason: string | null;
+  /** ISO timestamp of when metrics were recorded */
+  createdAt: string;
 }
 
