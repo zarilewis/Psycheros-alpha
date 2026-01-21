@@ -1,7 +1,7 @@
 /**
  * Server Module
  *
- * HTTP server and SSE streaming utilities for the SBy daemon.
+ * HTTP server for the SBy daemon.
  * This module provides the web interface and API endpoints for
  * interacting with the entity.
  *
@@ -20,21 +20,6 @@
  * ```
  */
 
-// Re-export SSE utilities (only those used externally)
-export { createSSEEncoder, createSSEResponse } from "./sse.ts";
-
-// Re-export route handlers and types
-export type { RouteContext } from "./routes.ts";
-export {
-  handleChat,
-  handleCORS,
-  handleCreateConversation,
-  handleGetMessages,
-  handleIndex,
-  handleListConversations,
-  handleStaticFile,
-} from "./routes.ts";
-
-// Re-export server
+// Re-export server (public API)
 export type { ServerConfig } from "./server.ts";
 export { Server } from "./server.ts";

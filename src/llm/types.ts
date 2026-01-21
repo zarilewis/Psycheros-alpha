@@ -62,13 +62,11 @@ export interface ChatRequest {
  * Delta object in a streaming response chunk.
  */
 export interface ChatDelta {
-  role?: string;
   content?: string;
   reasoning_content?: string;
   tool_calls?: Array<{
     index: number;
     id?: string;
-    type?: string;
     function?: {
       name?: string;
       arguments?: string;
@@ -96,31 +94,6 @@ export interface ChatResponseChunk {
   choices: ChatChoice[];
 }
 
-/**
- * Non-streaming chat response.
- */
-export interface ChatResponse {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: Array<{
-    index: number;
-    message: {
-      role: string;
-      content: string | null;
-      reasoning_content?: string;
-      tool_calls?: ToolCall[];
-    };
-    finish_reason: "stop" | "tool_calls" | "length";
-  }>;
-  usage?: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
-
 // =============================================================================
 // Stream Chunk Types
 // =============================================================================
@@ -138,17 +111,6 @@ export type StreamChunk =
 // =============================================================================
 // Error Types
 // =============================================================================
-
-/**
- * Error response from the API.
- */
-export interface APIError {
-  error: {
-    message: string;
-    type: string;
-    code?: string;
-  };
-}
 
 /**
  * Custom error class for LLM client errors.

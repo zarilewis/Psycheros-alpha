@@ -8,11 +8,11 @@
  * @module
  */
 
-import type { SSEEvent, ToolResult } from "../types.ts";
-import type { StreamChunk } from "../llm/mod.ts";
+import type { SSEEvent } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
+import type { EntityYield } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
 
 // Note: EntityTurn is imported dynamically since it may not exist yet
@@ -348,13 +348,6 @@ export async function handleChat(
   const encodedStream = stream.pipeThrough(createSSEEncoder());
   return createSSEResponse(encodedStream);
 }
-
-/**
- * EntityTurn yield type - combines StreamChunk and tool_result.
- */
-type EntityYield =
-  | StreamChunk
-  | { type: "tool_result"; result: ToolResult };
 
 /**
  * Convert an EntityTurn yield to an SSEEvent.

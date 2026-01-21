@@ -191,7 +191,9 @@ export class DBClient {
    * @throws Error if conversation doesn't exist or insert fails
    */
   addMessage(conversationId: string, message: MessageInput): Message {
-    // Validate role before attempting insert
+    // Defense-in-depth: validate role at runtime even though TypeScript
+    // enforces it at compile time and the DB schema has a CHECK constraint.
+    // This catches bugs from type assertions or corrupted data.
     if (!VALID_ROLES.has(message.role)) {
       throw new Error(`Invalid message role: ${message.role}`);
     }

@@ -14,7 +14,6 @@ import { shellTool } from "./shell.ts";
  *
  * The registry stores tools by name and provides methods for:
  * - Registering new tools
- * - Looking up tools by name
  * - Getting all tool definitions (for LLM requests)
  * - Executing tool calls
  */
@@ -35,16 +34,6 @@ export class ToolRegistry {
     }
 
     this.tools.set(name, tool);
-  }
-
-  /**
-   * Get a tool by name.
-   *
-   * @param name - The name of the tool to retrieve
-   * @returns The tool if found, undefined otherwise
-   */
-  get(name: string): Tool | undefined {
-    return this.tools.get(name);
   }
 
   /**
@@ -97,7 +86,9 @@ export class ToolRegistry {
       };
     }
 
-    // Add toolCallId to args so the executor can use it
+    // Pass toolCallId to executor via args (convention: _toolCallId).
+    // This allows tools to include the ID in their result without
+    // requiring a separate parameter in the Tool interface.
     args._toolCallId = toolCall.id;
 
     // Execute the tool

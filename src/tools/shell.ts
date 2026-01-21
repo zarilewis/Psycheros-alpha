@@ -163,8 +163,8 @@ export const shellTool: Tool = {
   },
 
   execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
-    // Note: toolCallId will be set by the registry before calling execute
-    // For direct calls, we use a placeholder
+    // toolCallId is passed via args._toolCallId by the registry (see registry.ts).
+    // Falls back to "direct-call" for direct invocations outside the registry.
     const toolCallId = (args._toolCallId as string) ?? "direct-call";
 
     try {
