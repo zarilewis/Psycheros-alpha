@@ -456,16 +456,3 @@ export function renderToolResult(result: ToolResult): string {
 </div>`;
 }
 
-/**
- * Render a status message.
- */
-export function renderStatus(message: string): string {
-  return `<div class="status">${escapeHtml(message)}</div>`;
-}
-
-/**
- * Render an error toast.
- */
-export function renderToast(message: string): string {
-  return `<div class="toast">${escapeHtml(message)}</div>`;
-}

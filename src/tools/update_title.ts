@@ -38,11 +38,6 @@ export const updateTitleTool: Tool = {
     },
   },
 
-  metadata: {
-    category: "conversation",
-    capabilities: ["write"],
-  },
-
   execute: (
     args: Record<string, unknown>,
     ctx: ToolContext

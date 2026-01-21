@@ -14,17 +14,6 @@ import type { EntityConfig } from "../entity/loop.ts";
 // =============================================================================
 
 /**
- * Services available to tools for extended functionality.
- * Currently a placeholder for future expansion (LLM, HTTP, memory, etc.)
- *
- * Future services:
- * - llm?: LLMClient - For tools that need to make LLM calls
- * - http?: HttpClient - For tools with network access
- * - memory?: MemoryService - For RAG/embedding tools
- */
-export type ToolServices = Record<string, unknown>;
-
-/**
  * Context passed to every tool execution.
  * Provides access to app services and execution metadata.
  */
@@ -37,24 +26,6 @@ export interface ToolContext {
   db: DBClient;
   /** Entity configuration (project root, etc.) */
   config: EntityConfig;
-  /** Additional services for extended functionality */
-  services: ToolServices;
-}
-
-// =============================================================================
-// Tool Metadata Types
-// =============================================================================
-
-/**
- * Optional metadata for tool categorization and access control.
- */
-export interface ToolMetadata {
-  /** Category for grouping related tools */
-  category?: "system" | "conversation" | "file" | "network" | "memory";
-  /** Capability flags for access control (e.g., ["write", "dangerous"]) */
-  capabilities?: string[];
-  /** If true, tool execution should prompt user for confirmation */
-  requiresConfirmation?: boolean;
 }
 
 // =============================================================================
@@ -87,8 +58,6 @@ export interface Tool {
   definition: ToolDefinition;
   /** The function that executes the tool with context */
   execute: ToolExecutor;
-  /** Optional metadata for categorization and access control */
-  metadata?: ToolMetadata;
 }
 
 // =============================================================================

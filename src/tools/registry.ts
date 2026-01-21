@@ -146,15 +146,6 @@ export class ToolRegistry {
 }
 
 /**
- * Get the list of all available tool names.
- *
- * @returns Array of tool names that can be enabled
- */
-export function getAvailableToolNames(): string[] {
-  return Object.keys(AVAILABLE_TOOLS);
-}
-
-/**
  * Create a registry with only the specified tools enabled.
  *
  * @param allowedTools - Array of tool names to enable (empty = no tools)

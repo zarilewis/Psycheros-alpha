@@ -21,7 +21,6 @@
  *   conversationId: "conv_123",
  *   db: dbClient,
  *   config: entityConfig,
- *   services: {},
  * };
  *
  * // Execute a tool call from LLM response
@@ -40,8 +39,6 @@
 export type {
   Tool,
   ToolContext,
-  ToolMetadata,
-  ToolServices,
   ShellToolArgs,
 } from "./types.ts";
 
@@ -49,5 +46,4 @@ export type {
 export {
   ToolRegistry,
   createDefaultRegistry,
-  getAvailableToolNames,
 } from "./registry.ts";

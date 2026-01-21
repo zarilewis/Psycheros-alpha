@@ -183,11 +183,6 @@ export const shellTool: Tool = {
     },
   },
 
-  metadata: {
-    category: "system",
-    capabilities: ["execute", "write", "dangerous"],
-  },
-
   execute: async (
     args: Record<string, unknown>,
     ctx: ToolContext

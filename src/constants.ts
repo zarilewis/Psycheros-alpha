@@ -13,9 +13,6 @@
 /** Maximum length for conversation titles */
 export const MAX_TITLE_LENGTH = 200;
 
-/** Minimum length for conversation titles (must have at least some content) */
-export const MIN_TITLE_LENGTH = 1;
-
 // =============================================================================
 // SSE Streaming
 // =============================================================================

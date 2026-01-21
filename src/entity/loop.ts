@@ -200,7 +200,6 @@ export class EntityTurn {
         conversationId,
         db: this.db,
         config: this.config,
-        services: {},
       };
 
       // Execute all tool calls with context
