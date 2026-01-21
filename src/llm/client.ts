@@ -2,15 +2,14 @@
  * LLM Client
  *
  * Handles all communication with the Z.ai API using the OpenAI-compatible
- * protocol. Supports both streaming and non-streaming requests, tool calling,
- * and chain-of-thought reasoning.
+ * protocol. Supports streaming requests, tool calling, and chain-of-thought
+ * reasoning.
  */
 
 import type { ToolDefinition } from "../types.ts";
 import type {
   ChatMessage,
   ChatRequest,
-  ChatResponse,
   ChatResponseChunk,
   LLMConfig,
   StreamChunk,
@@ -25,30 +24,6 @@ export class LLMClient {
 
   constructor(config: LLMConfig) {
     this.config = config;
-  }
-
-  /**
-   * Make a non-streaming chat request.
-   *
-   * @param messages - The conversation messages
-   * @param tools - Optional tool definitions
-   * @param options - Optional request parameters
-   * @returns The complete chat response
-   */
-  async chat(
-    messages: ChatMessage[],
-    tools?: ToolDefinition[],
-    options?: { temperature?: number; maxTokens?: number },
-  ): Promise<ChatResponse> {
-    const request = this.buildRequest(messages, tools, false, options);
-    const response = await this.makeRequest(request);
-
-    if (!response.ok) {
-      await this.handleErrorResponse(response);
-    }
-
-    const data = (await response.json()) as ChatResponse;
-    return data;
   }
 
   /**

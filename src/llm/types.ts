@@ -156,12 +156,8 @@ export interface APIError {
  * Provides structured error information including:
  * - Error code for programmatic handling
  * - HTTP status code when available
- * - isRetryable flag to help with retry logic
  */
 export class LLMError extends Error {
-  /** Whether this error is likely transient and worth retrying */
-  public readonly isRetryable: boolean;
-
   constructor(
     message: string,
     public readonly code?: string,
@@ -169,42 +165,5 @@ export class LLMError extends Error {
   ) {
     super(message);
     this.name = "LLMError";
-
-    // Determine if the error is retryable based on status code and error code
-    this.isRetryable = this.determineRetryable(code, statusCode);
-  }
-
-  private determineRetryable(
-    code?: string,
-    statusCode?: number,
-  ): boolean {
-    // Network errors are typically retryable
-    if (code === "NETWORK_ERROR") {
-      return true;
-    }
-
-    // Rate limiting - retryable with backoff
-    if (statusCode === 429) {
-      return true;
-    }
-
-    // Server errors (5xx) are typically retryable
-    if (statusCode && statusCode >= 500 && statusCode < 600) {
-      return true;
-    }
-
-    // Request timeout
-    if (statusCode === 408) {
-      return true;
-    }
-
-    // Client errors (4xx) are generally not retryable
-    // (bad request, unauthorized, forbidden, not found, etc.)
-    if (statusCode && statusCode >= 400 && statusCode < 500) {
-      return false;
-    }
-
-    // Default to not retryable for unknown errors
-    return false;
   }
 }

@@ -48,16 +48,6 @@ export class ToolRegistry {
   }
 
   /**
-   * Check if a tool is registered.
-   *
-   * @param name - The name of the tool to check
-   * @returns True if the tool is registered
-   */
-  has(name: string): boolean {
-    return this.tools.has(name);
-  }
-
-  /**
    * Get the names of all registered tools.
    *
    * @returns Array of tool names

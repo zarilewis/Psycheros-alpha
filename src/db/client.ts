@@ -164,23 +164,6 @@ export class DBClient {
   }
 
   /**
-   * Updates the title of a conversation.
-   *
-   * @param id - The conversation ID
-   * @param title - The new title
-   */
-  updateConversationTitle(id: string, title: string): void {
-    const now = new Date().toISOString();
-
-    this.db.exec(
-      `UPDATE conversations
-       SET title = ?, updated_at = ?
-       WHERE id = ?`,
-      [title, now, id]
-    );
-  }
-
-  /**
    * Converts a database row to a Conversation object.
    */
   private rowToConversation(row: ConversationRow): Conversation {
