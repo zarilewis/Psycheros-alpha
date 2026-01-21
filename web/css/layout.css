@@ -1,0 +1,86 @@
+/**
+ * Layout
+ * App structure with slide-out sidebar overlay.
+ */
+
+/* App shell */
+.app {
+  display: grid;
+  grid-template-rows: var(--header-height) 1fr;
+  grid-template-columns: 1fr;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Header row spans full width */
+.header {
+  grid-column: 1 / -1;
+}
+
+/* Main content area */
+.main {
+  display: grid;
+  grid-template-columns: 1fr;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Sidebar - always slide-out overlay */
+.sidebar {
+  position: fixed;
+  top: var(--header-height);
+  left: 0;
+  bottom: 0;
+  width: var(--sidebar-width);
+  background-color: var(--c-bg-raised);
+  border-right: 1px solid var(--c-border);
+  transform: translateX(-100%);
+  transition: transform var(--transition);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar.open {
+  transform: translateX(0);
+}
+
+/* Sidebar overlay */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  top: var(--header-height);
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 99;
+}
+
+.sidebar-overlay.open {
+  display: block;
+}
+
+/* Chat container */
+.chat {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Messages area */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+/* Input area fixed at bottom */
+.input-area {
+  flex-shrink: 0;
+  border-top: 1px solid var(--c-border);
+  background-color: var(--c-bg-raised);
+}

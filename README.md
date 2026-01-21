@@ -50,9 +50,14 @@ SBy/
 │   ├── db/            # SQLite persistence layer
 │   ├── tools/         # Tool system (shell, etc.)
 │   ├── entity/        # Entity loop orchestration
-│   └── server/        # HTTP server and SSE streaming
+│   └── server/        # HTTP server, SSE streaming, templates
 ├── web/
-│   └── index.html     # HTMX chat interface
+│   ├── css/           # Modular CSS (tokens, layout, components)
+│   ├── js/            # Client JavaScript (SSE, sidebar, input)
+│   ├── lib/           # Vendor files (HTMX)
+│   ├── icons/         # PWA icons
+│   ├── manifest.json  # PWA manifest
+│   └── sw.js          # Service worker
 └── .sby/              # Runtime data (SQLite DB, created automatically)
 ```
 

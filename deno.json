@@ -12,6 +12,9 @@
     "@std/dotenv": "jsr:@std/dotenv@^0.225",
     "@db/sqlite": "jsr:@db/sqlite@^0.12"
   },
+  "lint": {
+    "exclude": ["web/lib/"]
+  },
   "compilerOptions": {
     "strict": true,
     "noImplicitAny": true,

@@ -14,6 +14,12 @@ import type { LLMClient } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import { EntityTurn, type EntityYield } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
+import {
+  renderAppShell,
+  renderChatView,
+  renderConversationItem,
+  renderConversationList,
+} from "./templates.ts";
 
 /**
  * Context passed to route handlers containing dependencies.
@@ -94,43 +100,48 @@ function normalizePath(path: string): string {
 /**
  * Handle GET / - Serve the web UI
  *
- * Serves the index.html file from the web/ directory.
+ * Renders the app shell using server-side templates.
  *
- * @param ctx - Route context
- * @returns HTTP Response with the index.html content
+ * @param _ctx - Route context (unused, kept for consistency)
+ * @returns HTTP Response with the app shell HTML
  */
-export async function handleIndex(ctx: RouteContext): Promise<Response> {
-  const indexPath = `${ctx.projectRoot}/web/index.html`;
-
-  try {
-    const content = await Deno.readTextFile(indexPath);
-    return new Response(content, {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-      },
-    });
-  } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
-      return new Response("Web UI not found. Please ensure web/index.html exists.", {
-        status: 404,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }
-    throw error;
-  }
+export function handleIndex(_ctx: RouteContext): Response {
+  const html = renderAppShell();
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
 }
 
 /**
  * Handle GET /api/conversations - List conversations
  *
  * Returns all conversations ordered by most recently updated.
+ * Returns HTML when HX-Request header is present, JSON otherwise.
  *
  * @param ctx - Route context
- * @returns HTTP Response with JSON array of conversations
+ * @param request - HTTP Request to check for HX-Request header
+ * @returns HTTP Response with JSON array or HTML list of conversations
  */
-export function handleListConversations(ctx: RouteContext): Response {
+export function handleListConversations(
+  ctx: RouteContext,
+  request?: Request
+): Response {
   const conversations = ctx.db.listConversations();
 
+  // Return HTML for HTMX requests
+  if (request?.headers.get("HX-Request") === "true") {
+    const html = renderConversationList(conversations);
+    return new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
+  // Return JSON for API requests
   return new Response(JSON.stringify(conversations), {
     headers: {
       "Content-Type": "application/json",
@@ -143,6 +154,7 @@ export function handleListConversations(ctx: RouteContext): Response {
  * Handle POST /api/conversations - Create new conversation
  *
  * Creates a new conversation with an optional title from the request body.
+ * Returns HTML when HX-Request header is present, JSON otherwise.
  *
  * @param ctx - Route context
  * @param request - HTTP Request (body may contain { title?: string })
@@ -166,11 +178,56 @@ export async function handleCreateConversation(
 
   const conversation = ctx.db.createConversation(title);
 
+  // Return HTML for HTMX requests
+  if (request.headers.get("HX-Request") === "true") {
+    const html = renderConversationItem(conversation, true);
+    return new Response(html, {
+      status: 201,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
   return new Response(JSON.stringify(conversation), {
     status: 201,
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle GET /c/:id - Get conversation chat view
+ *
+ * Returns the chat view HTML for a specific conversation.
+ * Used by HTMX to swap in the chat area when selecting a conversation.
+ *
+ * @param ctx - Route context
+ * @param conversationId - The conversation ID
+ * @returns HTTP Response with HTML chat view
+ */
+export function handleConversationView(
+  ctx: RouteContext,
+  conversationId: string
+): Response {
+  // Check if conversation exists
+  const conversation = ctx.db.getConversation(conversationId);
+  if (!conversation) {
+    return new Response("Conversation not found", {
+      status: 404,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  const messages = ctx.db.getMessages(conversationId);
+  const html = renderChatView(messages);
+
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
     },
   });
 }

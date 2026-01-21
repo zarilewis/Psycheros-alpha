@@ -12,6 +12,7 @@ import { createDefaultClient, type LLMClient } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import {
   handleChat,
+  handleConversationView,
   handleCORS,
   handleCreateConversation,
   handleGetMessages,
@@ -188,7 +189,7 @@ export class Server {
 
     // GET /api/conversations - List conversations
     if (method === "GET" && path === "/api/conversations") {
-      return handleListConversations(ctx);
+      return handleListConversations(ctx, request);
     }
 
     // POST /api/conversations - Create conversation
@@ -232,9 +233,15 @@ export class Server {
       });
     }
 
-    // GET / - Serve index.html
+    // GET / - Serve app shell
     if (path === "/" || path === "/index.html") {
-      return await handleIndex(ctx);
+      return handleIndex(ctx);
+    }
+
+    // GET /c/:id - Serve conversation chat view (HTMX partial)
+    const convMatch = path.match(/^\/c\/([^/]+)$/);
+    if (convMatch) {
+      return handleConversationView(ctx, convMatch[1]);
     }
 
     // Serve static files from web/ directory
