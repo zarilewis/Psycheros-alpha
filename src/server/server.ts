@@ -156,7 +156,7 @@ export class Server {
       }
 
       // Static file and UI routes
-      return await this.handleStaticRoute(ctx, method, path);
+      return await this.handleStaticRoute(ctx, request, method, path);
     } catch (error) {
       console.error("Request error:", error);
       const message = error instanceof Error ? error.message : "Internal server error";
@@ -222,6 +222,7 @@ export class Server {
    */
   private async handleStaticRoute(
     ctx: RouteContext,
+    request: Request,
     method: string,
     path: string
   ): Promise<Response> {
@@ -238,10 +239,10 @@ export class Server {
       return handleIndex(ctx);
     }
 
-    // GET /c/:id - Serve conversation chat view (HTMX partial)
+    // GET /c/:id - Serve conversation chat view (HTMX partial or full app shell)
     const convMatch = path.match(/^\/c\/([^/]+)$/);
     if (convMatch) {
-      return handleConversationView(ctx, convMatch[1]);
+      return handleConversationView(ctx, convMatch[1], request);
     }
 
     // Serve static files from web/ directory

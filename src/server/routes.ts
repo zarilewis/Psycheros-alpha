@@ -203,15 +203,18 @@ export async function handleCreateConversation(
  * Handle GET /c/:id - Get conversation chat view
  *
  * Returns the chat view HTML for a specific conversation.
- * Used by HTMX to swap in the chat area when selecting a conversation.
+ * For HTMX requests, returns just the chat area partial.
+ * For direct navigation (browser), returns the full app shell.
  *
  * @param ctx - Route context
  * @param conversationId - The conversation ID
- * @returns HTTP Response with HTML chat view
+ * @param request - HTTP Request to check for HX-Request header
+ * @returns HTTP Response with HTML chat view or full app shell
  */
 export function handleConversationView(
   ctx: RouteContext,
-  conversationId: string
+  conversationId: string,
+  request?: Request
 ): Response {
   // Check if conversation exists
   const conversation = ctx.db.getConversation(conversationId);
@@ -222,9 +225,21 @@ export function handleConversationView(
     });
   }
 
-  const messages = ctx.db.getMessages(conversationId);
-  const html = renderChatView(messages);
+  // For HTMX requests, return just the chat partial
+  if (request?.headers.get("HX-Request") === "true") {
+    const messages = ctx.db.getMessages(conversationId);
+    const html = renderChatView(messages);
 
+    return new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  }
+
+  // For direct navigation, return the full app shell
+  // The frontend will detect the URL and load the conversation
+  const html = renderAppShell();
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

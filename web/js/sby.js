@@ -24,6 +24,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Check if URL has a conversation ID (e.g., /c/abc123)
+  const match = window.location.pathname.match(/^\/c\/([^/]+)$/);
+  if (match) {
+    const conversationId = match[1];
+    loadConversationFromUrl(conversationId);
+  }
+
   // Focus input on load
   const input = document.getElementById('message-input');
   if (input) {
@@ -46,6 +53,51 @@ function toggleSidebar() {
 // =============================================================================
 // Conversations
 // =============================================================================
+
+/**
+ * Load a conversation from URL on initial page load.
+ * Called when user navigates directly to /c/:id
+ */
+async function loadConversationFromUrl(conversationId) {
+  currentConversationId = conversationId;
+
+  try {
+    // Fetch the chat view and swap it into the chat area
+    const response = await fetch(`/c/${conversationId}`, {
+      headers: { 'HX-Request': 'true' }
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        showToast('Conversation not found');
+        history.replaceState({}, '', '/');
+        return;
+      }
+      throw new Error('Failed to load conversation');
+    }
+
+    const html = await response.text();
+    const chat = document.getElementById('chat');
+    if (chat) {
+      chat.innerHTML = html;
+    }
+
+    // Mark as active in sidebar after it loads
+    // Use a small delay to wait for the sidebar conversation list to load
+    setTimeout(() => {
+      document.querySelectorAll('.conv-item').forEach((item) => {
+        item.classList.toggle('active', item.dataset.convId === conversationId);
+      });
+    }, 500);
+
+    // Focus input
+    document.getElementById('message-input')?.focus();
+
+  } catch (error) {
+    console.error('Failed to load conversation:', error);
+    showToast('Failed to load conversation');
+  }
+}
 
 async function newConversation() {
   try {
