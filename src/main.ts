@@ -4,6 +4,7 @@
  * Starts the persistent entity harness server.
  */
 
+import "@std/dotenv/load";
 import { Server } from "./server/mod.ts";
 
 const VERSION = "0.1.0";
