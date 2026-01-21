@@ -1,0 +1,19 @@
+# Runtime data
+data/
+*.db
+
+# Deno cache and lock
+deno.lock
+
+# Tool/IDE specific
+.claude/
+.playwright-mcp/
+.sby/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
