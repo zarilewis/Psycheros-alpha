@@ -3,75 +3,76 @@
  * Global styles, scrollbars, focus states, selection.
  */
 
+html,
+body {
+  height: 100%;
+}
 
-  html,
-  body {
-    height: 100%;
-  }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height);
+  color: var(--c-fg);
+  background-color: var(--c-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
 
-  body {
-    font-family: var(--font-mono);
-    font-size: var(--font-size-base);
-    line-height: var(--line-height);
-    color: var(--c-fg);
-    background-color: var(--c-bg);
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
+/* Focus states - visible keyboard focus */
+:focus-visible {
+  outline: 2px solid var(--c-accent);
+  outline-offset: 2px;
+}
 
-  /* Focus states - visible keyboard focus */
-  :focus-visible {
-    outline: 2px solid var(--c-accent);
-    outline-offset: 2px;
-  }
+:focus:not(:focus-visible) {
+  outline: none;
+}
 
-  :focus:not(:focus-visible) {
-    outline: none;
-  }
+/* Selection */
+::selection {
+  background-color: var(--c-accent);
+  color: var(--c-bg);
+}
 
-  /* Selection */
-  ::selection {
-    background-color: var(--c-accent);
-    color: var(--c-bg);
-  }
+/* Scrollbars - thin and subtle */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
 
-  /* Scrollbars - brutalist thin */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
+::-webkit-scrollbar-track {
+  background: var(--c-bg-sunken);
+}
 
-  ::-webkit-scrollbar-track {
-    background: var(--c-bg-sunken);
-  }
+::-webkit-scrollbar-thumb {
+  background: var(--c-border-strong);
+  border-radius: 3px;
+}
 
-  ::-webkit-scrollbar-thumb {
-    background: var(--c-border-strong);
-  }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--c-fg-muted);
+}
 
-  ::-webkit-scrollbar-thumb:hover {
-    background: var(--c-fg-muted);
-  }
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-border-strong) var(--c-bg-sunken);
+}
 
-  /* Firefox scrollbar */
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: var(--c-border-strong) var(--c-bg-sunken);
-  }
+/* Links */
+a:hover {
+  color: var(--c-accent);
+}
 
-  /* Links */
-  a:hover {
-    color: var(--c-accent);
-  }
+/* Code - monospace for code elements */
+code,
+pre {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
 
-  /* Code */
-  code,
-  pre {
-    font-family: var(--font-mono);
-  }
-
-  pre {
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-  }
+pre {
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}

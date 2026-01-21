@@ -62,10 +62,8 @@ async function loadConversationFromUrl(conversationId) {
   currentConversationId = conversationId;
 
   try {
-    // Fetch the chat view and swap it into the chat area
-    const response = await fetch(`/c/${conversationId}`, {
-      headers: { 'HX-Request': 'true' }
-    });
+    // Fetch the chat fragment from the dedicated fragment endpoint
+    const response = await fetch(`/fragments/chat/${conversationId}`);
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -355,11 +353,11 @@ function handleSSEEvent(eventType, data, messageEl, state) {
     case 'thinking':
       if (!state.getThinking()) {
         const thinkingSection = document.createElement('div');
-        thinkingSection.className = 'thinking';
+        thinkingSection.className = 'thinking expanded';
         thinkingSection.innerHTML = `
-          <div class="thinking-header" onclick="this.parentElement.classList.toggle('collapsed')">
+          <div class="thinking-header" onclick="this.parentElement.classList.toggle('expanded')">
             <span class="thinking-toggle">&#9660;</span>
-            <span>Thinking...</span>
+            <span>Thinking</span>
           </div>
           <div class="thinking-content"></div>
         `;
@@ -414,6 +412,10 @@ function handleSSEEvent(eventType, data, messageEl, state) {
     }
 
     case 'done':
+      // Collapse all thinking and tool sections after streaming completes
+      contentContainer.querySelectorAll('.thinking.expanded, .tool.expanded').forEach(el => {
+        el.classList.remove('expanded');
+      });
       break;
   }
 
@@ -426,11 +428,25 @@ function handleSSEEvent(eventType, data, messageEl, state) {
 
 function createToolCard(toolCall) {
   const card = document.createElement('div');
-  card.className = 'tool';
+  card.className = 'tool expanded';
 
   const name = toolCall.function?.name || toolCall.name || 'unknown';
-  let args = toolCall.function?.arguments || toolCall.arguments || '{}';
+  let rawArgs = toolCall.function?.arguments || toolCall.arguments || '{}';
+  let args = rawArgs;
 
+  // Generate brief summary for collapsed state
+  let summary = '';
+  try {
+    const parsed = JSON.parse(rawArgs);
+    if (parsed.command) {
+      const cmd = parsed.command;
+      summary = cmd.length > 50 ? cmd.substring(0, 50) + '...' : cmd;
+    }
+  } catch {
+    // Keep summary empty
+  }
+
+  // Format JSON for expanded view
   try {
     if (typeof args === 'string') {
       args = JSON.stringify(JSON.parse(args), null, 2);
@@ -442,9 +458,11 @@ function createToolCard(toolCall) {
   }
 
   card.innerHTML = `
-    <div class="tool-header">
+    <div class="tool-header" onclick="this.parentElement.classList.toggle('expanded')">
       <span class="tool-icon">&#9881;</span>
       <span class="tool-name">${escapeHtml(name)}</span>
+      ${summary ? `<span class="tool-summary">${escapeHtml(summary)}</span>` : ''}
+      <span class="tool-toggle">&#9660;</span>
     </div>
     <div class="tool-args">${escapeHtml(args)}</div>
   `;

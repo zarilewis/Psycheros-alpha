@@ -59,11 +59,11 @@ export function renderAppShell(): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <meta name="theme-color" content="#0a0a0a">
+  <meta name="theme-color" content="#121416">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>SBy</title>
-  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/main.css?v=5">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.svg">
@@ -82,7 +82,7 @@ export function renderAppShell(): string {
       </div>
     </div>
   </div>
-  <script type="module" src="/js/sby.js"></script>
+  <script type="module" src="/js/sby.js?v=5"></script>
 </body>
 </html>`;
 }
@@ -112,7 +112,7 @@ export function renderSidebar(conversations: Conversation[]): string {
   <div class="sidebar-header">
     <span class="sidebar-title">Conversations</span>
   </div>
-  <nav class="conv-list" id="conv-list" hx-get="/api/conversations" hx-trigger="load" hx-swap="innerHTML">
+  <nav class="conv-list" id="conv-list" hx-get="/fragments/conv-list" hx-trigger="load" hx-swap="innerHTML">
     ${renderConversationList(conversations)}
   </nav>
 </aside>`;
@@ -144,7 +144,7 @@ export function renderConversationItem(
 
   return `<a class="conv-item${isActive ? " active" : ""}"
   data-conv-id="${conv.id}"
-  hx-get="/c/${conv.id}"
+  hx-get="/fragments/chat/${conv.id}"
   hx-target="#chat"
   hx-swap="innerHTML"
   hx-push-url="/c/${conv.id}"
@@ -267,12 +267,13 @@ export function renderInputArea(): string {
 
 /**
  * Render a collapsible thinking section.
+ * Collapsed by default; toggle 'expanded' class to show content.
  */
 export function renderThinkingSection(content: string): string {
   return `<div class="thinking">
-  <div class="thinking-header" onclick="this.parentElement.classList.toggle('collapsed')">
+  <div class="thinking-header" onclick="this.parentElement.classList.toggle('expanded')">
     <span class="thinking-toggle">&#9660;</span>
-    <span>Thinking...</span>
+    <span>Thinking</span>
   </div>
   <div class="thinking-content">${escapeHtml(content)}</div>
 </div>`;
@@ -280,12 +281,26 @@ export function renderThinkingSection(content: string): string {
 
 /**
  * Render a tool call card.
+ * Collapsed by default; toggle 'expanded' class to show args/result.
  */
 export function renderToolCard(toolCall: ToolCall, result?: ToolResult): string {
   const name = escapeHtml(toolCall.function.name);
   let args = toolCall.function.arguments;
 
-  // Try to format JSON
+  // Generate brief summary for collapsed state
+  let summary = "";
+  try {
+    const parsed = JSON.parse(args);
+    if (parsed.command) {
+      // For shell commands, show abbreviated command
+      const cmd = parsed.command as string;
+      summary = cmd.length > 50 ? cmd.substring(0, 50) + "..." : cmd;
+    }
+  } catch {
+    // Keep summary empty
+  }
+
+  // Try to format JSON for expanded view
   try {
     args = JSON.stringify(JSON.parse(args), null, 2);
   } catch {
@@ -293,9 +308,11 @@ export function renderToolCard(toolCall: ToolCall, result?: ToolResult): string 
   }
 
   let html = `<div class="tool" data-tool-call-id="${toolCall.id}">
-  <div class="tool-header">
+  <div class="tool-header" onclick="this.parentElement.classList.toggle('expanded')">
     <span class="tool-icon">&#9881;</span>
     <span class="tool-name">${name}</span>
+    ${summary ? `<span class="tool-summary">${escapeHtml(summary)}</span>` : ""}
+    <span class="tool-toggle">&#9660;</span>
   </div>
   <div class="tool-args">${escapeHtml(args)}</div>`;
 

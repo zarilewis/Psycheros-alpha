@@ -117,31 +117,15 @@ export function handleIndex(_ctx: RouteContext): Response {
 /**
  * Handle GET /api/conversations - List conversations
  *
- * Returns all conversations ordered by most recently updated.
- * Returns HTML when HX-Request header is present, JSON otherwise.
+ * Returns all conversations as JSON, ordered by most recently updated.
+ * For HTML partial, use /fragments/conv-list instead.
  *
  * @param ctx - Route context
- * @param request - HTTP Request to check for HX-Request header
- * @returns HTTP Response with JSON array or HTML list of conversations
+ * @returns HTTP Response with JSON array of conversations
  */
-export function handleListConversations(
-  ctx: RouteContext,
-  request?: Request
-): Response {
+export function handleListConversations(ctx: RouteContext): Response {
   const conversations = ctx.db.listConversations();
 
-  // Return HTML for HTMX requests
-  if (request?.headers.get("HX-Request") === "true") {
-    const html = renderConversationList(conversations);
-    return new Response(html, {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-        "Access-Control-Allow-Origin": "*",
-      },
-    });
-  }
-
-  // Return JSON for API requests
   return new Response(JSON.stringify(conversations), {
     headers: {
       "Content-Type": "application/json",
@@ -200,21 +184,19 @@ export async function handleCreateConversation(
 }
 
 /**
- * Handle GET /c/:id - Get conversation chat view
+ * Handle GET /c/:id - Get conversation page
  *
- * Returns the chat view HTML for a specific conversation.
- * For HTMX requests, returns just the chat area partial.
- * For direct navigation (browser), returns the full app shell.
+ * Always returns the full app shell. The frontend JavaScript
+ * detects the URL and loads the conversation content via the
+ * fragment endpoint.
  *
  * @param ctx - Route context
  * @param conversationId - The conversation ID
- * @param request - HTTP Request to check for HX-Request header
- * @returns HTTP Response with HTML chat view or full app shell
+ * @returns HTTP Response with full app shell HTML
  */
 export function handleConversationView(
   ctx: RouteContext,
-  conversationId: string,
-  request?: Request
+  conversationId: string
 ): Response {
   // Check if conversation exists
   const conversation = ctx.db.getConversation(conversationId);
@@ -225,21 +207,66 @@ export function handleConversationView(
     });
   }
 
-  // For HTMX requests, return just the chat partial
-  if (request?.headers.get("HX-Request") === "true") {
-    const messages = ctx.db.getMessages(conversationId);
-    const html = renderChatView(messages);
+  // Always return the full app shell
+  // Frontend JS will load the conversation content via /fragments/chat/:id
+  const html = renderAppShell();
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
 
-    return new Response(html, {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-      },
+// =============================================================================
+// Fragment Routes (HTML partials for HTMX)
+// =============================================================================
+
+/**
+ * Handle GET /fragments/chat/:id - Get chat view fragment
+ *
+ * Returns just the chat HTML partial (messages + input area).
+ * Used by HTMX for in-app navigation and by JS for initial load.
+ *
+ * @param ctx - Route context
+ * @param conversationId - The conversation ID
+ * @returns HTTP Response with chat HTML fragment
+ */
+export function handleChatFragment(
+  ctx: RouteContext,
+  conversationId: string
+): Response {
+  // Check if conversation exists
+  const conversation = ctx.db.getConversation(conversationId);
+  if (!conversation) {
+    return new Response("Conversation not found", {
+      status: 404,
+      headers: { "Content-Type": "text/plain" },
     });
   }
 
-  // For direct navigation, return the full app shell
-  // The frontend will detect the URL and load the conversation
-  const html = renderAppShell();
+  const messages = ctx.db.getMessages(conversationId);
+  const html = renderChatView(messages);
+
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+/**
+ * Handle GET /fragments/conv-list - Get conversation list fragment
+ *
+ * Returns just the conversation list HTML partial.
+ * Used by HTMX for sidebar updates.
+ *
+ * @param ctx - Route context
+ * @returns HTTP Response with conversation list HTML fragment
+ */
+export function handleConversationListFragment(ctx: RouteContext): Response {
+  const conversations = ctx.db.listConversations();
+  const html = renderConversationList(conversations);
+
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

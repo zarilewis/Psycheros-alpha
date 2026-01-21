@@ -12,6 +12,8 @@ import { createDefaultClient, type LLMClient } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import {
   handleChat,
+  handleChatFragment,
+  handleConversationListFragment,
   handleConversationView,
   handleCORS,
   handleCreateConversation,
@@ -156,7 +158,7 @@ export class Server {
       }
 
       // Static file and UI routes
-      return await this.handleStaticRoute(ctx, request, method, path);
+      return await this.handleStaticRoute(ctx, method, path);
     } catch (error) {
       console.error("Request error:", error);
       const message = error instanceof Error ? error.message : "Internal server error";
@@ -187,9 +189,9 @@ export class Server {
       return await handleChat(ctx, request);
     }
 
-    // GET /api/conversations - List conversations
+    // GET /api/conversations - List conversations (JSON)
     if (method === "GET" && path === "/api/conversations") {
-      return handleListConversations(ctx, request);
+      return handleListConversations(ctx);
     }
 
     // POST /api/conversations - Create conversation
@@ -222,7 +224,6 @@ export class Server {
    */
   private async handleStaticRoute(
     ctx: RouteContext,
-    request: Request,
     method: string,
     path: string
   ): Promise<Response> {
@@ -239,10 +240,22 @@ export class Server {
       return handleIndex(ctx);
     }
 
-    // GET /c/:id - Serve conversation chat view (HTMX partial or full app shell)
+    // GET /c/:id - Serve conversation page (always full app shell)
     const convMatch = path.match(/^\/c\/([^/]+)$/);
     if (convMatch) {
-      return handleConversationView(ctx, convMatch[1], request);
+      return handleConversationView(ctx, convMatch[1]);
+    }
+
+    // Fragment routes (HTML partials for HTMX)
+    // GET /fragments/chat/:id - Chat view fragment
+    const chatFragmentMatch = path.match(/^\/fragments\/chat\/([^/]+)$/);
+    if (chatFragmentMatch) {
+      return handleChatFragment(ctx, chatFragmentMatch[1]);
+    }
+
+    // GET /fragments/conv-list - Conversation list fragment
+    if (path === "/fragments/conv-list") {
+      return handleConversationListFragment(ctx);
     }
 
     // Serve static files from web/ directory

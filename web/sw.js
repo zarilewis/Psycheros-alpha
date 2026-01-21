@@ -1,9 +1,14 @@
 /**
  * SBy Service Worker
- * Caches static assets, network-first for API.
+ *
+ * Caching strategy:
+ * - /api/*       - Network-first (dynamic JSON data)
+ * - /fragments/* - Network-first (dynamic HTML partials, user-specific)
+ * - /c/*         - Network-first (page routes, returns app shell)
+ * - Static assets - Cache-first with background update
  */
 
-const CACHE_NAME = 'sby-v1';
+const CACHE_NAME = 'sby-v4';
 const STATIC_ASSETS = [
   '/',
   '/css/main.css',
@@ -39,51 +44,85 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch - network-first for API, cache-first for static
+// Fetch handler
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
+  const path = url.pathname;
 
-  // Network-first for API requests
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(
-      fetch(event.request).catch(() => {
-        return new Response(
-          JSON.stringify({ error: 'Offline' }),
-          {
-            status: 503,
-            headers: { 'Content-Type': 'application/json' }
-          }
-        );
-      })
-    );
+  // Network-first for dynamic routes
+  if (
+    path.startsWith('/api/') ||
+    path.startsWith('/fragments/') ||
+    path.startsWith('/c/')
+  ) {
+    event.respondWith(networkFirst(event.request));
     return;
   }
 
   // Cache-first for static assets
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        // Return cached, but also update cache in background
-        fetch(event.request).then((response) => {
-          if (response.ok) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, response);
-            });
-          }
-        }).catch(() => {});
-        return cached;
-      }
-
-      // Not cached, fetch and cache
-      return fetch(event.request).then((response) => {
-        if (response.ok && event.request.method === 'GET') {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, clone);
-          });
-        }
-        return response;
-      });
-    })
-  );
+  event.respondWith(cacheFirst(event.request));
 });
+
+/**
+ * Network-first strategy: try network, fall back to cache.
+ */
+async function networkFirst(request) {
+  try {
+    const response = await fetch(request);
+    return response;
+  } catch {
+    // Network failed, try cache
+    const cached = await caches.match(request);
+    if (cached) {
+      return cached;
+    }
+    // Nothing in cache, return offline error
+    return new Response(
+      JSON.stringify({ error: 'Offline' }),
+      {
+        status: 503,
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+  }
+}
+
+/**
+ * Cache-first strategy: return cached, update in background.
+ */
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+
+  if (cached) {
+    // Return cached immediately, but update cache in background
+    updateCache(request);
+    return cached;
+  }
+
+  // Not cached, fetch and cache
+  try {
+    const response = await fetch(request);
+    if (response.ok && request.method === 'GET') {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    return new Response('Not Found', { status: 404 });
+  }
+}
+
+/**
+ * Update cache in background (stale-while-revalidate).
+ */
+async function updateCache(request) {
+  try {
+    const response = await fetch(request);
+    if (response.ok) {
+      const cache = await caches.open(CACHE_NAME);
+      cache.put(request, response);
+    }
+  } catch {
+    // Network error, keep using cached version
+  }
+}
