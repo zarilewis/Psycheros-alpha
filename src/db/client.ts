@@ -114,9 +114,11 @@ export class DBClient {
       [id, title ?? null, nowISO, nowISO]
     );
 
+    // Return title as undefined (matching Conversation type) when not provided.
+    // The DB stores null, but Conversation.title is optional (undefined when absent).
     return {
       id,
-      title,
+      title: title ?? undefined,
       createdAt: now,
       updatedAt: now,
     };

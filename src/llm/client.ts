@@ -17,6 +17,40 @@ import type {
 import { LLMError } from "./types.ts";
 
 /**
+ * Accumulator for building tool calls from streamed chunks.
+ */
+interface ToolCallAccumulator {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+/**
+ * Emit accumulated tool calls as StreamChunks.
+ * Clears the accumulator map after emitting.
+ */
+function* emitAccumulatedToolCalls(
+  accumulators: Map<number, ToolCallAccumulator>
+): Generator<StreamChunk, void, unknown> {
+  for (const [index, acc] of accumulators) {
+    if (acc.id && acc.name) {
+      yield {
+        type: "tool_call",
+        toolCall: {
+          id: acc.id,
+          type: "function",
+          function: {
+            name: acc.name,
+            arguments: acc.arguments,
+          },
+        },
+      };
+    }
+    accumulators.delete(index);
+  }
+}
+
+/**
  * Client for communicating with the LLM API.
  */
 export class LLMClient {
@@ -54,10 +88,7 @@ export class LLMClient {
     }
 
     // Track tool calls being accumulated across chunks
-    const toolCallAccumulators = new Map<
-      number,
-      { id: string; name: string; arguments: string }
-    >();
+    const toolCallAccumulators = new Map<number, ToolCallAccumulator>();
 
     // Track the last finish reason we saw (to use in done event)
     let lastFinishReason: string | null = null;
@@ -93,22 +124,7 @@ export class LLMClient {
 
           if (chunk === "done") {
             // Emit any remaining tool calls before done
-            for (const [index, acc] of toolCallAccumulators) {
-              if (acc.id && acc.name) {
-                yield {
-                  type: "tool_call",
-                  toolCall: {
-                    id: acc.id,
-                    type: "function",
-                    function: {
-                      name: acc.name,
-                      arguments: acc.arguments,
-                    },
-                  },
-                };
-              }
-              toolCallAccumulators.delete(index);
-            }
+            yield* emitAccumulatedToolCalls(toolCallAccumulators);
             // Only emit done if we haven't already (from finish_reason)
             if (!doneEmitted) {
               yield { type: "done", finishReason: lastFinishReason || "stop" };
@@ -153,21 +169,7 @@ export class LLMClient {
       // If we never got a [DONE] signal but the stream ended, emit done now
       if (!doneEmitted) {
         // Emit any remaining tool calls
-        for (const [_index, acc] of toolCallAccumulators) {
-          if (acc.id && acc.name) {
-            yield {
-              type: "tool_call",
-              toolCall: {
-                id: acc.id,
-                type: "function",
-                function: {
-                  name: acc.name,
-                  arguments: acc.arguments,
-                },
-              },
-            };
-          }
-        }
+        yield* emitAccumulatedToolCalls(toolCallAccumulators);
         yield { type: "done", finishReason: lastFinishReason || "stop" };
       }
     } finally {
@@ -300,10 +302,7 @@ export class LLMClient {
    */
   private *processChunk(
     chunk: ChatResponseChunk,
-    toolCallAccumulators: Map<
-      number,
-      { id: string; name: string; arguments: string }
-    >,
+    toolCallAccumulators: Map<number, ToolCallAccumulator>,
   ): Generator<StreamChunk, void, unknown> {
     // Guard against missing or empty choices array
     if (!chunk.choices || chunk.choices.length === 0) {
@@ -333,12 +332,12 @@ export class LLMClient {
         for (const toolCallDelta of delta.tool_calls) {
           const index = toolCallDelta.index;
 
-          // Initialize accumulator if this is a new tool call
-          if (!toolCallAccumulators.has(index)) {
-            toolCallAccumulators.set(index, { id: "", name: "", arguments: "" });
+          // Get or create accumulator for this tool call index
+          let acc = toolCallAccumulators.get(index);
+          if (!acc) {
+            acc = { id: "", name: "", arguments: "" };
+            toolCallAccumulators.set(index, acc);
           }
-
-          const acc = toolCallAccumulators.get(index)!;
 
           // Accumulate the tool call data
           if (toolCallDelta.id) {
@@ -357,22 +356,7 @@ export class LLMClient {
       if (choice.finish_reason) {
         // Emit completed tool calls when we hit tool_calls finish reason
         if (choice.finish_reason === "tool_calls") {
-          for (const [index, acc] of toolCallAccumulators) {
-            if (acc.id && acc.name) {
-              yield {
-                type: "tool_call",
-                toolCall: {
-                  id: acc.id,
-                  type: "function",
-                  function: {
-                    name: acc.name,
-                    arguments: acc.arguments,
-                  },
-                },
-              };
-            }
-            toolCallAccumulators.delete(index);
-          }
+          yield* emitAccumulatedToolCalls(toolCallAccumulators);
         }
 
         // Yield done with the actual finish reason

@@ -27,6 +27,30 @@ export function escapeHtml(text: string): string {
 }
 
 /**
+ * Safely parse JSON with a fallback value.
+ * Returns the fallback if parsing fails.
+ */
+function tryJsonParse<T>(text: string, fallback: T): T | unknown {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
+ * Type guard for objects with a string command property.
+ */
+function hasStringCommand(obj: unknown): obj is { command: string } {
+  return (
+    typeof obj === "object" &&
+    obj !== null &&
+    "command" in obj &&
+    typeof (obj as Record<string, unknown>).command === "string"
+  );
+}
+
+/**
  * Format a date for display.
  */
 function formatDate(date: Date | string): string {
@@ -234,13 +258,13 @@ export function renderConversationItem(
   const title = escapeHtml(conv.title || "Untitled");
   const date = formatDate(conv.updatedAt || conv.createdAt);
 
+  // Use data attribute for conversation ID to avoid XSS risk with inline JS
   return `<a class="conv-item${isActive ? " active" : ""}"
-  data-conv-id="${conv.id}"
-  hx-get="/fragments/chat/${conv.id}"
+  data-conv-id="${escapeHtml(conv.id)}"
+  hx-get="/fragments/chat/${encodeURIComponent(conv.id)}"
   hx-target="#chat"
   hx-swap="innerHTML"
-  hx-push-url="/c/${conv.id}"
-  onclick="SBy.selectConversation('${conv.id}')">
+  hx-push-url="/c/${encodeURIComponent(conv.id)}">
   <span class="conv-title">${title}</span>
   <span class="conv-date">${date}</span>
 </a>`;
@@ -381,22 +405,17 @@ export function renderToolCard(toolCall: ToolCall, result?: ToolResult): string 
 
   // Generate brief summary for collapsed state
   let summary = "";
-  try {
-    const parsed = JSON.parse(args);
-    if (parsed.command) {
-      // For shell commands, show abbreviated command
-      const cmd = parsed.command as string;
-      summary = cmd.length > 50 ? cmd.substring(0, 50) + "..." : cmd;
-    }
-  } catch {
-    // Keep summary empty
+  const parsed = tryJsonParse(args, null);
+  if (hasStringCommand(parsed)) {
+    // For shell commands, show abbreviated command
+    const cmd = parsed.command;
+    summary = cmd.length > 50 ? cmd.substring(0, 50) + "..." : cmd;
   }
 
   // Try to format JSON for expanded view
-  try {
-    args = JSON.stringify(JSON.parse(args), null, 2);
-  } catch {
-    // Keep as-is
+  const parsedForFormat = tryJsonParse(args, null);
+  if (parsedForFormat !== null) {
+    args = JSON.stringify(parsedForFormat, null, 2);
   }
 
   let html = `<div class="tool" data-tool-call-id="${toolCall.id}">
@@ -423,13 +442,12 @@ export function renderToolResult(result: ToolResult): string {
   const isError = result.isError ?? false;
   let content = result.content;
 
-  // Try to format JSON
-  try {
-    if (content.startsWith("{") || content.startsWith("[")) {
-      content = JSON.stringify(JSON.parse(content), null, 2);
+  // Try to format JSON if it looks like JSON
+  if (content.startsWith("{") || content.startsWith("[")) {
+    const parsed = tryJsonParse(content, null);
+    if (parsed !== null) {
+      content = JSON.stringify(parsed, null, 2);
     }
-  } catch {
-    // Keep as-is
   }
 
   return `<div class="tool-result${isError ? " error" : ""}">

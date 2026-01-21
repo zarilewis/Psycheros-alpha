@@ -12,32 +12,53 @@ import type { Tool, ToolContext, ShellToolArgs } from "./types.ts";
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
+ * Type guard for validating command argument.
+ */
+function isValidCommand(value: unknown): value is string {
+  return typeof value === "string" && value.trim() !== "";
+}
+
+/**
+ * Type guard for optional string argument.
+ */
+function isOptionalString(value: unknown): value is string | undefined {
+  return value === undefined || typeof value === "string";
+}
+
+/**
+ * Type guard for optional positive number argument.
+ */
+function isOptionalPositiveNumber(value: unknown): value is number | undefined {
+  return value === undefined || (typeof value === "number" && value > 0);
+}
+
+/**
  * Parse and validate shell tool arguments.
  *
  * @param args - Raw arguments from the tool call
  * @returns Validated ShellToolArgs
- * @throws Error if required arguments are missing
+ * @throws Error if required arguments are missing or invalid
  */
 function parseArgs(args: Record<string, unknown>): ShellToolArgs {
-  const command = args.command;
-  if (typeof command !== "string" || command.trim() === "") {
+  const { command, workingDir, timeout } = args;
+
+  if (!isValidCommand(command)) {
     throw new Error("Shell tool requires a non-empty 'command' argument");
   }
 
-  const workingDir = args.workingDir;
-  if (workingDir !== undefined && typeof workingDir !== "string") {
+  if (!isOptionalString(workingDir)) {
     throw new Error("'workingDir' must be a string if provided");
   }
 
-  const timeout = args.timeout;
-  if (timeout !== undefined && (typeof timeout !== "number" || timeout <= 0)) {
+  if (!isOptionalPositiveNumber(timeout)) {
     throw new Error("'timeout' must be a positive number if provided");
   }
 
+  // Type guards have narrowed these types - no assertions needed
   return {
     command: command.trim(),
-    workingDir: workingDir as string | undefined,
-    timeout: timeout as number | undefined,
+    workingDir,
+    timeout,
   };
 }
 

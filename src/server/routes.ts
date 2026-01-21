@@ -22,6 +22,7 @@ import {
 } from "./templates.ts";
 import { updateConversationTitle } from "./state-changes.ts";
 import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
+import { MAX_SSE_MESSAGE_SIZE, SSE_TRUNCATION_SUFFIX } from "../constants.ts";
 
 /**
  * Context passed to route handlers containing dependencies.
@@ -67,6 +68,37 @@ const MIME_TYPES: Record<string, string> = {
 function getMimeType(path: string): string {
   const ext = path.substring(path.lastIndexOf(".")).toLowerCase();
   return MIME_TYPES[ext] || "application/octet-stream";
+}
+
+/**
+ * Determine if the client expects an HTML response.
+ *
+ * Checks in order:
+ * 1. HX-Request header (HTMX clients)
+ * 2. Accept header preferring text/html
+ *
+ * This allows non-HTMX clients to explicitly request HTML via Accept header.
+ *
+ * @param request - The HTTP request
+ * @returns true if HTML response is preferred
+ */
+function prefersHtml(request: Request): boolean {
+  // HTMX always sends this header
+  if (request.headers.get("HX-Request") === "true") {
+    return true;
+  }
+
+  // Check Accept header for HTML preference
+  const accept = request.headers.get("Accept") || "";
+  // Simple check: if text/html appears before application/json, prefer HTML
+  const htmlIndex = accept.indexOf("text/html");
+  const jsonIndex = accept.indexOf("application/json");
+
+  if (htmlIndex !== -1 && (jsonIndex === -1 || htmlIndex < jsonIndex)) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -164,8 +196,8 @@ export async function handleCreateConversation(
 
   const conversation = ctx.db.createConversation(title);
 
-  // Return HTML for HTMX requests
-  if (request.headers.get("HX-Request") === "true") {
+  // Return HTML for HTMX requests or clients preferring HTML
+  if (prefersHtml(request)) {
     const html = renderConversationItem(conversation, true);
     return new Response(html, {
       status: 201,
@@ -373,8 +405,8 @@ export async function handleUpdateTitle(
     );
   }
 
-  // For HTMX requests, return OOB swaps for reactive updates
-  if (request.headers.get("HX-Request") === "true") {
+  // For HTMX requests or clients preferring HTML, return OOB swaps
+  if (prefersHtml(request)) {
     const uiUpdates = generateUIUpdates(result.affectedRegions, ctx.db, conversationId);
     const oobHtml = renderAsOobSwaps(uiUpdates);
 
@@ -527,6 +559,22 @@ export async function handleChat(
 }
 
 /**
+ * Truncate SSE data if it exceeds the maximum size.
+ * Prevents memory issues and client disconnections from very large payloads.
+ *
+ * @param data - The data string to potentially truncate
+ * @returns The original data or truncated version with suffix
+ */
+function truncateSSEData(data: string): string {
+  if (data.length <= MAX_SSE_MESSAGE_SIZE) {
+    return data;
+  }
+
+  const truncateAt = MAX_SSE_MESSAGE_SIZE - SSE_TRUNCATION_SUFFIX.length;
+  return data.substring(0, truncateAt) + SSE_TRUNCATION_SUFFIX;
+}
+
+/**
  * Convert an EntityTurn yield to an SSEEvent.
  *
  * Mapping:
@@ -535,6 +583,8 @@ export async function handleChat(
  * - StreamChunk 'tool_call' -> SSEEvent 'tool_call', data is JSON of toolCall
  * - 'tool_result' -> SSEEvent 'tool_result', data is JSON of result
  * - StreamChunk 'done' -> SSEEvent 'done', data is finishReason
+ *
+ * Large payloads (tool results, etc.) are truncated to prevent memory issues.
  *
  * @param chunk - The chunk from EntityTurn
  * @returns The corresponding SSEEvent
@@ -556,19 +606,19 @@ function convertToSSEEvent(chunk: EntityYield): SSEEvent {
     case "tool_call":
       return {
         type: "tool_call",
-        data: JSON.stringify(chunk.toolCall),
+        data: truncateSSEData(JSON.stringify(chunk.toolCall)),
       };
 
     case "tool_result":
       return {
         type: "tool_result",
-        data: JSON.stringify(chunk.result),
+        data: truncateSSEData(JSON.stringify(chunk.result)),
       };
 
     case "dom_update":
       return {
         type: "dom_update",
-        data: JSON.stringify(chunk.update),
+        data: truncateSSEData(JSON.stringify(chunk.update)),
       };
 
     case "done":

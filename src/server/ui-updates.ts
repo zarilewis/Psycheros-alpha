@@ -12,13 +12,30 @@ import type { UIUpdate } from "../types.ts";
 import { renderConversationList, renderHeaderTitle } from "./templates.ts";
 
 /**
+ * Configuration for a UI region.
+ */
+interface UIRegionConfig {
+  target: string;
+  swap?: string;
+  classes?: string;
+}
+
+/**
  * Map of UI region names to their CSS selectors, swap strategies, and element classes.
  * The `classes` field is used when rendering OOB swaps to preserve element styling.
  */
-const UI_REGIONS: Record<string, { target: string; swap?: string; classes?: string }> = {
+const UI_REGIONS: Record<string, UIRegionConfig> = {
   "conv-list": { target: "#conv-list", swap: "innerHTML" },
   "header-title": { target: "#header-title", swap: "innerHTML", classes: "logo-sub" },
 };
+
+/**
+ * Reverse lookup map from CSS selector to region config.
+ * Pre-computed for O(1) lookup in renderAsOobSwaps.
+ */
+const UI_REGIONS_BY_TARGET: Map<string, UIRegionConfig> = new Map(
+  Object.values(UI_REGIONS).map((config) => [config.target, config])
+);
 
 /**
  * Generate UI updates for the specified regions.
@@ -95,8 +112,8 @@ export function renderAsOobSwaps(updates: UIUpdate[]): string {
       // Extract element ID from target selector (assumes "#id" format)
       const id = update.target.startsWith("#") ? update.target.slice(1) : update.target;
 
-      // Get classes for this region if defined
-      const regionConfig = Object.values(UI_REGIONS).find((r) => r.target === update.target);
+      // Get classes for this region if defined (O(1) lookup via pre-computed map)
+      const regionConfig = UI_REGIONS_BY_TARGET.get(update.target);
       const classAttr = regionConfig?.classes ? ` class="${regionConfig.classes}"` : "";
 
       // Determine the appropriate element tag based on the target

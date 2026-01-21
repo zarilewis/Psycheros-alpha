@@ -3,6 +3,24 @@
  *
  * The main orchestration module that handles a single conversation turn.
  * Manages the full agentic loop: LLM call -> tool execution -> continue.
+ *
+ * ## Error Handling Strategy
+ *
+ * This module uses a "best-effort persistence" strategy:
+ *
+ * 1. **User message persistence** - CRITICAL. If this fails, the turn is aborted
+ *    because we cannot proceed without the foundation message. Throws an error.
+ *
+ * 2. **Assistant message persistence** - IMPORTANT but non-fatal. If this fails,
+ *    the content has already been streamed to the client. We log the error and
+ *    continue so the user sees the response. Data may be lost on server restart.
+ *
+ * 3. **Tool result persistence** - IMPORTANT but non-fatal. Tool results have
+ *    already been yielded to the client and added to the LLM context. We log
+ *    the error and continue. The LLM will still see and process the results.
+ *
+ * This strategy prioritizes user experience (not breaking mid-stream) over
+ * data integrity, with the assumption that DB failures are rare and transient.
  */
 
 import type { LLMClient, StreamChunk, ChatMessage } from "../llm/mod.ts";
@@ -159,7 +177,7 @@ export class EntityTurn {
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
           });
         } catch (dbError) {
-          // DB write failed - log but continue so we can at least finish streaming
+          // Non-fatal: content already streamed to client (see Error Handling Strategy)
           console.error(
             "EntityTurn: Failed to persist assistant message:",
             dbError instanceof Error ? dbError.message : String(dbError),
@@ -204,7 +222,7 @@ export class EntityTurn {
           }
         }
 
-        // Persist to DB (with error handling)
+        // Persist to DB with error handling
         try {
           this.db.addMessage(conversationId, {
             role: "tool",
@@ -212,11 +230,11 @@ export class EntityTurn {
             toolCallId: result.toolCallId,
           });
         } catch (dbError) {
+          // Non-fatal: result already yielded and in LLM context (see Error Handling Strategy)
           console.error(
             "EntityTurn: Failed to persist tool result:",
             dbError instanceof Error ? dbError.message : String(dbError),
           );
-          // Continue - tool results are already yielded, just logging the persistence failure
         }
       }
 

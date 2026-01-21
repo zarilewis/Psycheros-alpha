@@ -25,11 +25,23 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Check if URL has a conversation ID (e.g., /c/abc123)
-  const match = window.location.pathname.match(/^\/c\/([^/]+)$/);
+  const match = globalThis.location.pathname.match(/^\/c\/([^/]+)$/);
   if (match) {
     const conversationId = match[1];
     loadConversationFromUrl(conversationId);
   }
+
+  // Event delegation for conversation list clicks
+  // This avoids inline onclick handlers (XSS prevention)
+  document.addEventListener('click', (e) => {
+    const convItem = e.target.closest('.conv-item[data-conv-id]');
+    if (convItem) {
+      const id = convItem.dataset.convId;
+      if (id) {
+        selectConversation(id);
+      }
+    }
+  });
 
   // Focus input on load
   const input = document.getElementById('message-input');
@@ -478,7 +490,7 @@ function createToolCard(toolCall) {
   card.className = 'tool expanded';
 
   const name = toolCall.function?.name || toolCall.name || 'unknown';
-  let rawArgs = toolCall.function?.arguments || toolCall.arguments || '{}';
+  const rawArgs = toolCall.function?.arguments || toolCall.arguments || '{}';
   let args = rawArgs;
 
   // Generate brief summary for collapsed state

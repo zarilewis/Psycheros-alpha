@@ -14,6 +14,7 @@
  */
 
 import type { DBClient } from "../db/mod.ts";
+import { MAX_TITLE_LENGTH } from "../constants.ts";
 
 /**
  * Result of a state change operation.
@@ -55,10 +56,10 @@ export function updateConversationTitle(
     };
   }
 
-  if (trimmedTitle.length > 200) {
+  if (trimmedTitle.length > MAX_TITLE_LENGTH) {
     return {
       success: false,
-      error: "Title exceeds maximum length of 200 characters",
+      error: `Title exceeds maximum length of ${MAX_TITLE_LENGTH} characters`,
       affectedRegions: [],
     };
   }
