@@ -8,8 +8,8 @@
  */
 
 import { DBClient } from "../db/mod.ts";
-import { createDefaultClient, LLMClient } from "../llm/mod.ts";
-import { createDefaultRegistry, ToolRegistry } from "../tools/mod.ts";
+import { createDefaultClient, type LLMClient } from "../llm/mod.ts";
+import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import {
   handleChat,
   handleCORS,

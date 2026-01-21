@@ -115,7 +115,7 @@ export class ToolRegistry {
    * @param toolCalls - Array of tool calls to execute
    * @returns Array of tool results in the same order as input
    */
-  async executeAll(toolCalls: ToolCall[]): Promise<ToolResult[]> {
+  executeAll(toolCalls: ToolCall[]): Promise<ToolResult[]> {
     return Promise.all(toolCalls.map((toolCall) => this.execute(toolCall)));
   }
 }
