@@ -35,3 +35,5 @@
 
 export { EntityTurn } from "./loop.ts";
 export type { EntityConfig, EntityYield } from "./loop.ts";
+
+export { generateAndSetTitle } from "./auto-title.ts";

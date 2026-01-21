@@ -17,6 +17,7 @@ import {
   handleConversationView,
   handleCORS,
   handleCreateConversation,
+  handleEvents,
   handleGetMessages,
   handleIndex,
   handleListConversations,
@@ -24,6 +25,7 @@ import {
   handleUpdateTitle,
   type RouteContext,
 } from "./routes.ts";
+import { getBroadcaster } from "./broadcaster.ts";
 
 /**
  * Server configuration options.
@@ -60,12 +62,16 @@ export interface ServerConfig {
  * server.stop();
  * ```
  */
+/** Keepalive interval in milliseconds (30 seconds) */
+const KEEPALIVE_INTERVAL_MS = 30_000;
+
 export class Server {
   private db: DBClient;
   private llm: LLMClient;
   private tools: ToolRegistry;
   private abortController: AbortController;
   private config: ServerConfig;
+  private keepaliveInterval: number | null = null;
 
   /**
    * Create a new Server instance.
@@ -93,12 +99,19 @@ export class Server {
    * Start the server.
    *
    * Begins listening for HTTP requests on the configured port.
+   * Also starts the keepalive timer for persistent SSE connections.
    */
   async start(): Promise<void> {
     const hostname = this.config.hostname || "localhost";
     const port = this.config.port;
 
     console.log(`Starting SBy server on http://${hostname}:${port}`);
+
+    // Start keepalive timer for persistent SSE connections
+    const broadcaster = getBroadcaster();
+    this.keepaliveInterval = setInterval(() => {
+      broadcaster.sendKeepalive();
+    }, KEEPALIVE_INTERVAL_MS);
 
     await Deno.serve(
       {
@@ -116,10 +129,17 @@ export class Server {
   /**
    * Stop the server gracefully.
    *
-   * Aborts the server and closes the database connection.
+   * Aborts the server, clears the keepalive timer, and closes the database connection.
    */
   stop(): void {
     console.log("Stopping SBy server...");
+
+    // Clear keepalive timer
+    if (this.keepaliveInterval !== null) {
+      clearInterval(this.keepaliveInterval);
+      this.keepaliveInterval = null;
+    }
+
     this.abortController.abort();
     this.db.close();
     console.log("SBy server stopped.");
@@ -190,6 +210,11 @@ export class Server {
     // POST /api/chat - Stream chat response
     if (method === "POST" && path === "/api/chat") {
       return await handleChat(ctx, request);
+    }
+
+    // GET /api/events - Persistent SSE event stream
+    if (method === "GET" && path === "/api/events") {
+      return handleEvents(ctx, request);
     }
 
     // GET /api/conversations - List conversations (JSON)

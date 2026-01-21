@@ -12,7 +12,7 @@ import type { SSEEvent } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
-import { EntityTurn, type EntityYield } from "../entity/mod.ts";
+import { EntityTurn, type EntityYield, generateAndSetTitle } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
 import {
   renderAppShell,
@@ -23,6 +23,7 @@ import {
 import { updateConversationTitle } from "./state-changes.ts";
 import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
 import { MAX_SSE_MESSAGE_SIZE, SSE_TRUNCATION_SUFFIX } from "../constants.ts";
+import { getBroadcaster } from "./broadcaster.ts";
 
 /**
  * Context passed to route handlers containing dependencies.
@@ -495,6 +496,10 @@ export async function handleChat(
     );
   }
 
+  // Check if this is the first message (for auto-titling in parallel)
+  const existingMessages = ctx.db.getMessages(body.conversationId);
+  const isFirstMessage = existingMessages.length === 0 && !conversation.title;
+
   // Create an AbortController to handle client disconnect
   const abortController = new AbortController();
   const { signal } = abortController;
@@ -503,6 +508,11 @@ export async function handleChat(
   const stream = new ReadableStream<SSEEvent>({
     async start(controller) {
       try {
+        // Start auto-title generation in parallel (runs concurrently with main response)
+        const titlePromise = isFirstMessage
+          ? generateAndSetTitle(body.conversationId, body.message, ctx.db)
+          : null;
+
         // Create EntityTurn instance
         const turn = new EntityTurn(
           ctx.llm,
@@ -512,15 +522,17 @@ export async function handleChat(
         );
 
         // Process the message and stream chunks
-        // process(conversationId, userMessage)
         for await (const chunk of turn.process(body.conversationId, body.message)) {
-          // Check if client has disconnected
           if (signal.aborted) {
             console.log("Client disconnected, stopping stream");
             break;
           }
-          const event = convertToSSEEvent(chunk);
-          controller.enqueue(event);
+          controller.enqueue(convertToSSEEvent(chunk));
+        }
+
+        // Await title generation (it broadcasts its own updates via persistent SSE)
+        if (titlePromise && !signal.aborted) {
+          await titlePromise;
         }
       } catch (error) {
         // Don't log or send error events if client disconnected
@@ -694,4 +706,66 @@ export function handleCORS(): Response {
       "Access-Control-Max-Age": "86400",
     },
   });
+}
+
+/**
+ * SSE headers for persistent event stream connections.
+ */
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  "Connection": "keep-alive",
+  "Access-Control-Allow-Origin": "*",
+};
+
+/**
+ * Handle GET /api/events - Persistent SSE event stream
+ *
+ * Creates a persistent SSE connection that receives DOM updates from
+ * background operations like auto-title generation. Unlike /api/chat,
+ * this connection stays open independently of any specific request.
+ *
+ * @param _ctx - Route context (unused)
+ * @param request - HTTP Request (may contain conversationId query param)
+ * @returns HTTP Response with SSE stream
+ */
+export function handleEvents(_ctx: RouteContext, request: Request): Response {
+  const url = new URL(request.url);
+  const conversationId = url.searchParams.get("conversationId");
+  const broadcaster = getBroadcaster();
+  const encoder = new TextEncoder();
+
+  let clientId: string | null = null;
+
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      // Create a wrapper controller that encodes strings to Uint8Array
+      const stringController = {
+        enqueue: (str: string) => controller.enqueue(encoder.encode(str)),
+        close: () => controller.close(),
+        error: (e: Error) => controller.error(e),
+      };
+
+      // Register this client with the broadcaster (using string-based controller)
+      clientId = broadcaster.addClient(
+        stringController as unknown as ReadableStreamDefaultController<string>,
+        conversationId
+      );
+
+      // Send initial connected event
+      const connectedEvent = `event: connected\ndata: ${JSON.stringify({
+        clientId,
+        conversationId,
+      })}\n\n`;
+      controller.enqueue(encoder.encode(connectedEvent));
+    },
+    cancel() {
+      // Client disconnected - clean up
+      if (clientId) {
+        broadcaster.removeClient(clientId);
+      }
+    },
+  });
+
+  return new Response(stream, { headers: SSE_HEADERS });
 }

@@ -12,4 +12,4 @@ export type { ChatMessage, LLMConfig, StreamChunk } from "./types.ts";
 export { LLMError } from "./types.ts";
 
 // Re-export client
-export { createDefaultClient, LLMClient } from "./client.ts";
+export { createDefaultClient, createWorkerClient, LLMClient } from "./client.ts";

@@ -11,6 +11,56 @@ let currentConversationId = null;
 let isStreaming = false;
 const pendingToolCalls = new Map();
 let currentAbortController = null;
+let persistentSSE = null;
+
+// =============================================================================
+// Persistent SSE Connection
+// =============================================================================
+
+/**
+ * Initialize or reconnect the persistent SSE connection.
+ * This connection receives DOM updates from background operations.
+ */
+function initPersistentSSE() {
+  // Close existing connection if any
+  if (persistentSSE) {
+    persistentSSE.close();
+    persistentSSE = null;
+  }
+
+  // Build URL with optional conversation filter
+  const url = currentConversationId
+    ? `/api/events?conversationId=${currentConversationId}`
+    : '/api/events';
+
+  persistentSSE = new EventSource(url);
+
+  persistentSSE.addEventListener('connected', (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      console.log('Persistent SSE connected:', data.clientId);
+    } catch (e) {
+      console.warn('Failed to parse connected event:', e);
+    }
+  });
+
+  persistentSSE.addEventListener('dom_update', (event) => {
+    try {
+      const update = JSON.parse(event.data);
+      const target = document.querySelector(update.target);
+      if (target) {
+        htmx.swap(target, update.html, { swapStyle: update.swap || 'innerHTML' });
+      }
+    } catch (e) {
+      console.error('Failed to handle dom_update:', e);
+    }
+  });
+
+  persistentSSE.onerror = (error) => {
+    console.warn('Persistent SSE error, will reconnect:', error);
+    // EventSource automatically reconnects on error
+  };
+}
 
 // =============================================================================
 // Initialization
@@ -28,8 +78,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const match = globalThis.location.pathname.match(/^\/c\/([^/]+)$/);
   if (match) {
     const conversationId = match[1];
+    currentConversationId = conversationId;
     loadConversationFromUrl(conversationId);
   }
+
+  // Initialize persistent SSE connection for background updates
+  initPersistentSSE();
 
   // Event delegation for conversation list clicks
   // This avoids inline onclick handlers (XSS prevention)
@@ -140,6 +194,9 @@ async function newConversation() {
     const conversation = await response.json();
     currentConversationId = conversation.id;
 
+    // Reconnect persistent SSE for the new conversation
+    initPersistentSSE();
+
     // Reset header title to default
     const headerTitle = document.getElementById('header-title');
     if (headerTitle) {
@@ -206,6 +263,9 @@ function selectConversation(id) {
   isStreaming = false;
   pendingToolCalls.clear();
   currentConversationId = id;
+
+  // Reconnect persistent SSE for the new conversation
+  initPersistentSSE();
 
   // Update active state in list
   document.querySelectorAll('.conv-item').forEach((item) => {
@@ -355,10 +415,6 @@ async function sendMessage() {
         }
       }
     }
-
-    // Reload conversations to update titles
-    htmx.trigger('#conv-list', 'load');
-
   } catch (error) {
     if (error.name === 'AbortError') {
       console.log('Request aborted');

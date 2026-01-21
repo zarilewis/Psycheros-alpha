@@ -397,3 +397,37 @@ export function createDefaultClient(
 
   return new LLMClient(config);
 }
+
+/**
+ * Create an LLM client configured for the worker model.
+ *
+ * Uses the same API credentials but with a lighter model (ZAI_WORKER_MODEL)
+ * suitable for quick tasks like auto-titling conversations.
+ *
+ * @param options - Optional configuration overrides
+ * @throws LLMError if API key is not provided and ZAI_API_KEY env var is not set
+ */
+export function createWorkerClient(
+  options?: Partial<LLMConfig>,
+): LLMClient {
+  const apiKey = options?.apiKey || Deno.env.get("ZAI_API_KEY");
+
+  if (!apiKey) {
+    throw new LLMError(
+      "API key is required. Set ZAI_API_KEY environment variable or provide apiKey in options.",
+      "MISSING_API_KEY",
+    );
+  }
+
+  const config: LLMConfig = {
+    baseUrl:
+      options?.baseUrl ||
+      Deno.env.get("ZAI_BASE_URL") ||
+      "https://api.z.ai/api/coding/paas/v4/chat/completions",
+    apiKey,
+    model: options?.model || Deno.env.get("ZAI_WORKER_MODEL") || "GLM-4.5-Air",
+    thinkingEnabled: options?.thinkingEnabled ?? false, // Worker model doesn't need thinking
+  };
+
+  return new LLMClient(config);
+}
