@@ -75,9 +75,25 @@ async function loadConversationFromUrl(conversationId) {
     }
 
     const html = await response.text();
+
+    // Parse the response to extract OOB elements
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    // Handle header title OOB swap
+    const headerTitleOob = doc.querySelector('#header-title[hx-swap-oob]');
+    if (headerTitleOob) {
+      const headerTitle = document.getElementById('header-title');
+      if (headerTitle) {
+        headerTitle.innerHTML = headerTitleOob.innerHTML;
+      }
+      headerTitleOob.remove();
+    }
+
+    // Set the chat content (without OOB elements)
     const chat = document.getElementById('chat');
     if (chat) {
-      chat.innerHTML = html;
+      chat.innerHTML = doc.body.innerHTML;
     }
 
     // Mark as active in sidebar after it loads
@@ -111,6 +127,12 @@ async function newConversation() {
 
     const conversation = await response.json();
     currentConversationId = conversation.id;
+
+    // Reset header title to default
+    const headerTitle = document.getElementById('header-title');
+    if (headerTitle) {
+      headerTitle.textContent = 'Strauberry Tavern';
+    }
 
     // Reload conversation list
     htmx.trigger('#conv-list', 'load');
@@ -413,6 +435,18 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         }
       } catch (e) {
         console.error('Failed to parse tool result:', e);
+      }
+      break;
+
+    case 'dom_update':
+      try {
+        const update = JSON.parse(data);
+        const target = document.querySelector(update.target);
+        if (target) {
+          htmx.swap(target, update.html, { swapStyle: update.swap || 'innerHTML' });
+        }
+      } catch (e) {
+        console.error('Failed to handle dom_update:', e);
       }
       break;
 

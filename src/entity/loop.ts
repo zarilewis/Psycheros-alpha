@@ -7,9 +7,10 @@
 
 import type { LLMClient, StreamChunk, ChatMessage } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
-import type { ToolRegistry } from "../tools/mod.ts";
-import type { ToolCall, ToolResult, Message } from "../types.ts";
+import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
+import type { ToolCall, ToolResult, Message, UIUpdate } from "../types.ts";
 import { loadSByMd, buildSystemMessage } from "./context.ts";
+import { generateUIUpdates } from "../server/ui-updates.ts";
 
 /**
  * Configuration for the entity turn processor.
@@ -27,11 +28,12 @@ export interface EntityConfig {
 const DEFAULT_MAX_TOOL_ITERATIONS = 10;
 
 /**
- * Extended yield type that includes tool results.
+ * Extended yield type that includes tool results and UI updates.
  */
 export type EntityYield =
   | StreamChunk
-  | { type: "tool_result"; result: ToolResult };
+  | { type: "tool_result"; result: ToolResult }
+  | { type: "dom_update"; update: UIUpdate };
 
 /**
  * Represents a single turn in the conversation.
@@ -175,13 +177,32 @@ export class EntityTurn {
         return;
       }
 
-      // Execute all tool calls
-      const toolResults = await this.tools.executeAll(toolCalls);
+      // Build tool execution context
+      const toolContext: Omit<ToolContext, "toolCallId"> = {
+        conversationId,
+        db: this.db,
+        config: this.config,
+        services: {},
+      };
+
+      // Execute all tool calls with context
+      const toolResults = await this.tools.executeAll(toolCalls, toolContext);
 
       // Persist tool results and add to messages for next iteration
+      // Track UI regions that need updating (from tool results, not metadata)
+      const affectedUIRegions = new Set<string>();
+
       for (const result of toolResults) {
         // Yield the tool result
         yield { type: "tool_result", result };
+
+        // Collect affected UI regions from the result
+        // (State change functions return these, making the pattern unified)
+        if (result.affectedRegions) {
+          for (const region of result.affectedRegions) {
+            affectedUIRegions.add(region);
+          }
+        }
 
         // Persist to DB (with error handling)
         try {
@@ -196,6 +217,18 @@ export class EntityTurn {
             dbError instanceof Error ? dbError.message : String(dbError),
           );
           // Continue - tool results are already yielded, just logging the persistence failure
+        }
+      }
+
+      // Generate and yield UI updates for affected regions
+      if (affectedUIRegions.size > 0) {
+        const uiUpdates = generateUIUpdates(
+          Array.from(affectedUIRegions),
+          this.db,
+          conversationId
+        );
+        for (const update of uiUpdates) {
+          yield { type: "dom_update", update };
         }
       }
 

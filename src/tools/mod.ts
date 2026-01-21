@@ -9,12 +9,20 @@
  *
  * @example
  * ```typescript
- * import { createDefaultRegistry } from "./tools/mod.ts";
+ * import { createDefaultRegistry, type ToolContext } from "./tools/mod.ts";
  *
  * const registry = createDefaultRegistry();
  *
  * // Get definitions for LLM
  * const definitions = registry.getDefinitions();
+ *
+ * // Build context for tool execution
+ * const context: Omit<ToolContext, "toolCallId"> = {
+ *   conversationId: "conv_123",
+ *   db: dbClient,
+ *   config: entityConfig,
+ *   services: {},
+ * };
  *
  * // Execute a tool call from LLM response
  * const result = await registry.execute({
@@ -24,12 +32,22 @@
  *     name: "shell",
  *     arguments: JSON.stringify({ command: "echo hello" })
  *   }
- * });
+ * }, context);
  * ```
  */
 
 // Re-export types (only those used externally)
-export type { Tool, ShellToolArgs } from "./types.ts";
+export type {
+  Tool,
+  ToolContext,
+  ToolMetadata,
+  ToolServices,
+  ShellToolArgs,
+} from "./types.ts";
 
 // Re-export registry
-export { ToolRegistry, createDefaultRegistry } from "./registry.ts";
+export {
+  ToolRegistry,
+  createDefaultRegistry,
+  getAvailableToolNames,
+} from "./registry.ts";

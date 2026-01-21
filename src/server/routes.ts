@@ -20,6 +20,8 @@ import {
   renderConversationItem,
   renderConversationList,
 } from "./templates.ts";
+import { updateConversationTitle } from "./state-changes.ts";
+import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
 
 /**
  * Context passed to route handlers containing dependencies.
@@ -226,6 +228,7 @@ export function handleConversationView(
  *
  * Returns just the chat HTML partial (messages + input area).
  * Used by HTMX for in-app navigation and by JS for initial load.
+ * Includes an out-of-band swap for the header title.
  *
  * @param ctx - Route context
  * @param conversationId - The conversation ID
@@ -245,9 +248,13 @@ export function handleChatFragment(
   }
 
   const messages = ctx.db.getMessages(conversationId);
-  const html = renderChatView(messages);
+  const chatHtml = renderChatView(messages);
 
-  return new Response(html, {
+  // Generate OOB swaps for header title using unified helper
+  const uiUpdates = generateUIUpdates(["header-title"], ctx.db, conversationId);
+  const oobHtml = renderAsOobSwaps(uiUpdates);
+
+  return new Response(chatHtml + oobHtml, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
     },
@@ -310,6 +317,85 @@ export function handleGetMessages(
       "Access-Control-Allow-Origin": "*",
     },
   });
+}
+
+/**
+ * Handle PATCH /api/conversations/:id/title - Update conversation title
+ *
+ * Updates the title and returns OOB swaps for reactive UI updates.
+ * Uses the unified state change pattern.
+ *
+ * @param ctx - Route context
+ * @param conversationId - The conversation ID
+ * @param request - HTTP Request with body { title: string }
+ * @returns HTTP Response with OOB swap HTML for HTMX, or JSON for non-HTMX
+ */
+export async function handleUpdateTitle(
+  ctx: RouteContext,
+  conversationId: string,
+  request: Request
+): Promise<Response> {
+  // Parse request body
+  let title: string;
+  try {
+    const body = await request.json();
+    if (!body.title || typeof body.title !== "string") {
+      throw new Error("Missing or invalid title");
+    }
+    title = body.title;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Invalid request body";
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Use the unified state change function
+  const result = updateConversationTitle(ctx.db, conversationId, title);
+
+  if (!result.success) {
+    return new Response(
+      JSON.stringify({ error: result.error }),
+      {
+        status: result.error?.includes("not found") ? 404 : 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // For HTMX requests, return OOB swaps for reactive updates
+  if (request.headers.get("HX-Request") === "true") {
+    const uiUpdates = generateUIUpdates(result.affectedRegions, ctx.db, conversationId);
+    const oobHtml = renderAsOobSwaps(uiUpdates);
+
+    return new Response(oobHtml, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
+  // For regular requests, return JSON
+  return new Response(
+    JSON.stringify({ success: true, title: result.data?.title }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    }
+  );
 }
 
 /**
@@ -477,6 +563,12 @@ function convertToSSEEvent(chunk: EntityYield): SSEEvent {
       return {
         type: "tool_result",
         data: JSON.stringify(chunk.result),
+      };
+
+    case "dom_update":
+      return {
+        type: "dom_update",
+        data: JSON.stringify(chunk.update),
       };
 
     case "done":

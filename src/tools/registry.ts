@@ -6,8 +6,22 @@
  */
 
 import type { ToolCall, ToolDefinition, ToolResult } from "../types.ts";
-import type { Tool } from "./types.ts";
+import type { Tool, ToolContext } from "./types.ts";
 import { shellTool } from "./shell.ts";
+import { updateTitleTool } from "./update_title.ts";
+
+// =============================================================================
+// Available Tools Catalog
+// =============================================================================
+
+/**
+ * All tools that can be enabled via the SBY_TOOLS environment variable.
+ * Each tool is keyed by its name (lowercase).
+ */
+const AVAILABLE_TOOLS: Record<string, Tool> = {
+  shell: shellTool,
+  update_title: updateTitleTool,
+};
 
 /**
  * Registry for managing available tools.
@@ -46,17 +60,27 @@ export class ToolRegistry {
   }
 
   /**
-   * Execute a tool call.
+   * Execute a tool call with the given context.
    *
    * Parses the arguments from the tool call's JSON string,
-   * finds the tool by name, and executes it.
+   * finds the tool by name, and executes it with context.
    *
    * @param toolCall - The tool call to execute
+   * @param baseContext - The execution context (without toolCallId, which is added automatically)
    * @returns The result of the tool execution
    */
-  async execute(toolCall: ToolCall): Promise<ToolResult> {
+  async execute(
+    toolCall: ToolCall,
+    baseContext: Omit<ToolContext, "toolCallId">
+  ): Promise<ToolResult> {
     const toolName = toolCall.function.name;
     const tool = this.tools.get(toolName);
+
+    // Build complete context with toolCallId
+    const ctx: ToolContext = {
+      ...baseContext,
+      toolCallId: toolCall.id,
+    };
 
     // Handle unknown tool
     if (!tool) {
@@ -86,14 +110,9 @@ export class ToolRegistry {
       };
     }
 
-    // Pass toolCallId to executor via args (convention: _toolCallId).
-    // This allows tools to include the ID in their result without
-    // requiring a separate parameter in the Tool interface.
-    args._toolCallId = toolCall.id;
-
-    // Execute the tool
+    // Execute the tool with context
     try {
-      const result = await tool.execute(args);
+      const result = await tool.execute(args, ctx);
       // Ensure the result has the correct toolCallId
       return {
         ...result,
@@ -113,26 +132,61 @@ export class ToolRegistry {
    * Execute multiple tool calls in parallel.
    *
    * @param toolCalls - Array of tool calls to execute
+   * @param baseContext - The execution context (toolCallId added per-call)
    * @returns Array of tool results in the same order as input
    */
-  executeAll(toolCalls: ToolCall[]): Promise<ToolResult[]> {
-    return Promise.all(toolCalls.map((toolCall) => this.execute(toolCall)));
+  executeAll(
+    toolCalls: ToolCall[],
+    baseContext: Omit<ToolContext, "toolCallId">
+  ): Promise<ToolResult[]> {
+    return Promise.all(
+      toolCalls.map((toolCall) => this.execute(toolCall, baseContext))
+    );
   }
 }
 
 /**
- * Create a registry with the default set of tools.
+ * Get the list of all available tool names.
  *
- * Currently includes:
- * - shell: Execute shell commands
- *
- * @returns A new ToolRegistry with default tools registered
+ * @returns Array of tool names that can be enabled
  */
-export function createDefaultRegistry(): ToolRegistry {
+export function getAvailableToolNames(): string[] {
+  return Object.keys(AVAILABLE_TOOLS);
+}
+
+/**
+ * Create a registry with only the specified tools enabled.
+ *
+ * @param allowedTools - Array of tool names to enable (empty = no tools)
+ * @returns A new ToolRegistry with only allowed tools registered
+ *
+ * @example
+ * ```typescript
+ * // Enable only shell tool
+ * const registry = createDefaultRegistry(["shell"]);
+ *
+ * // No tools enabled (secure default)
+ * const registry = createDefaultRegistry([]);
+ * ```
+ */
+export function createDefaultRegistry(allowedTools: string[] = []): ToolRegistry {
   const registry = new ToolRegistry();
 
-  // Register default tools
-  registry.register(shellTool);
+  // Normalize tool names to lowercase for matching
+  const normalizedAllowed = new Set(allowedTools.map((t) => t.toLowerCase()));
+
+  // Register only allowed tools
+  for (const toolName of normalizedAllowed) {
+    const tool = AVAILABLE_TOOLS[toolName];
+    if (tool) {
+      registry.register(tool);
+    } else {
+      console.warn(
+        `Warning: Unknown tool '${toolName}' in SBY_TOOLS. ` +
+          `Available tools: ${Object.keys(AVAILABLE_TOOLS).join(", ")}`
+      );
+    }
+  }
 
   return registry;
 }

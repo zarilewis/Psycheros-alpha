@@ -6,7 +6,7 @@
  */
 
 import type { ToolResult } from "../types.ts";
-import type { Tool, ShellToolArgs } from "./types.ts";
+import type { Tool, ToolContext, ShellToolArgs } from "./types.ts";
 
 /** Default timeout for shell commands in milliseconds */
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -162,18 +162,22 @@ export const shellTool: Tool = {
     },
   },
 
-  execute: async (args: Record<string, unknown>): Promise<ToolResult> => {
-    // toolCallId is passed via args._toolCallId by the registry (see registry.ts).
-    // Falls back to "direct-call" for direct invocations outside the registry.
-    const toolCallId = (args._toolCallId as string) ?? "direct-call";
+  metadata: {
+    category: "system",
+    capabilities: ["execute", "write", "dangerous"],
+  },
 
+  execute: async (
+    args: Record<string, unknown>,
+    ctx: ToolContext
+  ): Promise<ToolResult> => {
     try {
       const parsedArgs = parseArgs(args);
-      return await executeCommand(parsedArgs, toolCallId);
+      return await executeCommand(parsedArgs, ctx.toolCallId);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       return {
-        toolCallId,
+        toolCallId: ctx.toolCallId,
         content: `Error: ${errorMessage}`,
         isError: true,
       };

@@ -180,9 +180,19 @@ export function renderHeader(): string {
         <path d="M3 12h18M3 6h18M3 18h18"/>
       </svg>
     </button>
-    <div class="logo">SBy<span class="logo-sub">Strauberry Tavern</span></div>
+    <div class="logo">SBy<span class="logo-sub" id="header-title">Strauberry Tavern</span></div>
   </div>
 </header>`;
+}
+
+/**
+ * Render just the header title/subtitle text.
+ * Returns the conversation title if available, otherwise "Untitled".
+ * Note: "Strauberry Tavern" is shown when no conversation is selected,
+ * which is handled by the initial template and newConversation() in JS.
+ */
+export function renderHeaderTitle(title?: string): string {
+  return escapeHtml(title || "Untitled");
 }
 
 /**

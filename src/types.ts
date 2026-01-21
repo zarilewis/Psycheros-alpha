@@ -57,6 +57,21 @@ export interface ToolResult {
   toolCallId: string;
   content: string;
   isError?: boolean;
+  /** UI regions affected by this tool execution (for reactive updates) */
+  affectedRegions?: string[];
+}
+
+/**
+ * Represents a UI update to be sent to the client.
+ * Used for reactive DOM updates when tools modify state.
+ */
+export interface UIUpdate {
+  /** CSS selector for the target element */
+  target: string;
+  /** HTML fragment to swap in */
+  html: string;
+  /** HTMX swap strategy (default: innerHTML) */
+  swap?: string;
 }
 
 // =============================================================================
@@ -71,11 +86,12 @@ export interface ToolResult {
  * - content: Main response content
  * - tool_call: Tool invocation request
  * - tool_result: Result from tool execution
+ * - dom_update: Reactive UI update with HTML fragment and swap target
  * - status: Status updates (e.g., "processing", "complete")
  * - done: Stream completion signal
  */
 export interface SSEEvent {
-  type: "thinking" | "content" | "tool_call" | "tool_result" | "status" | "done";
+  type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "done";
   data: string;
 }
 

@@ -39,9 +39,9 @@ Each module has a `mod.ts` barrel file defining its public API:
 
 - **`src/llm/`** - OpenAI-compatible client for Z.ai API. Handles streaming, tool calls, and thinking/reasoning content.
 - **`src/db/`** - SQLite persistence via `@db/sqlite`. Stores conversations and messages.
-- **`src/tools/`** - Tool registry and executors. Currently has `shell` tool for command execution.
+- **`src/tools/`** - Tool registry and executors. Has `shell` (command execution) and `update_title` (conversation naming) tools.
 - **`src/entity/`** - The agentic loop. `EntityTurn` orchestrates: load context → LLM call → tool execution → persist → repeat until done.
-- **`src/server/`** - HTTP server with SSE streaming. Routes handle API endpoints and static files.
+- **`src/server/`** - HTTP server with SSE streaming. Includes `routes.ts` (API/static), `state-changes.ts` (unified state mutations), `ui-updates.ts` (reactive DOM updates), and `templates.ts` (HTML rendering).
 - **`src/types.ts`** - Shared types used across modules.
 
 ### Key Patterns
@@ -57,10 +57,26 @@ Each module has a `mod.ts` barrel file defining its public API:
 ### SSE Event Types
 
 ```typescript
-type: "thinking" | "content" | "tool_call" | "tool_result" | "status" | "done"
+type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "done"
 ```
+
+### Reactive UI Updates
+
+State changes that affect the UI use a unified pattern:
+
+1. **State change functions** in `src/server/state-changes.ts` perform DB operations and return `affectedRegions`
+2. **Tools** call state change functions and pass `affectedRegions` through in their result
+3. **Entity loop** reads `result.affectedRegions` and yields `dom_update` SSE events
+4. **API endpoints** use `generateUIUpdates()` + `renderAsOobSwaps()` for HTMX OOB swaps
+5. **Client** handles `dom_update` events with `htmx.swap()`
+
+To add a new state-changing feature:
+1. Add function to `state-changes.ts` that returns `{ success, data, affectedRegions }`
+2. Call it from tool or API endpoint
+3. UI updates flow automatically
 
 ### Adding a New Tool
 
 1. Create tool file in `src/tools/` with `Tool` interface (definition + execute function)
 2. Register in `createDefaultRegistry()` in `registry.ts`
+3. If tool changes UI state, use a state change function from `state-changes.ts`

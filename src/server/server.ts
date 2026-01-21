@@ -21,6 +21,7 @@ import {
   handleIndex,
   handleListConversations,
   handleStaticFile,
+  handleUpdateTitle,
   type RouteContext,
 } from "./routes.ts";
 
@@ -36,6 +37,8 @@ export interface ServerConfig {
   projectRoot: string;
   /** Optional database path (default: {projectRoot}/.sby/sby.db) */
   dbPath?: string;
+  /** List of tool names the entity is allowed to use (empty = no tools) */
+  allowedTools?: string[];
 }
 
 /**
@@ -79,8 +82,8 @@ export class Server {
     // Initialize LLM client with defaults
     this.llm = createDefaultClient();
 
-    // Initialize tool registry with default tools
-    this.tools = createDefaultRegistry();
+    // Initialize tool registry with only allowed tools
+    this.tools = createDefaultRegistry(config.allowedTools ?? []);
 
     // Create abort controller for graceful shutdown
     this.abortController = new AbortController();
@@ -204,6 +207,13 @@ export class Server {
     if (method === "GET" && messagesMatch) {
       const conversationId = messagesMatch[1];
       return handleGetMessages(ctx, conversationId);
+    }
+
+    // PATCH /api/conversations/:id/title - Update title
+    const titleMatch = path.match(/^\/api\/conversations\/([^/]+)\/title$/);
+    if (method === "PATCH" && titleMatch) {
+      const conversationId = titleMatch[1];
+      return await handleUpdateTitle(ctx, conversationId, request);
     }
 
     // 404 for unknown API routes

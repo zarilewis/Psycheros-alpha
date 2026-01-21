@@ -164,6 +164,35 @@ export class DBClient {
   }
 
   /**
+   * Updates the title of a conversation.
+   *
+   * @param id - The conversation ID
+   * @param title - The new title (or undefined to clear)
+   * @returns The updated conversation or null if not found
+   */
+  updateConversationTitle(id: string, title: string | undefined): Conversation | null {
+    const now = new Date();
+    const nowISO = now.toISOString();
+
+    // Check if conversation exists first
+    const conversation = this.getConversation(id);
+    if (!conversation) {
+      return null;
+    }
+
+    this.db.exec(
+      `UPDATE conversations SET title = ?, updated_at = ? WHERE id = ?`,
+      [title ?? null, nowISO, id]
+    );
+
+    return {
+      ...conversation,
+      title,
+      updatedAt: now,
+    };
+  }
+
+  /**
    * Converts a database row to a Conversation object.
    */
   private rowToConversation(row: ConversationRow): Conversation {
