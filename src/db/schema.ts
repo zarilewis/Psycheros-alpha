@@ -43,6 +43,7 @@ export const SCHEMA = `
   CREATE TABLE IF NOT EXISTS turn_metrics (
     id TEXT PRIMARY KEY,
     conversation_id TEXT NOT NULL,
+    message_id TEXT,
     request_started_at TEXT NOT NULL,
     ttfb INTEGER,
     ttfc INTEGER,
@@ -52,7 +53,8 @@ export const SCHEMA = `
     chunk_count INTEGER NOT NULL DEFAULT 0,
     finish_reason TEXT,
     created_at TEXT NOT NULL,
-    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
   );
 
   CREATE INDEX IF NOT EXISTS idx_turn_metrics_conversation
@@ -67,4 +69,21 @@ export const SCHEMA = `
  */
 export function initializeSchema(db: Database): void {
   db.exec(SCHEMA);
+  runMigrations(db);
+}
+
+/**
+ * Run schema migrations for backward compatibility.
+ * Each migration checks if it's needed before applying.
+ */
+function runMigrations(db: Database): void {
+  // Migration: Add message_id column to turn_metrics if missing
+  const hasMessageId = db
+    .prepare("SELECT 1 FROM pragma_table_info('turn_metrics') WHERE name = 'message_id'")
+    .get();
+
+  if (!hasMessageId) {
+    db.exec("ALTER TABLE turn_metrics ADD COLUMN message_id TEXT REFERENCES messages(id) ON DELETE CASCADE");
+    db.exec("CREATE INDEX IF NOT EXISTS idx_turn_metrics_message ON turn_metrics(message_id)");
+  }
 }

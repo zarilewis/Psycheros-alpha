@@ -121,6 +121,8 @@ export interface Conversation {
 export interface TurnMetrics {
   id: string;
   conversationId: string;
+  /** ID of the assistant message these metrics belong to (for persistence) */
+  messageId?: string;
   /** ISO timestamp of when the request started */
   requestStartedAt: string;
   /** Time to first byte from API (ms) */

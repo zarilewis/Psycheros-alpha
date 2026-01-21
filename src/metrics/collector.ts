@@ -88,17 +88,32 @@ export function setFinishReason(
 }
 
 /**
+ * Options for finalizing metrics.
+ */
+export interface FinalizeOptions {
+  /** Final finish reason (overrides any set during stream) */
+  finishReason?: string;
+  /** Message ID to link metrics to */
+  messageId?: string;
+}
+
+/**
  * Finalize the collector and produce a TurnMetrics object.
  * Calculates derived values like TTFB and total duration.
  *
  * @param collector - The metrics collector to finalize
- * @param finishReason - Optional final finish reason (overrides any set during stream)
+ * @param options - Optional finalize options (finish reason, message ID)
  * @returns A TurnMetrics object ready for persistence
  */
 export function finalize(
   collector: MetricsCollector,
-  finishReason?: string
+  options?: FinalizeOptions | string
 ): TurnMetrics {
+  // Support legacy signature: finalize(collector, finishReason)
+  const opts: FinalizeOptions = typeof options === "string"
+    ? { finishReason: options }
+    : options ?? {};
+
   const now = new Date();
   const startMs = collector.requestStartedAt.getTime();
 
@@ -118,6 +133,7 @@ export function finalize(
   return {
     id: crypto.randomUUID(),
     conversationId: collector.conversationId,
+    messageId: opts.messageId,
     requestStartedAt: collector.requestStartedAt.toISOString(),
     ttfb,
     ttfc,
@@ -125,7 +141,7 @@ export function finalize(
     slowChunkCount: collector.slowChunkCount,
     totalDuration,
     chunkCount: collector.chunkCount,
-    finishReason: finishReason ?? collector.finishReason,
+    finishReason: opts.finishReason ?? collector.finishReason,
     createdAt: now.toISOString(),
   };
 }

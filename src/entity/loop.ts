@@ -177,21 +177,20 @@ export class EntityTurn {
         finishReason = "error";
       }
 
-      // Finalize and persist metrics (non-fatal)
-      const metrics = finalize(metricsCollector, finishReason);
-      this.db.addTurnMetrics(metrics);
-      yield { type: "metrics", metrics };
+      // Generate message ID upfront so we can link metrics to it
+      const hasContent = assistantContent || toolCalls.length > 0 || assistantReasoning;
+      const messageId = hasContent ? crypto.randomUUID() : undefined;
 
-      // Persist the assistant message (even partial content on error)
+      // Persist the assistant message FIRST (metrics reference it via FK)
       // This ensures we don't lose content that was already streamed
-      if (assistantContent || toolCalls.length > 0 || assistantReasoning) {
+      if (hasContent) {
         try {
           this.db.addMessage(conversationId, {
             role: "assistant",
             content: assistantContent,
             reasoningContent: assistantReasoning || undefined,
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-          });
+          }, messageId);
         } catch (dbError) {
           // Non-fatal: content already streamed to client (see Error Handling Strategy)
           console.error(
@@ -200,6 +199,12 @@ export class EntityTurn {
           );
         }
       }
+
+      // Finalize and persist metrics (non-fatal), linked to message if present
+      // Must happen AFTER message insert due to FK constraint
+      const metrics = finalize(metricsCollector, { finishReason, messageId });
+      this.db.addTurnMetrics(metrics);
+      yield { type: "metrics", metrics };
 
       // If there was a stream error, re-throw it after persisting
       if (streamError) {

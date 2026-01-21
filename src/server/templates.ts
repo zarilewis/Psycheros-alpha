@@ -7,7 +7,7 @@
  * @module
  */
 
-import type { Conversation, Message, ToolCall, ToolResult } from "../types.ts";
+import type { Conversation, Message, ToolCall, ToolResult, TurnMetrics } from "../types.ts";
 
 // =============================================================================
 // Utilities
@@ -275,12 +275,20 @@ export function renderConversationItem(
 // =============================================================================
 
 /**
+ * Map of message ID to metrics for efficient lookup during rendering.
+ */
+export type MetricsMap = Map<string, TurnMetrics>;
+
+/**
  * Render the chat view for a conversation.
  * Includes messages and input area.
+ *
+ * @param messages - Messages to render
+ * @param metricsMap - Optional map of message ID to metrics
  */
-export function renderChatView(messages: Message[]): string {
+export function renderChatView(messages: Message[], metricsMap?: MetricsMap): string {
   return `<div class="messages" id="messages">
-  ${messages.length === 0 ? "" : renderMessages(messages)}
+  ${messages.length === 0 ? "" : renderMessages(messages, metricsMap)}
 </div>
 ${renderInputArea()}`;
 }
@@ -288,21 +296,21 @@ ${renderInputArea()}`;
 /**
  * Render all messages.
  */
-export function renderMessages(messages: Message[]): string {
+export function renderMessages(messages: Message[], metricsMap?: MetricsMap): string {
   return messages
     .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => renderMessage(m))
+    .map((m) => renderMessage(m, metricsMap?.get(m.id)))
     .join("");
 }
 
 /**
  * Render a single message based on role.
  */
-export function renderMessage(msg: Message): string {
+export function renderMessage(msg: Message, metrics?: TurnMetrics): string {
   if (msg.role === "user") {
     return renderUserMessage(msg.content);
   } else if (msg.role === "assistant") {
-    return renderAssistantMessage(msg);
+    return renderAssistantMessage(msg, metrics);
   }
   return "";
 }
@@ -318,11 +326,11 @@ export function renderUserMessage(content: string): string {
 }
 
 /**
- * Render an assistant message with optional thinking and tool calls.
+ * Render an assistant message with optional thinking, tool calls, and metrics.
  */
-export function renderAssistantMessage(msg: Message): string {
+export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics): string {
   let html = `<div class="msg msg--assistant">
-  <div class="msg-header">Assistant</div>
+  <div class="msg-header">Assistant${metrics ? renderMetricsIndicator(metrics) : ""}</div>
   <div class="msg-content">`;
 
   // Thinking section
@@ -344,6 +352,78 @@ export function renderAssistantMessage(msg: Message): string {
 
   html += `</div></div>`;
   return html;
+}
+
+/**
+ * Format milliseconds as human-readable string.
+ */
+function formatMs(ms: number | null): string {
+  if (ms === null || ms === undefined) return "-";
+  if (ms >= 1000) {
+    return (ms / 1000).toFixed(1) + "s";
+  }
+  return Math.round(ms) + "ms";
+}
+
+/**
+ * Get CSS class for metric value based on thresholds.
+ */
+function getMetricClass(metric: string, value: number | null): string {
+  if (value === null || value === undefined) return "";
+
+  switch (metric) {
+    case "ttfb":
+      if (value > 2000) return "slow";
+      if (value > 1000) return "warning";
+      return "";
+    case "ttfc":
+      if (value > 3000) return "slow";
+      if (value > 2000) return "warning";
+      return "";
+    case "maxChunkGap":
+      if (value > 1000) return "slow";
+      if (value > 500) return "warning";
+      return "";
+    case "slowChunkCount":
+      if (value > 5) return "slow";
+      if (value > 0) return "warning";
+      return "";
+    default:
+      return "";
+  }
+}
+
+/**
+ * Render the metrics indicator for an assistant message header.
+ */
+export function renderMetricsIndicator(metrics: TurnMetrics): string {
+  const summary = formatMs(metrics.totalDuration);
+
+  const rows = [
+    { label: "TTFB", value: metrics.ttfb, metric: "ttfb", raw: false },
+    { label: "TTFC", value: metrics.ttfc, metric: "ttfc", raw: false },
+    { label: "Max Gap", value: metrics.maxChunkGap, metric: "maxChunkGap", raw: false },
+    { label: "Slow Chunks", value: metrics.slowChunkCount, metric: "slowChunkCount", raw: true },
+    { label: "Total", value: metrics.totalDuration, metric: "total", raw: false },
+    { label: "Chunks", value: metrics.chunkCount, metric: "chunks", raw: true },
+  ];
+
+  const tooltipRows = rows
+    .map((row) => {
+      const valueClass = getMetricClass(row.metric, row.value);
+      const displayValue = row.raw ? (row.value ?? "-") : formatMs(row.value);
+      return `<div class="metrics-row">
+      <span class="metrics-label">${row.label}</span>
+      <span class="metrics-value ${valueClass}">${displayValue}</span>
+    </div>`;
+    })
+    .join("");
+
+  return `<div class="metrics-indicator">
+    <span class="metrics-indicator-icon">&#9201;</span>
+    <span class="metrics-indicator-summary">${summary}</span>
+    <div class="metrics-tooltip">${tooltipRows}</div>
+  </div>`;
 }
 
 /**

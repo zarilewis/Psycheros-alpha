@@ -542,6 +542,11 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         const indicator = createMetricsIndicator(metrics);
         const header = messageEl.querySelector('.msg-header');
         if (header) {
+          // Replace existing indicator to avoid duplicates from multi-iteration turns
+          const existing = header.querySelector('.metrics-indicator');
+          if (existing) {
+            existing.remove();
+          }
           header.appendChild(indicator);
         }
       } catch (e) {
@@ -703,6 +708,28 @@ function getMetricClass(metric, value) {
   }
 }
 
+// Global click listener to handle metrics tooltip toggle and close (event delegation)
+document.addEventListener('click', (e) => {
+  const clickedIndicator = e.target.closest('.metrics-indicator');
+
+  if (clickedIndicator) {
+    // Close all other expanded indicators
+    document.querySelectorAll('.metrics-indicator.expanded').forEach(el => {
+      if (el !== clickedIndicator) {
+        el.classList.remove('expanded');
+      }
+    });
+    // Toggle the clicked indicator
+    clickedIndicator.classList.toggle('expanded');
+    return;
+  }
+
+  // Click outside - close all expanded metrics tooltips
+  document.querySelectorAll('.metrics-indicator.expanded').forEach(el => {
+    el.classList.remove('expanded');
+  });
+});
+
 /**
  * Create the metrics indicator element with tooltip.
  * @param {Object} metrics - The TurnMetrics object
@@ -711,17 +738,17 @@ function getMetricClass(metric, value) {
 function createMetricsIndicator(metrics) {
   const indicator = document.createElement('div');
   indicator.className = 'metrics-indicator';
+
   indicator.onclick = (e) => {
     e.stopPropagation();
+    // Close any other expanded indicators first
+    document.querySelectorAll('.metrics-indicator.expanded').forEach(el => {
+      if (el !== indicator) {
+        el.classList.remove('expanded');
+      }
+    });
     indicator.classList.toggle('expanded');
   };
-
-  // Close tooltip when clicking outside
-  document.addEventListener('click', (e) => {
-    if (!indicator.contains(e.target)) {
-      indicator.classList.remove('expanded');
-    }
-  }, { once: true });
 
   // Summary shows total duration
   const summary = formatMs(metrics.totalDuration);

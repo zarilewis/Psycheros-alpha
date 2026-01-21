@@ -44,6 +44,7 @@ interface MessageRow {
 interface TurnMetricsRow {
   id: string;
   conversation_id: string;
+  message_id: string | null;
   request_started_at: string;
   ttfb: number | null;
   ttfc: number | null;
@@ -235,10 +236,11 @@ export class DBClient {
    *
    * @param conversationId - The conversation ID
    * @param message - The message data (without id and createdAt)
+   * @param messageId - Optional pre-generated ID (useful for linking to metrics)
    * @returns The created message with generated fields
    * @throws Error if conversation doesn't exist or insert fails
    */
-  addMessage(conversationId: string, message: MessageInput): Message {
+  addMessage(conversationId: string, message: MessageInput, messageId?: string): Message {
     // Defense-in-depth: validate role at runtime even though TypeScript
     // enforces it at compile time and the DB schema has a CHECK constraint.
     // This catches bugs from type assertions or corrupted data.
@@ -246,7 +248,7 @@ export class DBClient {
       throw new Error(`Invalid message role: ${message.role}`);
     }
 
-    const id = crypto.randomUUID();
+    const id = messageId ?? crypto.randomUUID();
     const now = new Date();
     const nowISO = now.toISOString();
 
@@ -383,12 +385,13 @@ export class DBClient {
     try {
       this.db.exec(
         `INSERT INTO turn_metrics
-         (id, conversation_id, request_started_at, ttfb, ttfc, max_chunk_gap,
+         (id, conversation_id, message_id, request_started_at, ttfb, ttfc, max_chunk_gap,
           slow_chunk_count, total_duration, chunk_count, finish_reason, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           metrics.id,
           metrics.conversationId,
+          metrics.messageId ?? null,
           metrics.requestStartedAt,
           metrics.ttfb,
           metrics.ttfc,
@@ -419,7 +422,7 @@ export class DBClient {
    */
   getTurnMetrics(conversationId: string, limit = 10): TurnMetrics[] {
     const stmt = this.db.prepare(
-      `SELECT id, conversation_id, request_started_at, ttfb, ttfc,
+      `SELECT id, conversation_id, message_id, request_started_at, ttfb, ttfc,
               max_chunk_gap, slow_chunk_count, total_duration, chunk_count,
               finish_reason, created_at
        FROM turn_metrics
@@ -432,6 +435,27 @@ export class DBClient {
     stmt.finalize();
 
     return rows.map((row) => this.rowToTurnMetrics(row));
+  }
+
+  /**
+   * Retrieves metrics for a specific message.
+   *
+   * @param messageId - The message ID
+   * @returns The metrics or null if none exist
+   */
+  getMetricsByMessageId(messageId: string): TurnMetrics | null {
+    const stmt = this.db.prepare(
+      `SELECT id, conversation_id, message_id, request_started_at, ttfb, ttfc,
+              max_chunk_gap, slow_chunk_count, total_duration, chunk_count,
+              finish_reason, created_at
+       FROM turn_metrics
+       WHERE message_id = ?`
+    );
+
+    const row = stmt.get<TurnMetricsRow>(messageId);
+    stmt.finalize();
+
+    return row ? this.rowToTurnMetrics(row) : null;
   }
 
   /**
@@ -452,6 +476,7 @@ export class DBClient {
     return {
       id: row.id,
       conversationId: row.conversation_id,
+      messageId: row.message_id ?? undefined,
       requestStartedAt: row.request_started_at,
       ttfb: row.ttfb,
       ttfc: row.ttfc,

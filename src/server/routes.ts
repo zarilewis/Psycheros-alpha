@@ -19,6 +19,7 @@ import {
   renderChatView,
   renderConversationItem,
   renderConversationList,
+  type MetricsMap,
 } from "./templates.ts";
 import { updateConversationTitle } from "./state-changes.ts";
 import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
@@ -281,7 +282,19 @@ export function handleChatFragment(
   }
 
   const messages = ctx.db.getMessages(conversationId);
-  const chatHtml = renderChatView(messages);
+
+  // Build metrics map for assistant messages
+  const metricsMap: MetricsMap = new Map();
+  for (const msg of messages) {
+    if (msg.role === "assistant") {
+      const metrics = ctx.db.getMetricsByMessageId(msg.id);
+      if (metrics) {
+        metricsMap.set(msg.id, metrics);
+      }
+    }
+  }
+
+  const chatHtml = renderChatView(messages, metricsMap);
 
   // Generate OOB swaps for header title using unified helper
   const uiUpdates = generateUIUpdates(["header-title"], ctx.db, conversationId);
