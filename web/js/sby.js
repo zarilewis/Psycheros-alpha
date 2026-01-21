@@ -392,11 +392,14 @@ async function sendMessage() {
 
       buffer += decoder.decode(value, { stream: true });
 
-      // Parse SSE events
+      // Parse SSE events - accumulate data lines and dispatch on blank line
+      // Per SSE spec, multiple data: lines should be joined with newlines
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
       let currentEventType = 'content';
+      let dataLines = [];
+
       for (const line of lines) {
         if (line.startsWith('event: ')) {
           currentEventType = line.slice(7).trim();
@@ -404,7 +407,13 @@ async function sendMessage() {
         }
 
         if (line.startsWith('data: ')) {
-          const data = line.slice(6);
+          dataLines.push(line.slice(6));
+          continue;
+        }
+
+        // Empty line signals end of event - dispatch accumulated data
+        if (line === '' && dataLines.length > 0) {
+          const data = dataLines.join('\n');
           handleSSEEvent(currentEventType, data, assistantEl, {
             getThinking: () => currentThinking,
             setThinking: (el) => currentThinking = el,
@@ -412,6 +421,7 @@ async function sendMessage() {
             setContent: (el) => currentContent = el
           });
           currentEventType = 'content';
+          dataLines = [];
         }
       }
     }
