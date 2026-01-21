@@ -12,11 +12,8 @@ import type { SSEEvent } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
-import type { EntityYield } from "../entity/mod.ts";
+import { EntityTurn, type EntityYield } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
-
-// Note: EntityTurn is imported dynamically since it may not exist yet
-// (being built in parallel). The handleChat function uses a type assertion.
 
 /**
  * Context passed to route handlers containing dependencies.
@@ -289,12 +286,7 @@ export async function handleChat(
   const stream = new ReadableStream<SSEEvent>({
     async start(controller) {
       try {
-        // Dynamically import EntityTurn (may not exist yet during parallel development)
-        // In production, this would be a static import
-        const { EntityTurn } = await import("../entity/mod.ts");
-
-        // Create EntityTurn instance with the correct signature:
-        // constructor(llm, db, tools, config)
+        // Create EntityTurn instance
         const turn = new EntityTurn(
           ctx.llm,
           ctx.db,

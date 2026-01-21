@@ -33,6 +33,3 @@ export type { Tool, ShellToolArgs } from "./types.ts";
 
 // Re-export registry
 export { ToolRegistry, createDefaultRegistry } from "./registry.ts";
-
-// Re-export individual tools
-export { shellTool } from "./shell.ts";

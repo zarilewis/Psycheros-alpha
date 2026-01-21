@@ -42,6 +42,7 @@ export interface ChatMessage {
 
 /**
  * Request body for chat completions.
+ * Note: Internal to llm module, not re-exported from mod.ts.
  */
 export interface ChatRequest {
   model: string;
@@ -55,7 +56,7 @@ export interface ChatRequest {
 }
 
 // =============================================================================
-// Response Types
+// Response Types (internal to llm module - not re-exported from mod.ts)
 // =============================================================================
 
 /**
@@ -88,9 +89,7 @@ export interface ChatChoice {
  */
 export interface ChatResponseChunk {
   id: string;
-  object?: string;
   created?: number;
-  model?: string;
   choices: ChatChoice[];
 }
 

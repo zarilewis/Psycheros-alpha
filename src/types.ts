@@ -64,7 +64,9 @@ export interface ToolResult {
 // =============================================================================
 
 /**
- * Types of Server-Sent Events for streaming responses.
+ * A Server-Sent Event for streaming to clients.
+ *
+ * Event types:
  * - thinking: Extended thinking/reasoning content
  * - content: Main response content
  * - tool_call: Tool invocation request
@@ -72,19 +74,8 @@ export interface ToolResult {
  * - status: Status updates (e.g., "processing", "complete")
  * - done: Stream completion signal
  */
-export type SSEEventType =
-  | "thinking"
-  | "content"
-  | "tool_call"
-  | "tool_result"
-  | "status"
-  | "done";
-
-/**
- * A Server-Sent Event for streaming to clients.
- */
 export interface SSEEvent {
-  type: SSEEventType;
+  type: "thinking" | "content" | "tool_call" | "tool_result" | "status" | "done";
   data: string;
 }
 
