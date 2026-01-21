@@ -102,26 +102,3 @@ export interface Conversation {
   updatedAt: Date;
 }
 
-// =============================================================================
-// Entity Types
-// =============================================================================
-
-/**
- * Configuration for the entity loop.
- */
-export interface EntityConfig {
-  modelId: string;
-  maxTokens: number;
-  temperature: number;
-  systemPromptPath: string;
-  stateDocPath: string;
-}
-
-/**
- * Represents the current state of the entity.
- */
-export interface EntityState {
-  isRunning: boolean;
-  currentConversationId: string | null;
-  lastActivityAt: Date | null;
-}
