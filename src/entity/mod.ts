@@ -14,7 +14,7 @@
  * import { createDefaultRegistry } from "./tools/mod.ts";
  *
  * const llm = createDefaultClient();
- * const db = new DBClient("./data/sby.db");
+ * const db = new DBClient("./.sby/sby.db");
  * const tools = createDefaultRegistry();
  *
  * const turn = new EntityTurn(llm, db, tools, {

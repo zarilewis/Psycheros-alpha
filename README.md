@@ -53,7 +53,7 @@ SBy/
 │   └── server/        # HTTP server and SSE streaming
 ├── web/
 │   └── index.html     # HTMX chat interface
-└── data/              # Runtime data (SQLite DB, created automatically)
+└── .sby/              # Runtime data (SQLite DB, created automatically)
 ```
 
 ## Development
