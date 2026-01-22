@@ -91,12 +91,11 @@ export class EventBroadcaster {
   /**
    * Broadcast multiple UI updates to relevant clients.
    *
-   * Updates are sent to clients that:
-   * - Have no conversation ID filter (global listeners)
-   * - Match the target conversation ID
+   * When conversationId is null (global update): send to ALL clients.
+   * When conversationId is set: send to global listeners + matching clients.
    *
    * @param updates - Array of UI updates to broadcast
-   * @param conversationId - Target conversation ID (null for global updates)
+   * @param conversationId - Target conversation ID (null = send to ALL clients)
    */
   broadcastUpdates(updates: UIUpdate[], conversationId: string | null): void {
     if (updates.length === 0) return;
@@ -104,12 +103,13 @@ export class EventBroadcaster {
     const deadClients: string[] = [];
 
     for (const [clientId, client] of this.clients) {
-      // Send to clients that are:
-      // 1. Listening globally (no conversationId filter)
-      // 2. Listening to this specific conversation
+      // Determine if this client should receive the update:
+      // - If broadcast is global (null): send to ALL clients
+      // - If broadcast targets a conversation: send to global listeners + that conversation
       const shouldSend =
-        client.conversationId === null ||
-        client.conversationId === conversationId;
+        conversationId === null ||              // Global broadcast → all clients
+        client.conversationId === null ||       // Client is global listener
+        client.conversationId === conversationId; // Client matches target
 
       if (!shouldSend) continue;
 

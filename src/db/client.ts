@@ -213,6 +213,93 @@ export class DBClient {
   }
 
   /**
+   * Deletes a conversation and all associated data.
+   *
+   * Manually deletes related records first to handle databases
+   * created before CASCADE constraints were added.
+   *
+   * @param id - The conversation ID to delete
+   * @returns true if a conversation was deleted, false if not found
+   */
+  deleteConversation(id: string): boolean {
+    this.db.exec("BEGIN TRANSACTION");
+
+    try {
+      // Manually cascade: delete metrics first (references both conversations and messages)
+      this.db.exec(
+        `DELETE FROM turn_metrics WHERE conversation_id = ?`,
+        [id]
+      );
+
+      // Delete messages
+      this.db.exec(
+        `DELETE FROM messages WHERE conversation_id = ?`,
+        [id]
+      );
+
+      // Delete the conversation
+      const result = this.db.exec(
+        `DELETE FROM conversations WHERE id = ?`,
+        [id]
+      );
+
+      this.db.exec("COMMIT");
+      return result > 0;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /**
+   * Deletes multiple conversations and all associated data.
+   *
+   * Manually deletes related records first to handle databases
+   * created before CASCADE constraints were added.
+   *
+   * @param ids - Array of conversation IDs to delete
+   * @returns Number of conversations actually deleted
+   */
+  deleteConversations(ids: string[]): number {
+    if (ids.length === 0) {
+      return 0;
+    }
+
+    this.db.exec("BEGIN TRANSACTION");
+
+    try {
+      let deletedCount = 0;
+
+      for (const id of ids) {
+        // Manually cascade: delete metrics first
+        this.db.exec(
+          `DELETE FROM turn_metrics WHERE conversation_id = ?`,
+          [id]
+        );
+
+        // Delete messages
+        this.db.exec(
+          `DELETE FROM messages WHERE conversation_id = ?`,
+          [id]
+        );
+
+        // Delete the conversation
+        const result = this.db.exec(
+          `DELETE FROM conversations WHERE id = ?`,
+          [id]
+        );
+        deletedCount += result;
+      }
+
+      this.db.exec("COMMIT");
+      return deletedCount;
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
+  }
+
+  /**
    * Converts a database row to a Conversation object.
    */
   private rowToConversation(row: ConversationRow): Conversation {

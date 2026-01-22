@@ -21,7 +21,7 @@ import {
   renderConversationList,
   type MetricsMap,
 } from "./templates.ts";
-import { updateConversationTitle } from "./state-changes.ts";
+import { updateConversationTitle, deleteConversation, deleteConversations } from "./state-changes.ts";
 import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
 import { MAX_SSE_MESSAGE_SIZE, SSE_TRUNCATION_SUFFIX } from "../constants.ts";
 import { getBroadcaster } from "./broadcaster.ts";
@@ -445,6 +445,121 @@ export async function handleUpdateTitle(
 }
 
 /**
+ * Handle DELETE /api/conversations/:id - Delete a single conversation
+ *
+ * Deletes the conversation and broadcasts UI update via SSE.
+ *
+ * @param ctx - Route context
+ * @param conversationId - The conversation ID to delete
+ * @param _request - HTTP Request (unused)
+ * @returns HTTP Response with JSON result
+ */
+export function handleDeleteConversation(
+  ctx: RouteContext,
+  conversationId: string,
+  _request: Request
+): Response {
+  const result = deleteConversation(ctx.db, conversationId);
+
+  if (!result.success) {
+    return new Response(
+      JSON.stringify({ error: result.error }),
+      {
+        status: result.error?.includes("not found") ? 404 : 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Broadcast UI update via SSE to all clients
+  const uiUpdates = generateUIUpdates(result.affectedRegions, ctx.db);
+  getBroadcaster().broadcastUpdates(uiUpdates, null); // null = broadcast to all
+
+  return new Response(
+    JSON.stringify({ success: true, deletedId: result.data?.deletedId }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    }
+  );
+}
+
+/**
+ * Handle DELETE /api/conversations - Delete multiple conversations
+ *
+ * Expects body: { ids: string[] }
+ * Deletes the conversations and broadcasts UI update via SSE.
+ *
+ * @param ctx - Route context
+ * @param request - HTTP Request with body { ids: string[] }
+ * @returns HTTP Response with JSON result
+ */
+export async function handleBatchDeleteConversations(
+  ctx: RouteContext,
+  request: Request
+): Promise<Response> {
+  // Parse request body
+  let ids: string[];
+  try {
+    const body = await request.json();
+    if (!body.ids || !Array.isArray(body.ids)) {
+      throw new Error("Missing or invalid ids array");
+    }
+    ids = body.ids.filter((id: unknown) => typeof id === "string");
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Invalid request body";
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const result = deleteConversations(ctx.db, ids);
+
+  if (!result.success) {
+    return new Response(
+      JSON.stringify({ error: result.error }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Broadcast UI update via SSE to all clients
+  const uiUpdates = generateUIUpdates(result.affectedRegions, ctx.db);
+  getBroadcaster().broadcastUpdates(uiUpdates, null); // null = broadcast to all
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      deletedCount: result.data?.deletedCount,
+      deletedIds: result.data?.deletedIds,
+    }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    }
+  );
+}
+
+/**
  * Chat request body schema.
  */
 interface ChatRequestBody {
@@ -720,7 +835,7 @@ export function handleCORS(): Response {
     status: 204,
     headers: {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type",
       "Access-Control-Max-Age": "86400",
     },

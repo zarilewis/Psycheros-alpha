@@ -81,3 +81,63 @@ export function updateConversationTitle(
     affectedRegions: ["conv-list", "header-title"],
   };
 }
+
+/**
+ * Delete a single conversation.
+ *
+ * Affects UI regions: conv-list
+ *
+ * @param db - Database client
+ * @param conversationId - The conversation to delete
+ * @returns StateChangeResult with the deleted ID
+ */
+export function deleteConversation(
+  db: DBClient,
+  conversationId: string
+): StateChangeResult<{ deletedId: string }> {
+  const deleted = db.deleteConversation(conversationId);
+
+  if (!deleted) {
+    return {
+      success: false,
+      error: `Conversation not found: ${conversationId}`,
+      affectedRegions: [],
+    };
+  }
+
+  return {
+    success: true,
+    data: { deletedId: conversationId },
+    affectedRegions: ["conv-list"],
+  };
+}
+
+/**
+ * Delete multiple conversations.
+ *
+ * Affects UI regions: conv-list
+ *
+ * @param db - Database client
+ * @param ids - Array of conversation IDs to delete
+ * @returns StateChangeResult with deleted count and IDs
+ */
+export function deleteConversations(
+  db: DBClient,
+  ids: string[]
+): StateChangeResult<{ deletedCount: number; deletedIds: string[] }> {
+  if (ids.length === 0) {
+    return {
+      success: false,
+      error: "No conversation IDs provided",
+      affectedRegions: [],
+    };
+  }
+
+  const deletedCount = db.deleteConversations(ids);
+
+  return {
+    success: true,
+    data: { deletedCount, deletedIds: ids },
+    affectedRegions: ["conv-list"],
+  };
+}

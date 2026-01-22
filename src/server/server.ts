@@ -11,12 +11,14 @@ import { DBClient } from "../db/mod.ts";
 import { createDefaultClient, type LLMClient } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import {
+  handleBatchDeleteConversations,
   handleChat,
   handleChatFragment,
   handleConversationListFragment,
   handleConversationView,
   handleCORS,
   handleCreateConversation,
+  handleDeleteConversation,
   handleEvents,
   handleGetMessages,
   handleIndex,
@@ -239,6 +241,18 @@ export class Server {
     if (method === "PATCH" && titleMatch) {
       const conversationId = titleMatch[1];
       return await handleUpdateTitle(ctx, conversationId, request);
+    }
+
+    // DELETE /api/conversations - Batch delete conversations
+    if (method === "DELETE" && path === "/api/conversations") {
+      return await handleBatchDeleteConversations(ctx, request);
+    }
+
+    // DELETE /api/conversations/:id - Delete single conversation
+    const deleteMatch = path.match(/^\/api\/conversations\/([^/]+)$/);
+    if (method === "DELETE" && deleteMatch) {
+      const conversationId = deleteMatch[1];
+      return handleDeleteConversation(ctx, conversationId, request);
     }
 
     // 404 for unknown API routes

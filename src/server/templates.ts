@@ -249,7 +249,7 @@ export function renderConversationList(conversations: Conversation[]): string {
 }
 
 /**
- * Render a single conversation list item.
+ * Render a single conversation list item with swipe actions.
  */
 export function renderConversationItem(
   conv: Conversation,
@@ -257,17 +257,48 @@ export function renderConversationItem(
 ): string {
   const title = escapeHtml(conv.title || "Untitled");
   const date = formatDate(conv.updatedAt || conv.createdAt);
+  const escapedId = escapeHtml(conv.id);
+  const encodedId = encodeURIComponent(conv.id);
 
-  // Use data attribute for conversation ID to avoid XSS risk with inline JS
-  return `<a class="conv-item${isActive ? " active" : ""}"
-  data-conv-id="${escapeHtml(conv.id)}"
-  hx-get="/fragments/chat/${encodeURIComponent(conv.id)}"
-  hx-target="#chat"
-  hx-swap="innerHTML"
-  hx-push-url="/c/${encodeURIComponent(conv.id)}">
-  <span class="conv-title">${title}</span>
-  <span class="conv-date">${date}</span>
-</a>`;
+  // Swipe wrapper structure with edit/delete actions
+  return `<div class="conv-item-wrapper" data-conv-id="${escapedId}">
+  <div class="conv-swipe-action conv-swipe-action--edit" data-action="edit">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+    </svg>
+  </div>
+  <a class="conv-item${isActive ? " active" : ""}"
+    data-conv-id="${escapedId}"
+    hx-get="/fragments/chat/${encodedId}"
+    hx-target="#chat"
+    hx-swap="innerHTML"
+    hx-push-url="/c/${encodedId}">
+    <input type="checkbox" class="conv-select-checkbox" data-conv-id="${escapedId}" onclick="event.stopPropagation()">
+    <span class="conv-title">${title}</span>
+    <span class="conv-date">${date}</span>
+    <div class="conv-actions">
+      <button class="conv-action-btn conv-action-btn--edit" data-action="edit" title="Edit title" onclick="event.preventDefault(); event.stopPropagation(); SBy.startTitleEdit('${escapedId}')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+      <button class="conv-action-btn conv-action-btn--delete" data-action="delete" title="Delete" onclick="event.preventDefault(); event.stopPropagation(); SBy.showDeleteModal(['${escapedId}'])">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="3,6 5,6 21,6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+        </svg>
+      </button>
+    </div>
+  </a>
+  <div class="conv-swipe-action conv-swipe-action--delete" data-action="delete">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="3,6 5,6 21,6"/>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+    </svg>
+  </div>
+</div>`;
 }
 
 // =============================================================================

@@ -714,3 +714,271 @@
 .metrics-value.warning {
   color: #f59e0b;
 }
+
+/* ==========================================================================
+   Conversation Item Swipe Actions
+   ========================================================================== */
+.conv-item-wrapper {
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 2px;
+  border-radius: 6px;
+}
+
+.conv-swipe-action {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.conv-swipe-action--edit {
+  left: 0;
+  background-color: var(--c-accent);
+}
+
+.conv-swipe-action--delete {
+  right: 0;
+  background-color: var(--c-error);
+}
+
+/* Show swipe actions when swiping */
+.conv-item-wrapper.swiping-right .conv-swipe-action--edit,
+.conv-item-wrapper.swiping-left .conv-swipe-action--delete {
+  opacity: 1;
+}
+
+/* Conversation item in swipe context */
+.conv-item-wrapper .conv-item {
+  position: relative;
+  background-color: var(--c-bg);
+  transition: transform 0.2s ease-out;
+  z-index: 1;
+  margin-bottom: 0;
+}
+
+/* Desktop hover actions - positioned absolutely to prevent layout shift */
+.conv-actions {
+  position: absolute;
+  right: var(--sp-3);
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: var(--sp-1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition);
+  background-color: inherit;
+}
+
+@media (hover: hover) {
+  .conv-item-wrapper:hover .conv-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .conv-item-wrapper:hover .conv-date {
+    opacity: 0;
+  }
+}
+
+.conv-date {
+  transition: opacity var(--transition);
+}
+
+.conv-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  color: var(--c-fg-muted);
+  transition: all var(--transition);
+}
+
+.conv-action-btn:hover {
+  background-color: var(--c-bg-hover);
+}
+
+.conv-action-btn--edit:hover {
+  color: var(--c-accent);
+}
+
+.conv-action-btn--delete:hover {
+  color: var(--c-error);
+}
+
+/* Selection checkbox - hidden by default */
+.conv-select-checkbox {
+  display: none;
+  width: 16px;
+  height: 16px;
+  margin-right: var(--sp-2);
+  accent-color: var(--c-accent);
+  flex-shrink: 0;
+}
+
+/* Selection mode */
+.conv-list.selection-mode .conv-select-checkbox {
+  display: block;
+}
+
+.conv-list.selection-mode .conv-actions {
+  display: none !important;
+}
+
+.conv-list.selection-mode .conv-date {
+  display: none;
+}
+
+.conv-item-wrapper.selected .conv-item {
+  background-color: var(--c-accent-subtle);
+  border-left: 2px solid var(--c-accent);
+  padding-left: calc(var(--sp-3) - 2px);
+}
+
+/* ==========================================================================
+   Selection Bar (floating action bar for multi-select)
+   ========================================================================== */
+.selection-bar {
+  position: fixed;
+  bottom: calc(var(--input-height) + var(--sp-4));
+  left: 50%;
+  transform: translateX(-50%);
+  display: none;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-4);
+  background-color: var(--c-bg-raised);
+  border: 1px solid var(--c-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+}
+
+.selection-bar.visible {
+  display: flex;
+}
+
+.selection-count {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--c-fg-muted);
+}
+
+.selection-bar .btn {
+  padding: var(--sp-1) var(--sp-3);
+}
+
+/* ==========================================================================
+   Delete Confirmation Modal
+   ========================================================================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.15s ease;
+}
+
+.modal-backdrop.visible {
+  display: flex;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal {
+  background-color: var(--c-bg-raised);
+  border: 1px solid var(--c-border);
+  border-radius: 12px;
+  padding: var(--sp-6);
+  max-width: 400px;
+  width: 90%;
+  animation: scaleIn 0.15s ease;
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.modal-title {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--c-fg);
+  margin-bottom: var(--sp-2);
+}
+
+.modal-message {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  color: var(--c-fg-muted);
+  margin-bottom: var(--sp-4);
+  line-height: var(--line-height);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}
+
+/* Danger button variant */
+.btn--danger {
+  background-color: var(--c-error);
+  border-color: var(--c-error);
+  color: #fff;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background-color: #ff6666;
+  border-color: #ff6666;
+  box-shadow: 0 0 12px rgba(255, 68, 68, 0.4);
+}
+
+/* ==========================================================================
+   Inline Title Edit
+   ========================================================================== */
+.conv-title-edit {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-1) var(--sp-2);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--c-fg);
+  background-color: var(--c-bg-sunken);
+  border: 1px solid var(--c-accent);
+  border-radius: 4px;
+  outline: none;
+}
+
+.conv-title-edit:focus {
+  box-shadow: 0 0 0 2px var(--c-accent-subtle);
+}
+
+/* ==========================================================================
+   Mobile Touch Feedback
+   ========================================================================== */
+@media (hover: none) {
+  .conv-item-wrapper .conv-item {
+    touch-action: pan-y pinch-zoom;
+  }
+
+  .conv-actions {
+    display: none !important;
+  }
+}

@@ -42,13 +42,13 @@ const UI_REGIONS_BY_TARGET: Map<string, UIRegionConfig> = new Map(
  *
  * @param regions - Array of region names to update
  * @param db - Database client for fetching fresh data
- * @param conversationId - Current conversation ID (for context-specific updates)
+ * @param conversationId - Optional conversation ID (for context-specific updates like header-title)
  * @returns Array of UIUpdate objects ready to send to the client
  */
 export function generateUIUpdates(
   regions: string[],
   db: DBClient,
-  conversationId: string
+  conversationId?: string
 ): UIUpdate[] {
   const updates: UIUpdate[] = [];
 
@@ -77,13 +77,13 @@ export function generateUIUpdates(
  *
  * @param region - The region name to render
  * @param db - Database client for fetching data
- * @param conversationId - Current conversation ID
- * @returns HTML string or null if region is unknown
+ * @param conversationId - Optional conversation ID (required for header-title)
+ * @returns HTML string or null if region is unknown or cannot be rendered
  */
 function renderRegion(
   region: string,
   db: DBClient,
-  conversationId: string
+  conversationId?: string
 ): string | null {
   switch (region) {
     case "conv-list": {
@@ -91,6 +91,10 @@ function renderRegion(
       return renderConversationList(conversations);
     }
     case "header-title": {
+      // Skip header-title if no conversationId provided
+      if (!conversationId) {
+        return null;
+      }
       const conversation = db.getConversation(conversationId);
       return renderHeaderTitle(conversation?.title);
     }

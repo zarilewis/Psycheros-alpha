@@ -13,6 +13,21 @@ const pendingToolCalls = new Map();
 let currentAbortController = null;
 let persistentSSE = null;
 
+// Selection mode state
+let selectionMode = false;
+const selectedConversations = new Set();
+let pendingDeleteIds = null;
+
+// Touch/swipe state
+const touchState = {
+  wrapper: null,
+  startX: 0,
+  startY: 0,
+  currentX: 0,
+  isDragging: false,
+  longPressTimer: null,
+};
+
 // =============================================================================
 // Persistent SSE Connection
 // =============================================================================
@@ -88,14 +103,59 @@ document.addEventListener('DOMContentLoaded', () => {
   // Event delegation for conversation list clicks
   // This avoids inline onclick handlers (XSS prevention)
   document.addEventListener('click', (e) => {
+    // Handle checkbox clicks in selection mode
+    if (e.target.classList.contains('conv-select-checkbox')) {
+      const wrapper = e.target.closest('.conv-item-wrapper');
+      if (wrapper) {
+        toggleSelection(wrapper);
+      }
+      return;
+    }
+
     const convItem = e.target.closest('.conv-item[data-conv-id]');
     if (convItem) {
+      // In selection mode, toggle selection instead of navigating
+      if (selectionMode) {
+        e.preventDefault();
+        const wrapper = convItem.closest('.conv-item-wrapper');
+        if (wrapper) {
+          toggleSelection(wrapper);
+        }
+        return;
+      }
+
       const id = convItem.dataset.convId;
       if (id) {
         selectConversation(id);
       }
     }
   });
+
+  // Right-click for selection mode (desktop)
+  document.addEventListener('contextmenu', (e) => {
+    const wrapper = e.target.closest('.conv-item-wrapper');
+    if (wrapper) {
+      e.preventDefault();
+      enterSelectionMode(wrapper);
+    }
+  });
+
+  // ESC key exits selection mode or closes modal
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (document.querySelector('.modal-backdrop.visible')) {
+        closeDeleteModal();
+      } else if (selectionMode) {
+        exitSelectionMode();
+      }
+    }
+  });
+
+  // Initialize touch handlers for swipe
+  initConversationTouchHandlers();
+
+  // Create selection bar and modal containers
+  createUIContainers();
 
   // Focus input on load
   const input = document.getElementById('message-input');
@@ -782,6 +842,487 @@ function createMetricsIndicator(metrics) {
 }
 
 // =============================================================================
+// UI Containers
+// =============================================================================
+
+/**
+ * Create the selection bar and modal containers on page load.
+ */
+function createUIContainers() {
+  // Selection bar
+  if (!document.getElementById('selection-bar')) {
+    const bar = document.createElement('div');
+    bar.id = 'selection-bar';
+    bar.className = 'selection-bar';
+    bar.innerHTML = `
+      <span class="selection-count"><span id="selection-count-num">0</span> selected</span>
+      <button class="btn btn--ghost" onclick="SBy.exitSelectionMode()">Cancel</button>
+      <button class="btn btn--danger" onclick="SBy.deleteSelected()">Delete</button>
+    `;
+    document.body.appendChild(bar);
+  }
+
+  // Modal backdrop
+  if (!document.getElementById('modal-backdrop')) {
+    const backdrop = document.createElement('div');
+    backdrop.id = 'modal-backdrop';
+    backdrop.className = 'modal-backdrop';
+    backdrop.onclick = (e) => {
+      if (e.target === backdrop) closeDeleteModal();
+    };
+    backdrop.innerHTML = `
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-title">Delete Conversation</div>
+        <div class="modal-message" id="modal-message">Are you sure you want to delete this conversation?</div>
+        <div class="modal-actions">
+          <button class="btn btn--ghost" onclick="SBy.closeDeleteModal()">Cancel</button>
+          <button class="btn btn--danger" onclick="SBy.confirmDelete()">Delete</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+  }
+}
+
+// =============================================================================
+// Touch/Swipe Handlers
+// =============================================================================
+
+const SWIPE_THRESHOLD = 60;
+const LONG_PRESS_DURATION = 500;
+
+/**
+ * Initialize touch event handlers for conversation list swipe.
+ */
+function initConversationTouchHandlers() {
+  const convList = document.getElementById('conv-list');
+  if (!convList) return;
+
+  convList.addEventListener('touchstart', handleConvTouchStart, { passive: true });
+  convList.addEventListener('touchmove', handleConvTouchMove, { passive: false });
+  convList.addEventListener('touchend', handleConvTouchEnd);
+  convList.addEventListener('touchcancel', handleConvTouchCancel);
+}
+
+function handleConvTouchStart(e) {
+  const wrapper = e.target.closest('.conv-item-wrapper');
+  if (!wrapper || selectionMode) return;
+
+  const touch = e.touches[0];
+  touchState.wrapper = wrapper;
+  touchState.startX = touch.clientX;
+  touchState.startY = touch.clientY;
+  touchState.currentX = 0;
+  touchState.isDragging = false;
+
+  // Start long press timer for selection mode
+  touchState.longPressTimer = setTimeout(() => {
+    if (!touchState.isDragging && touchState.wrapper) {
+      enterSelectionMode(touchState.wrapper);
+      touchState.wrapper = null;
+    }
+  }, LONG_PRESS_DURATION);
+}
+
+function handleConvTouchMove(e) {
+  if (!touchState.wrapper) return;
+
+  const touch = e.touches[0];
+  const deltaX = touch.clientX - touchState.startX;
+  const deltaY = touch.clientY - touchState.startY;
+
+  // Cancel long press if moving
+  if (Math.abs(deltaX) > 10 || Math.abs(deltaY) > 10) {
+    clearTimeout(touchState.longPressTimer);
+  }
+
+  // If vertical scroll is more prominent, don't start horizontal swipe
+  if (!touchState.isDragging && Math.abs(deltaY) > Math.abs(deltaX)) {
+    return;
+  }
+
+  // Start dragging if horizontal movement is significant
+  if (!touchState.isDragging && Math.abs(deltaX) > 10) {
+    touchState.isDragging = true;
+    clearTimeout(touchState.longPressTimer);
+  }
+
+  if (touchState.isDragging) {
+    e.preventDefault();
+    touchState.currentX = deltaX;
+
+    const convItem = touchState.wrapper.querySelector('.conv-item');
+    if (convItem) {
+      // Clamp the translation
+      const clampedX = Math.max(-SWIPE_THRESHOLD * 1.5, Math.min(SWIPE_THRESHOLD * 1.5, deltaX));
+      convItem.style.transform = `translateX(${clampedX}px)`;
+
+      // Update swipe direction classes
+      touchState.wrapper.classList.toggle('swiping-left', deltaX < -10);
+      touchState.wrapper.classList.toggle('swiping-right', deltaX > 10);
+    }
+  }
+}
+
+function handleConvTouchEnd(_e) {
+  clearTimeout(touchState.longPressTimer);
+
+  if (!touchState.wrapper) return;
+
+  const wrapper = touchState.wrapper;
+  const convItem = wrapper.querySelector('.conv-item');
+  const convId = wrapper.dataset.convId;
+
+  if (touchState.isDragging && convItem) {
+    // Reset transform with animation
+    convItem.style.transform = '';
+    wrapper.classList.remove('swiping-left', 'swiping-right');
+
+    // Check if swipe was past threshold
+    if (touchState.currentX > SWIPE_THRESHOLD) {
+      // Swipe right - edit
+      startTitleEdit(convId);
+    } else if (touchState.currentX < -SWIPE_THRESHOLD) {
+      // Swipe left - delete
+      showDeleteModal([convId]);
+    }
+  }
+
+  // Reset state
+  touchState.wrapper = null;
+  touchState.isDragging = false;
+  touchState.currentX = 0;
+}
+
+function handleConvTouchCancel() {
+  clearTimeout(touchState.longPressTimer);
+
+  if (touchState.wrapper) {
+    const convItem = touchState.wrapper.querySelector('.conv-item');
+    if (convItem) {
+      convItem.style.transform = '';
+    }
+    touchState.wrapper.classList.remove('swiping-left', 'swiping-right');
+  }
+
+  touchState.wrapper = null;
+  touchState.isDragging = false;
+  touchState.currentX = 0;
+}
+
+// =============================================================================
+// Selection Mode
+// =============================================================================
+
+/**
+ * Enter selection mode, optionally selecting an initial item.
+ */
+function enterSelectionMode(initialWrapper = null) {
+  selectionMode = true;
+  selectedConversations.clear();
+
+  const convList = document.getElementById('conv-list');
+  convList?.classList.add('selection-mode');
+
+  if (initialWrapper) {
+    toggleSelection(initialWrapper);
+  }
+
+  updateSelectionBar();
+}
+
+/**
+ * Exit selection mode and clear all selections.
+ */
+function exitSelectionMode() {
+  selectionMode = false;
+  selectedConversations.clear();
+
+  const convList = document.getElementById('conv-list');
+  convList?.classList.remove('selection-mode');
+
+  // Clear all selection visual states
+  document.querySelectorAll('.conv-item-wrapper.selected').forEach(el => {
+    el.classList.remove('selected');
+  });
+  document.querySelectorAll('.conv-select-checkbox:checked').forEach(cb => {
+    cb.checked = false;
+  });
+
+  updateSelectionBar();
+}
+
+/**
+ * Toggle selection state for a conversation wrapper.
+ */
+function toggleSelection(wrapper) {
+  const convId = wrapper.dataset.convId;
+  if (!convId) return;
+
+  const checkbox = wrapper.querySelector('.conv-select-checkbox');
+
+  if (selectedConversations.has(convId)) {
+    selectedConversations.delete(convId);
+    wrapper.classList.remove('selected');
+    if (checkbox) checkbox.checked = false;
+  } else {
+    selectedConversations.add(convId);
+    wrapper.classList.add('selected');
+    if (checkbox) checkbox.checked = true;
+  }
+
+  updateSelectionBar();
+
+  // Auto-exit selection mode if no items selected
+  if (selectedConversations.size === 0 && selectionMode) {
+    exitSelectionMode();
+  }
+}
+
+/**
+ * Update the selection bar visibility and count.
+ */
+function updateSelectionBar() {
+  const bar = document.getElementById('selection-bar');
+  const countEl = document.getElementById('selection-count-num');
+
+  if (bar) {
+    bar.classList.toggle('visible', selectionMode && selectedConversations.size > 0);
+  }
+  if (countEl) {
+    countEl.textContent = selectedConversations.size;
+  }
+}
+
+/**
+ * Delete all selected conversations.
+ */
+function deleteSelected() {
+  if (selectedConversations.size === 0) return;
+  showDeleteModal([...selectedConversations]);
+}
+
+// =============================================================================
+// Delete Modal
+// =============================================================================
+
+/**
+ * Show the delete confirmation modal.
+ */
+function showDeleteModal(ids) {
+  if (!ids || ids.length === 0) return;
+
+  pendingDeleteIds = ids;
+
+  const backdrop = document.getElementById('modal-backdrop');
+  const messageEl = document.getElementById('modal-message');
+
+  if (messageEl) {
+    const count = ids.length;
+    messageEl.textContent = count === 1
+      ? 'Are you sure you want to delete this conversation? This cannot be undone.'
+      : `Are you sure you want to delete ${count} conversations? This cannot be undone.`;
+  }
+
+  backdrop?.classList.add('visible');
+}
+
+/**
+ * Close the delete modal without deleting.
+ */
+function closeDeleteModal() {
+  pendingDeleteIds = null;
+  document.getElementById('modal-backdrop')?.classList.remove('visible');
+}
+
+/**
+ * Confirm deletion of pending conversations.
+ */
+async function confirmDelete() {
+  if (!pendingDeleteIds || pendingDeleteIds.length === 0) {
+    closeDeleteModal();
+    return;
+  }
+
+  const ids = [...pendingDeleteIds];
+  const wasCurrentDeleted = ids.includes(currentConversationId);
+
+  closeDeleteModal();
+
+  try {
+    let response;
+
+    if (ids.length === 1) {
+      // Single delete
+      response = await fetch(`/api/conversations/${encodeURIComponent(ids[0])}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' },
+      });
+    } else {
+      // Batch delete
+      response = await fetch('/api/conversations', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ ids }),
+      });
+    }
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete');
+    }
+
+    // Exit selection mode if active
+    if (selectionMode) {
+      exitSelectionMode();
+    }
+
+    // Server broadcasts UI update via SSE - no need to manually reload
+
+    // If current conversation was deleted, reset to home
+    if (wasCurrentDeleted) {
+      currentConversationId = null;
+      history.pushState({}, '', '/');
+
+      // Reset header title
+      const headerTitle = document.getElementById('header-title');
+      if (headerTitle) {
+        headerTitle.textContent = 'Strauberry Tavern';
+      }
+
+      // Show empty state
+      const chat = document.getElementById('chat');
+      if (chat) {
+        chat.innerHTML = `
+          <div class="messages" id="messages">
+            <div class="empty-state" id="empty-state">
+              <div class="empty-title">SBy</div>
+              <p class="empty-text">Start a new conversation or select one from the sidebar.</p>
+            </div>
+          </div>
+          <div class="input-area">
+            <div class="input-container">
+              <textarea
+                class="input-field"
+                id="message-input"
+                placeholder="Type your message..."
+                rows="1"
+                onkeydown="SBy.handleKeyDown(event)"
+                oninput="SBy.autoResize(this)"
+              ></textarea>
+              <button class="send-btn" id="send-btn" onclick="SBy.sendMessage()">Send</button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    showToast(`Deleted ${ids.length} conversation${ids.length > 1 ? 's' : ''}`);
+
+  } catch (error) {
+    console.error('Delete failed:', error);
+    showToast('Failed to delete: ' + error.message);
+  }
+}
+
+// =============================================================================
+// Inline Title Edit
+// =============================================================================
+
+/**
+ * Start inline editing of a conversation title.
+ */
+function startTitleEdit(convId) {
+  const wrapper = document.querySelector(`.conv-item-wrapper[data-conv-id="${convId}"]`);
+  if (!wrapper) return;
+
+  const convItem = wrapper.querySelector('.conv-item');
+  const titleSpan = convItem?.querySelector('.conv-title');
+  if (!titleSpan) return;
+
+  const currentTitle = titleSpan.textContent || '';
+
+  // Replace title span with input
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'conv-title-edit';
+  input.value = currentTitle;
+  input.dataset.originalTitle = currentTitle;
+  input.dataset.convId = convId;
+
+  // Handle completion
+  input.onblur = () => finishTitleEdit(input);
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      input.blur();
+    } else if (e.key === 'Escape') {
+      input.value = input.dataset.originalTitle;
+      input.blur();
+    }
+  };
+
+  titleSpan.replaceWith(input);
+  input.focus();
+  input.select();
+
+  // Prevent click from propagating
+  input.onclick = (e) => e.stopPropagation();
+}
+
+/**
+ * Finish inline editing and save the title if changed.
+ */
+async function finishTitleEdit(input) {
+  const convId = input.dataset.convId;
+  const originalTitle = input.dataset.originalTitle;
+  const newTitle = input.value.trim();
+
+  // Create new title span
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'conv-title';
+  titleSpan.textContent = newTitle || 'Untitled';
+
+  input.replaceWith(titleSpan);
+
+  // If title changed, update it
+  if (newTitle && newTitle !== originalTitle) {
+    try {
+      const response = await fetch(`/api/conversations/${encodeURIComponent(convId)}/title`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ title: newTitle }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to update title');
+      }
+
+      // Update header title if this is the current conversation
+      if (convId === currentConversationId) {
+        const headerTitle = document.getElementById('header-title');
+        if (headerTitle) {
+          headerTitle.textContent = newTitle;
+        }
+      }
+
+    } catch (error) {
+      console.error('Title update failed:', error);
+      showToast('Failed to update title: ' + error.message);
+      // Revert to original title
+      titleSpan.textContent = originalTitle || 'Untitled';
+    }
+  }
+}
+
+// =============================================================================
 // Global Export
 // =============================================================================
 
@@ -792,4 +1333,14 @@ globalThis.SBy = {
   autoResize,
   handleKeyDown,
   sendMessage,
+  // Selection mode
+  enterSelectionMode,
+  exitSelectionMode,
+  deleteSelected,
+  // Modal
+  showDeleteModal,
+  closeDeleteModal,
+  confirmDelete,
+  // Inline edit
+  startTitleEdit,
 };
