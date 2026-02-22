@@ -10,6 +10,8 @@
 import { DBClient } from "../db/mod.ts";
 import { createDefaultClient, type LLMClient } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
+import { createIndexer, createRetriever, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
+import { join } from "@std/path";
 import {
   handleBatchDeleteConversations,
   handleChat,
@@ -23,6 +25,10 @@ import {
   handleGetMessages,
   handleIndex,
   handleListConversations,
+  handleSettingsFileEditorFragment,
+  handleSettingsFileListFragment,
+  handleSettingsFragment,
+  handleSaveSettingsFile,
   handleStaticFile,
   handleUpdateTitle,
   type RouteContext,
@@ -43,6 +49,8 @@ export interface ServerConfig {
   dbPath?: string;
   /** List of tool names the entity is allowed to use (empty = no tools) */
   allowedTools?: string[];
+  /** RAG configuration options */
+  ragConfig?: Partial<RAGConfig>;
 }
 
 /**
@@ -71,6 +79,8 @@ export class Server {
   private db: DBClient;
   private llm: LLMClient;
   private tools: ToolRegistry;
+  private ragRetriever: Retriever | null = null;
+  private ragConfig: RAGConfig;
   private abortController: AbortController;
   private config: ServerConfig;
   private keepaliveInterval: number | null = null;
@@ -93,6 +103,18 @@ export class Server {
     // Initialize tool registry with only allowed tools
     this.tools = createDefaultRegistry(config.allowedTools ?? []);
 
+    // Initialize RAG configuration
+    this.ragConfig = {
+      ...DEFAULT_RAG_CONFIG,
+      ...config.ragConfig,
+      memoriesDir: join(config.projectRoot, config.ragConfig?.memoriesDir ?? DEFAULT_RAG_CONFIG.memoriesDir),
+    };
+
+    // Initialize RAG retriever if enabled
+    if (this.ragConfig.enabled) {
+      this.ragRetriever = createRetriever(this.db.getRawDb(), this.ragConfig);
+    }
+
     // Create abort controller for graceful shutdown
     this.abortController = new AbortController();
   }
@@ -102,12 +124,28 @@ export class Server {
    *
    * Begins listening for HTTP requests on the configured port.
    * Also starts the keepalive timer for persistent SSE connections.
+   * If RAG is enabled, indexes memories on startup.
    */
   async start(): Promise<void> {
     const hostname = this.config.hostname || "localhost";
     const port = this.config.port;
 
     console.log(`Starting SBy server on http://${hostname}:${port}`);
+
+    // Index memories on startup if RAG is enabled
+    if (this.ragConfig.enabled && this.ragRetriever) {
+      try {
+        const indexer = createIndexer(this.db.getRawDb(), this.ragConfig.memoriesDir);
+        await indexer.indexAll();
+      } catch (error) {
+        console.error(
+          "[RAG] Failed to index memories on startup:",
+          error instanceof Error ? error.message : String(error)
+        );
+        // Continue without RAG if indexing fails
+        this.ragRetriever = null;
+      }
+    }
 
     // Start keepalive timer for persistent SSE connections
     const broadcaster = getBroadcaster();
@@ -156,6 +194,8 @@ export class Server {
       llm: this.llm,
       tools: this.tools,
       projectRoot: this.config.projectRoot,
+      ragRetriever: this.ragRetriever ?? undefined,
+      ragConfig: this.ragConfig,
     };
   }
 
@@ -255,6 +295,14 @@ export class Server {
       return handleDeleteConversation(ctx, conversationId, request);
     }
 
+    // POST /api/settings/file/:directory/:filename - Save settings file
+    const settingsFileMatch = path.match(/^\/api\/settings\/file\/([^/]+)\/([^/]+)$/);
+    if (method === "POST" && settingsFileMatch) {
+      const directory = settingsFileMatch[1];
+      const filename = settingsFileMatch[2];
+      return await handleSaveSettingsFile(ctx, directory, filename, request);
+    }
+
     // 404 for unknown API routes
     return new Response(
       JSON.stringify({ error: "API endpoint not found" }),
@@ -305,6 +353,23 @@ export class Server {
     // GET /fragments/conv-list - Conversation list fragment
     if (path === "/fragments/conv-list") {
       return handleConversationListFragment(ctx);
+    }
+
+    // GET /fragments/settings/core-prompts - Settings page fragment
+    if (path === "/fragments/settings/core-prompts") {
+      return handleSettingsFragment(ctx);
+    }
+
+    // GET /fragments/settings/core-prompts/:directory - File list fragment
+    const settingsDirMatch = path.match(/^\/fragments\/settings\/core-prompts\/([^/]+)$/);
+    if (settingsDirMatch) {
+      return await handleSettingsFileListFragment(ctx, settingsDirMatch[1]);
+    }
+
+    // GET /fragments/settings/file/:directory/:filename - File editor fragment
+    const settingsFileMatch = path.match(/^\/fragments\/settings\/file\/([^/]+)\/([^/]+)$/);
+    if (settingsFileMatch) {
+      return await handleSettingsFileEditorFragment(ctx, settingsFileMatch[1], settingsFileMatch[2]);
     }
 
     // Serve static files from web/ directory

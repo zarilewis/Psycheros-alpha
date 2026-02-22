@@ -587,4 +587,18 @@ export class DBClient {
   close(): void {
     this.db.close();
   }
+
+  // ===========================================================================
+  // Raw Database Access
+  // ===========================================================================
+
+  /**
+   * Get the raw database connection for advanced operations.
+   * Use with caution - bypasses the client's abstraction layer.
+   *
+   * @returns The raw SQLite database instance
+   */
+  getRawDb(): Database {
+    return this.db;
+  }
 }

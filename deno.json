@@ -11,7 +11,8 @@
     "@std/path": "jsr:@std/path@^1",
     "@std/async": "jsr:@std/async@^1",
     "@std/dotenv": "jsr:@std/dotenv@^0.225",
-    "@db/sqlite": "jsr:@db/sqlite@^0.12"
+    "@db/sqlite": "jsr:@db/sqlite@^0.12",
+    "@xenova/transformers": "npm:@huggingface/transformers@3.3.1"
   },
   "lint": {
     "exclude": ["web/lib/"]

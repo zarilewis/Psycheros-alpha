@@ -27,7 +27,9 @@ import type { LLMClient, StreamChunk, ChatMessage } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
 import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics } from "../types.ts";
-import { loadSByMd, buildSystemMessage } from "./context.ts";
+import type { Retriever } from "../rag/mod.ts";
+import { loadSByMd, loadUserFiles, loadRelationshipFiles, buildSystemMessage } from "./context.ts";
+import { buildRAGContext } from "../rag/mod.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
 import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
 
@@ -39,6 +41,8 @@ export interface EntityConfig {
   projectRoot: string;
   /** Maximum tool iterations before stopping (prevents infinite loops) */
   maxToolIterations?: number;
+  /** Optional RAG retriever for memory search */
+  ragRetriever?: Retriever;
 }
 
 /**
@@ -101,9 +105,34 @@ export class EntityTurn {
       );
     }
 
-    // Load SBy.md and build system message
-    const sbyMdContent = await loadSByMd(this.config.projectRoot);
-    const systemMessage = buildSystemMessage(sbyMdContent);
+    // Load self files, user files, and relationship files, build system message
+    const selfContent = await loadSByMd(this.config.projectRoot);
+    const userContent = await loadUserFiles(this.config.projectRoot);
+    const relationshipContent = await loadRelationshipFiles(this.config.projectRoot);
+
+    // Retrieve relevant memories using RAG if available
+    let memoriesContent: string | undefined;
+    if (this.config.ragRetriever) {
+      console.log("[RAG] Retrieving memories for query:", userMessage.substring(0, 50));
+      try {
+        const memories = await this.config.ragRetriever.retrieve(userMessage);
+        console.log("[RAG] Found", memories.length, "memories");
+        memoriesContent = buildRAGContext(memories);
+        if (memoriesContent) {
+          console.log("[RAG] Injected memories into context (", memoriesContent.length, "chars)");
+        }
+      } catch (error) {
+        // Non-fatal: log and continue without memories
+        console.error(
+          "EntityTurn: RAG retrieval failed:",
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    } else {
+      console.log("[RAG] No retriever configured - skipping RAG");
+    }
+
+    const systemMessage = buildSystemMessage(selfContent, userContent, relationshipContent, memoriesContent);
 
     // Get conversation history from DB
     const history = this.db.getMessages(conversationId);

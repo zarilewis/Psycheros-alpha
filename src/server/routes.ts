@@ -12,6 +12,7 @@ import type { SSEEvent } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
+import type { Retriever, RAGConfig } from "../rag/mod.ts";
 import { EntityTurn, type EntityYield, generateAndSetTitle } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
 import {
@@ -19,6 +20,11 @@ import {
   renderChatView,
   renderConversationItem,
   renderConversationList,
+  renderCorePromptsSettings,
+  renderFileList,
+  renderFileEditor,
+  renderSaveSuccess,
+  renderSaveError,
   type MetricsMap,
 } from "./templates.ts";
 import { updateConversationTitle, deleteConversation, deleteConversations } from "./state-changes.ts";
@@ -38,6 +44,10 @@ export interface RouteContext {
   tools: ToolRegistry;
   /** Root directory of the project for file serving */
   projectRoot: string;
+  /** Optional RAG retriever for memory search */
+  ragRetriever?: Retriever;
+  /** RAG configuration */
+  ragConfig?: Partial<RAGConfig>;
 }
 
 /**
@@ -646,7 +656,10 @@ export async function handleChat(
           ctx.llm,
           ctx.db,
           ctx.tools,
-          { projectRoot: ctx.projectRoot }
+          {
+            projectRoot: ctx.projectRoot,
+            ragRetriever: ctx.ragRetriever,
+          }
         );
 
         // Process the message and stream chunks
@@ -902,4 +915,216 @@ export function handleEvents(_ctx: RouteContext, request: Request): Response {
   });
 
   return new Response(stream, { headers: SSE_HEADERS });
+}
+
+// =============================================================================
+// Settings Routes
+// =============================================================================
+
+/**
+ * Valid prompt directories for file operations.
+ */
+const VALID_PROMPT_DIRS = ["self", "user", "relationship"];
+
+/**
+ * Security check for directory parameter.
+ * Prevents path traversal attacks.
+ */
+function isValidDirectory(dir: string): boolean {
+  return VALID_PROMPT_DIRS.includes(dir);
+}
+
+/**
+ * Security check for filename parameter.
+ * Only allows .md files with safe names.
+ */
+function isValidFilename(filename: string): boolean {
+  // Must end with .md
+  if (!filename.endsWith(".md")) return false;
+  // No path separators
+  if (filename.includes("/") || filename.includes("\\")) return false;
+  // No parent directory references
+  if (filename.includes("..")) return false;
+  // Must be a reasonable filename (alphanumeric, underscores, hyphens)
+  const baseName = filename.slice(0, -3); // Remove .md
+  return /^[a-zA-Z0-9_-]+$/.test(baseName);
+}
+
+/**
+ * Handle GET /fragments/settings/core-prompts - Settings page fragment.
+ * Returns the core prompts settings view with tabs.
+ *
+ * @param _ctx - Route context
+ * @returns HTTP Response with settings HTML fragment
+ */
+export function handleSettingsFragment(_ctx: RouteContext): Response {
+  const html = renderCorePromptsSettings("self");
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/core-prompts/:directory - File list fragment.
+ * Returns the list of files for the selected directory.
+ *
+ * @param ctx - Route context
+ * @param directory - The prompt directory (self, user, relationship)
+ * @returns HTTP Response with file list HTML fragment
+ */
+export async function handleSettingsFileListFragment(
+  ctx: RouteContext,
+  directory: string
+): Promise<Response> {
+  // Validate directory
+  if (!isValidDirectory(directory)) {
+    return new Response("Invalid directory", {
+      status: 400,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  try {
+    // List .md files in the directory
+    const dirPath = `${ctx.projectRoot}/${directory}`;
+    const files: string[] = [];
+
+    for await (const entry of Deno.readDir(dirPath)) {
+      if (entry.isFile && entry.name.endsWith(".md")) {
+        files.push(entry.name);
+      }
+    }
+
+    // Sort files alphabetically
+    files.sort();
+
+    const html = renderFileList(directory as "self" | "user" | "relationship", files);
+    return new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      return new Response("Directory not found", {
+        status: 404,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/file/:directory/:filename - File editor fragment.
+ * Returns the file editor with textarea for editing the file.
+ *
+ * @param ctx - Route context
+ * @param directory - The prompt directory (self, user, relationship)
+ * @param filename - The filename to edit
+ * @returns HTTP Response with editor HTML fragment
+ */
+export async function handleSettingsFileEditorFragment(
+  ctx: RouteContext,
+  directory: string,
+  filename: string
+): Promise<Response> {
+  // Validate parameters
+  if (!isValidDirectory(directory)) {
+    return new Response("Invalid directory", {
+      status: 400,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  if (!isValidFilename(filename)) {
+    return new Response("Invalid filename", {
+      status: 400,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  try {
+    // Read file content
+    const filePath = `${ctx.projectRoot}/${directory}/${filename}`;
+    const content = await Deno.readTextFile(filePath);
+
+    const html = renderFileEditor(directory as "self" | "user" | "relationship", filename, content);
+    return new Response(html, {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      return new Response("File not found", {
+        status: 404,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+    throw error;
+  }
+}
+
+/**
+ * Handle POST /api/settings/file/:directory/:filename - Save file changes.
+ * Saves the file content and returns a status message.
+ *
+ * @param ctx - Route context
+ * @param directory - The prompt directory (self, user, relationship)
+ * @param filename - The filename to save
+ * @param request - HTTP Request with form body containing content
+ * @returns HTTP Response with status HTML fragment
+ */
+export async function handleSaveSettingsFile(
+  ctx: RouteContext,
+  directory: string,
+  filename: string,
+  request: Request
+): Promise<Response> {
+  // Validate parameters
+  if (!isValidDirectory(directory)) {
+    return new Response(renderSaveError("Invalid directory"), {
+      status: 400,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  if (!isValidFilename(filename)) {
+    return new Response(renderSaveError("Invalid filename"), {
+      status: 400,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  try {
+    // Parse form data
+    const formData = await request.formData();
+    const content = formData.get("content");
+
+    if (typeof content !== "string") {
+      return new Response(renderSaveError("Missing content"), {
+        status: 400,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Write file
+    const filePath = `${ctx.projectRoot}/${directory}/${filename}`;
+    await Deno.writeTextFile(filePath, content);
+
+    return new Response(renderSaveSuccess(), {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to save file";
+    return new Response(renderSaveError(message), {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
 }
