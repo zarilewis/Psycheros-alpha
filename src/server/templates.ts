@@ -168,7 +168,7 @@ export function renderAppShell(): string {
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>SBy</title>
-  <link rel="stylesheet" href="/css/main.css?v=6">
+  <link rel="stylesheet" href="/css/main.css?v=10">
   ${getAccentColorOverride()}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json">
@@ -188,7 +188,7 @@ export function renderAppShell(): string {
       </div>
     </div>
   </div>
-  <script type="module" src="/js/sby.js?v=6"></script>
+  <script type="module" src="/js/sby.js?v=10"></script>
 </body>
 </html>`;
 }
@@ -231,6 +231,20 @@ export function renderSidebar(conversations: Conversation[]): string {
   <nav class="conv-list" id="conv-list" hx-get="/fragments/conv-list" hx-trigger="load" hx-swap="innerHTML">
     ${renderConversationList(conversations)}
   </nav>
+  <div class="sidebar-footer">
+    <span class="sidebar-title">Settings</span>
+    <a class="sidebar-settings-link"
+      hx-get="/fragments/settings/core-prompts"
+      hx-target="#chat"
+      hx-swap="innerHTML"
+      onclick="SBy.closeSidebarAfterNav()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+      <span>Core Prompts</span>
+    </a>
+  </div>
 </aside>`;
 }
 
@@ -260,7 +274,7 @@ export function renderConversationItem(
   const escapedId = escapeHtml(conv.id);
   const encodedId = encodeURIComponent(conv.id);
 
-  // Swipe wrapper structure with edit/delete actions
+  // Swipe wrapper structure with edit action (delete removed - too easy to lose conversations)
   return `<div class="conv-item-wrapper" data-conv-id="${escapedId}">
   <div class="conv-swipe-action conv-swipe-action--edit" data-action="edit">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -292,12 +306,6 @@ export function renderConversationItem(
       </button>
     </div>
   </a>
-  <div class="conv-swipe-action conv-swipe-action--delete" data-action="delete">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polyline points="3,6 5,6 21,6"/>
-      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-    </svg>
-  </div>
 </div>`;
 }
 
@@ -565,5 +573,170 @@ export function renderToolResult(result: ToolResult): string {
   <div class="tool-result-label">${isError ? "Error" : "Output"}</div>
   ${escapeHtml(content)}
 </div>`;
+}
+
+// =============================================================================
+// Settings Templates
+// =============================================================================
+
+/**
+ * Valid core prompt directories.
+ */
+const VALID_DIRECTORIES = ["self", "user", "relationship"] as const;
+type PromptDirectory = typeof VALID_DIRECTORIES[number];
+
+/**
+ * Check if a directory is a valid prompt directory.
+ */
+export function isValidPromptDirectory(dir: string): dir is PromptDirectory {
+  return VALID_DIRECTORIES.includes(dir as PromptDirectory);
+}
+
+/**
+ * Render the Core Prompts Settings view.
+ * Shows tabs for self/user/relationship directories and file list.
+ */
+export function renderCorePromptsSettings(activeDir: PromptDirectory = "self"): string {
+  const tabs = [
+    { id: "self", label: "Self" },
+    { id: "user", label: "User" },
+    { id: "relationship", label: "Relationship" },
+  ];
+
+  const tabsHtml = tabs.map((tab) => {
+    const isActive = tab.id === activeDir;
+    return `<button
+      class="settings-tab${isActive ? " active" : ""}"
+      hx-get="/fragments/settings/core-prompts/${tab.id}"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+    >${tab.label}</button>`;
+  }).join("");
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <h1 class="settings-title">Core Prompts</h1>
+    <p class="settings-desc">Edit the prompt files that define the entity's core behavior.</p>
+  </div>
+  <div class="settings-tabs">
+    ${tabsHtml}
+  </div>
+  <div class="settings-content" id="settings-content"
+    hx-get="/fragments/settings/core-prompts/${activeDir}"
+    hx-trigger="load"
+    hx-swap="innerHTML">
+    <div class="settings-loading">Loading...</div>
+  </div>
+</div>`;
+}
+
+/**
+ * Render the file list for a prompt directory.
+ * Includes OOB swap to update the active tab state.
+ */
+export function renderFileList(directory: PromptDirectory, files: string[]): string {
+  const fileListHtml = files.length === 0
+    ? `<div class="settings-empty">No files in this directory</div>`
+    : `<div class="settings-file-list">
+      ${files.map((file) => {
+        const displayName = file.replace(/\.md$/, "").replace(/_/g, " ");
+        return `<button
+          class="settings-file-item"
+          hx-get="/fragments/settings/file/${directory}/${encodeURIComponent(file)}"
+          hx-target="#settings-content"
+          hx-swap="innerHTML"
+        >
+          <span class="settings-file-icon">📄</span>
+          <span class="settings-file-name">${escapeHtml(displayName)}</span>
+        </button>`;
+      }).join("")}
+    </div>`;
+
+  // OOB swap to update active tab
+  const oobSwap = renderTabActiveState(directory);
+
+  return fileListHtml + oobSwap;
+}
+
+/**
+ * Render the active tab indicator as an OOB swap.
+ */
+function renderTabActiveState(activeDir: PromptDirectory): string {
+  const tabs = ["self", "user", "relationship"];
+  return tabs.map((dir) => {
+    const isActive = dir === activeDir;
+    return `<button
+      class="settings-tab${isActive ? " active" : ""}"
+      hx-get="/fragments/settings/core-prompts/${dir}"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-swap-oob="true"
+      id="tab-${dir}"
+    >${dir.charAt(0).toUpperCase() + dir.slice(1)}</button>`;
+  }).join("");
+}
+
+/**
+ * Render the file editor with textarea.
+ */
+export function renderFileEditor(
+  directory: PromptDirectory,
+  filename: string,
+  content: string
+): string {
+  const displayName = filename.replace(/\.md$/, "").replace(/_/g, " ");
+  const safeContent = escapeHtml(content);
+
+  return `<div class="settings-editor">
+  <div class="settings-editor-header">
+    <button
+      class="btn btn--ghost btn--sm"
+      hx-get="/fragments/settings/core-prompts/${directory}"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+    >
+      ← Back
+    </button>
+    <span class="settings-editor-filename">${escapeHtml(displayName)}</span>
+  </div>
+  <form
+    class="settings-editor-form"
+    hx-post="/api/settings/file/${directory}/${encodeURIComponent(filename)}"
+    hx-target="#settings-editor-status"
+    hx-swap="innerHTML"
+  >
+    <textarea
+      class="settings-textarea"
+      name="content"
+      placeholder="Enter prompt content..."
+      rows="20"
+    >${safeContent}</textarea>
+    <div class="settings-editor-actions">
+      <button
+        type="button"
+        class="btn btn--ghost"
+        hx-get="/fragments/settings/core-prompts/${directory}"
+        hx-target="#settings-content"
+        hx-swap="innerHTML"
+      >Cancel</button>
+      <button type="submit" class="btn btn--primary">Save</button>
+    </div>
+    <div id="settings-editor-status" class="settings-editor-status"></div>
+  </form>
+</div>`;
+}
+
+/**
+ * Render a success message after saving.
+ */
+export function renderSaveSuccess(): string {
+  return `<div class="settings-save-success">✓ Saved successfully</div>`;
+}
+
+/**
+ * Render an error message.
+ */
+export function renderSaveError(message: string): string {
+  return `<div class="settings-save-error">✗ ${escapeHtml(message)}</div>`;
 }
 

@@ -577,6 +577,183 @@ export class DBClient {
   }
 
   // ===========================================================================
+  // Date-based Message Operations (for Memory Summarization)
+  // ===========================================================================
+
+  /**
+   * Retrieves all messages for a specific date.
+   *
+   * @param date - The date to query (Date object or ISO date string YYYY-MM-DD)
+   * @returns Array of messages with conversation IDs, ordered by creation time
+   */
+  getMessagesByDate(date: Date | string): Array<Message & { conversationId: string }> {
+    // Normalize date to YYYY-MM-DD format
+    let dateStr: string;
+    if (typeof date === "string") {
+      dateStr = date;
+    } else {
+      dateStr = date.toISOString().split("T")[0];
+    }
+
+    const stmt = this.db.prepare(
+      `SELECT id, conversation_id, role, content, reasoning_content,
+              tool_call_id, tool_calls, created_at
+       FROM messages
+       WHERE date(created_at) = ?
+       ORDER BY created_at ASC`
+    );
+
+    const rows = stmt.all<MessageRow>(dateStr);
+    stmt.finalize();
+
+    return rows.map((row) => ({
+      ...this.rowToMessage(row),
+      conversationId: row.conversation_id,
+    }));
+  }
+
+  /**
+   * Gets the date of the most recent message across all conversations.
+   * Used for day-change detection.
+   *
+   * @returns The date of the most recent message, or null if no messages exist
+   */
+  getLastMessageDate(): Date | null {
+    const stmt = this.db.prepare(
+      `SELECT created_at FROM messages ORDER BY created_at DESC LIMIT 1`
+    );
+
+    const row = stmt.get<{ created_at: string }>();
+    stmt.finalize();
+
+    return row ? new Date(row.created_at) : null;
+  }
+
+  /**
+   * Gets all unique conversation IDs that had messages on a specific date.
+   *
+   * @param date - The date to query (Date object or ISO date string YYYY-MM-DD)
+   * @returns Array of conversation IDs
+   */
+  getConversationIdsByDate(date: Date | string): string[] {
+    // Normalize date to YYYY-MM-DD format
+    let dateStr: string;
+    if (typeof date === "string") {
+      dateStr = date;
+    } else {
+      dateStr = date.toISOString().split("T")[0];
+    }
+
+    const stmt = this.db.prepare(
+      `SELECT DISTINCT conversation_id FROM messages WHERE date(created_at) = ?`
+    );
+
+    const rows = stmt.all<{ conversation_id: string }>(dateStr);
+    stmt.finalize();
+
+    return rows.map((row) => row.conversation_id);
+  }
+
+  /**
+   * Gets all dates that have messages but no memory summary.
+   * Used by the catch-up summarization to find missed days.
+   *
+   * @returns Array of dates in YYYY-MM-DD format, oldest first
+   */
+  getUnsummarizedDates(): string[] {
+    const stmt = this.db.prepare(
+      `SELECT DISTINCT DATE(m.created_at) as date
+       FROM messages m
+       LEFT JOIN summarized_chats sc ON sc.message_date = DATE(m.created_at)
+       WHERE sc.message_date IS NULL
+       ORDER BY date ASC`
+    );
+
+    const rows = stmt.all<{ date: string }>();
+    stmt.finalize();
+
+    return rows.map((row) => row.date);
+  }
+
+  // ===========================================================================
+  // Memory Summary Operations
+  // ===========================================================================
+
+  /**
+   * Creates a new memory summary record.
+   *
+   * @param date - The date being summarized
+   * @param granularity - The granularity level
+   * @param filePath - Path to the memory file
+   * @param chatIds - Array of chat IDs included in the summary
+   * @returns The summary ID
+   */
+  createMemorySummary(
+    date: string,
+    granularity: "daily" | "weekly" | "monthly" | "yearly",
+    filePath: string,
+    chatIds: string[]
+  ): string {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    this.db.exec(
+      `INSERT INTO memory_summaries (id, date, granularity, file_path, chat_ids, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, date, granularity, filePath, JSON.stringify(chatIds), now]
+    );
+
+    return id;
+  }
+
+  /**
+   * Records that a chat has been summarized.
+   *
+   * @param chatId - The chat ID
+   * @param messageDate - The date of the messages
+   * @param summaryId - The summary ID
+   */
+  markChatSummarized(chatId: string, messageDate: string, summaryId: string): void {
+    const now = new Date().toISOString();
+    this.db.exec(
+      `INSERT OR REPLACE INTO summarized_chats (chat_id, message_date, summary_id, summarized_at)
+       VALUES (?, ?, ?, ?)`,
+      [chatId, messageDate, summaryId, now]
+    );
+  }
+
+  /**
+   * Checks if a chat has already been summarized for a specific date.
+   *
+   * @param chatId - The chat ID
+   * @param messageDate - The date of the messages
+   * @returns True if the chat has been summarized for this date
+   */
+  isChatSummarized(chatId: string, messageDate: string): boolean {
+    const stmt = this.db.prepare(
+      `SELECT 1 FROM summarized_chats WHERE chat_id = ? AND message_date = ?`
+    );
+    const result = stmt.get(chatId, messageDate);
+    stmt.finalize();
+    return !!result;
+  }
+
+  /**
+   * Gets the most recent memory summary for a granularity level.
+   *
+   * @param granularity - The granularity level
+   * @returns The most recent summary date, or null if none exist
+   */
+  getLastSummaryDate(granularity: "daily" | "weekly" | "monthly" | "yearly"): string | null {
+    const stmt = this.db.prepare(
+      `SELECT date FROM memory_summaries WHERE granularity = ? ORDER BY date DESC LIMIT 1`
+    );
+    const row = stmt.get<{ date: string }>(granularity);
+    stmt.finalize();
+    return row?.date ?? null;
+  }
+
+  // ===========================================================================
   // Cleanup
   // ===========================================================================
 

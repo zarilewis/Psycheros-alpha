@@ -176,6 +176,19 @@ function toggleSidebar() {
   overlay?.classList.toggle('open');
 }
 
+/**
+ * Close sidebar after navigation (for settings links).
+ */
+function closeSidebarAfterNav() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.querySelector('.sidebar-overlay');
+
+  if (sidebar?.classList.contains('open')) {
+    sidebar.classList.remove('open');
+    overlay?.classList.remove('open');
+  }
+}
+
 // =============================================================================
 // Conversations
 // =============================================================================
@@ -982,10 +995,9 @@ function handleConvTouchEnd(_e) {
     if (touchState.currentX > SWIPE_THRESHOLD) {
       // Swipe right - edit
       startTitleEdit(convId);
-    } else if (touchState.currentX < -SWIPE_THRESHOLD) {
-      // Swipe left - delete
-      showDeleteModal([convId]);
     }
+    // Note: swipe-left for delete is intentionally disabled
+    // to prevent accidental conversation deletion
   }
 
   // Reset state
@@ -1328,6 +1340,7 @@ async function finishTitleEdit(input) {
 
 globalThis.SBy = {
   toggleSidebar,
+  closeSidebarAfterNav,
   newConversation,
   selectConversation,
   autoResize,

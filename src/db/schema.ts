@@ -82,6 +82,39 @@ export const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_memory_chunks_source
     ON memory_chunks(source_file);
+
+  -- Memory Summarization Tables
+  -- Track memory summarization state
+  CREATE TABLE IF NOT EXISTS memory_summaries (
+    id TEXT PRIMARY KEY,
+    date TEXT NOT NULL,
+    granularity TEXT NOT NULL CHECK (granularity IN ('daily', 'weekly', 'monthly', 'yearly')),
+    file_path TEXT NOT NULL,
+    chat_ids TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_memory_summaries_date
+    ON memory_summaries(date);
+
+  CREATE INDEX IF NOT EXISTS idx_memory_summaries_granularity
+    ON memory_summaries(granularity);
+
+  -- Track which chats have been summarized (to avoid re-summarizing)
+  CREATE TABLE IF NOT EXISTS summarized_chats (
+    chat_id TEXT NOT NULL,
+    message_date TEXT NOT NULL,
+    summary_id TEXT NOT NULL,
+    summarized_at TEXT NOT NULL,
+    PRIMARY KEY (chat_id, message_date),
+    FOREIGN KEY (summary_id) REFERENCES memory_summaries(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_summarized_chats_chat
+    ON summarized_chats(chat_id);
+
+  CREATE INDEX IF NOT EXISTS idx_summarized_chats_date
+    ON summarized_chats(message_date);
 `;
 
 /**
@@ -136,6 +169,45 @@ function runMigrations(db: Database): void {
 
       CREATE INDEX IF NOT EXISTS idx_memory_chunks_source
         ON memory_chunks(source_file);
+    `);
+  }
+
+  // Migration: Add memory summarization tables if missing
+  const hasMemorySummaryTables = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'memory_summaries'")
+    .get();
+
+  if (!hasMemorySummaryTables) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS memory_summaries (
+        id TEXT PRIMARY KEY,
+        date TEXT NOT NULL,
+        granularity TEXT NOT NULL CHECK (granularity IN ('daily', 'weekly', 'monthly', 'yearly')),
+        file_path TEXT NOT NULL,
+        chat_ids TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_memory_summaries_date
+        ON memory_summaries(date);
+
+      CREATE INDEX IF NOT EXISTS idx_memory_summaries_granularity
+        ON memory_summaries(granularity);
+
+      CREATE TABLE IF NOT EXISTS summarized_chats (
+        chat_id TEXT NOT NULL,
+        message_date TEXT NOT NULL,
+        summary_id TEXT NOT NULL,
+        summarized_at TEXT NOT NULL,
+        PRIMARY KEY (chat_id, message_date),
+        FOREIGN KEY (summary_id) REFERENCES memory_summaries(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_summarized_chats_chat
+        ON summarized_chats(chat_id);
+
+      CREATE INDEX IF NOT EXISTS idx_summarized_chats_date
+        ON summarized_chats(message_date);
     `);
   }
 }

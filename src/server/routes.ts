@@ -31,6 +31,7 @@ import { updateConversationTitle, deleteConversation, deleteConversations } from
 import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
 import { MAX_SSE_MESSAGE_SIZE, SSE_TRUNCATION_SUFFIX } from "../constants.ts";
 import { getBroadcaster } from "./broadcaster.ts";
+import { runConsolidation, needsConsolidation } from "../memory/mod.ts";
 
 /**
  * Context passed to route handlers containing dependencies.
@@ -48,6 +49,8 @@ export interface RouteContext {
   ragRetriever?: Retriever;
   /** RAG configuration */
   ragConfig?: Partial<RAGConfig>;
+  /** Whether memory summarization is enabled */
+  memoryEnabled?: boolean;
 }
 
 /**
@@ -1126,5 +1129,118 @@ export async function handleSaveSettingsFile(
       status: 500,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
+  }
+}
+
+// =============================================================================
+// Memory Consolidation Routes
+// =============================================================================
+
+/**
+ * Handle POST /api/memory/consolidate/:granularity - Trigger memory consolidation
+ *
+ * Manually triggers consolidation for testing/debugging purposes.
+ * Granularity can be "weekly", "monthly", or "yearly".
+ *
+ * @param ctx - Route context
+ * @param granularity - The consolidation granularity
+ * @returns HTTP Response with JSON result
+ */
+export async function handleMemoryConsolidate(
+  ctx: RouteContext,
+  granularity: string
+): Promise<Response> {
+  // Validate granularity
+  if (granularity !== "weekly" && granularity !== "monthly" && granularity !== "yearly") {
+    return new Response(
+      JSON.stringify({ error: `Invalid granularity: ${granularity}. Must be weekly, monthly, or yearly.` }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Check if memory is enabled
+  if (!ctx.memoryEnabled) {
+    return new Response(
+      JSON.stringify({ error: "Memory summarization is disabled" }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    // Check if consolidation is needed
+    const needed = await needsConsolidation(granularity, ctx.db, ctx.projectRoot);
+
+    if (!needed) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `No ${granularity} consolidation needed - no unconsolidated source files from a completed period`,
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    // Run consolidation
+    const result = await runConsolidation(granularity, ctx.db, ctx.projectRoot);
+
+    if (result.success) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: `${granularity} consolidation completed`,
+          memoryFile: result.memoryFile,
+          archivedFiles: result.archivedFiles,
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    } else {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: result.error || "Consolidation failed",
+        }),
+        {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ success: false, error: message }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
   }
 }

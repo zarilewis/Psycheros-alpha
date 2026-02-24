@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "exports": "./src/main.ts",
   "tasks": {
-    "dev": "deno run --watch -A src/main.ts",
-    "start": "deno run -A src/main.ts",
+    "dev": "deno run --watch -A --unstable-cron src/main.ts",
+    "start": "deno run -A --unstable-cron src/main.ts",
     "stop": "pkill -INT -f 'deno.*main.ts' || true"
   },
   "imports": {

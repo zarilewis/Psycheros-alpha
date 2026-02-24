@@ -11,6 +11,7 @@ import { DBClient } from "../db/mod.ts";
 import { createDefaultClient, type LLMClient } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import { createIndexer, createRetriever, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
+import { catchUpSummarization, needsConsolidation, runConsolidation } from "../memory/mod.ts";
 import { join } from "@std/path";
 import {
   handleBatchDeleteConversations,
@@ -25,6 +26,7 @@ import {
   handleGetMessages,
   handleIndex,
   handleListConversations,
+  handleMemoryConsolidate,
   handleSettingsFileEditorFragment,
   handleSettingsFileListFragment,
   handleSettingsFragment,
@@ -51,6 +53,8 @@ export interface ServerConfig {
   allowedTools?: string[];
   /** RAG configuration options */
   ragConfig?: Partial<RAGConfig>;
+  /** Whether memory summarization is enabled (default: true) */
+  memoryEnabled?: boolean;
 }
 
 /**
@@ -147,6 +151,81 @@ export class Server {
       }
     }
 
+    // Set up memory summarization cron job and catch-up on startup
+    if (this.config.memoryEnabled !== false) {
+      // Catch up on any missed summarizations from when server was down
+      catchUpSummarization(this.db, this.config.projectRoot).catch((error) => {
+        console.error("[Memory] Startup catch-up failed:", error instanceof Error ? error.message : String(error));
+      });
+
+      // Set up daily cron job at configured hour (default 4 AM)
+      const memoryHour = parseInt(Deno.env.get("SBY_MEMORY_HOUR") || "4");
+      const cronPattern = `0 ${memoryHour} * * *`;
+
+      Deno.cron("memory-daily-summarization", cronPattern, async () => {
+        console.log("[Memory] Running daily summarization cron");
+        try {
+          const count = await catchUpSummarization(this.db, this.config.projectRoot);
+          if (count > 0) {
+            console.log(`[Memory] Daily cron: summarized ${count} day(s)`);
+          }
+        } catch (error) {
+          console.error("[Memory] Daily cron failed:", error instanceof Error ? error.message : String(error));
+        }
+      });
+
+      // Weekly consolidation - runs Sunday at 5 AM (7 = Sunday in Deno cron)
+      Deno.cron("memory-weekly-consolidation", "0 5 * * 7", async () => {
+        console.log("[Memory] Running weekly consolidation cron");
+        try {
+          if (await needsConsolidation("weekly", this.db, this.config.projectRoot)) {
+            const result = await runConsolidation("weekly", this.db, this.config.projectRoot);
+            if (result.success) {
+              console.log("[Memory] Weekly consolidation complete");
+            } else if (result.error) {
+              console.error("[Memory] Weekly consolidation failed:", result.error);
+            }
+          }
+        } catch (error) {
+          console.error("[Memory] Weekly consolidation cron failed:", error instanceof Error ? error.message : String(error));
+        }
+      });
+
+      // Monthly consolidation - runs 1st of month at 5 AM
+      Deno.cron("memory-monthly-consolidation", "0 5 1 * *", async () => {
+        console.log("[Memory] Running monthly consolidation cron");
+        try {
+          if (await needsConsolidation("monthly", this.db, this.config.projectRoot)) {
+            const result = await runConsolidation("monthly", this.db, this.config.projectRoot);
+            if (result.success) {
+              console.log("[Memory] Monthly consolidation complete");
+            } else if (result.error) {
+              console.error("[Memory] Monthly consolidation failed:", result.error);
+            }
+          }
+        } catch (error) {
+          console.error("[Memory] Monthly consolidation cron failed:", error instanceof Error ? error.message : String(error));
+        }
+      });
+
+      // Yearly consolidation - runs Jan 1st at 5 AM
+      Deno.cron("memory-yearly-consolidation", "0 5 1 1 *", async () => {
+        console.log("[Memory] Running yearly consolidation cron");
+        try {
+          if (await needsConsolidation("yearly", this.db, this.config.projectRoot)) {
+            const result = await runConsolidation("yearly", this.db, this.config.projectRoot);
+            if (result.success) {
+              console.log("[Memory] Yearly consolidation complete");
+            } else if (result.error) {
+              console.error("[Memory] Yearly consolidation failed:", result.error);
+            }
+          }
+        } catch (error) {
+          console.error("[Memory] Yearly consolidation cron failed:", error instanceof Error ? error.message : String(error));
+        }
+      });
+    }
+
     // Start keepalive timer for persistent SSE connections
     const broadcaster = getBroadcaster();
     this.keepaliveInterval = setInterval(() => {
@@ -196,6 +275,7 @@ export class Server {
       projectRoot: this.config.projectRoot,
       ragRetriever: this.ragRetriever ?? undefined,
       ragConfig: this.ragConfig,
+      memoryEnabled: this.config.memoryEnabled ?? true,
     };
   }
 
@@ -301,6 +381,13 @@ export class Server {
       const directory = settingsFileMatch[1];
       const filename = settingsFileMatch[2];
       return await handleSaveSettingsFile(ctx, directory, filename, request);
+    }
+
+    // POST /api/memory/consolidate/:granularity - Trigger memory consolidation
+    const memoryConsolidateMatch = path.match(/^\/api\/memory\/consolidate\/(weekly|monthly|yearly)$/);
+    if (method === "POST" && memoryConsolidateMatch) {
+      const granularity = memoryConsolidateMatch[1];
+      return await handleMemoryConsolidate(ctx, granularity);
     }
 
     // 404 for unknown API routes
