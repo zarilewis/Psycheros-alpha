@@ -156,12 +156,33 @@ export class MemoryIndexer implements Indexer {
   }
 
   /**
-   * Find all markdown files in the memories directory.
+   * Find all markdown files in the memories directory, including subdirectories.
+   * Scans: daily/, weekly/, monthly/, yearly/, significant/
+   * Excludes: archive/ (consolidated files shouldn't be re-indexed)
    */
   private async findMarkdownFiles(): Promise<string[]> {
     const files: string[] = [];
+    const allowedDirs = ["daily", "weekly", "monthly", "yearly", "significant"];
 
     try {
+      // Scan each allowed subdirectory
+      for (const subdir of allowedDirs) {
+        const subdirPath = join(this.memoriesDir, subdir);
+        try {
+          for await (const entry of Deno.readDir(subdirPath)) {
+            if (entry.isFile && entry.name.endsWith(".md") && entry.name !== ".gitkeep") {
+              files.push(join(subdirPath, entry.name));
+            }
+          }
+        } catch (error) {
+          // Subdirectory doesn't exist yet, skip it
+          if (!(error instanceof Deno.errors.NotFound)) {
+            console.warn(`[RAG] Warning: Could not read ${subdirPath}:`, error);
+          }
+        }
+      }
+
+      // Also check for any .md files directly in memories/ root (legacy support)
       for await (const entry of Deno.readDir(this.memoriesDir)) {
         if (entry.isFile && entry.name.endsWith(".md")) {
           files.push(join(this.memoriesDir, entry.name));

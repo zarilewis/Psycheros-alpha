@@ -9,6 +9,7 @@ import type { MemoryFile, Granularity } from "./types.ts";
 
 /**
  * Write a memory file to disk and update the database.
+ * Note: "significant" memories skip database tracking (they don't consolidate).
  *
  * @param memory - The memory file to write
  * @param db - Database client for recording the summary
@@ -30,10 +31,16 @@ export async function writeMemoryFile(
     // Write the file
     await Deno.writeTextFile(fullPath, memory.content);
 
-    // Record in database
+    // Significant memories are not tracked in the database (no consolidation)
+    if (memory.granularity === "significant") {
+      console.log(`[Memory] Wrote significant memory: ${memory.path}`);
+      return true;
+    }
+
+    // Record in database for consolidatable granularities
     const summaryId = db.createMemorySummary(
       memory.date,
-      memory.granularity,
+      memory.granularity as "daily" | "weekly" | "monthly" | "yearly",
       `memories/${memory.path}`,
       memory.chatIds
     );
@@ -178,5 +185,67 @@ export async function archiveDailyMemory(
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error(`[Memory] Failed to archive ${filePath}:`, errorMessage);
     return false;
+  }
+}
+
+/**
+ * Write a significant memory file to disk.
+ * Significant memories are NOT recorded in the database (they don't consolidate).
+ *
+ * @param title - The title for the memory
+ * @param content - The content of the memory
+ * @param conversationId - The ID of the conversation where this memory was created
+ * @param projectRoot - Root directory of the project
+ * @returns The relative file path if successful, null on error
+ */
+export async function writeSignificantMemory(
+  title: string,
+  content: string,
+  conversationId: string,
+  projectRoot: string
+): Promise<string | null> {
+  const now = new Date();
+  const dateStr = now.toISOString().split("T")[0];
+  const timestamp = now.toISOString();
+
+  // Create slug from title
+  const slug = title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .substring(0, 50);
+
+  const fileName = `${dateStr}_${slug}.md`;
+  const relativePath = `significant/${fileName}`;
+  const fullPath = `${projectRoot}/memories/${relativePath}`;
+
+  try {
+    // Ensure directory exists
+    await Deno.mkdir(`${projectRoot}/memories/significant`, { recursive: true });
+
+    // Format the memory file
+    const formattedContent = `# ${title}
+
+${content}
+
+<!--
+Date: ${dateStr}
+Conversation: ${conversationId}
+Created: ${timestamp}
+-->
+`;
+
+    // Write the file
+    await Deno.writeTextFile(fullPath, formattedContent);
+
+    console.log(`[Memory] Wrote significant memory: ${relativePath}`);
+    return relativePath;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[Memory] Failed to write significant memory:`, errorMessage);
+    return null;
   }
 }

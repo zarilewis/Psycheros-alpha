@@ -7,8 +7,9 @@
 
 /**
  * Granularity levels for memory summaries.
+ * "significant" is for emotionally important events that should be permanently remembered.
  */
-export type Granularity = "daily" | "weekly" | "monthly" | "yearly";
+export type Granularity = "daily" | "weekly" | "monthly" | "yearly" | "significant";
 
 /**
  * A memory file with its metadata and content.
@@ -134,5 +135,13 @@ export function getDateFormatInfo(date: Date, granularity: Granularity): DateFor
         filePath: `yearly/${year}.md`,
         title: `Yearly Memory - ${year}`,
       };
+    case "significant": {
+      const dateStr = `${year}-${month}-${day}`;
+      return {
+        dateStr,
+        filePath: `significant/${dateStr}.md`,
+        title: `Significant Memory - ${dateStr}`,
+      };
+    }
   }
 }

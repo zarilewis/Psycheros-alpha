@@ -71,7 +71,8 @@ src/
 │   ├── registry.ts   # Tool registration
 │   ├── shell.ts      # Command execution
 │   ├── update_title.ts
-│   └── get_metrics.ts # Streaming performance metrics tool
+│   ├── get_metrics.ts # Streaming performance metrics tool
+│   └── create-significant-memory.ts # Permanent memory creation
 ├── metrics/          # Performance instrumentation
 │   ├── mod.ts
 │   ├── types.ts      # MetricsCollector interface
@@ -122,15 +123,34 @@ memories/
 │   └── 2026-02.md
 ├── yearly/          # Yearly consolidation (Jan 1st)
 │   └── 2026.md
+├── significant/     # Permanently remembered events (never consolidated)
+│   └── 2026-02-23_first-conversation.md
 └── archive/
     └── daily/       # Archived daily files after weekly consolidation
 ```
+
+**Memory Types**:
+- **Daily/Weekly/Monthly/Yearly**: Auto-generated summaries that consolidate over time
+- **Significant**: Emotionally important events that are permanently remembered with clarity. These are created explicitly by the entity via the `create_significant_memory` tool and are never consolidated or archived.
 
 **Consolidation Schedule** (via Deno cron):
 - Daily summarization: Configured hour (default 4 AM)
 - Weekly consolidation: Sunday 5 AM
 - Monthly consolidation: 1st of month 5 AM
 - Yearly consolidation: January 1st 5 AM
+
+**Significant Memory Format**:
+```markdown
+# Title of the Memory
+
+Content describing what happened, how it felt, why it matters...
+
+<!--
+Date: 2026-02-23
+Conversation: abc123-def456-...
+Created: 2026-02-23T15:30:00.000Z
+-->
+```
 
 ### RAG System
 
@@ -256,6 +276,7 @@ SBy/
 │   ├── weekly/
 │   ├── monthly/
 │   ├── yearly/
+│   ├── significant/   # Permanent emotionally-important memories
 │   └── archive/
 └── .sby/              # Runtime data (SQLite DB)
 ```

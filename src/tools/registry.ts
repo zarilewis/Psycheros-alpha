@@ -10,6 +10,7 @@ import type { Tool, ToolContext } from "./types.ts";
 import { shellTool } from "./shell.ts";
 import { updateTitleTool } from "./update_title.ts";
 import { getMetricsTool } from "./get_metrics.ts";
+import { createSignificantMemoryTool } from "./create-significant-memory.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -23,6 +24,7 @@ const AVAILABLE_TOOLS: Record<string, Tool> = {
   shell: shellTool,
   update_title: updateTitleTool,
   get_metrics: getMetricsTool,
+  create_significant_memory: createSignificantMemoryTool,
 };
 
 /**
