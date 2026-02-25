@@ -13,6 +13,7 @@ import type { DBClient } from "../db/mod.ts";
 import type { LLMClient } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { Retriever, RAGConfig } from "../rag/mod.ts";
+import type { MCPClient } from "../mcp-client/mod.ts";
 import { EntityTurn, type EntityYield, generateAndSetTitle } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
 import {
@@ -51,6 +52,8 @@ export interface RouteContext {
   ragConfig?: Partial<RAGConfig>;
   /** Whether memory summarization is enabled */
   memoryEnabled?: boolean;
+  /** Optional MCP client for syncing with entity-core */
+  mcpClient?: MCPClient;
 }
 
 /**
@@ -662,6 +665,7 @@ export async function handleChat(
           {
             projectRoot: ctx.projectRoot,
             ragRetriever: ctx.ragRetriever,
+            mcpClient: ctx.mcpClient,
           }
         );
 
@@ -1114,9 +1118,20 @@ export async function handleSaveSettingsFile(
       });
     }
 
-    // Write file
-    const filePath = `${ctx.projectRoot}/${directory}/${filename}`;
-    await Deno.writeTextFile(filePath, content);
+    // Write file - MCP is source of truth when connected
+    if (ctx.mcpClient) {
+      // Use MCP client to write (pushes to entity-core, updates cache, writes local)
+      await ctx.mcpClient.writeIdentityFile(
+        directory as "self" | "user" | "relationship",
+        filename,
+        content,
+        ctx.projectRoot,
+      );
+    } else {
+      // Fallback to direct file write when MCP is not enabled
+      const filePath = `${ctx.projectRoot}/${directory}/${filename}`;
+      await Deno.writeTextFile(filePath, content);
+    }
 
     return new Response(renderSaveSuccess(), {
       headers: {
@@ -1230,6 +1245,112 @@ export async function handleMemoryConsolidate(
         }
       );
     }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ success: false, error: message }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
+// =============================================================================
+// MCP Sync Routes
+// =============================================================================
+
+/**
+ * Handle POST /api/mcp/sync - Manually trigger MCP sync
+ *
+ * Triggers an immediate pull + push with entity-core.
+ * Useful for testing or when you need to sync immediately.
+ *
+ * @param ctx - Route context
+ * @returns HTTP Response with JSON result
+ */
+export async function handleMcpSync(ctx: RouteContext): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "MCP is not enabled. Set SBY_MCP_ENABLED=true to use entity-core sync.",
+      }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    // Check if connected
+    if (!ctx.mcpClient.isConnected()) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          connected: false,
+          message: "MCP client is not connected to entity-core",
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    // Pull latest from entity-core
+    const identity = await ctx.mcpClient.pull();
+
+    // Push any pending changes
+    const pushSuccess = await ctx.mcpClient.push();
+
+    // Get pending counts
+    const pending = ctx.mcpClient.getPendingCount();
+
+    const result: {
+      success: boolean;
+      connected: boolean;
+      pulled?: {
+        self: number;
+        user: number;
+        relationship: number;
+      };
+      pushed: boolean;
+      pending: {
+        identity: number;
+        memories: number;
+      };
+    } = {
+      success: true,
+      connected: true,
+      pushed: pushSuccess,
+      pending,
+    };
+
+    if (identity) {
+      result.pulled = {
+        self: identity.self.length,
+        user: identity.user.length,
+        relationship: identity.relationship.length,
+      };
+    }
+
+    return new Response(JSON.stringify(result), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(

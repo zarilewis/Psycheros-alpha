@@ -6,6 +6,7 @@
 
 import "@std/dotenv/load";
 import { Server } from "./server/mod.ts";
+import { createMCPClient, type MCPClient } from "./mcp-client/mod.ts";
 
 const VERSION = "0.1.0";
 
@@ -67,11 +68,59 @@ console.log(
 console.log(`RAG enabled: ${ragEnabled}`);
 console.log(`Press Ctrl+C to stop\n`);
 
-const server = new Server(config);
+// Initialize MCP client if enabled
+let mcpClient: MCPClient | undefined;
+const mcpEnabled = Deno.env.get("SBY_MCP_ENABLED") === "true";
+
+if (mcpEnabled) {
+  const mcpCommand = Deno.env.get("SBY_MCP_COMMAND") || "/home/zari/.deno/bin/deno";
+  const mcpArgsStr = Deno.env.get("SBY_MCP_ARGS") || `run -A ${Deno.env.get("HOME")}/projects/entity-core/src/mod.ts`;
+  const mcpArgs = mcpArgsStr.split(" ");
+  const mcpInstance = Deno.env.get("SBY_MCP_INSTANCE") || "sby-harness";
+  const entityCoreDataDir = Deno.env.get("SBY_ENTITY_CORE_DATA_DIR") || `${Deno.env.get("HOME")}/projects/entity-core/data`;
+
+  console.log(`MCP enabled: connecting to entity-core as ${mcpInstance}`);
+
+  mcpClient = createMCPClient({
+    command: mcpCommand,
+    args: mcpArgs,
+    instanceId: mcpInstance,
+    env: {
+      ENTITY_CORE_DATA_DIR: entityCoreDataDir,
+    },
+    syncOnStartup: true,
+    syncInterval: 5 * 60 * 1000, // 5 minutes
+    offlineFallback: true,
+  });
+
+  // Attempt connection (non-blocking)
+  mcpClient.connect().then((connected) => {
+    if (connected) {
+      console.log("[MCP] Connected to entity-core");
+    } else {
+      console.log("[MCP] Running in offline mode (will sync when available)");
+    }
+  }).catch((error) => {
+    console.error("[MCP] Connection failed:", error);
+    console.log("[MCP] Running in offline mode");
+  });
+}
+
+const server = new Server({
+  ...config,
+  mcpClient,
+});
 
 // Handle graceful shutdown
-Deno.addSignalListener("SIGINT", () => {
+Deno.addSignalListener("SIGINT", async () => {
   console.log("\nShutting down...");
+
+  // Disconnect MCP client (triggers final sync)
+  if (mcpClient) {
+    console.log("[MCP] Syncing and disconnecting...");
+    await mcpClient.disconnect();
+  }
+
   server.stop();
   Deno.exit(0);
 });

@@ -12,6 +12,7 @@ import { createDefaultClient, type LLMClient } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import { createIndexer, createRetriever, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import { catchUpSummarization, needsConsolidation, runConsolidation } from "../memory/mod.ts";
+import type { MCPClient } from "../mcp-client/mod.ts";
 import { join } from "@std/path";
 import {
   handleBatchDeleteConversations,
@@ -27,6 +28,7 @@ import {
   handleIndex,
   handleListConversations,
   handleMemoryConsolidate,
+  handleMcpSync,
   handleSettingsFileEditorFragment,
   handleSettingsFileListFragment,
   handleSettingsFragment,
@@ -55,6 +57,8 @@ export interface ServerConfig {
   ragConfig?: Partial<RAGConfig>;
   /** Whether memory summarization is enabled (default: true) */
   memoryEnabled?: boolean;
+  /** Optional MCP client for syncing with entity-core */
+  mcpClient?: MCPClient;
 }
 
 /**
@@ -88,6 +92,7 @@ export class Server {
   private abortController: AbortController;
   private config: ServerConfig;
   private keepaliveInterval: number | null = null;
+  private mcpClient: MCPClient | null = null;
 
   /**
    * Create a new Server instance.
@@ -118,6 +123,9 @@ export class Server {
     if (this.ragConfig.enabled) {
       this.ragRetriever = createRetriever(this.db.getRawDb(), this.ragConfig);
     }
+
+    // Store MCP client if provided
+    this.mcpClient = config.mcpClient ?? null;
 
     // Create abort controller for graceful shutdown
     this.abortController = new AbortController();
@@ -276,6 +284,7 @@ export class Server {
       ragRetriever: this.ragRetriever ?? undefined,
       ragConfig: this.ragConfig,
       memoryEnabled: this.config.memoryEnabled ?? true,
+      mcpClient: this.mcpClient ?? undefined,
     };
   }
 
@@ -388,6 +397,11 @@ export class Server {
     if (method === "POST" && memoryConsolidateMatch) {
       const granularity = memoryConsolidateMatch[1];
       return await handleMemoryConsolidate(ctx, granularity);
+    }
+
+    // POST /api/mcp/sync - Manually trigger MCP sync
+    if (method === "POST" && path === "/api/mcp/sync") {
+      return await handleMcpSync(ctx);
     }
 
     // 404 for unknown API routes
