@@ -99,12 +99,19 @@ export class MemoryRetriever implements Retriever {
       return [];
     }
 
-    // Calculate similarity scores
+    // Calculate similarity scores with instance boost
     const results: RetrievalResult[] = [];
+    const instanceBoost = config.instanceBoost ?? 0.1;
+
     for (const chunk of chunks) {
       if (!chunk.embedding) continue;
 
-      const score = cosineSimilarity(queryEmbedding, chunk.embedding);
+      let score = cosineSimilarity(queryEmbedding, chunk.embedding);
+
+      // Apply instance boost if configured
+      if (config.currentInstance && chunk.metadata?.sourceInstance === config.currentInstance) {
+        score = Math.min(score + instanceBoost, 1.0); // Cap at 1.0
+      }
 
       // Filter by minimum score
       if (score >= config.minScore) {

@@ -28,7 +28,8 @@ import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
 import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics } from "../types.ts";
 import type { Retriever } from "../rag/mod.ts";
-import { loadSByMd, loadUserFiles, loadRelationshipFiles, buildSystemMessage } from "./context.ts";
+import type { MCPClient } from "../mcp-client/mod.ts";
+import { loadSelfContent, loadUserContent, loadRelationshipContent, buildSystemMessage } from "./context.ts";
 import { buildRAGContext } from "../rag/mod.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
 import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
@@ -43,6 +44,8 @@ export interface EntityConfig {
   maxToolIterations?: number;
   /** Optional RAG retriever for memory search */
   ragRetriever?: Retriever;
+  /** Optional MCP client for syncing with entity-core */
+  mcpClient?: MCPClient;
 }
 
 /**
@@ -106,9 +109,10 @@ export class EntityTurn {
     }
 
     // Load self files, user files, and relationship files, build system message
-    const selfContent = await loadSByMd(this.config.projectRoot);
-    const userContent = await loadUserFiles(this.config.projectRoot);
-    const relationshipContent = await loadRelationshipFiles(this.config.projectRoot);
+    // Use MCP client if available, otherwise fall back to local files
+    const selfContent = await loadSelfContent(this.config.projectRoot, this.config.mcpClient);
+    const userContent = await loadUserContent(this.config.projectRoot, this.config.mcpClient);
+    const relationshipContent = await loadRelationshipContent(this.config.projectRoot, this.config.mcpClient);
 
     // Retrieve relevant memories using RAG if available
     let memoriesContent: string | undefined;

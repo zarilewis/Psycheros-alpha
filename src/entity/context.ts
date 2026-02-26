@@ -6,6 +6,7 @@
  */
 
 import { join } from "@std/path";
+import type { MCPClient, IdentityContent } from "../mcp-client/mod.ts";
 
 /**
  * The directory name for the entity's self files.
@@ -155,6 +156,89 @@ export async function loadUserFiles(projectRoot: string): Promise<string> {
  */
 export async function loadRelationshipFiles(projectRoot: string): Promise<string> {
   return await loadFilesFromDirectory(projectRoot, RELATIONSHIP_DIR, RELATIONSHIP_FILE_ORDER);
+}
+
+/**
+ * Convert identity files from MCP to concatenated string.
+ */
+function identityFilesToString(
+  files: IdentityContent["self"],
+  fileOrder: string[],
+): string {
+  // Sort by defined order
+  const sorted = [...files].sort((a, b) => {
+    const aIndex = fileOrder.indexOf(a.filename);
+    const bIndex = fileOrder.indexOf(b.filename);
+    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+    if (aIndex !== -1) return -1;
+    if (bIndex !== -1) return 1;
+    return a.filename.localeCompare(b.filename);
+  });
+
+  return sorted
+    .map((f) => f.content.trim())
+    .filter((c) => c)
+    .join("\n\n---\n\n");
+}
+
+/**
+ * Load self content from MCP client or local files.
+ *
+ * @param projectRoot - The root directory of the project
+ * @param mcpClient - Optional MCP client for loading from entity-core
+ * @returns The concatenated contents of all self/*.md files
+ */
+export async function loadSelfContent(
+  projectRoot: string,
+  mcpClient?: MCPClient,
+): Promise<string> {
+  if (mcpClient) {
+    const identity = await mcpClient.loadIdentity();
+    if (identity?.self) {
+      return identityFilesToString(identity.self, SELF_FILE_ORDER);
+    }
+  }
+  return await loadSByMd(projectRoot);
+}
+
+/**
+ * Load user content from MCP client or local files.
+ *
+ * @param projectRoot - The root directory of the project
+ * @param mcpClient - Optional MCP client for loading from entity-core
+ * @returns The concatenated contents of all user/*.md files
+ */
+export async function loadUserContent(
+  projectRoot: string,
+  mcpClient?: MCPClient,
+): Promise<string> {
+  if (mcpClient) {
+    const identity = await mcpClient.loadIdentity();
+    if (identity?.user) {
+      return identityFilesToString(identity.user, USER_FILE_ORDER);
+    }
+  }
+  return await loadUserFiles(projectRoot);
+}
+
+/**
+ * Load relationship content from MCP client or local files.
+ *
+ * @param projectRoot - The root directory of the project
+ * @param mcpClient - Optional MCP client for loading from entity-core
+ * @returns The concatenated contents of all relationship/*.md files
+ */
+export async function loadRelationshipContent(
+  projectRoot: string,
+  mcpClient?: MCPClient,
+): Promise<string> {
+  if (mcpClient) {
+    const identity = await mcpClient.loadIdentity();
+    if (identity?.relationship) {
+      return identityFilesToString(identity.relationship, RELATIONSHIP_FILE_ORDER);
+    }
+  }
+  return await loadRelationshipFiles(projectRoot);
 }
 
 /**

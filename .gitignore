@@ -9,6 +9,9 @@ deno.lock
 .playwright-mcp/
 .sby/
 
+# Entity-core data (if running from wrong directory)
+data/
+
 # OS files
 .DS_Store
 Thumbs.db

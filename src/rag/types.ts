@@ -18,6 +18,10 @@ export interface RAGConfig {
   minScore: number;
   /** Path to memories directory */
   memoriesDir: string;
+  /** Current embodiment ID for instance relevance boosting */
+  currentInstance?: string;
+  /** Boost factor for memories from the same embodiment (default: 0.1) */
+  instanceBoost?: number;
 }
 
 /**
@@ -57,6 +61,8 @@ export interface ChunkMetadata {
   headers?: string[];
   /** Line number in source file */
   lineNumber?: number;
+  /** Which embodiment created this memory */
+  sourceInstance?: string;
 }
 
 /**

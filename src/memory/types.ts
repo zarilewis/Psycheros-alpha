@@ -25,6 +25,10 @@ export interface MemoryFile {
   granularity: Granularity;
   /** Date string (YYYY-MM-DD for daily, YYYY-WXX for weekly, YYYY-MM for monthly, YYYY for yearly) */
   date: string;
+  /** Which embodiment created this memory (e.g., "sby-harness", "sillytavern") */
+  sourceInstance?: string;
+  /** Other embodiments that participated in the conversation */
+  participatingInstances?: string[];
 }
 
 /**

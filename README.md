@@ -2,6 +2,8 @@
 
 A persistent AI entity harness daemon built on Deno. Unlike traditional CLI-based AI assistants, SBy runs as a web service with durable state, tool execution, and real-time streaming.
 
+SBy is an **embodiment** - an interface through which the AI entity interacts. The entity's core identity and memories live in [entity-core](../entity-core/), a separate MCP server that provides centralized identity persistence across multiple embodiments.
+
 ## Quick Start
 
 ```bash
@@ -19,6 +21,8 @@ open http://localhost:3000
 
 ## Configuration
 
+### Core Settings
+
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `ZAI_API_KEY` | Yes | - | Your Z.ai API key |
@@ -29,13 +33,49 @@ open http://localhost:3000
 | `SBY_HOST` | No | `0.0.0.0` | Server hostname |
 | `SBY_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
 | `SBY_TOOLS` | No | (none) | Comma-separated list of enabled tools |
-| `SBY_RAG_ENABLED` | No | `true` | Enable RAG memory retrieval |
-| `SBY_RAG_MAX_CHUNKS` | No | `8` | Max memory chunks to retrieve |
-| `SBY_RAG_MAX_TOKENS` | No | `2000` | Max tokens in retrieved context |
-| `SBY_RAG_MIN_SCORE` | No | `0.3` | Minimum similarity score |
 | `SBY_MEMORY_HOUR` | No | `4` | Hour to run daily summarization (0-23) |
 
+### RAG Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SBY_RAG_ENABLED` | `true` | Enable RAG memory retrieval |
+| `SBY_RAG_MAX_CHUNKS` | `8` | Max memory chunks to retrieve |
+| `SBY_RAG_MAX_TOKENS` | `2000` | Max tokens in retrieved context |
+| `SBY_RAG_MIN_SCORE` | `0.3` | Minimum similarity score |
+
+### MCP Integration (entity-core)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `SBY_MCP_ENABLED` | `false` | Enable connection to entity-core |
+| `SBY_MCP_COMMAND` | `/home/zari/.deno/bin/deno` | Command to spawn entity-core |
+| `SBY_MCP_ARGS` | `run -A ~/projects/entity-core/src/mod.ts` | Arguments for entity-core |
+| `SBY_MCP_INSTANCE` | `sby-harness` | Instance ID for this embodiment |
+
+When MCP is enabled, SBy pulls identity files (self/, user/, relationship/) from entity-core on startup and syncs changes back periodically.
+
 ## Architecture
+
+### Multi-Embodiment Design
+
+```
+┌─────────────────────────────────────┐
+│     entity-core (MCP Server)        │
+│     ~/projects/entity-core/         │
+│  • Canonical identity files         │
+│  • Memory storage with instance tags│
+│  • RAG indexing & retrieval         │
+│  • Sync with conflict resolution    │
+└─────────────────────────────────────┘
+         ↑ pull/push
+    ┌────┴────┐
+    │   SBy   │  (other embodiments: SillyTavern, Claude Code, etc.)
+    │ Harness │
+    └─────────┘
+```
+
+The entity's core self lives in entity-core. SBy is one embodiment - an interface through which the entity interacts. This allows the same entity to exist across multiple interfaces while maintaining a single persistent identity.
 
 ### Request Flow
 
@@ -44,6 +84,7 @@ Browser (HTMX)
     → POST /api/chat
     → Server (routes.ts)
     → EntityTurn.process()
+    → MCP client loads identity from entity-core (if enabled)
     → RAG retrieval (eager)
     → LLM streaming + tool execution loop
     → SSE stream back to browser
@@ -55,7 +96,7 @@ Each module has a `mod.ts` barrel file defining its public API:
 
 ```
 src/
-├── main.ts           # Daemon entry point
+├── main.ts           # Daemon entry point, MCP initialization
 ├── types.ts          # Shared type definitions
 ├── constants.ts      # App constants
 ├── llm/              # OpenAI-compatible LLM client
@@ -79,21 +120,25 @@ src/
 │   └── collector.ts  # Timing collection functions
 ├── rag/              # Retrieval-Augmented Generation
 │   ├── mod.ts
+│   ├── types.ts      # RAGConfig with instance boosting
 │   ├── embedder.ts   # HuggingFace transformer embeddings
 │   ├── chunker.ts    # Memory chunking with overlap
 │   ├── indexer.ts    # SQLite FTS5 indexing
-│   ├── retriever.ts  # Similarity search
+│   ├── retriever.ts  # Similarity search with instance relevance
 │   └── context-builder.ts # Prompt construction
 ├── memory/           # Hierarchical memory system
 │   ├── mod.ts
-│   ├── types.ts      # Granularity, MemoryFile types
+│   ├── types.ts      # Granularity, MemoryFile with instance tagging
 │   ├── summarizer.ts # Daily/weekly/monthly/yearly summarization
 │   ├── consolidator.ts # Period-based consolidation
 │   ├── file-writer.ts # Memory file operations
 │   └── trigger.ts    # Day-change detection
+├── mcp-client/       # Entity-core MCP client
+│   └── mod.ts        # MCPClient for sync/pull/push operations
 ├── entity/           # Agentic loop
 │   ├── mod.ts
-│   ├── loop.ts       # EntityTurn orchestration
+│   ├── loop.ts       # EntityTurn orchestration with MCP support
+│   ├── context.ts    # Identity loading (local or from MCP)
 │   └── auto-title.ts # Background title generation
 └── server/           # HTTP server
     ├── mod.ts
@@ -131,7 +176,9 @@ memories/
 
 **Memory Types**:
 - **Daily/Weekly/Monthly/Yearly**: Auto-generated summaries that consolidate over time
-- **Significant**: Emotionally important events that are permanently remembered with clarity. These are created explicitly by the entity via the `create_significant_memory` tool and are never consolidated or archived.
+- **Significant**: Emotionally important events that are permanently remembered with clarity. Created explicitly by the entity via the `create_significant_memory` tool.
+
+**Instance Tagging**: Memories can be tagged with `sourceInstance` to track which embodiment created them. RAG retrieval boosts relevance for memories from the same instance.
 
 **Consolidation Schedule** (via Deno cron):
 - Daily summarization: Configured hour (default 4 AM)
@@ -139,26 +186,14 @@ memories/
 - Monthly consolidation: 1st of month 5 AM
 - Yearly consolidation: January 1st 5 AM
 
-**Significant Memory Format**:
-```markdown
-# Title of the Memory
-
-Content describing what happened, how it felt, why it matters...
-
-<!--
-Date: 2026-02-23
-Conversation: abc123-def456-...
-Created: 2026-02-23T15:30:00.000Z
--->
-```
-
 ### RAG System
 
 Eager RAG retrieves relevant memories before each LLM call:
 
 1. **Indexing**: On startup, all memory files are chunked and embedded
 2. **Retrieval**: Before processing a message, top-k chunks are retrieved by similarity
-3. **Context**: Retrieved memories are injected into the system prompt
+3. **Instance Boost**: Memories from the same embodiment get a relevance boost
+4. **Context**: Retrieved memories are injected into the system prompt
 
 The system uses HuggingFace transformers for embeddings and SQLite FTS5 for storage.
 
@@ -188,7 +223,7 @@ relationship/   # Shared dynamics
 └── relationship_notes.md
 ```
 
-These can be edited via the Settings UI at `/fragments/settings/core-prompts`.
+When MCP is enabled, these are loaded from entity-core. Otherwise, they're read from local files.
 
 ### Dual SSE Architecture
 
@@ -209,28 +244,6 @@ Two SSE channels serve different purposes:
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Chat Stream** (`/api/chat`): Per-request SSE for the active conversation. Streams thinking, content, tool calls/results, and performance metrics. Closes when the response completes.
-
-**Persistent Channel** (`/api/events`): Long-lived SSE connection opened on page load. Receives `dom_update` events from background operations like auto-title generation. Stays open across multiple chat requests.
-
-### SSE Event Types
-
-```typescript
-type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "metrics" | "done"
-```
-
-### Key Patterns
-
-**Hybrid Streaming**: Thinking and content stream token-by-token. Tool calls and results are discrete SSE events rendered as collapsible UI blocks.
-
-**Tool Execution Loop**: `EntityTurn.process()` yields chunks, executes tool calls, adds results to context, and continues until the LLM returns without tool calls (max 10 iterations).
-
-**Reactive UI Updates**: State changes flow through a unified pattern:
-1. State change functions in `state-changes.ts` perform DB operations and return `affectedRegions`
-2. Tools pass `affectedRegions` through in their result
-3. Entity loop yields `dom_update` SSE events (chat stream) or background operations use `getBroadcaster().broadcastUpdates()` (persistent channel)
-4. Client handles `dom_update` events with `htmx.swap()`
-
 ### API Endpoints
 
 | Method | Path | Description |
@@ -245,13 +258,9 @@ type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "sta
 | `PATCH` | `/api/conversations/:id/title` | Update title |
 | `DELETE` | `/api/conversations/:id` | Delete conversation |
 | `DELETE` | `/api/conversations` | Batch delete conversations |
-| `POST` | `/api/memory/consolidate/:granularity` | Trigger consolidation (weekly/monthly/yearly) |
+| `POST` | `/api/memory/consolidate/:granularity` | Trigger consolidation |
 | `POST` | `/api/settings/file/:dir/:filename` | Save core prompt file |
-| `GET` | `/fragments/chat/:id` | Chat view HTML fragment |
-| `GET` | `/fragments/conv-list` | Conversation list fragment |
-| `GET` | `/fragments/settings/core-prompts` | Settings page |
-| `GET` | `/fragments/settings/core-prompts/:dir` | File list for directory |
-| `GET` | `/fragments/settings/file/:dir/:filename` | File editor |
+| `GET` | `/fragments/*` | HTML fragments for HTMX |
 
 ## Project Structure
 
@@ -268,16 +277,10 @@ SBy/
 │   ├── icons/         # PWA icons
 │   ├── manifest.json  # PWA manifest
 │   └── sw.js          # Service worker
-├── self/              # Entity identity prompts
-├── user/              # User knowledge prompts
-├── relationship/      # Relationship context prompts
+├── self/              # Entity identity prompts (local fallback)
+├── user/              # User knowledge prompts (local fallback)
+├── relationship/      # Relationship context prompts (local fallback)
 ├── memories/          # Hierarchical memory storage
-│   ├── daily/
-│   ├── weekly/
-│   ├── monthly/
-│   ├── yearly/
-│   ├── significant/   # Permanent emotionally-important memories
-│   └── archive/
 └── .sby/              # Runtime data (SQLite DB)
 ```
 
@@ -291,6 +294,29 @@ deno check src/main.ts # Type check
 deno lint              # Lint all files
 ```
 
+### Running with MCP
+
+To run with entity-core integration:
+
+```bash
+# Terminal 1: Start entity-core
+cd ~/projects/entity-core
+deno run -A src/mod.ts
+
+# Terminal 2: Start SBy with MCP enabled
+SBY_MCP_ENABLED=true deno task dev
+```
+
+### Migration
+
+To migrate existing identity files and memories to entity-core:
+
+```bash
+deno run -A scripts/migrate-to-entity-core.ts
+```
+
+Use `--dry-run` to preview without making changes.
+
 ## Design Principles
 
 - **Minimal dependencies**: Deno std lib, SQLite driver, HTMX, HuggingFace transformers
@@ -298,6 +324,12 @@ deno lint              # Lint all files
 - **Server-side rendering**: HTML templates, HTMX for interactivity
 - **Extensible primitives**: Tool registry, SSE events, hierarchical memory
 - **Authentic memory**: Entity writes their own memories in their voice
+- **First-person perspective**: All prompts written from entity's viewpoint, not as instructions
+- **Multi-embodiment**: Entity can exist across multiple interfaces with single core identity
+
+## Related Projects
+
+- [entity-core](../entity-core/) - MCP server holding the entity's canonical identity and memories
 
 ## License
 

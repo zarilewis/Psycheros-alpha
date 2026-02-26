@@ -18,20 +18,34 @@ deno lint              # Lint
 cp .env.example .env   # Then set ZAI_API_KEY
 ```
 
+### With MCP (entity-core)
+
+```bash
+# Terminal 1: Start entity-core
+cd ~/projects/entity-core && deno run -A src/mod.ts
+
+# Terminal 2: Start SBy with MCP
+SBY_MCP_ENABLED=true deno task dev
+```
+
 ## Key Files
 
 | File | Purpose |
 |------|---------|
 | `src/entity/loop.ts` | Agentic loop - LLM calls, tool execution |
+| `src/entity/context.ts` | Context loading (supports MCP client) |
 | `src/server/routes.ts` | API endpoints and handlers |
 | `src/server/broadcaster.ts` | Persistent SSE for background updates |
 | `src/server/state-changes.ts` | Unified state mutations |
 | `src/tools/registry.ts` | Tool registration |
 | `src/metrics/mod.ts` | Streaming performance metrics |
 | `src/memory/mod.ts` | Hierarchical memory system |
+| `src/memory/types.ts` | Memory types with instance tagging |
 | `src/memory/consolidator.ts` | Weekly/monthly/yearly consolidation |
 | `src/rag/mod.ts` | RAG retrieval system |
-| `src/rag/retriever.ts` | Memory similarity search |
+| `src/rag/retriever.ts` | Memory similarity search with instance boost |
+| `src/mcp-client/mod.ts` | MCP client for entity-core connection |
+| `scripts/migrate-to-entity-core.ts` | Migration script for entity-core |
 | `web/js/sby.js` | Client-side SSE handling |
 
 ## Patterns
@@ -62,3 +76,21 @@ cp .env.example .env   # Then set ZAI_API_KEY
 - Enabled by default, configured via `SBY_RAG_*` env vars
 - Embeds memory files on startup using HuggingFace transformers
 - Retrieves top-k similar chunks before each LLM call
+- Instance relevance boost: memories from same embodiment get +0.1 score
+
+**MCP Integration (entity-core)**:
+- Optional connection to centralized identity/memory server
+- Enabled via `SBY_MCP_ENABLED=true`
+- Pulls identity files (self/, user/, relationship/) on startup
+- Queues changes and syncs periodically (every 5 minutes)
+- Falls back to local files if MCP unavailable
+- Memories tagged with `sourceInstance` for relevance scoring
+
+**Migration to entity-core**:
+```bash
+deno run -A scripts/migrate-to-entity-core.ts --dry-run  # Preview
+deno run -A scripts/migrate-to-entity-core.ts            # Run migration
+```
+
+# currentDate
+Today's date is 2026-02-25.
