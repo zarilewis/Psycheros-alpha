@@ -44,8 +44,12 @@ SBY_MCP_ENABLED=true deno task dev
 | `src/memory/consolidator.ts` | Weekly/monthly/yearly consolidation |
 | `src/rag/mod.ts` | RAG retrieval system |
 | `src/rag/retriever.ts` | Memory similarity search with instance boost |
+| `src/rag/conversation.ts` | ChatRAG - semantic search over chat history |
+| `src/rag/indexer.ts` | Memory indexing with sqlite-vec sync |
+| `src/db/vector.ts` | sqlite-vec helpers, serialization, search |
 | `src/mcp-client/mod.ts` | MCP client for entity-core connection |
 | `scripts/migrate-to-entity-core.ts` | Migration script for entity-core |
+| `scripts/index-messages.ts` | Index existing messages for ChatRAG |
 | `web/js/sby.js` | Client-side SSE handling |
 
 ## Patterns
@@ -73,10 +77,18 @@ SBY_MCP_ENABLED=true deno task dev
 - Archived dailies moved to `memories/archive/daily/`
 
 **RAG Retrieval**:
+- Two RAG systems: Memory RAG (memories/) and ChatRAG (chat history)
 - Enabled by default, configured via `SBY_RAG_*` env vars
-- Embeds memory files on startup using HuggingFace transformers
+- Embeds memory files on startup using HuggingFace transformers (all-MiniLM-L6-v2, 384 dims)
 - Retrieves top-k similar chunks before each LLM call
 - Instance relevance boost: memories from same embodiment get +0.1 score
+- Vector search: sqlite-vec (primary) or in-memory cosine similarity (fallback)
+
+**ChatRAG**:
+- Semantic search over conversation history
+- Automatic indexing: every message embedded when saved (non-blocking)
+- Searches current conversation by default, or all if configured
+- One-time migration: `deno run -A scripts/index-messages.ts`
 
 **MCP Integration (entity-core)**:
 - Optional connection to centralized identity/memory server

@@ -43,6 +43,7 @@ open http://localhost:3000
 | `SBY_RAG_MAX_CHUNKS` | `8` | Max memory chunks to retrieve |
 | `SBY_RAG_MAX_TOKENS` | `2000` | Max tokens in retrieved context |
 | `SBY_RAG_MIN_SCORE` | `0.3` | Minimum similarity score |
+| `SBY_CHAT_RAG_ALL_CONVERSATIONS` | `false` | Search all conversations (not just current) |
 
 ### MCP Integration (entity-core)
 
@@ -106,7 +107,8 @@ src/
 ├── db/               # SQLite persistence
 │   ├── mod.ts
 │   ├── client.ts     # Conversations, messages, memory summaries
-│   └── schema.ts     # Table definitions
+│   ├── schema.ts     # Table definitions, migrations
+│   └── vector.ts     # sqlite-vec helpers, serialization, search
 ├── tools/            # Tool system
 │   ├── mod.ts
 │   ├── registry.ts   # Tool registration
@@ -123,8 +125,9 @@ src/
 │   ├── types.ts      # RAGConfig with instance boosting
 │   ├── embedder.ts   # HuggingFace transformer embeddings
 │   ├── chunker.ts    # Memory chunking with overlap
-│   ├── indexer.ts    # SQLite FTS5 indexing
+│   ├── indexer.ts    # SQLite FTS5 indexing with sqlite-vec
 │   ├── retriever.ts  # Similarity search with instance relevance
+│   ├── conversation.ts # ChatRAG for semantic search over chat history
 │   └── context-builder.ts # Prompt construction
 ├── memory/           # Hierarchical memory system
 │   ├── mod.ts
@@ -188,14 +191,34 @@ memories/
 
 ### RAG System
 
-Eager RAG retrieves relevant memories before each LLM call:
+SBy uses two RAG systems working together:
+
+**Memory RAG** retrieves relevant memories before each LLM call:
 
 1. **Indexing**: On startup, all memory files are chunked and embedded
 2. **Retrieval**: Before processing a message, top-k chunks are retrieved by similarity
 3. **Instance Boost**: Memories from the same embodiment get a relevance boost
 4. **Context**: Retrieved memories are injected into the system prompt
 
-The system uses HuggingFace transformers for embeddings and SQLite FTS5 for storage.
+**Chat RAG** provides semantic search over conversation history:
+
+1. **Automatic Indexing**: Every message is embedded and indexed when saved
+2. **Contextual Retrieval**: Searches current conversation (or all if configured)
+3. **Relevance Filtering**: Only messages above minimum similarity score are included
+4. **Historical Context**: Helps the entity remember what was discussed previously
+
+**Vector Search Backend**:
+- Primary: sqlite-vec extension for efficient vector similarity search
+- Fallback: In-memory cosine similarity calculation when sqlite-vec is unavailable
+- Embeddings: HuggingFace `all-MiniLM-L6-v2` model (384 dimensions)
+
+**Indexing Existing Messages**:
+
+```bash
+deno run -A scripts/index-messages.ts           # Index all existing messages
+deno run -A scripts/index-messages.ts --dry-run # Preview without indexing
+deno run -A scripts/index-messages.ts --force   # Re-index all messages
+```
 
 ### Core Prompts
 
@@ -270,6 +293,21 @@ SBy/
 ├── .env.example       # Environment template
 ├── CLAUDE.md          # Agent system card for Claude Code
 ├── src/               # Server source
+│   ├── db/            # SQLite persistence
+│   │   ├── mod.ts
+│   │   ├── client.ts  # Conversations, messages, memory summaries
+│   │   ├── schema.ts  # Table definitions, migrations
+│   │   └── vector.ts  # sqlite-vec helpers, serialization, search
+│   ├── rag/           # Retrieval-Augmented Generation
+│   │   ├── mod.ts
+│   │   ├── embedder.ts
+│   │   ├── indexer.ts
+│   │   ├── retriever.ts
+│   │   └── conversation.ts  # ChatRAG for chat history
+│   └── ...
+├── scripts/           # Utility scripts
+│   ├── migrate-to-entity-core.ts
+│   └── index-messages.ts    # Index existing messages for ChatRAG
 ├── web/
 │   ├── css/           # Modular CSS (tokens, layout, components)
 │   ├── js/            # Client JavaScript
