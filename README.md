@@ -43,7 +43,6 @@ open http://localhost:3000
 | `SBY_RAG_MAX_CHUNKS` | `8` | Max memory chunks to retrieve |
 | `SBY_RAG_MAX_TOKENS` | `2000` | Max tokens in retrieved context |
 | `SBY_RAG_MIN_SCORE` | `0.3` | Minimum similarity score |
-| `SBY_CHAT_RAG_ALL_CONVERSATIONS` | `false` | Search all conversations (not just current) |
 
 ### MCP Integration (entity-core)
 
@@ -203,7 +202,7 @@ SBy uses two RAG systems working together:
 **Chat RAG** provides semantic search over conversation history:
 
 1. **Automatic Indexing**: Every message is embedded and indexed when saved
-2. **Contextual Retrieval**: Searches current conversation (or all if configured)
+2. **Tiered Search**: First searches current conversation; if no good matches (score < 0.6), expands to all conversations
 3. **Relevance Filtering**: Only messages above minimum similarity score are included
 4. **Historical Context**: Helps the entity remember what was discussed previously
 

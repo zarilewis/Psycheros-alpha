@@ -57,8 +57,6 @@ export interface RouteContext {
   memoryEnabled?: boolean;
   /** Optional MCP client for syncing with entity-core */
   mcpClient?: MCPClient;
-  /** Whether to search all conversations for chat RAG */
-  searchAllConversations?: boolean;
 }
 
 /**
@@ -672,7 +670,6 @@ export async function handleChat(
             ragRetriever: ctx.ragRetriever,
             chatRAG: ctx.chatRAG,
             mcpClient: ctx.mcpClient,
-            searchAllConversations: ctx.searchAllConversations,
           }
         );
 

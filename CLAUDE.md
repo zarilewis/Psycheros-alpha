@@ -87,7 +87,7 @@ SBY_MCP_ENABLED=true deno task dev
 **ChatRAG**:
 - Semantic search over conversation history
 - Automatic indexing: every message embedded when saved (non-blocking)
-- Searches current conversation by default, or all if configured
+- Tiered search: current conversation first, expands to all if score < 0.6
 - One-time migration: `deno run -A scripts/index-messages.ts`
 
 **MCP Integration (entity-core)**:
@@ -105,4 +105,4 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 ```
 
 # currentDate
-Today's date is 2026-02-25.
+Today's date is 2026-02-27.

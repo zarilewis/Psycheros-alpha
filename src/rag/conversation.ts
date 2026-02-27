@@ -24,6 +24,22 @@ export interface ChatSearchOptions {
 }
 
 /**
+ * Options for tiered chat history search.
+ */
+export interface TieredSearchOptions {
+  /** The query text to search for */
+  query: string;
+  /** Current conversation ID (searched first) */
+  conversationId: string;
+  /** Maximum number of results */
+  limit: number;
+  /** Minimum similarity score (0-1) */
+  minScore: number;
+  /** Score threshold for current chat results (default: 0.6) */
+  currentThreshold?: number;
+}
+
+/**
  * A retrieved message from chat history.
  */
 export interface RetrievedMessage {
@@ -128,6 +144,43 @@ export class ConversationRAG {
     } else {
       return this.searchInMemory(queryEmbedding, options);
     }
+  }
+
+  /**
+   * Tiered search: first search current conversation, then expand to all if needed.
+   *
+   * This provides the best of both worlds:
+   * - Context continuity when relevant results exist in current chat
+   * - Cross-chat memory when current chat doesn't have good matches
+   *
+   * @param options - Tiered search options
+   * @returns Array of retrieved messages sorted by relevance
+   */
+  async searchTiered(options: TieredSearchOptions): Promise<RetrievedMessage[]> {
+    const threshold = options.currentThreshold ?? 0.6;
+
+    // Phase 1: Search current conversation
+    const currentResults = await this.search({
+      query: options.query,
+      conversationId: options.conversationId,
+      limit: options.limit,
+      minScore: options.minScore,
+    });
+
+    // If we found good results above threshold, return them
+    if (currentResults.length > 0 && currentResults[0].score >= threshold) {
+      console.log(`[ChatRAG] Using current chat results (top score: ${currentResults[0].score.toFixed(2)} >= ${threshold})`);
+      return currentResults;
+    }
+
+    // Phase 2: Expand to all conversations
+    console.log(`[ChatRAG] Expanding to all conversations (current chat score: ${currentResults[0]?.score.toFixed(2) ?? 'none'} < ${threshold})`);
+    return await this.search({
+      query: options.query,
+      conversationId: undefined,
+      limit: options.limit,
+      minScore: options.minScore,
+    });
   }
 
   /**

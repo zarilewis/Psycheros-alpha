@@ -49,8 +49,6 @@ export interface EntityConfig {
   chatRAG?: ConversationRAG;
   /** Optional MCP client for syncing with entity-core */
   mcpClient?: MCPClient;
-  /** Whether to search all conversations for chat RAG (default: false = current only) */
-  searchAllConversations?: boolean;
 }
 
 /**
@@ -146,11 +144,12 @@ export class EntityTurn {
     if (this.config.chatRAG) {
       console.log("[ChatRAG] Searching chat history for:", userMessage.substring(0, 50));
       try {
-        const chatMessages = await this.config.chatRAG.search({
+        const chatMessages = await this.config.chatRAG.searchTiered({
           query: userMessage,
-          conversationId: this.config.searchAllConversations ? undefined : conversationId,
+          conversationId: conversationId,
           limit: 5,
           minScore: 0.5,
+          currentThreshold: 0.6,
         });
         console.log("[ChatRAG] Found", chatMessages.length, "relevant messages");
         chatHistoryContent = formatChatHistoryForContext(chatMessages);

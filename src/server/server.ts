@@ -60,8 +60,6 @@ export interface ServerConfig {
   memoryEnabled?: boolean;
   /** Optional MCP client for syncing with entity-core */
   mcpClient?: MCPClient;
-  /** Whether to search all conversations for chat RAG (default: false) */
-  searchAllConversations?: boolean;
 }
 
 /**
@@ -293,7 +291,6 @@ export class Server {
       ragConfig: this.ragConfig,
       memoryEnabled: this.config.memoryEnabled ?? true,
       mcpClient: this.mcpClient ?? undefined,
-      searchAllConversations: this.config.searchAllConversations,
     };
   }
 
