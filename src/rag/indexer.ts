@@ -10,6 +10,7 @@ import type { Database } from "@db/sqlite";
 import type { Indexer, Chunk } from "./types.ts";
 import { getEmbedder } from "./embedder.ts";
 import { getChunker } from "./chunker.ts";
+import { serializeVector, getVecVersion } from "../db/vector.ts";
 
 /**
  * Hash content using SHA-256.
@@ -26,12 +27,14 @@ async function hashContent(content: string): Promise<string> {
  * Convert embedding array to Uint8Array for storage.
  */
 function embeddingToUint8Array(embedding: number[]): Uint8Array {
-  const buffer = new ArrayBuffer(embedding.length * 4);
-  const view = new Float32Array(buffer);
-  for (let i = 0; i < embedding.length; i++) {
-    view[i] = embedding[i];
-  }
-  return new Uint8Array(buffer);
+  return serializeVector(embedding);
+}
+
+/**
+ * Check if sqlite-vec is available.
+ */
+function isVectorExtensionAvailable(db: Database): boolean {
+  return getVecVersion(db) !== null;
 }
 
 /**
@@ -50,10 +53,12 @@ interface IndexedMemoryRow {
 export class MemoryIndexer implements Indexer {
   private readonly db: Database;
   private readonly memoriesDir: string;
+  private readonly useVectorExt: boolean;
 
   constructor(db: Database, memoriesDir: string) {
     this.db = db;
     this.memoriesDir = memoriesDir;
+    this.useVectorExt = isVectorExtensionAvailable(db);
   }
 
   /**
@@ -146,8 +151,20 @@ export class MemoryIndexer implements Indexer {
 
   /**
    * Remove all indexed data for a file.
+   * Also removes from vec_memory_chunks if sqlite-vec is available.
    */
   removeFile(relativePath: string): void {
+    // Get rowids before deleting (for vector table cleanup)
+    if (this.useVectorExt) {
+      const stmt = this.db.prepare("SELECT rowid FROM memory_chunks WHERE source_file = ?");
+      const rows = stmt.all<{ rowid: number }>(relativePath);
+      stmt.finalize();
+
+      for (const row of rows) {
+        this.db.exec("DELETE FROM vec_memory_chunks WHERE rowid = ?", [row.rowid]);
+      }
+    }
+
     // Delete chunks
     this.db.exec("DELETE FROM memory_chunks WHERE source_file = ?", [relativePath]);
 
@@ -201,6 +218,7 @@ export class MemoryIndexer implements Indexer {
 
   /**
    * Store a chunk with its embedding in the database.
+   * Also inserts into vec_memory_chunks if sqlite-vec is available.
    */
   private storeChunk(chunk: Chunk, embedding: number[]): void {
     const metadataJson = chunk.metadata ? JSON.stringify(chunk.metadata) : null;
@@ -219,6 +237,21 @@ export class MemoryIndexer implements Indexer {
         chunk.createdAt.toISOString(),
       ]
     );
+
+    // Also insert into vector table if available
+    if (this.useVectorExt) {
+      // Get the numeric rowid from the insert
+      const rowidStmt = this.db.prepare("SELECT rowid FROM memory_chunks WHERE id = ?");
+      const row = rowidStmt.get<{ rowid: number }>(chunk.id);
+      rowidStmt.finalize();
+
+      if (row) {
+        this.db.exec(
+          `INSERT INTO vec_memory_chunks(rowid, embedding) VALUES (?, ?)`,
+          [row.rowid, embeddingData]
+        );
+      }
+    }
   }
 
   /**

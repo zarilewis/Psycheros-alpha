@@ -2,7 +2,8 @@
  * RAG Module
  *
  * Retrieval-Augmented Generation system for SBy.
- * Provides local-first semantic search over the memories directory.
+ * Provides local-first semantic search over the memories directory
+ * and conversational history.
  *
  * @module
  *
@@ -53,3 +54,11 @@ export { MemoryRetriever, createRetriever } from "./retriever.ts";
 
 // Context Builder
 export { formatMemories, buildRAGContext } from "./context-builder.ts";
+
+// Conversational RAG
+export {
+  ConversationRAG,
+  getConversationRAG,
+  formatChatHistoryForContext,
+} from "./conversation.ts";
+export type { ChatSearchOptions, RetrievedMessage } from "./conversation.ts";

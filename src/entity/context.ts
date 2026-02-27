@@ -243,13 +243,14 @@ export async function loadRelationshipContent(
 
 /**
  * Build the system message from self/, user/, relationship/ directory content,
- * and optional RAG-retrieved memories.
+ * and optional RAG-retrieved memories and chat history.
  * This gets included at the start of every LLM request.
  *
  * @param selfContent - The concatenated contents of self/*.md files
  * @param userContent - The concatenated contents of user/*.md files
  * @param relationshipContent - The concatenated contents of relationship/*.md files
  * @param memoriesContent - Optional RAG-retrieved memories content
+ * @param chatHistoryContent - Optional chat history content from Chat RAG
  * @returns The formatted system message
  */
 export function buildSystemMessage(
@@ -257,6 +258,7 @@ export function buildSystemMessage(
   userContent: string,
   relationshipContent: string,
   memoriesContent?: string,
+  chatHistoryContent?: string,
 ): string {
   const timestamp = new Date().toISOString();
 
@@ -308,6 +310,13 @@ ${relationshipContent}`);
   // Add RAG-retrieved memories if present
   if (memoriesContent && memoriesContent.trim()) {
     sections.push(memoriesContent);
+  }
+
+  // Add chat history if present
+  if (chatHistoryContent && chatHistoryContent.trim()) {
+    sections.push(`---
+
+${chatHistoryContent}`);
   }
 
   return sections.join("\n");

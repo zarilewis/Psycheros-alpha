@@ -28,9 +28,10 @@ import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
 import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics } from "../types.ts";
 import type { Retriever } from "../rag/mod.ts";
+import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import { loadSelfContent, loadUserContent, loadRelationshipContent, buildSystemMessage } from "./context.ts";
-import { buildRAGContext } from "../rag/mod.ts";
+import { buildRAGContext, formatChatHistoryForContext } from "../rag/mod.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
 import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
 
@@ -44,8 +45,12 @@ export interface EntityConfig {
   maxToolIterations?: number;
   /** Optional RAG retriever for memory search */
   ragRetriever?: Retriever;
+  /** Optional chat RAG for searching conversation history */
+  chatRAG?: ConversationRAG;
   /** Optional MCP client for syncing with entity-core */
   mcpClient?: MCPClient;
+  /** Whether to search all conversations for chat RAG (default: false = current only) */
+  searchAllConversations?: boolean;
 }
 
 /**
@@ -136,18 +141,59 @@ export class EntityTurn {
       console.log("[RAG] No retriever configured - skipping RAG");
     }
 
-    const systemMessage = buildSystemMessage(selfContent, userContent, relationshipContent, memoriesContent);
+    // Retrieve relevant chat history using Chat RAG if available
+    let chatHistoryContent: string | undefined;
+    if (this.config.chatRAG) {
+      console.log("[ChatRAG] Searching chat history for:", userMessage.substring(0, 50));
+      try {
+        const chatMessages = await this.config.chatRAG.search({
+          query: userMessage,
+          conversationId: this.config.searchAllConversations ? undefined : conversationId,
+          limit: 5,
+          minScore: 0.5,
+        });
+        console.log("[ChatRAG] Found", chatMessages.length, "relevant messages");
+        chatHistoryContent = formatChatHistoryForContext(chatMessages);
+        if (chatHistoryContent) {
+          console.log("[ChatRAG] Injected chat history into context (", chatHistoryContent.length, "chars)");
+        }
+      } catch (error) {
+        // Non-fatal: log and continue without chat history
+        console.error(
+          "EntityTurn: Chat RAG search failed:",
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+
+    const systemMessage = buildSystemMessage(selfContent, userContent, relationshipContent, memoriesContent, chatHistoryContent);
 
     // Get conversation history from DB
     const history = this.db.getMessages(conversationId);
 
     // Persist the user message
     // Note: This must succeed before we proceed, as it's the foundation of the turn
+    // Store the message ID for chat RAG indexing
+    let userMessageId: string | undefined;
     try {
+      // Generate ID upfront so we can use it for chat RAG indexing
+      userMessageId = crypto.randomUUID();
       this.db.addMessage(conversationId, {
         role: "user",
         content: userMessage,
-      });
+      }, userMessageId);
+
+      // Index the user message for chat RAG (non-blocking, non-fatal)
+      if (this.config.chatRAG && userMessageId) {
+        this.config.chatRAG.indexMessage(
+          userMessageId,
+          conversationId,
+          "user",
+          userMessage
+        ).catch((error) => {
+          console.warn("[ChatRAG] Failed to index user message:", error);
+        });
+      }
     } catch (error) {
       // User message persistence is critical - rethrow with context
       const message = error instanceof Error ? error.message : String(error);
@@ -224,6 +270,18 @@ export class EntityTurn {
             reasoningContent: assistantReasoning || undefined,
             toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
           }, messageId);
+
+          // Index the assistant message for chat RAG (non-blocking, non-fatal)
+          if (this.config.chatRAG && messageId && assistantContent) {
+            this.config.chatRAG.indexMessage(
+              messageId,
+              conversationId,
+              "assistant",
+              assistantContent
+            ).catch((error) => {
+              console.warn("[ChatRAG] Failed to index assistant message:", error);
+            });
+          }
         } catch (dbError) {
           // Non-fatal: content already streamed to client (see Error Handling Strategy)
           console.error(

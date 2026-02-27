@@ -10,9 +10,10 @@
 import { DBClient } from "../db/mod.ts";
 import { createDefaultClient, type LLMClient } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
-import { createIndexer, createRetriever, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
+import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import { catchUpSummarization, needsConsolidation, runConsolidation } from "../memory/mod.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
+import type { ConversationRAG } from "../rag/conversation.ts";
 import { join } from "@std/path";
 import {
   handleBatchDeleteConversations,
@@ -59,6 +60,8 @@ export interface ServerConfig {
   memoryEnabled?: boolean;
   /** Optional MCP client for syncing with entity-core */
   mcpClient?: MCPClient;
+  /** Whether to search all conversations for chat RAG (default: false) */
+  searchAllConversations?: boolean;
 }
 
 /**
@@ -88,6 +91,7 @@ export class Server {
   private llm: LLMClient;
   private tools: ToolRegistry;
   private ragRetriever: Retriever | null = null;
+  private chatRAG: ConversationRAG | null = null;
   private ragConfig: RAGConfig;
   private abortController: AbortController;
   private config: ServerConfig;
@@ -122,6 +126,9 @@ export class Server {
     // Initialize RAG retriever if enabled
     if (this.ragConfig.enabled) {
       this.ragRetriever = createRetriever(this.db.getRawDb(), this.ragConfig);
+
+      // Initialize chat RAG for conversation history search
+      this.chatRAG = getConversationRAG(this.db.getRawDb());
     }
 
     // Store MCP client if provided
@@ -282,9 +289,11 @@ export class Server {
       tools: this.tools,
       projectRoot: this.config.projectRoot,
       ragRetriever: this.ragRetriever ?? undefined,
+      chatRAG: this.chatRAG ?? undefined,
       ragConfig: this.ragConfig,
       memoryEnabled: this.config.memoryEnabled ?? true,
       mcpClient: this.mcpClient ?? undefined,
+      searchAllConversations: this.config.searchAllConversations,
     };
   }
 

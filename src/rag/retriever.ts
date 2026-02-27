@@ -1,13 +1,15 @@
 /**
  * Memory Retriever
  *
- * Retrieves relevant memory chunks using cosine similarity search.
+ * Retrieves relevant memory chunks using sqlite-vec for vector similarity search.
+ * Falls back to in-memory cosine similarity if sqlite-vec is not available.
  */
 
 import type { Database } from "@db/sqlite";
 import type { Retriever, RetrievalResult, Chunk, RAGConfig, ChunkMetadata } from "./types.ts";
 import { DEFAULT_RAG_CONFIG } from "./types.ts";
 import { getEmbedder } from "./embedder.ts";
+import { getVecVersion, serializeVector, deserializeVector } from "../db/vector.ts";
 
 /**
  * Row type for memory_chunks table.
@@ -23,19 +25,30 @@ interface MemoryChunkRow {
 }
 
 /**
+ * Row type for vector search join result.
+ */
+interface VectorSearchRow {
+  id: string;
+  content: string;
+  source_file: string;
+  token_count: number;
+  metadata: string | null;
+  created_at: string;
+  distance: number;
+}
+
+/**
  * Convert buffer to embedding array.
  * Handles both ArrayBuffer and Uint8Array from database.
  */
 function bufferToEmbedding(buffer: ArrayBuffer | Uint8Array | null): number[] | null {
   if (!buffer) return null;
-  // If it's a Uint8Array, get the underlying ArrayBuffer
-  const arrayBuffer = buffer instanceof Uint8Array ? buffer.buffer : buffer;
-  const view = new Float32Array(arrayBuffer);
-  return Array.from(view);
+  return deserializeVector(buffer);
 }
 
 /**
  * Calculate cosine similarity between two vectors.
+ * Used as fallback when sqlite-vec is not available.
  */
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) {
@@ -59,15 +72,24 @@ function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 /**
- * Memory retriever using cosine similarity search.
+ * Check if sqlite-vec is available.
+ */
+function isVectorExtensionAvailable(db: Database): boolean {
+  return getVecVersion(db) !== null;
+}
+
+/**
+ * Memory retriever using sqlite-vec for efficient vector similarity search.
  */
 export class MemoryRetriever implements Retriever {
   private readonly db: Database;
   private readonly config: RAGConfig;
+  private readonly useVectorExt: boolean;
 
   constructor(db: Database, config: Partial<RAGConfig> = {}) {
     this.db = db;
     this.config = { ...DEFAULT_RAG_CONFIG, ...config };
+    this.useVectorExt = isVectorExtensionAvailable(db);
   }
 
   /**
@@ -92,6 +114,76 @@ export class MemoryRetriever implements Retriever {
     await embedder.initialize();
     const queryEmbedding = await embedder.embed(query);
 
+    // Use sqlite-vec if available, otherwise fall back to in-memory
+    if (this.useVectorExt) {
+      return this.retrieveWithVectorExt(queryEmbedding, config);
+    } else {
+      return Promise.resolve(this.retrieveInMemory(queryEmbedding, config));
+    }
+  }
+
+  /**
+   * Retrieve using sqlite-vec extension for efficient vector search.
+   */
+  private retrieveWithVectorExt(
+    queryEmbedding: number[],
+    config: RAGConfig
+  ): RetrievalResult[] {
+    const serialized = serializeVector(queryEmbedding);
+
+    // Use a larger limit initially, then filter by score
+    const stmt = this.db.prepare(
+      `SELECT m.id, m.content, m.source_file, m.token_count, m.metadata, m.created_at, v.distance
+       FROM memory_chunks m
+       JOIN vec_memory_chunks v ON m.rowid = v.rowid
+       WHERE v.embedding MATCH ?
+       ORDER BY v.distance
+       LIMIT ?`
+    );
+
+    const rows = stmt.all<VectorSearchRow>(serialized, config.maxChunks * 2);
+    stmt.finalize();
+
+    const instanceBoost = config.instanceBoost ?? 0.1;
+    const results: RetrievalResult[] = [];
+
+    for (const row of rows) {
+      // sqlite-vec cosine distance: 1 - similarity, so convert back
+      const similarity = 1 - row.distance;
+      let score = similarity;
+
+      // Apply instance boost if configured
+      const metadata = row.metadata ? JSON.parse(row.metadata) as ChunkMetadata : undefined;
+      if (config.currentInstance && metadata?.sourceInstance === config.currentInstance) {
+        score = Math.min(score + instanceBoost, 1.0);
+      }
+
+      if (score >= config.minScore) {
+        results.push({
+          chunk: {
+            id: row.id,
+            content: row.content,
+            sourceFile: row.source_file,
+            tokenCount: row.token_count,
+            metadata,
+            createdAt: new Date(row.created_at),
+          },
+          score,
+        });
+      }
+    }
+
+    // Apply token budget
+    return this.applyTokenBudget(results, config);
+  }
+
+  /**
+   * Retrieve using in-memory cosine similarity (fallback).
+   */
+  private retrieveInMemory(
+    queryEmbedding: number[],
+    config: RAGConfig
+  ): RetrievalResult[] {
     // Load all chunks with embeddings
     const chunks = this.loadAllChunks();
 
@@ -122,7 +214,13 @@ export class MemoryRetriever implements Retriever {
     // Sort by score descending
     results.sort((a, b) => b.score - a.score);
 
-    // Apply token budget
+    return this.applyTokenBudget(results, config);
+  }
+
+  /**
+   * Apply token budget to results.
+   */
+  private applyTokenBudget(results: RetrievalResult[], config: RAGConfig): RetrievalResult[] {
     const selectedResults: RetrievalResult[] = [];
     let totalTokens = 0;
 
@@ -138,7 +236,7 @@ export class MemoryRetriever implements Retriever {
     }
 
     console.log(
-      `[RAG] Retrieved ${selectedResults.length} chunks (score >= ${config.minScore})`
+      `[RAG] Retrieved ${selectedResults.length} chunks (score >= ${config.minScore})${this.useVectorExt ? " [sqlite-vec]" : " [in-memory]"}`
     );
 
     return selectedResults;

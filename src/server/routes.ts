@@ -13,6 +13,7 @@ import type { DBClient } from "../db/mod.ts";
 import type { LLMClient } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { Retriever, RAGConfig } from "../rag/mod.ts";
+import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import { EntityTurn, type EntityYield, generateAndSetTitle } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
@@ -48,12 +49,16 @@ export interface RouteContext {
   projectRoot: string;
   /** Optional RAG retriever for memory search */
   ragRetriever?: Retriever;
+  /** Optional chat RAG for searching conversation history */
+  chatRAG?: ConversationRAG;
   /** RAG configuration */
   ragConfig?: Partial<RAGConfig>;
   /** Whether memory summarization is enabled */
   memoryEnabled?: boolean;
   /** Optional MCP client for syncing with entity-core */
   mcpClient?: MCPClient;
+  /** Whether to search all conversations for chat RAG */
+  searchAllConversations?: boolean;
 }
 
 /**
@@ -665,7 +670,9 @@ export async function handleChat(
           {
             projectRoot: ctx.projectRoot,
             ragRetriever: ctx.ragRetriever,
+            chatRAG: ctx.chatRAG,
             mcpClient: ctx.mcpClient,
+            searchAllConversations: ctx.searchAllConversations,
           }
         );
 

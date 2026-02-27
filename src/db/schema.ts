@@ -6,6 +6,7 @@
  */
 
 import type { Database } from "@db/sqlite";
+import { loadVectorExtension, getVecVersion } from "./vector.ts";
 
 /**
  * SQL schema for the SBy database.
@@ -70,6 +71,7 @@ export const SCHEMA = `
   );
 
   -- Store memory chunks with their embeddings
+  -- Note: embedding BLOB is kept for backward compatibility but vec_memory_chunks is used for search
   CREATE TABLE IF NOT EXISTS memory_chunks (
     id TEXT PRIMARY KEY,
     content TEXT NOT NULL,
@@ -82,6 +84,25 @@ export const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_memory_chunks_source
     ON memory_chunks(source_file);
+
+  -- Message Embeddings Table
+  -- Stores embeddings for chat messages for conversational RAG
+  CREATE TABLE IF NOT EXISTS message_embeddings (
+    id TEXT PRIMARY KEY,
+    message_id TEXT NOT NULL,
+    conversation_id TEXT NOT NULL,
+    role TEXT NOT NULL,
+    content TEXT NOT NULL,
+    embedding BLOB,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_message_embeddings_message
+    ON message_embeddings(message_id);
+
+  CREATE INDEX IF NOT EXISTS idx_message_embeddings_conversation
+    ON message_embeddings(conversation_id);
 
   -- Memory Summarization Tables
   -- Track memory summarization state
@@ -118,6 +139,11 @@ export const SCHEMA = `
 `;
 
 /**
+ * Embedding dimension for all-MiniLM-L6-v2 model.
+ */
+export const EMBEDDING_DIMENSION = 384;
+
+/**
  * Initializes the database schema by executing the schema SQL.
  * This is idempotent - safe to call multiple times.
  *
@@ -126,6 +152,7 @@ export const SCHEMA = `
 export function initializeSchema(db: Database): void {
   db.exec(SCHEMA);
   runMigrations(db);
+  initializeVectorTables(db);
 }
 
 /**
@@ -209,5 +236,82 @@ function runMigrations(db: Database): void {
       CREATE INDEX IF NOT EXISTS idx_summarized_chats_date
         ON summarized_chats(message_date);
     `);
+  }
+
+  // Migration: Add message embeddings table if missing
+  const hasMessageEmbeddings = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'message_embeddings'")
+    .get();
+
+  if (!hasMessageEmbeddings) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS message_embeddings (
+        id TEXT PRIMARY KEY,
+        message_id TEXT NOT NULL,
+        conversation_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        embedding BLOB,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (message_id) REFERENCES messages(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_message_embeddings_message
+        ON message_embeddings(message_id);
+
+      CREATE INDEX IF NOT EXISTS idx_message_embeddings_conversation
+        ON message_embeddings(conversation_id);
+    `);
+  }
+}
+
+/**
+ * Initialize sqlite-vec virtual tables for vector similarity search.
+ * Called after schema initialization.
+ */
+function initializeVectorTables(db: Database): void {
+  try {
+    // Load the sqlite-vec extension
+    loadVectorExtension(db);
+
+    // Check if extension loaded successfully
+    const version = getVecVersion(db);
+    if (version) {
+      console.log(`[DB] sqlite-vec extension loaded (version ${version})`);
+    }
+
+    // Create vec_memory_chunks virtual table for memory RAG
+    const hasMemoryVecTable = db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'vec_memory_chunks'")
+      .get();
+
+    if (!hasMemoryVecTable) {
+      db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS vec_memory_chunks USING vec0(
+          embedding FLOAT[${EMBEDDING_DIMENSION}]
+        )
+      `);
+      console.log("[DB] Created vec_memory_chunks virtual table");
+    }
+
+    // Create vec_messages virtual table for chat RAG
+    const hasMessageVecTable = db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'vec_messages'")
+      .get();
+
+    if (!hasMessageVecTable) {
+      db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS vec_messages USING vec0(
+          embedding FLOAT[${EMBEDDING_DIMENSION}]
+        )
+      `);
+      console.log("[DB] Created vec_messages virtual table");
+    }
+  } catch (error) {
+    // Log warning but don't fail - vector search is optional
+    console.warn(
+      "[DB] Failed to initialize sqlite-vec extension. Vector search will fall back to in-memory calculation.",
+      error instanceof Error ? error.message : String(error)
+    );
   }
 }
