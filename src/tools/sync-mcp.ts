@@ -17,8 +17,8 @@ export const syncMcpTool: Tool = {
     function: {
       name: "sync_mcp",
       description:
-        "Sync with entity-core to get the latest identity files and push any pending changes. " +
-        "Use this when you want to ensure you have the most up-to-date identity information, " +
+        "Sync with entity-core to get my latest identity files and push any pending changes. " +
+        "I use this when I want to ensure I have the most up-to-date identity information, " +
         "or after making changes that should be synced to the central entity-core server.",
       parameters: {
         type: "object",

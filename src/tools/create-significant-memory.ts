@@ -66,7 +66,7 @@ export const createSignificantMemoryTool: Tool = {
     function: {
       name: "create_significant_memory",
       description:
-        "Create a significant memory for an emotionally important event that should be permanently remembered. Use this for major life events, traumas, spiritual experiences, meaningful connections, or anything that feels deeply significant. These memories are never consolidated or lost.",
+        "Create a significant memory for an emotionally important event that I want to permanently remember. I use this for major life events, traumas, spiritual experiences, meaningful connections, or anything that feels deeply significant. These memories are never consolidated or lost.",
       parameters: {
         type: "object",
         properties: {

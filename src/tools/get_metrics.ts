@@ -34,7 +34,7 @@ export const getMetricsTool: Tool = {
       name: "get_metrics",
       description:
         "Retrieve streaming performance metrics for recent turns in this conversation. " +
-        "Use this to analyze API latency, identify slow responses, or diagnose streaming issues. " +
+        "I use this to analyze API latency, identify slow responses, or diagnose streaming issues. " +
         "Metrics include TTFB (time to first byte), TTFC (time to first content), " +
         "chunk gaps, and total duration.",
       parameters: {

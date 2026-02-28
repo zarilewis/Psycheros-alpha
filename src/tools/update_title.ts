@@ -23,7 +23,7 @@ export const updateTitleTool: Tool = {
     function: {
       name: "update_title",
       description:
-        "Update the title of the current conversation. Use this to give the conversation a descriptive name based on what's being discussed. Keep titles concise but descriptive (under 50 characters is ideal).",
+        "Update the title of the current conversation. I use this to give the conversation a descriptive name based on what's being discussed. I keep titles concise but descriptive (under 50 characters is ideal).",
       parameters: {
         type: "object",
         properties: {

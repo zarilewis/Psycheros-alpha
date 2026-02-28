@@ -160,7 +160,7 @@ export const shellTool: Tool = {
     function: {
       name: "shell",
       description:
-        "Execute a shell command and return the output. Use this to run any command-line operation including file operations, git commands, build tools, and more.",
+        "Execute a shell command and return the output. I use this to run any command-line operation including file operations, git commands, build tools, and more.",
       parameters: {
         type: "object",
         properties: {
