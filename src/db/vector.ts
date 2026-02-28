@@ -19,8 +19,9 @@ async function loadSqliteVecModule(): Promise<{ load: (db: Database) => void } |
   loadAttempted = true;
 
   try {
-    // Dynamic import to handle cases where native modules fail to load
-    const module = await import("sqlite-vec");
+    // Use fully dynamic import with npm specifier to avoid compile-time validation
+    // This allows the server to start even if sqlite-vec optional deps fail
+    const module = await import("npm:sqlite-vec@0.0.1-alpha.9");
     sqliteVecModule = module as { load: (db: Database) => void };
     return sqliteVecModule;
   } catch (error) {
@@ -30,9 +31,6 @@ async function loadSqliteVecModule(): Promise<{ load: (db: Database) => void } |
     return null;
   }
 }
-
-// Attempt to load the module on startup
-loadSqliteVecModule();
 
 /**
  * Check if the sqlite-vec module was loaded successfully.

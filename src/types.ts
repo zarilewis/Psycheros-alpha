@@ -92,7 +92,7 @@ export interface UIUpdate {
  * - done: Stream completion signal
  */
 export interface SSEEvent {
-  type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "metrics" | "done";
+  type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "metrics" | "context" | "done";
   data: string;
 }
 
@@ -141,5 +141,49 @@ export interface TurnMetrics {
   finishReason: string | null;
   /** ISO timestamp of when metrics were recorded */
   createdAt: string;
+}
+
+// =============================================================================
+// Context Snapshot Types
+// =============================================================================
+
+/**
+ * Snapshot of the full context sent to the LLM for a single turn.
+ * Used for debugging and prompt inspection.
+ */
+export interface LLMContextSnapshot {
+  /** ISO timestamp when context was built */
+  timestamp: string;
+  /** Conversation ID this context belongs to */
+  conversationId: string;
+  /** User message that triggered this context */
+  userMessage: string;
+  /** The system message with all identity files and RAG context */
+  systemMessage: string;
+  /** Self content loaded from self/ directory */
+  selfContent: string;
+  /** User content loaded from user/ directory */
+  userContent: string;
+  /** Relationship content loaded from relationship/ directory */
+  relationshipContent: string;
+  /** RAG-retrieved memories content */
+  memoriesContent?: string;
+  /** ChatRAG-retrieved chat history context */
+  chatHistoryContent?: string;
+  /** The messages array sent to the LLM (excluding system) */
+  messages: Array<{
+    role: string;
+    content: string;
+    toolCalls?: ToolCall[];
+    toolCallId?: string;
+  }>;
+  /** Tool definitions available for this turn */
+  toolDefinitions: ToolDefinition[];
+  /** Metrics about context size */
+  metrics: {
+    systemMessageLength: number;
+    totalMessages: number;
+    estimatedTokens: number;
+  };
 }
 

@@ -791,6 +791,12 @@ function convertToSSEEvent(chunk: EntityYield): SSEEvent {
         data: JSON.stringify(chunk.metrics),
       };
 
+    case "context":
+      return {
+        type: "context",
+        data: truncateSSEData(JSON.stringify(chunk.context)),
+      };
+
     case "done":
       return {
         type: "done",

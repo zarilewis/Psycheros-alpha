@@ -206,6 +206,14 @@ export function renderHeader(): string {
     </button>
     <div class="logo">SBy<span class="logo-sub" id="header-title">Strauberry Tavern</span></div>
   </div>
+  <div class="header-right">
+    <button class="context-toggle" onclick="SBy.toggleContextViewer()" aria-label="Toggle context viewer" title="View LLM Context">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="16 18 22 12 16 6"/>
+        <polyline points="8 6 2 12 8 18"/>
+      </svg>
+    </button>
+  </div>
 </header>`;
 }
 

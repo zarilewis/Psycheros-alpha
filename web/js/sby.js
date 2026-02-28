@@ -28,6 +28,10 @@ const touchState = {
   longPressTimer: null,
 };
 
+// Context viewer state
+let contextViewerOpen = false;
+let currentContext = null;
+
 // =============================================================================
 // Persistent SSE Connection
 // =============================================================================
@@ -624,6 +628,17 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         }
       } catch (e) {
         console.error('Failed to parse metrics:', e);
+      }
+      break;
+
+    case 'context':
+      try {
+        currentContext = JSON.parse(data);
+        if (contextViewerOpen) {
+          renderContextViewer();
+        }
+      } catch (e) {
+        console.error('Failed to parse context:', e);
       }
       break;
 
@@ -1335,6 +1350,256 @@ async function finishTitleEdit(input) {
 }
 
 // =============================================================================
+// Context Viewer
+// =============================================================================
+
+/**
+ * Toggle the context viewer panel open/closed.
+ */
+function toggleContextViewer() {
+  contextViewerOpen = !contextViewerOpen;
+  if (contextViewerOpen) {
+    showContextViewer();
+  } else {
+    hideContextViewer();
+  }
+}
+
+/**
+ * Show the context viewer panel.
+ */
+function showContextViewer() {
+  let viewer = document.getElementById('context-viewer');
+  let backdrop = document.getElementById('context-viewer-backdrop');
+
+  if (!viewer) {
+    createContextViewer();
+    viewer = document.getElementById('context-viewer');
+    backdrop = document.getElementById('context-viewer-backdrop');
+  }
+
+  backdrop?.classList.add('visible');
+  viewer?.classList.add('visible');
+
+  if (currentContext) {
+    renderContextViewer();
+  }
+}
+
+/**
+ * Hide the context viewer panel.
+ */
+function hideContextViewer() {
+  contextViewerOpen = false;
+  document.getElementById('context-viewer')?.classList.remove('visible');
+  document.getElementById('context-viewer-backdrop')?.classList.remove('visible');
+}
+
+/**
+ * Create the context viewer DOM structure.
+ */
+function createContextViewer() {
+  const backdrop = document.createElement('div');
+  backdrop.id = 'context-viewer-backdrop';
+  backdrop.className = 'context-viewer-backdrop';
+  backdrop.onclick = () => hideContextViewer();
+
+  const viewer = document.createElement('div');
+  viewer.id = 'context-viewer';
+  viewer.className = 'context-viewer';
+  viewer.onclick = (e) => e.stopPropagation();
+  viewer.innerHTML = `
+    <div class="context-viewer-header">
+      <h2>Context Inspector</h2>
+      <button class="context-viewer-close" onclick="SBy.hideContextViewer()">&times;</button>
+    </div>
+    <div class="context-viewer-tabs">
+      <button class="context-tab active" data-tab="system">System</button>
+      <button class="context-tab" data-tab="rag">RAG</button>
+      <button class="context-tab" data-tab="messages">Messages</button>
+      <button class="context-tab" data-tab="tools">Tools</button>
+    </div>
+    <div class="context-viewer-content" id="context-content">
+      <div class="context-empty">Send a message to see the context</div>
+    </div>
+  `;
+
+  document.body.appendChild(backdrop);
+  document.body.appendChild(viewer);
+
+  // Tab click handlers
+  viewer.querySelectorAll('.context-tab').forEach(tab => {
+    tab.onclick = () => switchContextTab(tab.dataset.tab);
+  });
+}
+
+/**
+ * Switch to a different context tab.
+ */
+function switchContextTab(tabName) {
+  document.querySelectorAll('.context-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`.context-tab[data-tab="${tabName}"]`)?.classList.add('active');
+  renderContextTab(tabName);
+}
+
+/**
+ * Render the current context in the viewer.
+ */
+function renderContextViewer() {
+  if (!currentContext) return;
+  const activeTab = document.querySelector('.context-tab.active')?.dataset.tab || 'system';
+  renderContextTab(activeTab);
+}
+
+/**
+ * Render a specific tab's content.
+ */
+function renderContextTab(tabName) {
+  const content = document.getElementById('context-content');
+  if (!content) return;
+
+  if (!currentContext) {
+    content.innerHTML = '<div class="context-empty">Send a message to see the context</div>';
+    return;
+  }
+
+  switch (tabName) {
+    case 'system':
+      content.innerHTML = renderSystemTab();
+      break;
+    case 'rag':
+      content.innerHTML = renderRagTab();
+      break;
+    case 'messages':
+      content.innerHTML = renderMessagesTab();
+      break;
+    case 'tools':
+      content.innerHTML = renderToolsTab();
+      break;
+  }
+}
+
+/**
+ * Render the System tab content.
+ */
+function renderSystemTab() {
+  return `
+    <div class="context-section expanded">
+      <div class="context-section-header" onclick="this.parentElement.classList.toggle('expanded')">
+        <span>Full System Message</span>
+        <span class="context-section-toggle">&#9660;</span>
+      </div>
+      <div class="context-section-content">
+        <pre>${escapeHtml(currentContext.systemMessage)}</pre>
+      </div>
+    </div>
+    <div class="context-metrics">
+      <div>System Length: ${currentContext.metrics.systemMessageLength.toLocaleString()} chars</div>
+      <div>Total Messages: ${currentContext.metrics.totalMessages}</div>
+      <div>Estimated Tokens: ~${currentContext.metrics.estimatedTokens.toLocaleString()}</div>
+    </div>
+  `;
+}
+
+/**
+ * Render the RAG tab content.
+ */
+function renderRagTab() {
+  let html = '';
+
+  if (currentContext.memoriesContent) {
+    html += `
+      <div class="context-section expanded">
+        <div class="context-section-header" onclick="this.parentElement.classList.toggle('expanded')">
+          <span>Retrieved Memories</span>
+          <span class="context-section-toggle">&#9660;</span>
+        </div>
+        <div class="context-section-content">
+          <pre>${escapeHtml(currentContext.memoriesContent)}</pre>
+        </div>
+      </div>
+    `;
+  }
+
+  if (currentContext.chatHistoryContent) {
+    html += `
+      <div class="context-section expanded">
+        <div class="context-section-header" onclick="this.parentElement.classList.toggle('expanded')">
+          <span>Chat History Context</span>
+          <span class="context-section-toggle">&#9660;</span>
+        </div>
+        <div class="context-section-content">
+          <pre>${escapeHtml(currentContext.chatHistoryContent)}</pre>
+        </div>
+      </div>
+    `;
+  }
+
+  if (!html) {
+    html = '<div class="context-empty">No RAG context retrieved for this message</div>';
+  }
+
+  return html;
+}
+
+/**
+ * Render the Messages tab content.
+ */
+function renderMessagesTab() {
+  let html = `<div class="context-info">Total Messages: ${currentContext.messages.length}</div>`;
+
+  if (currentContext.messages.length === 0) {
+    html += '<div class="context-empty">No messages in context</div>';
+    return html;
+  }
+
+  currentContext.messages.forEach((msg, i) => {
+    const roleClass = msg.role === 'user' ? 'role-user' : msg.role === 'assistant' ? 'role-assistant' : 'role-other';
+    html += `
+      <div class="context-message">
+        <div class="context-message-header">
+          <span class="context-message-role ${roleClass}">${escapeHtml(msg.role)}</span>
+          <span class="context-message-index">#${i + 1}</span>
+        </div>
+        <pre class="context-message-content">${escapeHtml(msg.content || '')}</pre>
+        ${msg.toolCalls && msg.toolCalls.length > 0 ? `<div class="context-tool-calls">Tool Calls: ${msg.toolCalls.length}</div>` : ''}
+      </div>
+    `;
+  });
+
+  return html;
+}
+
+/**
+ * Render the Tools tab content.
+ */
+function renderToolsTab() {
+  let html = `<div class="context-info">Available Tools: ${currentContext.toolDefinitions.length}</div>`;
+
+  if (currentContext.toolDefinitions.length === 0) {
+    html += '<div class="context-empty">No tools available</div>';
+    return html;
+  }
+
+  currentContext.toolDefinitions.forEach(tool => {
+    html += `
+      <div class="context-section">
+        <div class="context-section-header" onclick="this.parentElement.classList.toggle('expanded')">
+          <span>${escapeHtml(tool.function.name)}</span>
+          <span class="context-section-toggle">&#9660;</span>
+        </div>
+        <div class="context-section-content">
+          <p class="tool-description">${escapeHtml(tool.function.description)}</p>
+          <pre>${escapeHtml(JSON.stringify(tool.function.parameters, null, 2))}</pre>
+        </div>
+      </div>
+    `;
+  });
+
+  return html;
+}
+
+// =============================================================================
 // Global Export
 // =============================================================================
 
@@ -1356,4 +1621,7 @@ globalThis.SBy = {
   confirmDelete,
   // Inline edit
   startTitleEdit,
+  // Context viewer
+  toggleContextViewer,
+  hideContextViewer,
 };

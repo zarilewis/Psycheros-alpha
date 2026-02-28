@@ -14,8 +14,7 @@
     "@std/fs": "jsr:@std/fs@^1",
     "@db/sqlite": "jsr:@db/sqlite@^0.12",
     "@xenova/transformers": "npm:@huggingface/transformers@3.3.1",
-    "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1",
-    "sqlite-vec": "npm:sqlite-vec@0.0.1-alpha.9"
+    "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1"
   },
   "lint": {
     "exclude": ["web/lib/"]

@@ -97,7 +97,7 @@ Each module has a `mod.ts` barrel file defining its public API:
 ```
 src/
 ├── main.ts           # Daemon entry point, MCP initialization
-├── types.ts          # Shared type definitions
+├── types.ts          # Shared type definitions (SSEEvent, LLMContextSnapshot)
 ├── constants.ts      # App constants
 ├── llm/              # OpenAI-compatible LLM client
 │   ├── mod.ts        # Public exports
@@ -254,8 +254,8 @@ Two SSE channels serve different purposes:
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  POST /api/chat (per-request, closes when done)         │
-│  thinking → content → tool_call → tool_result → metrics │
-│  → done. Also: dom_update for tool-based UI changes     │
+│  context → thinking → content → tool_call → tool_result │
+│  → metrics → done. Also: dom_update for UI changes      │
 └─────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────┐
@@ -265,6 +265,19 @@ Two SSE channels serve different purposes:
 │  Managed by EventBroadcaster singleton                  │
 └─────────────────────────────────────────────────────────┘
 ```
+
+### Context Viewer
+
+A built-in debugging tool for inspecting the full context sent to the LLM. Click the code icon (`</>`) in the header to toggle the context viewer drawer.
+
+**Features**:
+- **System tab**: View the complete system prompt with identity files and RAG context
+- **RAG tab**: Retrieved memories and chat history context
+- **Messages tab**: Conversation history sent to the LLM
+- **Tools tab**: Available tool definitions with parameters
+- **Metrics**: Context size and estimated token count
+
+The context is captured automatically for each message and can be inspected at any time during or after the response.
 
 ### API Endpoints
 

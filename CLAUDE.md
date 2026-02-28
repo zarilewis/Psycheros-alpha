@@ -32,11 +32,13 @@ SBY_MCP_ENABLED=true deno task dev
 
 | File | Purpose |
 |------|---------|
-| `src/entity/loop.ts` | Agentic loop - LLM calls, tool execution |
+| `src/types.ts` | Shared types (SSEEvent, LLMContextSnapshot, ToolCall, etc.) |
+| `src/entity/loop.ts` | Agentic loop - LLM calls, tool execution, context capture |
 | `src/entity/context.ts` | Context loading (supports MCP client) |
 | `src/server/routes.ts` | API endpoints and handlers |
 | `src/server/broadcaster.ts` | Persistent SSE for background updates |
 | `src/server/state-changes.ts` | Unified state mutations |
+| `src/server/templates.ts` | HTML templates including header with context viewer |
 | `src/tools/registry.ts` | Tool registration |
 | `src/metrics/mod.ts` | Streaming performance metrics |
 | `src/memory/mod.ts` | Hierarchical memory system |
@@ -50,7 +52,8 @@ SBY_MCP_ENABLED=true deno task dev
 | `src/mcp-client/mod.ts` | MCP client for entity-core connection |
 | `scripts/migrate-to-entity-core.ts` | Migration script for entity-core |
 | `scripts/index-messages.ts` | Index existing messages for ChatRAG |
-| `web/js/sby.js` | Client-side SSE handling |
+| `web/js/sby.js` | Client-side SSE handling, context viewer |
+| `web/css/components.css` | UI component styles including context viewer |
 
 ## Patterns
 
@@ -67,7 +70,7 @@ SBY_MCP_ENABLED=true deno task dev
 3. Background: call `getBroadcaster().broadcastUpdates()` directly
 
 **SSE Channels**:
-- `/api/chat` - Per-request stream (thinking, content, tool calls, metrics)
+- `/api/chat` - Per-request stream (context, thinking, content, tool calls, metrics)
 - `/api/events` - Persistent channel (background dom_update events)
 
 **Memory System**:
@@ -103,6 +106,14 @@ SBY_MCP_ENABLED=true deno task dev
 deno run -A scripts/migrate-to-entity-core.ts --dry-run  # Preview
 deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 ```
+
+**Context Viewer**:
+- Built-in debugging tool for inspecting LLM context
+- Toggle via code icon (`</>`) in header
+- Shows: system message, RAG context, messages array, tools, metrics
+- Context captured per message, viewable during/after response
+- `LLMContextSnapshot` type in `src/types.ts`
+- Yielded as first event in SSE stream from `EntityTurn.process()`
 
 # currentDate
 Today's date is 2026-02-27.

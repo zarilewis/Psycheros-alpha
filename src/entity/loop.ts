@@ -26,7 +26,7 @@
 import type { LLMClient, StreamChunk, ChatMessage } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
-import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics } from "../types.ts";
+import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics, LLMContextSnapshot } from "../types.ts";
 import type { Retriever } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
@@ -63,7 +63,8 @@ export type EntityYield =
   | StreamChunk
   | { type: "tool_result"; result: ToolResult }
   | { type: "dom_update"; update: UIUpdate }
-  | { type: "metrics"; metrics: TurnMetrics };
+  | { type: "metrics"; metrics: TurnMetrics }
+  | { type: "context"; context: LLMContextSnapshot };
 
 /**
  * Represents a single turn in the conversation.
@@ -204,6 +205,33 @@ export class EntityTurn {
 
     // Get tool definitions
     const toolDefinitions = this.tools.getDefinitions();
+
+    // Create and yield context snapshot for debugging
+    const contextSnapshot: LLMContextSnapshot = {
+      timestamp: new Date().toISOString(),
+      conversationId,
+      userMessage,
+      systemMessage,
+      selfContent,
+      userContent,
+      relationshipContent,
+      memoriesContent,
+      chatHistoryContent,
+      messages: messages.slice(1).map((msg) => ({
+        role: msg.role,
+        content: msg.content,
+        toolCalls: msg.tool_calls,
+        toolCallId: msg.tool_call_id,
+      })),
+      toolDefinitions,
+      metrics: {
+        systemMessageLength: systemMessage.length,
+        totalMessages: messages.length,
+        estimatedTokens: Math.ceil(systemMessage.length / 4) +
+          messages.reduce((acc, m) => acc + Math.ceil((m.content?.length || 0) / 4), 0),
+      },
+    };
+    yield { type: "context", context: contextSnapshot };
 
     // Track current iteration for tool loop protection
     let iteration = 0;
