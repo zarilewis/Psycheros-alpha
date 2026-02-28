@@ -2,7 +2,7 @@
  * MCP Client Module
  *
  * Client for connecting to the entity-core MCP server.
- * Allows SBy harness to sync identity and memories with my core.
+ * Allows Psycheros harness to sync identity and memories with my core.
  */
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -141,7 +141,7 @@ export class MCPClient {
       });
 
       this.client = new Client({
-        name: "sby-harness",
+        name: "psycheros-harness",
         version: "0.1.0",
       });
 
@@ -270,7 +270,7 @@ export class MCPClient {
         arguments: {
           instance: {
             id: this.config.instanceId,
-            type: "sby",
+            type: "psycheros",
             version: 1,
           },
           identityChanges: this.pendingIdentityChanges.map((change) => ({
@@ -360,7 +360,7 @@ export class MCPClient {
           arguments: {
             instance: {
               id: this.config.instanceId,
-              type: "sby",
+              type: "psycheros",
               version: 1,
             },
             identityChanges: [change],

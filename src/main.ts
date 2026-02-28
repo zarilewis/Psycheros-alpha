@@ -1,5 +1,5 @@
 /**
- * SBy Daemon Entry Point
+ * Psycheros Daemon Entry Point
  *
  * Starts the persistent entity harness server.
  */
@@ -11,11 +11,11 @@ import { createMCPClient, type MCPClient } from "./mcp-client/mod.ts";
 const VERSION = "0.1.0";
 
 /**
- * Parse the SBY_TOOLS environment variable into an array of tool names.
+ * Parse the PSYCHEROS_TOOLS environment variable into an array of tool names.
  * Returns empty array if not set (secure by default - no tools enabled).
  */
 function parseAllowedTools(): string[] {
-  const toolsEnv = Deno.env.get("SBY_TOOLS");
+  const toolsEnv = Deno.env.get("PSYCHEROS_TOOLS");
   if (!toolsEnv || toolsEnv.trim() === "") {
     return [];
   }
@@ -26,11 +26,11 @@ function parseAllowedTools(): string[] {
 }
 
 /**
- * Parse the SBY_RAG_ENABLED environment variable.
+ * Parse the PSYCHEROS_RAG_ENABLED environment variable.
  * Defaults to true (RAG enabled by default).
  */
 function parseRagEnabled(): boolean {
-  const env = Deno.env.get("SBY_RAG_ENABLED");
+  const env = Deno.env.get("PSYCHEROS_RAG_ENABLED");
   if (env === undefined || env === "") {
     return true; // Default to enabled
   }
@@ -41,21 +41,21 @@ function parseRagEnabled(): boolean {
 const allowedTools = parseAllowedTools();
 const ragEnabled = parseRagEnabled();
 const config = {
-  port: parseInt(Deno.env.get("SBY_PORT") || "3000"),
-  hostname: Deno.env.get("SBY_HOST") || "0.0.0.0",
+  port: parseInt(Deno.env.get("PSYCHEROS_PORT") || "3000"),
+  hostname: Deno.env.get("PSYCHEROS_HOST") || "0.0.0.0",
   projectRoot: Deno.cwd(),
   allowedTools,
   ragConfig: {
     enabled: ragEnabled,
-    maxChunks: parseInt(Deno.env.get("SBY_RAG_MAX_CHUNKS") || "8"),
-    maxTokens: parseInt(Deno.env.get("SBY_RAG_MAX_TOKENS") || "2000"),
-    minScore: parseFloat(Deno.env.get("SBY_RAG_MIN_SCORE") || "0.3"),
+    maxChunks: parseInt(Deno.env.get("PSYCHEROS_RAG_MAX_CHUNKS") || "8"),
+    maxTokens: parseInt(Deno.env.get("PSYCHEROS_RAG_MAX_TOKENS") || "2000"),
+    minScore: parseFloat(Deno.env.get("PSYCHEROS_RAG_MIN_SCORE") || "0.3"),
   },
 };
 
 console.log(`
 ╔═══════════════════════════════════════╗
-║  SBy - Strauberry Tavern v${VERSION}        ║
+║  Psycheros v${VERSION}                     ║
 ║  Entity Harness Daemon                ║
 ╚═══════════════════════════════════════╝
 `);
@@ -70,14 +70,14 @@ console.log(`Press Ctrl+C to stop\n`);
 
 // Initialize MCP client if enabled
 let mcpClient: MCPClient | undefined;
-const mcpEnabled = Deno.env.get("SBY_MCP_ENABLED") === "true";
+const mcpEnabled = Deno.env.get("PSYCHEROS_MCP_ENABLED") === "true";
 
 if (mcpEnabled) {
-  const mcpCommand = Deno.env.get("SBY_MCP_COMMAND") || "/home/zari/.deno/bin/deno";
-  const mcpArgsStr = Deno.env.get("SBY_MCP_ARGS") || `run -A ${Deno.env.get("HOME")}/projects/entity-core/src/mod.ts`;
+  const mcpCommand = Deno.env.get("PSYCHEROS_MCP_COMMAND") || "/home/zari/.deno/bin/deno";
+  const mcpArgsStr = Deno.env.get("PSYCHEROS_MCP_ARGS") || `run -A ${Deno.env.get("HOME")}/projects/entity-core/src/mod.ts`;
   const mcpArgs = mcpArgsStr.split(" ");
-  const mcpInstance = Deno.env.get("SBY_MCP_INSTANCE") || "sby-harness";
-  const entityCoreDataDir = Deno.env.get("SBY_ENTITY_CORE_DATA_DIR") || `${Deno.env.get("HOME")}/projects/entity-core/data`;
+  const mcpInstance = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
+  const entityCoreDataDir = Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${Deno.env.get("HOME")}/projects/entity-core/data`;
 
   console.log(`MCP enabled: connecting to entity-core as ${mcpInstance}`);
 

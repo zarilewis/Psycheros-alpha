@@ -1,7 +1,7 @@
 /**
- * SBy HTTP Server
+ * Psycheros HTTP Server
  *
- * Main HTTP server for the SBy daemon. Handles routing, static file serving,
+ * Main HTTP server for the Psycheros daemon. Handles routing, static file serving,
  * API endpoints, and SSE streaming for chat responses.
  *
  * @module
@@ -50,7 +50,7 @@ export interface ServerConfig {
   hostname?: string;
   /** Root directory of the project for file serving */
   projectRoot: string;
-  /** Optional database path (default: {projectRoot}/.sby/sby.db) */
+  /** Optional database path (default: {projectRoot}/.psycheros/psycheros.db) */
   dbPath?: string;
   /** List of tool names the entity is allowed to use (empty = no tools) */
   allowedTools?: string[];
@@ -63,7 +63,7 @@ export interface ServerConfig {
 }
 
 /**
- * HTTP server for the SBy daemon.
+ * HTTP server for the Psycheros daemon.
  *
  * Manages the database, LLM client, tool registry, and handles
  * incoming HTTP requests with routing to appropriate handlers.
@@ -105,7 +105,7 @@ export class Server {
     this.config = config;
 
     // Initialize database
-    const dbPath = config.dbPath || `${config.projectRoot}/.sby/sby.db`;
+    const dbPath = config.dbPath || `${config.projectRoot}/.psycheros/psycheros.db`;
     this.db = new DBClient(dbPath);
 
     // Initialize LLM client with defaults
@@ -147,7 +147,7 @@ export class Server {
     const hostname = this.config.hostname || "localhost";
     const port = this.config.port;
 
-    console.log(`Starting SBy server on http://${hostname}:${port}`);
+    console.log(`Starting Psycheros server on http://${hostname}:${port}`);
 
     // Index memories on startup if RAG is enabled
     if (this.ragConfig.enabled && this.ragRetriever) {
@@ -172,7 +172,7 @@ export class Server {
       });
 
       // Set up daily cron job at configured hour (default 4 AM)
-      const memoryHour = parseInt(Deno.env.get("SBY_MEMORY_HOUR") || "4");
+      const memoryHour = parseInt(Deno.env.get("PSYCHEROS_MEMORY_HOUR") || "4");
       const cronPattern = `0 ${memoryHour} * * *`;
 
       Deno.cron("memory-daily-summarization", cronPattern, async () => {
@@ -251,7 +251,7 @@ export class Server {
         hostname,
         signal: this.abortController.signal,
         onListen: ({ hostname, port }) => {
-          console.log(`SBy server listening on http://${hostname}:${port}`);
+          console.log(`Psycheros server listening on http://${hostname}:${port}`);
         },
       },
       (request) => this.handleRequest(request)
@@ -264,7 +264,7 @@ export class Server {
    * Aborts the server, clears the keepalive timer, and closes the database connection.
    */
   stop(): void {
-    console.log("Stopping SBy server...");
+    console.log("Stopping Psycheros server...");
 
     // Clear keepalive timer
     if (this.keepaliveInterval !== null) {
@@ -274,7 +274,7 @@ export class Server {
 
     this.abortController.abort();
     this.db.close();
-    console.log("SBy server stopped.");
+    console.log("Psycheros server stopped.");
   }
 
   /**

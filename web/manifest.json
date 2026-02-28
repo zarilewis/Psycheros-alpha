@@ -1,6 +1,6 @@
 {
-  "name": "SBy - Strauberry Tavern",
-  "short_name": "SBy",
+  "name": "Psycheros",
+  "short_name": "Psycheros",
   "description": "Persistent AI entity harness daemon",
   "start_url": "/",
   "display": "standalone",

@@ -24,8 +24,8 @@ cp .env.example .env   # Then set ZAI_API_KEY
 # Terminal 1: Start entity-core
 cd ~/projects/entity-core && deno run -A src/mod.ts
 
-# Terminal 2: Start SBy with MCP
-SBY_MCP_ENABLED=true deno task dev
+# Terminal 2: Start Psycheros with MCP
+PSYCHEROS_MCP_ENABLED=true deno task dev
 ```
 
 ## Key Files
@@ -52,7 +52,7 @@ SBY_MCP_ENABLED=true deno task dev
 | `src/mcp-client/mod.ts` | MCP client for entity-core connection |
 | `scripts/migrate-to-entity-core.ts` | Migration script for entity-core |
 | `scripts/index-messages.ts` | Index existing messages for ChatRAG |
-| `web/js/sby.js` | Client-side SSE handling, context viewer |
+| `web/js/psycheros.js` | Client-side SSE handling, context viewer |
 | `web/css/components.css` | UI component styles including context viewer |
 
 ## Patterns
@@ -81,7 +81,7 @@ SBY_MCP_ENABLED=true deno task dev
 
 **RAG Retrieval**:
 - Two RAG systems: Memory RAG (memories/) and ChatRAG (chat history)
-- Enabled by default, configured via `SBY_RAG_*` env vars
+- Enabled by default, configured via `PSYCHEROS_RAG_*` env vars
 - Embeds memory files on startup using HuggingFace transformers (all-MiniLM-L6-v2, 384 dims)
 - Retrieves top-k similar chunks before each LLM call
 - Instance relevance boost: memories from same embodiment get +0.1 score
@@ -95,7 +95,7 @@ SBY_MCP_ENABLED=true deno task dev
 
 **MCP Integration (entity-core)**:
 - Optional connection to centralized identity/memory server
-- Enabled via `SBY_MCP_ENABLED=true`
+- Enabled via `PSYCHEROS_MCP_ENABLED=true`
 - Pulls identity files (self/, user/, relationship/) on startup
 - Queues changes and syncs periodically (every 5 minutes)
 - Falls back to local files if MCP unavailable

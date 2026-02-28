@@ -1,14 +1,14 @@
-# SBy - Strauberry Tavern
+# Psycheros
 
-A persistent AI entity harness daemon built on Deno. Unlike traditional CLI-based AI assistants, SBy runs as a web service with durable state, tool execution, and real-time streaming.
+A persistent AI entity harness daemon built on Deno. Unlike traditional CLI-based AI assistants, Psycheros runs as a web service with durable state, tool execution, and real-time streaming.
 
-SBy is an **embodiment** - an interface through which the AI entity interacts. The entity's core identity and memories live in [entity-core](../entity-core/), a separate MCP server that provides centralized identity persistence across multiple embodiments.
+Psycheros is an **embodiment** - an interface through which the AI entity interacts. The entity's core identity and memories live in [entity-core](../entity-core/), a separate MCP server that provides centralized identity persistence across multiple embodiments.
 
 ## Quick Start
 
 ```bash
 cp .env.example .env
-# Edit .env and set ZAI_API_KEY and SBY_TOOLS
+# Edit .env and set ZAI_API_KEY and PSYCHEROS_TOOLS
 
 deno task dev    # Development with hot reload
 open http://localhost:3000
@@ -29,31 +29,31 @@ open http://localhost:3000
 | `ZAI_BASE_URL` | No | Z.ai endpoint | API endpoint URL |
 | `ZAI_MODEL` | No | `glm-4.7` | Main model for chat |
 | `ZAI_WORKER_MODEL` | No | `GLM-4.5-Air` | Lightweight model for background tasks |
-| `SBY_PORT` | No | `3000` | Server port |
-| `SBY_HOST` | No | `0.0.0.0` | Server hostname |
-| `SBY_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
-| `SBY_TOOLS` | No | (none) | Comma-separated list of enabled tools |
-| `SBY_MEMORY_HOUR` | No | `4` | Hour to run daily summarization (0-23) |
+| `PSYCHEROS_PORT` | No | `3000` | Server port |
+| `PSYCHEROS_HOST` | No | `0.0.0.0` | Server hostname |
+| `PSYCHEROS_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
+| `PSYCHEROS_TOOLS` | No | (none) | Comma-separated list of enabled tools |
+| `PSYCHEROS_MEMORY_HOUR` | No | `4` | Hour to run daily summarization (0-23) |
 
 ### RAG Settings
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SBY_RAG_ENABLED` | `true` | Enable RAG memory retrieval |
-| `SBY_RAG_MAX_CHUNKS` | `8` | Max memory chunks to retrieve |
-| `SBY_RAG_MAX_TOKENS` | `2000` | Max tokens in retrieved context |
-| `SBY_RAG_MIN_SCORE` | `0.3` | Minimum similarity score |
+| `PSYCHEROS_RAG_ENABLED` | `true` | Enable RAG memory retrieval |
+| `PSYCHEROS_RAG_MAX_CHUNKS` | `8` | Max memory chunks to retrieve |
+| `PSYCHEROS_RAG_MAX_TOKENS` | `2000` | Max tokens in retrieved context |
+| `PSYCHEROS_RAG_MIN_SCORE` | `0.3` | Minimum similarity score |
 
 ### MCP Integration (entity-core)
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `SBY_MCP_ENABLED` | `false` | Enable connection to entity-core |
-| `SBY_MCP_COMMAND` | `/home/zari/.deno/bin/deno` | Command to spawn entity-core |
-| `SBY_MCP_ARGS` | `run -A ~/projects/entity-core/src/mod.ts` | Arguments for entity-core |
-| `SBY_MCP_INSTANCE` | `sby-harness` | Instance ID for this embodiment |
+| `PSYCHEROS_MCP_ENABLED` | `false` | Enable connection to entity-core |
+| `PSYCHEROS_MCP_COMMAND` | `/home/zari/.deno/bin/deno` | Command to spawn entity-core |
+| `PSYCHEROS_MCP_ARGS` | `run -A ~/projects/entity-core/src/mod.ts` | Arguments for entity-core |
+| `PSYCHEROS_MCP_INSTANCE` | `psycheros-harness` | Instance ID for this embodiment |
 
-When MCP is enabled, SBy pulls identity files (self/, user/, relationship/) from entity-core on startup and syncs changes back periodically.
+When MCP is enabled, Psycheros pulls identity files (self/, user/, relationship/) from entity-core on startup and syncs changes back periodically.
 
 ## Architecture
 
@@ -70,12 +70,12 @@ When MCP is enabled, SBy pulls identity files (self/, user/, relationship/) from
 └─────────────────────────────────────┘
          ↑ pull/push
     ┌────┴────┐
-    │   SBy   │  (other embodiments: SillyTavern, Claude Code, etc.)
+    │Psycheros│  (other embodiments: SillyTavern, Claude Code, etc.)
     │ Harness │
     └─────────┘
 ```
 
-The entity's core self lives in entity-core. SBy is one embodiment - an interface through which the entity interacts. This allows the same entity to exist across multiple interfaces while maintaining a single persistent identity.
+The entity's core self lives in entity-core. Psycheros is one embodiment - an interface through which the entity interacts. This allows the same entity to exist across multiple interfaces while maintaining a single persistent identity.
 
 ### Request Flow
 
@@ -155,7 +155,7 @@ src/
 
 ### Memory System
 
-SBy implements a hierarchical memory system where the entity writes their own memories from conversations. Memories are written in the entity's voice (first-person), with the user in third-person.
+Psycheros implements a hierarchical memory system where the entity writes their own memories from conversations. Memories are written in the entity's voice (first-person), with the user in third-person.
 
 **Trigger**: On first message of a new day (detected by date change), the previous day's conversations are summarized.
 
@@ -190,7 +190,7 @@ memories/
 
 ### RAG System
 
-SBy uses two RAG systems working together:
+Psycheros uses two RAG systems working together:
 
 **Memory RAG** retrieves relevant memories before each LLM call:
 
@@ -300,7 +300,7 @@ The context is captured automatically for each message and can be inspected at a
 ## Project Structure
 
 ```
-SBy/
+Psycheros/
 ├── deno.json          # Tasks, imports, config
 ├── .env.example       # Environment template
 ├── CLAUDE.md          # Agent system card for Claude Code
@@ -331,7 +331,7 @@ SBy/
 ├── user/              # User knowledge prompts (local fallback)
 ├── relationship/      # Relationship context prompts (local fallback)
 ├── memories/          # Hierarchical memory storage
-└── .sby/              # Runtime data (SQLite DB)
+└── .psycheros/        # Runtime data (SQLite DB)
 ```
 
 ## Development
@@ -353,8 +353,8 @@ To run with entity-core integration:
 cd ~/projects/entity-core
 deno run -A src/mod.ts
 
-# Terminal 2: Start SBy with MCP enabled
-SBY_MCP_ENABLED=true deno task dev
+# Terminal 2: Start Psycheros with MCP enabled
+PSYCHEROS_MCP_ENABLED=true deno task dev
 ```
 
 ### Migration

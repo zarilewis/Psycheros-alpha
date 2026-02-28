@@ -1,5 +1,5 @@
 /**
- * SBy Client JavaScript
+ * Psycheros Client JavaScript
  * Handles SSE streaming, sidebar toggle, input management, and service worker.
  */
 
@@ -277,7 +277,7 @@ async function newConversation() {
     // Reset header title to default
     const headerTitle = document.getElementById('header-title');
     if (headerTitle) {
-      headerTitle.textContent = 'Strauberry Tavern';
+      headerTitle.textContent = 'Psycheros';
     }
 
     // Reload conversation list
@@ -289,7 +289,7 @@ async function newConversation() {
       chat.innerHTML = `
         <div class="messages" id="messages">
           <div class="empty-state" id="empty-state">
-            <div class="empty-title">SBy</div>
+            <div class="empty-title">Psycheros</div>
             <p class="empty-text">What's on your mind?</p>
           </div>
         </div>
@@ -300,10 +300,10 @@ async function newConversation() {
               id="message-input"
               placeholder="Type your message..."
               rows="1"
-              onkeydown="SBy.handleKeyDown(event)"
-              oninput="SBy.autoResize(this)"
+              onkeydown="Psycheros.handleKeyDown(event)"
+              oninput="Psycheros.autoResize(this)"
             ></textarea>
-            <button class="send-btn" id="send-btn" onclick="SBy.sendMessage()">Send</button>
+            <button class="send-btn" id="send-btn" onclick="Psycheros.sendMessage()">Send</button>
           </div>
         </div>
       `;
@@ -884,8 +884,8 @@ function createUIContainers() {
     bar.className = 'selection-bar';
     bar.innerHTML = `
       <span class="selection-count"><span id="selection-count-num">0</span> selected</span>
-      <button class="btn btn--ghost" onclick="SBy.exitSelectionMode()">Cancel</button>
-      <button class="btn btn--danger" onclick="SBy.deleteSelected()">Delete</button>
+      <button class="btn btn--ghost" onclick="Psycheros.exitSelectionMode()">Cancel</button>
+      <button class="btn btn--danger" onclick="Psycheros.deleteSelected()">Delete</button>
     `;
     document.body.appendChild(bar);
   }
@@ -903,8 +903,8 @@ function createUIContainers() {
         <div class="modal-title">Delete Conversation</div>
         <div class="modal-message" id="modal-message">Are you sure you want to delete this conversation?</div>
         <div class="modal-actions">
-          <button class="btn btn--ghost" onclick="SBy.closeDeleteModal()">Cancel</button>
-          <button class="btn btn--danger" onclick="SBy.confirmDelete()">Delete</button>
+          <button class="btn btn--ghost" onclick="Psycheros.closeDeleteModal()">Cancel</button>
+          <button class="btn btn--danger" onclick="Psycheros.confirmDelete()">Delete</button>
         </div>
       </div>
     `;
@@ -1217,7 +1217,7 @@ async function confirmDelete() {
       // Reset header title
       const headerTitle = document.getElementById('header-title');
       if (headerTitle) {
-        headerTitle.textContent = 'Strauberry Tavern';
+        headerTitle.textContent = 'Psycheros';
       }
 
       // Show empty state
@@ -1226,7 +1226,7 @@ async function confirmDelete() {
         chat.innerHTML = `
           <div class="messages" id="messages">
             <div class="empty-state" id="empty-state">
-              <div class="empty-title">SBy</div>
+              <div class="empty-title">Psycheros</div>
               <p class="empty-text">Start a new conversation or select one from the sidebar.</p>
             </div>
           </div>
@@ -1237,10 +1237,10 @@ async function confirmDelete() {
                 id="message-input"
                 placeholder="Type your message..."
                 rows="1"
-                onkeydown="SBy.handleKeyDown(event)"
-                oninput="SBy.autoResize(this)"
+                onkeydown="Psycheros.handleKeyDown(event)"
+                oninput="Psycheros.autoResize(this)"
               ></textarea>
-              <button class="send-btn" id="send-btn" onclick="SBy.sendMessage()">Send</button>
+              <button class="send-btn" id="send-btn" onclick="Psycheros.sendMessage()">Send</button>
             </div>
           </div>
         `;
@@ -1411,7 +1411,7 @@ function createContextViewer() {
   viewer.innerHTML = `
     <div class="context-viewer-header">
       <h2>Context Inspector</h2>
-      <button class="context-viewer-close" onclick="SBy.hideContextViewer()">&times;</button>
+      <button class="context-viewer-close" onclick="Psycheros.hideContextViewer()">&times;</button>
     </div>
     <div class="context-viewer-tabs">
       <button class="context-tab active" data-tab="system">System</button>
@@ -1603,7 +1603,7 @@ function renderToolsTab() {
 // Global Export
 // =============================================================================
 
-globalThis.SBy = {
+globalThis.Psycheros = {
   toggleSidebar,
   closeSidebarAfterNav,
   newConversation,

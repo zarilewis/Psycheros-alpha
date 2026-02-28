@@ -42,7 +42,7 @@ export const syncMcpTool: Tool = {
     if (!mcpClient) {
       return {
         toolCallId: ctx.toolCallId,
-        content: "MCP is not enabled. Set SBY_MCP_ENABLED=true to use entity-core sync.",
+        content: "MCP is not enabled. Set PSYCHEROS_MCP_ENABLED=true to use entity-core sync.",
         isError: true,
       };
     }

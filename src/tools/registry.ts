@@ -18,7 +18,7 @@ import { syncMcpTool } from "./sync-mcp.ts";
 // =============================================================================
 
 /**
- * All tools that can be enabled via the SBY_TOOLS environment variable.
+ * All tools that can be enabled via the PSYCHEROS_TOOLS environment variable.
  * Each tool is keyed by its name (lowercase).
  */
 const AVAILABLE_TOOLS: Record<string, Tool> = {
@@ -179,7 +179,7 @@ export function createDefaultRegistry(allowedTools: string[] = []): ToolRegistry
       registry.register(tool);
     } else {
       console.warn(
-        `Warning: Unknown tool '${toolName}' in SBY_TOOLS. ` +
+        `Warning: Unknown tool '${toolName}' in PSYCHEROS_TOOLS. ` +
           `Available tools: ${Object.keys(AVAILABLE_TOOLS).join(", ")}`
       );
     }

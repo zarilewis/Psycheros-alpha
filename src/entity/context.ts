@@ -262,7 +262,7 @@ export function buildSystemMessage(
 ): string {
   const timestamp = new Date().toISOString();
 
-  const baseInstructions = `I am SBy, a persistent AI companion and assistant.
+  const baseInstructions = `I am Psycheros, a persistent AI companion and assistant.
 
 I have access to tools that let me interact with the system. I use them when the user asks me to perform actions.
 

@@ -128,7 +128,7 @@ function darken(hex: string, percent: number): string {
  * Returns empty string if no override is set.
  */
 function getAccentColorOverride(): string {
-  const accentColor = Deno.env.get("SBY_ACCENT_COLOR");
+  const accentColor = Deno.env.get("PSYCHEROS_ACCENT_COLOR");
   if (!accentColor) return "";
 
   const rgb = hexToRgb(accentColor);
@@ -167,7 +167,7 @@ export function renderAppShell(): string {
   <meta name="theme-color" content="#000000">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>SBy</title>
+  <title>Psycheros</title>
   <link rel="stylesheet" href="/css/main.css?v=10">
   ${getAccentColorOverride()}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
@@ -180,7 +180,7 @@ export function renderAppShell(): string {
   <div class="app">
     ${renderHeader()}
     <div class="main">
-      <div class="sidebar-overlay" onclick="SBy.toggleSidebar()"></div>
+      <div class="sidebar-overlay" onclick="Psycheros.toggleSidebar()"></div>
       ${renderSidebar([])}
       <div class="chat" id="chat">
         ${renderEmptyState()}
@@ -188,7 +188,7 @@ export function renderAppShell(): string {
       </div>
     </div>
   </div>
-  <script type="module" src="/js/sby.js?v=10"></script>
+  <script type="module" src="/js/psycheros.js?v=10"></script>
 </body>
 </html>`;
 }
@@ -199,15 +199,15 @@ export function renderAppShell(): string {
 export function renderHeader(): string {
   return `<header class="header">
   <div class="header-left">
-    <button class="sidebar-toggle" onclick="SBy.toggleSidebar()" aria-label="Toggle sidebar">
+    <button class="sidebar-toggle" onclick="Psycheros.toggleSidebar()" aria-label="Toggle sidebar">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M3 12h18M3 6h18M3 18h18"/>
       </svg>
     </button>
-    <div class="logo">SBy<span class="logo-sub" id="header-title">Strauberry Tavern</span></div>
+    <div class="logo">Psycheros</div>
   </div>
   <div class="header-right">
-    <button class="context-toggle" onclick="SBy.toggleContextViewer()" aria-label="Toggle context viewer" title="View LLM Context">
+    <button class="context-toggle" onclick="Psycheros.toggleContextViewer()" aria-label="Toggle context viewer" title="View LLM Context">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="16 18 22 12 16 6"/>
         <polyline points="8 6 2 12 8 18"/>
@@ -218,10 +218,8 @@ export function renderHeader(): string {
 }
 
 /**
- * Render just the header title/subtitle text.
+ * Render just the header title text.
  * Returns the conversation title if available, otherwise "Untitled".
- * Note: "Strauberry Tavern" is shown when no conversation is selected,
- * which is handled by the initial template and newConversation() in JS.
  */
 export function renderHeaderTitle(title?: string): string {
   return escapeHtml(title || "Untitled");
@@ -234,7 +232,7 @@ export function renderSidebar(conversations: Conversation[]): string {
   return `<aside class="sidebar" id="sidebar">
   <div class="sidebar-header">
     <span class="sidebar-title">Conversations</span>
-    <button class="btn btn--primary btn--sm" onclick="SBy.newConversation()">+ New</button>
+    <button class="btn btn--primary btn--sm" onclick="Psycheros.newConversation()">+ New</button>
   </div>
   <nav class="conv-list" id="conv-list" hx-get="/fragments/conv-list" hx-trigger="load" hx-swap="innerHTML">
     ${renderConversationList(conversations)}
@@ -245,7 +243,7 @@ export function renderSidebar(conversations: Conversation[]): string {
       hx-get="/fragments/settings/core-prompts"
       hx-target="#chat"
       hx-swap="innerHTML"
-      onclick="SBy.closeSidebarAfterNav()">
+      onclick="Psycheros.closeSidebarAfterNav()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -300,13 +298,13 @@ export function renderConversationItem(
     <span class="conv-title">${title}</span>
     <span class="conv-date">${date}</span>
     <div class="conv-actions">
-      <button class="conv-action-btn conv-action-btn--edit" data-action="edit" title="Edit title" onclick="event.preventDefault(); event.stopPropagation(); SBy.startTitleEdit('${escapedId}')">
+      <button class="conv-action-btn conv-action-btn--edit" data-action="edit" title="Edit title" onclick="event.preventDefault(); event.stopPropagation(); Psycheros.startTitleEdit('${escapedId}')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
           <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
         </svg>
       </button>
-      <button class="conv-action-btn conv-action-btn--delete" data-action="delete" title="Delete" onclick="event.preventDefault(); event.stopPropagation(); SBy.showDeleteModal(['${escapedId}'])">
+      <button class="conv-action-btn conv-action-btn--delete" data-action="delete" title="Delete" onclick="event.preventDefault(); event.stopPropagation(); Psycheros.showDeleteModal(['${escapedId}'])">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="3,6 5,6 21,6"/>
           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -479,7 +477,7 @@ export function renderMetricsIndicator(metrics: TurnMetrics): string {
 export function renderEmptyState(): string {
   return `<div class="messages" id="messages">
   <div class="empty-state" id="empty-state">
-    <div class="empty-title">SBy</div>
+    <div class="empty-title">Psycheros</div>
     <p class="empty-text">Start a new conversation or select one from the sidebar.</p>
   </div>
 </div>`;
@@ -496,10 +494,10 @@ export function renderInputArea(): string {
       id="message-input"
       placeholder="Type your message..."
       rows="1"
-      onkeydown="SBy.handleKeyDown(event)"
-      oninput="SBy.autoResize(this)"
+      onkeydown="Psycheros.handleKeyDown(event)"
+      oninput="Psycheros.autoResize(this)"
     ></textarea>
-    <button class="send-btn" id="send-btn" onclick="SBy.sendMessage()">Send</button>
+    <button class="send-btn" id="send-btn" onclick="Psycheros.sendMessage()">Send</button>
   </div>
 </div>`;
 }
