@@ -12,6 +12,12 @@ import { updateTitleTool } from "./update_title.ts";
 import { getMetricsTool } from "./get_metrics.ts";
 import { createSignificantMemoryTool } from "./create-significant-memory.ts";
 import { syncMcpTool } from "./sync-mcp.ts";
+// Identity tools
+import { appendToSelfTool } from "./identity-casual.ts";
+import { appendToUserTool } from "./identity-casual.ts";
+import { appendToRelationshipTool } from "./identity-casual.ts";
+import { maintainIdentityTool } from "./identity-maintain.ts";
+import { listIdentitySnapshotsTool } from "./identity-maintain.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -27,6 +33,13 @@ const AVAILABLE_TOOLS: Record<string, Tool> = {
   get_metrics: getMetricsTool,
   create_significant_memory: createSignificantMemoryTool,
   sync_mcp: syncMcpTool,
+  // Tier 1: Casual identity tools (append-only, safe for everyday use)
+  append_to_self: appendToSelfTool,
+  append_to_user: appendToUserTool,
+  append_to_relationship: appendToRelationshipTool,
+  // Tier 2: Maintenance tools (full suite for intentional reorganization)
+  maintain_identity: maintainIdentityTool,
+  list_identity_snapshots: listIdentitySnapshotsTool,
 };
 
 /**

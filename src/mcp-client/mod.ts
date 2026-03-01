@@ -407,6 +407,138 @@ export class MCPClient {
   }
 
   /**
+   * Append content to an identity file via MCP.
+   * Calls the identity_append tool on entity-core for server-side manipulation.
+   */
+  async appendIdentityFile(
+    category: "self" | "user" | "relationship",
+    filename: string,
+    content: string,
+    reason?: string,
+    localBasePath?: string,
+  ): Promise<{ success: boolean; content?: string; message?: string }> {
+    if (!this.client) {
+      return { success: false, message: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "identity_append",
+        arguments: {
+          category,
+          filename,
+          content,
+          reason,
+          instanceId: this.config.instanceId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        if (response.success && localBasePath) {
+          // Update local cache
+          await Deno.writeTextFile(`${localBasePath}/${category}/${filename}`, response.content);
+          this.updateLocalCache(category, filename, response.content, new Date().toISOString());
+        }
+        return response;
+      }
+      return { success: false, message: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] identity_append failed:", error);
+      return { success: false, message: String(error) };
+    }
+  }
+
+  /**
+   * Prepend content to an identity file via MCP.
+   * Calls the identity_prepend tool on entity-core for server-side manipulation.
+   */
+  async prependIdentityFile(
+    category: "self" | "user" | "relationship",
+    filename: string,
+    content: string,
+    reason?: string,
+    localBasePath?: string,
+  ): Promise<{ success: boolean; content?: string; message?: string }> {
+    if (!this.client) {
+      return { success: false, message: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "identity_prepend",
+        arguments: {
+          category,
+          filename,
+          content,
+          reason,
+          instanceId: this.config.instanceId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        if (response.success && localBasePath) {
+          await Deno.writeTextFile(`${localBasePath}/${category}/${filename}`, response.content);
+          this.updateLocalCache(category, filename, response.content, new Date().toISOString());
+        }
+        return response;
+      }
+      return { success: false, message: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] identity_prepend failed:", error);
+      return { success: false, message: String(error) };
+    }
+  }
+
+  /**
+   * Update a section in an identity file via MCP.
+   * Calls the identity_update_section tool on entity-core for server-side manipulation.
+   */
+  async updateIdentitySection(
+    category: "self" | "user" | "relationship",
+    filename: string,
+    section: string,
+    content: string,
+    reason?: string,
+    localBasePath?: string,
+  ): Promise<{ success: boolean; content?: string; message?: string }> {
+    if (!this.client) {
+      return { success: false, message: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "identity_update_section",
+        arguments: {
+          category,
+          filename,
+          section,
+          content,
+          reason,
+          instanceId: this.config.instanceId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        if (response.success && localBasePath) {
+          await Deno.writeTextFile(`${localBasePath}/${category}/${filename}`, response.content);
+          this.updateLocalCache(category, filename, response.content, new Date().toISOString());
+        }
+        return response;
+      }
+      return { success: false, message: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] identity_update_section failed:", error);
+      return { success: false, message: String(error) };
+    }
+  }
+
+  /**
    * Update the local cache with a new/modified file.
    */
   private updateLocalCache(

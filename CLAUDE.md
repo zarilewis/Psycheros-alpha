@@ -65,6 +65,9 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/server/state-changes.ts` | Unified state mutations |
 | `src/server/templates.ts` | HTML templates including header with context viewer |
 | `src/tools/registry.ts` | Tool registration |
+| `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
+| `src/tools/identity-casual.ts` | Tier 1 identity tools (append-only) |
+| `src/tools/identity-maintain.ts` | Tier 2 identity tools (maintenance) |
 | `src/metrics/mod.ts` | Streaming performance metrics |
 | `src/memory/mod.ts` | Hierarchical memory system |
 | `src/memory/types.ts` | Memory types with instance tagging |
@@ -88,6 +91,14 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 1. Create `src/tools/my-tool.ts` with `Tool` interface
 2. Register in `createDefaultRegistry()` in `registry.ts`
 3. For UI updates: use state-change function, return `affectedRegions`
+
+**Identity Tools** (for modifying identity files):
+- Two tiers: Tier 1 (casual, append-only) and Tier 2 (maintenance, full suite)
+- Tier 1: `append_to_self`, `append_to_user`, `append_to_relationship`
+- Tier 2: `maintain_identity`, `list_identity_snapshots`
+- All tools route through MCP when connected, fall back to local files when offline
+- Changes are timestamped and preserve XML tag structure
+- Enable via `PSYCHEROS_TOOLS=append_to_self,append_to_user,append_to_relationship,maintain_identity`
 
 **State Changes** (for reactive UI):
 1. Add function to `state-changes.ts` returning `{ success, data, affectedRegions }`
@@ -141,4 +152,4 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 - Yielded as first event in SSE stream from `EntityTurn.process()`
 
 # currentDate
-Today's date is 2026-02-27.
+Today's date is 2026-02-28.

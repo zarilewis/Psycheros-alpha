@@ -35,6 +35,21 @@ open http://localhost:3000
 | `PSYCHEROS_TOOLS` | No | (none) | Comma-separated list of enabled tools |
 | `PSYCHEROS_MEMORY_HOUR` | No | `4` | Hour to run daily summarization (0-23) |
 
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `shell` | Execute shell commands |
+| `update_title` | Update conversation titles |
+| `get_metrics` | Retrieve streaming performance metrics |
+| `create_significant_memory` | Create permanent memory files |
+| `sync_mcp` | Sync with entity-core |
+| `append_to_self` | Add knowledge about entity (Tier 1) |
+| `append_to_user` | Add knowledge about user (Tier 1) |
+| `append_to_relationship` | Add relationship understanding (Tier 1) |
+| `maintain_identity` | Full identity file maintenance (Tier 2) |
+| `list_identity_snapshots` | View available backups (Tier 2) |
+
 ### RAG Settings
 
 | Variable | Default | Description |
@@ -139,7 +154,10 @@ src/
 │   ├── shell.ts      # Command execution
 │   ├── update_title.ts
 │   ├── get_metrics.ts # Streaming performance metrics tool
-│   └── create-significant-memory.ts # Permanent memory creation
+│   ├── create-significant-memory.ts # Permanent memory creation
+│   ├── identity-helpers.ts # Identity file utilities (XML, MCP fallback)
+│   ├── identity-casual.ts  # Tier 1: append-only identity tools
+│   └── identity-maintain.ts # Tier 2: maintenance identity tools
 ├── metrics/          # Performance instrumentation
 │   ├── mod.ts
 │   ├── types.ts      # MetricsCollector interface
@@ -271,6 +289,42 @@ relationship/   # Shared dynamics
 ```
 
 When MCP is enabled, these are loaded from entity-core. Otherwise, they're read from local files.
+
+### Identity Tools
+
+The entity can modify its identity files through tools. Two tiers are available:
+
+**Tier 1: Casual Tools (Append-Only)**
+Safe for everyday use - can only add content, never modify or delete.
+
+- `append_to_self` - Add new self-knowledge (who I am, how I work)
+- `append_to_user` - Add new user knowledge (preferences, patterns, life)
+- `append_to_relationship` - Add relationship understanding (dynamics, history)
+
+**Tier 2: Maintenance Tools (Full Suite)**
+For intentional reorganization - includes prepend, section updates, and replacement.
+
+- `maintain_identity` - Full file maintenance with operations: append, prepend, update_section, replace
+- `list_identity_snapshots` - View available backups created during replace operations
+
+**MCP Fallback Pattern:**
+```
+Tool called → MCP connected?
+                ↓ Yes          ↓ No
+         Call MCP tool    Write local file
+                ↓                ↓
+         Server-side       Queue for sync
+         manipulation
+```
+
+**Enable identity tools:**
+```bash
+# Tier 1 only (safe for everyday use)
+PSYCHEROS_TOOLS=append_to_self,append_to_user,append_to_relationship
+
+# All tools including maintenance
+PSYCHEROS_TOOLS=append_to_self,append_to_user,append_to_relationship,maintain_identity,list_identity_snapshots
+```
 
 ### Dual SSE Architecture
 
