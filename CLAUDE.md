@@ -152,4 +152,4 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 - Yielded as first event in SSE stream from `EntityTurn.process()`
 
 # currentDate
-Today's date is 2026-02-28.
+Today's date is 2026-03-01.

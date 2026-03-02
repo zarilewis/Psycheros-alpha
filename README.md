@@ -68,7 +68,7 @@ open http://localhost:3000
 | `PSYCHEROS_MCP_ARGS` | `run -A ~/projects/entity-core/src/mod.ts` | Arguments for entity-core |
 | `PSYCHEROS_MCP_INSTANCE` | `psycheros-harness` | Instance ID for this embodiment |
 
-When MCP is enabled, Psycheros pulls identity files (self/, user/, relationship/) from entity-core on startup and syncs changes back periodically.
+When MCP is enabled, Psycheros pulls identity files (identity/self/, identity/user/, identity/relationship/, identity/custom/) from entity-core on startup and syncs changes back periodically.
 
 ## Design Philosophy
 
@@ -264,34 +264,32 @@ deno run -A scripts/index-messages.ts --force   # Re-index all messages
 
 ### Core Prompts
 
-The entity's personality and relationship context are stored in versioned markdown files:
+The entity's personality and relationship context are stored in versioned markdown files under the `identity/` directory:
 
 ```
-self/           # Entity identity
-├── my_identity.md
-├── my_persona.md
-├── my_personhood.md
-├── my_wants.md
-└── my_mechanics.md
-
-user/           # User knowledge
-├── user_identity.md
-├── user_life.md
-├── user_beliefs.md
-├── user_preferences.md
-├── user_patterns.md
-└── user_notes.md
-
-relationship/   # Shared dynamics
-├── relationship_dynamics.md
-├── relationship_history.md
-└── relationship_notes.md
-
-custom/         # Custom identity files (user-defined)
-└── *.md        # Any valid .md filename (letters, numbers, underscores)
+identity/
+├── self/           # Entity identity
+│   ├── my_identity.md
+│   ├── my_persona.md
+│   ├── my_personhood.md
+│   ├── my_wants.md
+│   └── my_mechanics.md
+├── user/           # User knowledge
+│   ├── user_identity.md
+│   ├── user_life.md
+│   ├── user_beliefs.md
+│   ├── user_preferences.md
+│   ├── user_patterns.md
+│   └── user_notes.md
+├── relationship/   # Shared dynamics
+│   ├── relationship_dynamics.md
+│   ├── relationship_history.md
+│   └── relationship_notes.md
+└── custom/         # Custom identity files (user-defined)
+    └── *.md        # Any valid .md filename (letters, numbers, underscores)
 ```
 
-**Custom Files**: The `custom/` directory allows creating arbitrary identity files with any valid filename. These are useful for storing specialized context (e.g., `project_notes.md`, `favorite_books.md`). Custom files:
+**Custom Files**: The `identity/custom/` directory allows creating arbitrary identity files with any valid filename. These are useful for storing specialized context (e.g., `project_notes.md`, `favorite_books.md`). Custom files:
 - Must use single-word filenames (letters, numbers, underscores only)
 - Are automatically wrapped in XML tags matching the filename
 - Can be created and deleted via the Settings → Core Prompts UI
@@ -415,9 +413,7 @@ Psycheros/
 │   ├── icons/         # PWA icons
 │   ├── manifest.json  # PWA manifest
 │   └── sw.js          # Service worker
-├── self/              # Entity identity prompts (local fallback)
-├── user/              # User knowledge prompts (local fallback)
-├── relationship/      # Relationship context prompts (local fallback)
+├── identity/          # Identity files (self, user, relationship, custom)
 ├── memories/          # Hierarchical memory storage
 └── .psycheros/        # Runtime data (SQLite DB)
 ```
