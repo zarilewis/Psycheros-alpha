@@ -30,7 +30,7 @@ import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics, LLMContextSn
 import type { Retriever } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
-import { loadSelfContent, loadUserContent, loadRelationshipContent, buildSystemMessage } from "./context.ts";
+import { loadSelfContent, loadUserContent, loadRelationshipContent, loadCustomContent, buildSystemMessage } from "./context.ts";
 import { buildRAGContext, formatChatHistoryForContext } from "../rag/mod.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
 import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
@@ -112,11 +112,12 @@ export class EntityTurn {
       );
     }
 
-    // Load self files, user files, and relationship files, build system message
+    // Load self files, user files, relationship files, and custom files, build system message
     // Use MCP client if available, otherwise fall back to local files
     const selfContent = await loadSelfContent(this.config.projectRoot, this.config.mcpClient);
     const userContent = await loadUserContent(this.config.projectRoot, this.config.mcpClient);
     const relationshipContent = await loadRelationshipContent(this.config.projectRoot, this.config.mcpClient);
+    const customContent = await loadCustomContent(this.config.projectRoot, this.config.mcpClient);
 
     // Retrieve relevant memories using RAG if available
     let memoriesContent: string | undefined;
@@ -166,7 +167,7 @@ export class EntityTurn {
       }
     }
 
-    const systemMessage = buildSystemMessage(selfContent, userContent, relationshipContent, memoriesContent, chatHistoryContent);
+    const systemMessage = buildSystemMessage(selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent);
 
     // Get conversation history from DB
     const history = this.db.getMessages(conversationId);

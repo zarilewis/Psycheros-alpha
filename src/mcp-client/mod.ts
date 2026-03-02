@@ -33,7 +33,7 @@ function extractTextContent(result: unknown): string | null {
  * Identity file structure from entity-core.
  */
 export interface IdentityFile {
-  category: "self" | "user" | "relationship";
+  category: "self" | "user" | "relationship" | "custom";
   filename: string;
   content: string;
   version: number;
@@ -48,6 +48,7 @@ export interface IdentityContent {
   self: IdentityFile[];
   user: IdentityFile[];
   relationship: IdentityFile[];
+  custom: IdentityFile[];
 }
 
 /**
@@ -118,7 +119,7 @@ export class MCPClient {
     lastSync: null,
   };
   private pendingIdentityChanges: Array<{
-    category: "self" | "user" | "relationship";
+    category: "self" | "user" | "relationship" | "custom";
     filename: string;
     content: string;
   }> = [];
@@ -331,13 +332,13 @@ export class MCPClient {
    * It pushes to entity-core, updates the local cache, and writes to local files
    * as an offline cache.
    *
-   * @param category - The identity category (self, user, relationship)
+   * @param category - The identity category (self, user, relationship, custom)
    * @param filename - The filename to write
    * @param content - The file content
    * @param localBasePath - Base path for local file storage (project root)
    */
   async writeIdentityFile(
-    category: "self" | "user" | "relationship",
+    category: "self" | "user" | "relationship" | "custom",
     filename: string,
     content: string,
     localBasePath: string,
@@ -411,7 +412,7 @@ export class MCPClient {
    * Calls the identity_append tool on entity-core for server-side manipulation.
    */
   async appendIdentityFile(
-    category: "self" | "user" | "relationship",
+    category: "self" | "user" | "relationship" | "custom",
     filename: string,
     content: string,
     reason?: string,
@@ -455,7 +456,7 @@ export class MCPClient {
    * Calls the identity_prepend tool on entity-core for server-side manipulation.
    */
   async prependIdentityFile(
-    category: "self" | "user" | "relationship",
+    category: "self" | "user" | "relationship" | "custom",
     filename: string,
     content: string,
     reason?: string,
@@ -498,7 +499,7 @@ export class MCPClient {
    * Calls the identity_update_section tool on entity-core for server-side manipulation.
    */
   async updateIdentitySection(
-    category: "self" | "user" | "relationship",
+    category: "self" | "user" | "relationship" | "custom",
     filename: string,
     section: string,
     content: string,
@@ -539,10 +540,57 @@ export class MCPClient {
   }
 
   /**
+   * Delete a custom identity file via MCP.
+   * Calls the identity_delete_custom tool on entity-core.
+   * Only custom files can be deleted.
+   */
+  async deleteCustomFile(
+    filename: string,
+    localBasePath?: string,
+  ): Promise<{ success: boolean; message?: string }> {
+    if (!this.client) {
+      return { success: false, message: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "identity_delete_custom",
+        arguments: {
+          filename,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        if (response.success && localBasePath) {
+          // Delete from local cache
+          if (this.cache.identity?.custom) {
+            this.cache.identity.custom = this.cache.identity.custom.filter(
+              (f) => f.filename !== filename,
+            );
+          }
+          // Delete local file
+          try {
+            await Deno.remove(`${localBasePath}/custom/${filename}`);
+          } catch {
+            // File may not exist locally, that's fine
+          }
+        }
+        return response;
+      }
+      return { success: false, message: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] identity_delete_custom failed:", error);
+      return { success: false, message: String(error) };
+    }
+  }
+
+  /**
    * Update the local cache with a new/modified file.
    */
   private updateLocalCache(
-    category: "self" | "user" | "relationship",
+    category: "self" | "user" | "relationship" | "custom",
     filename: string,
     content: string,
     lastModified: string,
@@ -553,6 +601,7 @@ export class MCPClient {
         self: [],
         user: [],
         relationship: [],
+        custom: [],
       };
     }
 
@@ -579,7 +628,7 @@ export class MCPClient {
    * Queue an identity file change for sync.
    */
   queueIdentityChange(
-    category: "self" | "user" | "relationship",
+    category: "self" | "user" | "relationship" | "custom",
     filename: string,
     content: string,
   ): void {

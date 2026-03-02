@@ -941,7 +941,7 @@ export function handleEvents(_ctx: RouteContext, request: Request): Response {
 /**
  * Valid prompt directories for file operations.
  */
-const VALID_PROMPT_DIRS = ["self", "user", "relationship"];
+const VALID_PROMPT_DIRS = ["self", "user", "relationship", "custom"];
 
 /**
  * Security check for directory parameter.
@@ -954,16 +954,22 @@ function isValidDirectory(dir: string): boolean {
 /**
  * Security check for filename parameter.
  * Only allows .md files with safe names.
+ * For custom files, only allows single words (letters, numbers, underscores).
  */
-function isValidFilename(filename: string): boolean {
+function isValidFilename(filename: string, isCustom: boolean = false): boolean {
   // Must end with .md
   if (!filename.endsWith(".md")) return false;
   // No path separators
   if (filename.includes("/") || filename.includes("\\")) return false;
   // No parent directory references
   if (filename.includes("..")) return false;
-  // Must be a reasonable filename (alphanumeric, underscores, hyphens)
+  // Must be a reasonable filename
   const baseName = filename.slice(0, -3); // Remove .md
+  if (isCustom) {
+    // Custom files: single word only (letters, numbers, underscores - no spaces or hyphens)
+    return /^[a-zA-Z0-9_]+$/.test(baseName);
+  }
+  // Standard files: alphanumeric, underscores, hyphens (no spaces)
   return /^[a-zA-Z0-9_-]+$/.test(baseName);
 }
 
@@ -1017,7 +1023,7 @@ export async function handleSettingsFileListFragment(
     // Sort files alphabetically
     files.sort();
 
-    const html = renderFileList(directory as "self" | "user" | "relationship", files);
+    const html = renderFileList(directory as "self" | "user" | "relationship" | "custom", files);
     return new Response(html, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
@@ -1025,6 +1031,17 @@ export async function handleSettingsFileListFragment(
     });
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
+      // For custom directory, create it and return empty list
+      if (directory === "custom") {
+        const customDir = `${ctx.projectRoot}/custom`;
+        await Deno.mkdir(customDir, { recursive: true });
+        const html = renderFileList("custom", []);
+        return new Response(html, {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
+        });
+      }
       return new Response("Directory not found", {
         status: 404,
         headers: { "Content-Type": "text/plain" },
@@ -1056,7 +1073,8 @@ export async function handleSettingsFileEditorFragment(
     });
   }
 
-  if (!isValidFilename(filename)) {
+  const isCustom = directory === "custom";
+  if (!isValidFilename(filename, isCustom)) {
     return new Response("Invalid filename", {
       status: 400,
       headers: { "Content-Type": "text/plain" },
@@ -1068,7 +1086,7 @@ export async function handleSettingsFileEditorFragment(
     const filePath = `${ctx.projectRoot}/${directory}/${filename}`;
     const content = await Deno.readTextFile(filePath);
 
-    const html = renderFileEditor(directory as "self" | "user" | "relationship", filename, content);
+    const html = renderFileEditor(directory as "self" | "user" | "relationship" | "custom", filename, content);
     return new Response(html, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
@@ -1109,7 +1127,8 @@ export async function handleSaveSettingsFile(
     });
   }
 
-  if (!isValidFilename(filename)) {
+  const isCustom = directory === "custom";
+  if (!isValidFilename(filename, isCustom)) {
     return new Response(renderSaveError("Invalid filename"), {
       status: 400,
       headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -1132,7 +1151,7 @@ export async function handleSaveSettingsFile(
     if (ctx.mcpClient) {
       // Use MCP client to write (pushes to entity-core, updates cache, writes local)
       await ctx.mcpClient.writeIdentityFile(
-        directory as "self" | "user" | "relationship",
+        directory as "self" | "user" | "relationship" | "custom",
         filename,
         content,
         ctx.projectRoot,
@@ -1154,6 +1173,167 @@ export async function handleSaveSettingsFile(
       status: 500,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
+  }
+}
+
+/**
+ * Handle POST /api/settings/custom/create - Create a new custom file.
+ * Creates an empty file with the given filename.
+ *
+ * @param ctx - Route context
+ * @param request - HTTP Request with body { filename: string }
+ * @returns HTTP Response redirecting to the editor for the new file
+ */
+export async function handleCreateCustomFile(
+  ctx: RouteContext,
+  request: Request
+): Promise<Response> {
+  try {
+    // Parse request body
+    const body = await request.json();
+    const filename = body.filename;
+
+    if (typeof filename !== "string" || !filename.trim()) {
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid filename" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Ensure filename ends with .md
+    const fullFilename = filename.endsWith(".md") ? filename : `${filename}.md`;
+
+    // Validate filename (custom files: single word only)
+    if (!isValidFilename(fullFilename, true)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid filename. Use only letters, numbers, and underscores (no spaces)." }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Ensure custom directory exists
+    const customDir = `${ctx.projectRoot}/custom`;
+    await Deno.mkdir(customDir, { recursive: true });
+
+    // Create file with XML tags based on filename
+    const filePath = `${customDir}/${fullFilename}`;
+    const tagName = fullFilename.replace(/\.md$/, "");
+    const initialContent = `<${tagName}>
+
+</${tagName}>
+`;
+    await Deno.writeTextFile(filePath, initialContent);
+
+    // If MCP is connected, sync the new file
+    if (ctx.mcpClient) {
+      await ctx.mcpClient.writeIdentityFile(
+        "custom",
+        fullFilename,
+        initialContent,
+        ctx.projectRoot,
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ success: true, filename: fullFilename }),
+      {
+        status: 201,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to create file";
+    return new Response(
+      JSON.stringify({ error: message }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+}
+
+/**
+ * Handle DELETE /api/settings/file/custom/:filename - Delete a custom file.
+ * Only custom files can be deleted.
+ *
+ * @param ctx - Route context
+ * @param filename - The filename to delete
+ * @returns HTTP Response with JSON result
+ */
+export async function handleDeleteCustomFile(
+  ctx: RouteContext,
+  filename: string
+): Promise<Response> {
+  // Decode filename from URL
+  const decodedFilename = decodeURIComponent(filename);
+
+  // Validate filename (custom files allow spaces)
+  if (!isValidFilename(decodedFilename, true)) {
+    return new Response(
+      JSON.stringify({ error: "Invalid filename" }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  try {
+    // If MCP is connected, use MCP to delete (which also handles local)
+    if (ctx.mcpClient) {
+      const result = await ctx.mcpClient.deleteCustomFile(decodedFilename, ctx.projectRoot);
+      if (result.success) {
+        return new Response(
+          JSON.stringify({ success: true, message: result.message }),
+          {
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      return new Response(
+        JSON.stringify({ error: result.message || "Failed to delete file" }),
+        {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Fallback: direct file delete when MCP is not enabled
+    const filePath = `${ctx.projectRoot}/custom/${decodedFilename}`;
+    await Deno.remove(filePath);
+
+    return new Response(
+      JSON.stringify({ success: true, message: "File deleted" }),
+      {
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      return new Response(
+        JSON.stringify({ error: "File not found" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+    const message = error instanceof Error ? error.message : "Failed to delete file";
+    return new Response(
+      JSON.stringify({ error: message }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 }
 

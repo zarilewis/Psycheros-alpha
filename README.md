@@ -286,7 +286,16 @@ relationship/   # Shared dynamics
 ├── relationship_dynamics.md
 ├── relationship_history.md
 └── relationship_notes.md
+
+custom/         # Custom identity files (user-defined)
+└── *.md        # Any valid .md filename (letters, numbers, underscores)
 ```
+
+**Custom Files**: The `custom/` directory allows creating arbitrary identity files with any valid filename. These are useful for storing specialized context (e.g., `project_notes.md`, `favorite_books.md`). Custom files:
+- Must use single-word filenames (letters, numbers, underscores only)
+- Are automatically wrapped in XML tags matching the filename
+- Can be created and deleted via the Settings → Core Prompts UI
+- Are sorted alphabetically (no predefined order)
 
 When MCP is enabled, these are loaded from entity-core. Otherwise, they're read from local files.
 

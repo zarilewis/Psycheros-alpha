@@ -12,7 +12,7 @@ import type { MCPClient } from "../mcp-client/mod.ts";
 // Type Definitions
 // =============================================================================
 
-export type IdentityCategory = "self" | "user" | "relationship";
+export type IdentityCategory = "self" | "user" | "relationship" | "custom";
 
 export interface IdentityFileInfo {
   category: IdentityCategory;
@@ -30,6 +30,7 @@ export interface IdentityOperationResult {
 
 /**
  * Valid filenames for each category.
+ * Custom category accepts any valid .md filename.
  */
 export const VALID_FILES: Record<IdentityCategory, readonly string[]> = {
   self: [
@@ -52,6 +53,7 @@ export const VALID_FILES: Record<IdentityCategory, readonly string[]> = {
     "relationship_history.md",
     "relationship_notes.md",
   ] as const,
+  custom: [] as const, // Custom files can have any valid filename
 };
 
 // =============================================================================
@@ -251,9 +253,38 @@ export class IdentityFileManager {
     if (!validFiles) {
       return {
         success: false,
-        message: `Invalid category: ${category}. Must be "self", "user", or "relationship".`,
+        message: `Invalid category: ${category}. Must be "self", "user", "relationship", or "custom".`,
         error: "invalid_category",
       };
+    }
+
+    // Custom category accepts any valid .md filename
+    if (category === "custom") {
+      if (!filename.endsWith(".md")) {
+        return {
+          success: false,
+          message: `Invalid filename "${filename}". Must end with .md`,
+          error: "invalid_filename",
+        };
+      }
+      // Check for path traversal and invalid characters
+      if (filename.includes("/") || filename.includes("\\") || filename.includes("..")) {
+        return {
+          success: false,
+          message: `Invalid filename "${filename}". Path separators not allowed.`,
+          error: "invalid_filename",
+        };
+      }
+      // Must be a single word (letters, numbers, underscores only - no spaces or hyphens)
+      const baseName = filename.slice(0, -3); // Remove .md
+      if (!/^[a-zA-Z0-9_]+$/.test(baseName)) {
+        return {
+          success: false,
+          message: `Invalid filename "${filename}". Use only letters, numbers, and underscores (no spaces).`,
+          error: "invalid_filename",
+        };
+      }
+      return null; // Valid custom filename
     }
 
     if (!validFiles.includes(filename as never)) {
@@ -665,6 +696,48 @@ ${content}
       return snapshots;
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Delete a custom identity file.
+   * Only custom files can be deleted; predefined files in other categories cannot.
+   */
+  async deleteCustomFile(filename: string): Promise<IdentityOperationResult> {
+    // Validate filename
+    const validation = this.validateFile("custom", filename);
+    if (validation) return validation;
+
+    // Try MCP first
+    if (this.mcpClient?.isConnected()) {
+      try {
+        const result = await this.mcpClient.deleteCustomFile(filename, this.projectRoot);
+        if (result.success) {
+          console.log(`[Identity] Deleted custom file ${filename} via MCP`);
+          return { success: true, message: result.message ?? `I've deleted my custom file: ${filename}` };
+        }
+        return { success: false, message: result.message ?? "Failed to delete custom file" };
+      } catch (e) {
+        console.warn(`[Identity] MCP delete failed, falling back to local:`, e);
+      }
+    }
+
+    // Fallback: local delete
+    try {
+      const filePath = this.getFilePath("custom", filename);
+      await Deno.remove(filePath);
+      console.log(`[Identity] Deleted custom file ${filename} locally`);
+      return { success: true, message: `I've deleted my custom file: ${filename} (deleted locally).` };
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return { success: false, message: `Custom file ${filename} not found`, error: "not_found" };
+      }
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        message: `Failed to delete custom file ${filename}: ${errorMessage}`,
+        error: "delete_failed",
+      };
     }
   }
 }

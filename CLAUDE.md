@@ -132,7 +132,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 **MCP Integration (entity-core)**:
 - Optional connection to centralized identity/memory server
 - Enabled via `PSYCHEROS_MCP_ENABLED=true`
-- Pulls identity files (self/, user/, relationship/) on startup
+- Pulls identity files (self/, user/, relationship/, custom/) on startup
 - Queues changes and syncs periodically (every 5 minutes)
 - Falls back to local files if MCP unavailable
 - Memories tagged with `sourceInstance` for relevance scoring

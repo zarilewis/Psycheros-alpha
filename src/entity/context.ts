@@ -24,6 +24,11 @@ const USER_DIR = "user";
 const RELATIONSHIP_DIR = "relationship";
 
 /**
+ * The directory name for the custom files.
+ */
+const CUSTOM_DIR = "custom";
+
+/**
  * The order in which self-files should be loaded.
  * Files not in this list will be appended at the end (alphabetically).
  */
@@ -57,6 +62,12 @@ const RELATIONSHIP_FILE_ORDER = [
   "relationship_history.md",
   "relationship_notes.md",
 ];
+
+/**
+ * Custom files have no predefined order (sorted alphabetically).
+ * This empty array indicates alphabetical sorting.
+ */
+const CUSTOM_FILE_ORDER: string[] = [];
 
 /**
  * Load all .md files from a directory and concatenate them in specified order.
@@ -159,6 +170,18 @@ export async function loadRelationshipFiles(projectRoot: string): Promise<string
 }
 
 /**
+ * Load all .md files from the custom/ directory and concatenate them.
+ * Files are sorted alphabetically (no predefined order).
+ * Returns empty string if directory doesn't exist or is empty.
+ *
+ * @param projectRoot - The root directory of the project
+ * @returns The concatenated contents of all custom/*.md files
+ */
+export async function loadCustomFiles(projectRoot: string): Promise<string> {
+  return await loadFilesFromDirectory(projectRoot, CUSTOM_DIR, CUSTOM_FILE_ORDER);
+}
+
+/**
  * Convert identity files from MCP to concatenated string.
  */
 function identityFilesToString(
@@ -242,13 +265,36 @@ export async function loadRelationshipContent(
 }
 
 /**
- * Build the system message from self/, user/, relationship/ directory content,
+ * Load custom content from MCP client or local files.
+ * Custom files are sorted alphabetically.
+ *
+ * @param projectRoot - The root directory of the project
+ * @param mcpClient - Optional MCP client for loading from entity-core
+ * @returns The concatenated contents of all custom/*.md files
+ */
+export async function loadCustomContent(
+  projectRoot: string,
+  mcpClient?: MCPClient,
+): Promise<string> {
+  if (mcpClient) {
+    const identity = await mcpClient.loadIdentity();
+    if (identity?.custom) {
+      // Custom files are sorted alphabetically
+      return identityFilesToString(identity.custom, CUSTOM_FILE_ORDER);
+    }
+  }
+  return await loadCustomFiles(projectRoot);
+}
+
+/**
+ * Build the system message from self/, user/, relationship/, custom/ directory content,
  * and optional RAG-retrieved memories and chat history.
  * This gets included at the start of every LLM request.
  *
  * @param selfContent - The concatenated contents of self/*.md files
  * @param userContent - The concatenated contents of user/*.md files
  * @param relationshipContent - The concatenated contents of relationship/*.md files
+ * @param customContent - The concatenated contents of custom/*.md files
  * @param memoriesContent - Optional RAG-retrieved memories content
  * @param chatHistoryContent - Optional chat history content from Chat RAG
  * @returns The formatted system message
@@ -257,6 +303,7 @@ export function buildSystemMessage(
   selfContent: string,
   userContent: string,
   relationshipContent: string,
+  customContent?: string,
   memoriesContent?: string,
   chatHistoryContent?: string,
 ): string {
@@ -278,9 +325,11 @@ I can also learn about the user and update files in the user/ directory to remem
 
 I can track my relationship with the user in the relationship/ directory.
 
+I can store additional context in custom files in the custom/ directory.
+
 Current timestamp: ${timestamp}`;
 
-  // Build sections for self, user, and relationship content
+  // Build sections for self, user, relationship, and custom content
   const sections: string[] = [baseInstructions];
 
   if (selfContent.trim()) {
@@ -305,6 +354,14 @@ ${userContent}`);
 Relationship files (from relationship/ directory):
 
 ${relationshipContent}`);
+  }
+
+  if (customContent?.trim()) {
+    sections.push(`---
+
+Custom files (from custom/ directory):
+
+${customContent}`);
   }
 
   // Add RAG-retrieved memories if present

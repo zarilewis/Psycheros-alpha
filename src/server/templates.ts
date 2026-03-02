@@ -588,7 +588,7 @@ export function renderToolResult(result: ToolResult): string {
 /**
  * Valid core prompt directories.
  */
-const VALID_DIRECTORIES = ["self", "user", "relationship"] as const;
+const VALID_DIRECTORIES = ["self", "user", "relationship", "custom"] as const;
 type PromptDirectory = typeof VALID_DIRECTORIES[number];
 
 /**
@@ -600,13 +600,14 @@ export function isValidPromptDirectory(dir: string): dir is PromptDirectory {
 
 /**
  * Render the Core Prompts Settings view.
- * Shows tabs for self/user/relationship directories and file list.
+ * Shows tabs for self/user/relationship/custom directories and file list.
  */
 export function renderCorePromptsSettings(activeDir: PromptDirectory = "self"): string {
   const tabs = [
     { id: "self", label: "Self" },
     { id: "user", label: "User" },
     { id: "relationship", label: "Relationship" },
+    { id: "custom", label: "Custom" },
   ];
 
   const tabsHtml = tabs.map((tab) => {
@@ -616,6 +617,7 @@ export function renderCorePromptsSettings(activeDir: PromptDirectory = "self"): 
       hx-get="/fragments/settings/core-prompts/${tab.id}"
       hx-target="#settings-content"
       hx-swap="innerHTML"
+      id="tab-${tab.id}"
     >${tab.label}</button>`;
   }).join("");
 
@@ -639,13 +641,44 @@ export function renderCorePromptsSettings(activeDir: PromptDirectory = "self"): 
 /**
  * Render the file list for a prompt directory.
  * Includes OOB swap to update the active tab state.
+ * For custom directory, includes create file input and delete buttons.
  */
 export function renderFileList(directory: PromptDirectory, files: string[]): string {
+  const isCustom = directory === "custom";
+
+  // Custom directory has special UI for creating files
+  let createFileHtml = "";
+  if (isCustom) {
+    createFileHtml = `
+      <div class="settings-create-file">
+        <input
+          type="text"
+          class="settings-create-file-input"
+          id="custom-filename-input"
+          placeholder="New file name (e.g., my_context.md)"
+          pattern="[a-zA-Z0-9_]+\\.md"
+        />
+        <button
+          class="btn btn--primary btn--sm"
+          onclick="Psycheros.createCustomFile()"
+        >
+          Create
+        </button>
+      </div>`;
+  }
+
   const fileListHtml = files.length === 0
-    ? `<div class="settings-empty">No files in this directory</div>`
+    ? `<div class="settings-empty">${isCustom ? "No custom files yet. Create one above!" : "No files in this directory"}</div>`
     : `<div class="settings-file-list">
       ${files.map((file) => {
         const displayName = file.replace(/\.md$/, "").replace(/_/g, " ");
+        const deleteButton = isCustom
+          ? `<button
+              class="settings-file-delete"
+              onclick="event.stopPropagation(); Psycheros.deleteCustomFile('${escapeHtml(file)}')"
+              title="Delete file"
+            >🗑️</button>`
+          : "";
         return `<button
           class="settings-file-item"
           hx-get="/fragments/settings/file/${directory}/${encodeURIComponent(file)}"
@@ -654,6 +687,7 @@ export function renderFileList(directory: PromptDirectory, files: string[]): str
         >
           <span class="settings-file-icon">📄</span>
           <span class="settings-file-name">${escapeHtml(displayName)}</span>
+          ${deleteButton}
         </button>`;
       }).join("")}
     </div>`;
@@ -661,16 +695,17 @@ export function renderFileList(directory: PromptDirectory, files: string[]): str
   // OOB swap to update active tab
   const oobSwap = renderTabActiveState(directory);
 
-  return fileListHtml + oobSwap;
+  return createFileHtml + fileListHtml + oobSwap;
 }
 
 /**
  * Render the active tab indicator as an OOB swap.
  */
 function renderTabActiveState(activeDir: PromptDirectory): string {
-  const tabs = ["self", "user", "relationship"];
+  const tabs = ["self", "user", "relationship", "custom"];
   return tabs.map((dir) => {
     const isActive = dir === activeDir;
+    const label = dir === "custom" ? "Custom" : dir.charAt(0).toUpperCase() + dir.slice(1);
     return `<button
       class="settings-tab${isActive ? " active" : ""}"
       hx-get="/fragments/settings/core-prompts/${dir}"
@@ -678,7 +713,7 @@ function renderTabActiveState(activeDir: PromptDirectory): string {
       hx-swap="innerHTML"
       hx-swap-oob="true"
       id="tab-${dir}"
-    >${dir.charAt(0).toUpperCase() + dir.slice(1)}</button>`;
+    >${label}</button>`;
   }).join("");
 }
 

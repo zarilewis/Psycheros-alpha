@@ -1600,6 +1600,103 @@ function renderToolsTab() {
 }
 
 // =============================================================================
+// Custom File Management
+// =============================================================================
+
+/**
+ * Create a new custom file from the filename input.
+ */
+async function createCustomFile() {
+  const input = document.getElementById('custom-filename-input');
+  if (!input) {
+    showToast('Input not found');
+    return;
+  }
+
+  let filename = input.value.trim();
+  if (!filename) {
+    showToast('Please enter a filename');
+    return;
+  }
+
+  // Add .md extension if not present
+  if (!filename.endsWith('.md')) {
+    filename = filename + '.md';
+  }
+
+  // Validate filename format (single word: letters, numbers, underscores only)
+  const baseName = filename.slice(0, -3); // Remove .md
+  if (!/^[a-zA-Z0-9_]+$/.test(baseName)) {
+    showToast('Invalid filename. Use only letters, numbers, and underscores (no spaces).');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/settings/custom/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ filename }),
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      showToast(`Created ${result.filename}`);
+      // Clear input
+      input.value = '';
+      // Reload file list
+      htmx.trigger('#settings-content', 'load');
+      // Navigate to edit the new file
+      const editUrl = `/fragments/settings/file/custom/${encodeURIComponent(result.filename)}`;
+      setTimeout(() => {
+        htmx.ajax('GET', editUrl, { target: '#settings-content', swap: 'innerHTML' });
+      }, 100);
+    } else {
+      showToast(result.error || 'Failed to create file');
+    }
+  } catch (error) {
+    console.error('Failed to create custom file:', error);
+    showToast('Failed to create file');
+  }
+}
+
+/**
+ * Delete a custom file after confirmation.
+ */
+async function deleteCustomFile(filename) {
+  if (!confirm(`Delete "${filename}"? This cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/settings/file/custom/${encodeURIComponent(filename)}`, {
+      method: 'DELETE',
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      showToast(`Deleted ${filename}`);
+      // Reload file list
+      htmx.ajax('GET', '/fragments/settings/core-prompts/custom', {
+        target: '#settings-content',
+        swap: 'innerHTML',
+      });
+    } else {
+      showToast(result.error || 'Failed to delete file');
+    }
+  } catch (error) {
+    console.error('Failed to delete custom file:', error);
+    showToast('Failed to delete file');
+  }
+}
+
+// =============================================================================
 // Global Export
 // =============================================================================
 
@@ -1624,4 +1721,7 @@ globalThis.Psycheros = {
   // Context viewer
   toggleContextViewer,
   hideContextViewer,
+  // Custom file management
+  createCustomFile,
+  deleteCustomFile,
 };

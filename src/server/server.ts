@@ -23,7 +23,9 @@ import {
   handleConversationView,
   handleCORS,
   handleCreateConversation,
+  handleCreateCustomFile,
   handleDeleteConversation,
+  handleDeleteCustomFile,
   handleEvents,
   handleGetMessages,
   handleIndex,
@@ -148,6 +150,14 @@ export class Server {
     const port = this.config.port;
 
     console.log(`Starting Psycheros server on http://${hostname}:${port}`);
+
+    // Ensure custom directory exists
+    try {
+      const customDir = join(this.config.projectRoot, "custom");
+      await Deno.mkdir(customDir, { recursive: true });
+    } catch {
+      // Directory already exists, ignore
+    }
 
     // Index memories on startup if RAG is enabled
     if (this.ragConfig.enabled && this.ragRetriever) {
@@ -396,6 +406,17 @@ export class Server {
       const directory = settingsFileMatch[1];
       const filename = settingsFileMatch[2];
       return await handleSaveSettingsFile(ctx, directory, filename, request);
+    }
+
+    // POST /api/settings/custom/create - Create custom file
+    if (method === "POST" && path === "/api/settings/custom/create") {
+      return await handleCreateCustomFile(ctx, request);
+    }
+
+    // DELETE /api/settings/file/custom/:filename - Delete custom file
+    const deleteCustomMatch = path.match(/^\/api\/settings\/file\/custom\/([^/]+)$/);
+    if (method === "DELETE" && deleteCustomMatch) {
+      return await handleDeleteCustomFile(ctx, deleteCustomMatch[1]);
     }
 
     // POST /api/memory/consolidate/:granularity - Trigger memory consolidation
