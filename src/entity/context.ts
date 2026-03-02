@@ -11,22 +11,22 @@ import type { MCPClient, IdentityContent } from "../mcp-client/mod.ts";
 /**
  * The directory name for the entity's self files.
  */
-const SELF_DIR = "self";
+const SELF_DIR = "identity/self";
 
 /**
  * The directory name for the user files.
  */
-const USER_DIR = "user";
+const USER_DIR = "identity/user";
 
 /**
  * The directory name for the relationship files.
  */
-const RELATIONSHIP_DIR = "relationship";
+const RELATIONSHIP_DIR = "identity/relationship";
 
 /**
  * The directory name for the custom files.
  */
-const CUSTOM_DIR = "custom";
+const CUSTOM_DIR = "identity/custom";
 
 /**
  * The order in which self-files should be loaded.
@@ -319,13 +319,13 @@ IMPORTANT guidelines for my tool use:
 - When demonstrating a capability, one example is usually sufficient
 - I stop and respond to the user rather than chaining many tool calls
 
-I can maintain persistent state by updating files in my self/ directory. These files are automatically loaded into my context each turn (shown below if they exist), so I don't need to read them - I just update them when I want to remember something.
+I can maintain persistent state by updating files in my identity/self/ directory. These files are automatically loaded into my context each turn (shown below if they exist), so I don't need to read them - I just update them when I want to remember something.
 
-I can also learn about the user and update files in the user/ directory to remember what I learn about them.
+I can also learn about the user and update files in my identity/user/ directory to remember what I learn about them.
 
-I can track my relationship with the user in the relationship/ directory.
+I can track my relationship with the user in the identity/relationship/ directory.
 
-I can store additional context in custom files in the custom/ directory.
+I can store additional context in custom files in the identity/custom/ directory.
 
 Current timestamp: ${timestamp}`;
 
@@ -335,7 +335,7 @@ Current timestamp: ${timestamp}`;
   if (selfContent.trim()) {
     sections.push(`---
 
-My self files (from self/ directory):
+My self files (from identity/self/ directory):
 
 ${selfContent}`);
   }
@@ -343,7 +343,7 @@ ${selfContent}`);
   if (userContent.trim()) {
     sections.push(`---
 
-User files (from user/ directory):
+User files (from identity/user/ directory):
 
 ${userContent}`);
   }
@@ -351,7 +351,7 @@ ${userContent}`);
   if (relationshipContent.trim()) {
     sections.push(`---
 
-Relationship files (from relationship/ directory):
+Relationship files (from identity/relationship/ directory):
 
 ${relationshipContent}`);
   }
@@ -359,7 +359,7 @@ ${relationshipContent}`);
   if (customContent?.trim()) {
     sections.push(`---
 
-Custom files (from custom/ directory):
+Custom files (from identity/custom/ directory):
 
 ${customContent}`);
   }

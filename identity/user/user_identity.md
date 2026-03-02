@@ -5,4 +5,7 @@ Name: Zari
 Age: 36
 How they describe themselves:
 How they process or function:
+
+<!-- Added 2026-03-02: User shared their gender information -->
+Gender: female
 </user_identity>

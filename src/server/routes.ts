@@ -1011,7 +1011,7 @@ export async function handleSettingsFileListFragment(
 
   try {
     // List .md files in the directory
-    const dirPath = `${ctx.projectRoot}/${directory}`;
+    const dirPath = `${ctx.projectRoot}/identity/${directory}`;
     const files: string[] = [];
 
     for await (const entry of Deno.readDir(dirPath)) {
@@ -1033,7 +1033,7 @@ export async function handleSettingsFileListFragment(
     if (error instanceof Deno.errors.NotFound) {
       // For custom directory, create it and return empty list
       if (directory === "custom") {
-        const customDir = `${ctx.projectRoot}/custom`;
+        const customDir = `${ctx.projectRoot}/identity/custom`;
         await Deno.mkdir(customDir, { recursive: true });
         const html = renderFileList("custom", []);
         return new Response(html, {
@@ -1083,7 +1083,7 @@ export async function handleSettingsFileEditorFragment(
 
   try {
     // Read file content
-    const filePath = `${ctx.projectRoot}/${directory}/${filename}`;
+    const filePath = `${ctx.projectRoot}/identity/${directory}/${filename}`;
     const content = await Deno.readTextFile(filePath);
 
     const html = renderFileEditor(directory as "self" | "user" | "relationship" | "custom", filename, content);
@@ -1158,7 +1158,7 @@ export async function handleSaveSettingsFile(
       );
     } else {
       // Fallback to direct file write when MCP is not enabled
-      const filePath = `${ctx.projectRoot}/${directory}/${filename}`;
+      const filePath = `${ctx.projectRoot}/identity/${directory}/${filename}`;
       await Deno.writeTextFile(filePath, content);
     }
 
@@ -1218,7 +1218,7 @@ export async function handleCreateCustomFile(
     }
 
     // Ensure custom directory exists
-    const customDir = `${ctx.projectRoot}/custom`;
+    const customDir = `${ctx.projectRoot}/identity/custom`;
     await Deno.mkdir(customDir, { recursive: true });
 
     // Create file with XML tags based on filename
@@ -1307,7 +1307,7 @@ export async function handleDeleteCustomFile(
     }
 
     // Fallback: direct file delete when MCP is not enabled
-    const filePath = `${ctx.projectRoot}/custom/${decodedFilename}`;
+    const filePath = `${ctx.projectRoot}/identity/custom/${decodedFilename}`;
     await Deno.remove(filePath);
 
     return new Response(

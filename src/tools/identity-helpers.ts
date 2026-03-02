@@ -302,7 +302,7 @@ export class IdentityFileManager {
    * Get the full path to an identity file.
    */
   getFilePath(category: IdentityCategory, filename: string): string {
-    return join(this.projectRoot, category, filename);
+    return join(this.projectRoot, "identity", category, filename);
   }
 
   /**
@@ -333,7 +333,7 @@ export class IdentityFileManager {
     const filePath = this.getFilePath(category, filename);
 
     // Ensure directory exists
-    const dirPath = join(this.projectRoot, category);
+    const dirPath = join(this.projectRoot, "identity", category);
     await Deno.mkdir(dirPath, { recursive: true });
 
     await Deno.writeTextFile(filePath, content);

@@ -396,7 +396,7 @@ export class MCPClient {
 
     // Write to local file (offline cache)
     try {
-      const filePath = `${localBasePath}/${category}/${filename}`;
+      const filePath = `${localBasePath}/identity/${category}/${filename}`;
       await Deno.writeTextFile(filePath, content);
       console.log(`[MCP] Wrote ${category}/${filename} to local cache`);
     } catch (error) {
@@ -439,7 +439,7 @@ export class MCPClient {
         const response = JSON.parse(textContent);
         if (response.success && localBasePath) {
           // Update local cache
-          await Deno.writeTextFile(`${localBasePath}/${category}/${filename}`, response.content);
+          await Deno.writeTextFile(`${localBasePath}/identity/${category}/${filename}`, response.content);
           this.updateLocalCache(category, filename, response.content, new Date().toISOString());
         }
         return response;
@@ -482,7 +482,7 @@ export class MCPClient {
       if (textContent) {
         const response = JSON.parse(textContent);
         if (response.success && localBasePath) {
-          await Deno.writeTextFile(`${localBasePath}/${category}/${filename}`, response.content);
+          await Deno.writeTextFile(`${localBasePath}/identity/${category}/${filename}`, response.content);
           this.updateLocalCache(category, filename, response.content, new Date().toISOString());
         }
         return response;
@@ -527,7 +527,7 @@ export class MCPClient {
       if (textContent) {
         const response = JSON.parse(textContent);
         if (response.success && localBasePath) {
-          await Deno.writeTextFile(`${localBasePath}/${category}/${filename}`, response.content);
+          await Deno.writeTextFile(`${localBasePath}/identity/${category}/${filename}`, response.content);
           this.updateLocalCache(category, filename, response.content, new Date().toISOString());
         }
         return response;
@@ -572,7 +572,7 @@ export class MCPClient {
           }
           // Delete local file
           try {
-            await Deno.remove(`${localBasePath}/custom/${filename}`);
+            await Deno.remove(`${localBasePath}/identity/custom/${filename}`);
           } catch {
             // File may not exist locally, that's fine
           }

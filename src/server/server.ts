@@ -151,12 +151,15 @@ export class Server {
 
     console.log(`Starting Psycheros server on http://${hostname}:${port}`);
 
-    // Ensure custom directory exists
-    try {
-      const customDir = join(this.config.projectRoot, "custom");
-      await Deno.mkdir(customDir, { recursive: true });
-    } catch {
-      // Directory already exists, ignore
+    // Ensure identity directories exist
+    const identityDirs = ["self", "user", "relationship", "custom"];
+    for (const dir of identityDirs) {
+      try {
+        const identityDir = join(this.config.projectRoot, "identity", dir);
+        await Deno.mkdir(identityDir, { recursive: true });
+      } catch {
+        // Directory already exists, ignore
+      }
     }
 
     // Index memories on startup if RAG is enabled
