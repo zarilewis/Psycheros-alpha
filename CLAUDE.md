@@ -60,7 +60,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/types.ts` | Shared types (SSEEvent, LLMContextSnapshot, ToolCall, etc.) |
 | `src/entity/loop.ts` | Agentic loop - LLM calls, tool execution, context capture |
 | `src/entity/context.ts` | Context loading (supports MCP client) |
-| `src/server/routes.ts` | API endpoints and handlers |
+| `src/server/routes.ts` | API endpoints and handlers (chat, conversations, snapshots) |
 | `src/server/broadcaster.ts` | Persistent SSE for background updates |
 | `src/server/state-changes.ts` | Unified state mutations |
 | `src/server/templates.ts` | HTML templates including header with context viewer |
@@ -152,4 +152,4 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 - Yielded as first event in SSE stream from `EntityTurn.process()`
 
 # currentDate
-Today's date is 2026-03-01.
+Today's date is 2026-03-02.

@@ -297,6 +297,25 @@ identity/
 
 When MCP is enabled, these are loaded from entity-core. Otherwise, they're read from local files.
 
+### Core Prompts UI
+
+The Settings → Core Prompts UI provides a web interface for managing identity files:
+
+**Tabs**:
+- **Self**: Entity identity files (my_identity, my_persona, etc.)
+- **User**: User knowledge files
+- **Relationship**: Relationship dynamics and history
+- **Custom**: User-defined identity files
+- **Snapshots**: Backup management (requires MCP connection)
+
+**Features**:
+- View and edit any identity file
+- Create/delete custom files
+- Create manual snapshots
+- Preview and restore from snapshots
+
+**Snapshots Tab**: When connected to entity-core, the Snapshots tab shows all available identity file backups. Snapshots are created automatically before changes and can also be created manually. Click any snapshot to preview its content and restore if needed.
+
 ### Identity Tools
 
 The entity can modify its identity files through tools. Two tiers are available:
@@ -381,6 +400,9 @@ The context is captured automatically for each message and can be inspected at a
 | `DELETE` | `/api/conversations` | Batch delete conversations |
 | `POST` | `/api/memory/consolidate/:granularity` | Trigger consolidation |
 | `POST` | `/api/settings/file/:dir/:filename` | Save core prompt file |
+| `GET` | `/api/snapshots` | List snapshots (requires MCP) |
+| `POST` | `/api/snapshots/create` | Create manual snapshot |
+| `POST` | `/api/snapshots/:id/restore` | Restore from snapshot |
 | `GET` | `/fragments/*` | HTML fragments for HTMX |
 
 ## Project Structure

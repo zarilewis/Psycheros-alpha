@@ -588,7 +588,7 @@ export function renderToolResult(result: ToolResult): string {
 /**
  * Valid core prompt directories.
  */
-const VALID_DIRECTORIES = ["self", "user", "relationship", "custom"] as const;
+const VALID_DIRECTORIES = ["self", "user", "relationship", "custom", "snapshots"] as const;
 type PromptDirectory = typeof VALID_DIRECTORIES[number];
 
 /**
@@ -608,13 +608,17 @@ export function renderCorePromptsSettings(activeDir: PromptDirectory = "self"): 
     { id: "user", label: "User" },
     { id: "relationship", label: "Relationship" },
     { id: "custom", label: "Custom" },
+    { id: "snapshots", label: "Snapshots" },
   ];
 
   const tabsHtml = tabs.map((tab) => {
     const isActive = tab.id === activeDir;
+    const getUrl = tab.id === "snapshots"
+      ? "/fragments/settings/snapshots"
+      : `/fragments/settings/core-prompts/${tab.id}`;
     return `<button
       class="settings-tab${isActive ? " active" : ""}"
-      hx-get="/fragments/settings/core-prompts/${tab.id}"
+      hx-get="${getUrl}"
       hx-target="#settings-content"
       hx-swap="innerHTML"
       id="tab-${tab.id}"
@@ -779,5 +783,180 @@ export function renderSaveSuccess(): string {
  */
 export function renderSaveError(message: string): string {
   return `<div class="settings-save-error">✗ ${escapeHtml(message)}</div>`;
+}
+
+// =============================================================================
+// Snapshot Templates
+// =============================================================================
+
+/**
+ * Render the snapshots list view.
+ *
+ * @param snapshots - Array of snapshot metadata
+ * @returns HTML string for the snapshots list
+ */
+export function renderSnapshotsView(
+  snapshots: Array<{
+    id: string;
+    category: string;
+    filename: string;
+    timestamp: string;
+    date: string;
+    reason: string;
+    source: string;
+  }>
+): string {
+  // Group snapshots by date
+  const grouped: Record<string, typeof snapshots> = {};
+  for (const snapshot of snapshots) {
+    if (!grouped[snapshot.date]) {
+      grouped[snapshot.date] = [];
+    }
+    grouped[snapshot.date].push(snapshot);
+  }
+
+  // Sort dates descending (newest first)
+  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+  if (sortedDates.length === 0) {
+    return `<div class="snapshots-empty">
+      <p>No snapshots available. Snapshots are created automatically on the scheduled hour (default 3 AM) and before major changes.</p>
+      <button
+        class="btn btn--primary"
+        hx-post="/api/snapshots/create"
+        hx-target="#settings-content"
+        hx-swap="innerHTML"
+      >Create Manual Snapshot</button>
+    </div>`;
+  }
+
+  let html = `<div class="snapshots-header">
+    <button
+      class="btn btn--primary btn--sm"
+      hx-post="/api/snapshots/create"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+    >Create Manual Snapshot</button>
+  </div>`;
+
+  for (const date of sortedDates) {
+    const dateSnapshots = grouped[date];
+    const formattedDate = formatSnapshotDate(date);
+
+    html += `<div class="snapshot-group">
+      <h3 class="snapshot-group-date">${escapeHtml(formattedDate)}</h3>`;
+
+    for (const snapshot of dateSnapshots) {
+      const formattedTime = formatTime(snapshot.timestamp);
+      const formattedReason = snapshot.reason;
+      const encodedSnapshotId = encodeURIComponent(snapshot.id);
+      const snapshotSource = snapshot.source || "entity-core";
+
+      html += `
+        <div class="snapshot-item"
+          hx-get="/fragments/settings/snapshots/${encodedSnapshotId}"
+          hx-target="#settings-content"
+          hx-swap="innerHTML"
+        >
+          <span class="snapshot-category">${escapeHtml(snapshot.category)}</span>
+          <span class="snapshot-filename">${escapeHtml(snapshot.filename.replace(/\.md$/, ""))}</span>
+          <span class="snapshot-time">${formattedTime}</span>
+          <span class="snapshot-reason">${escapeHtml(formattedReason)}</span>
+          <span class="snapshot-source">${escapeHtml(snapshotSource)}</span>
+        </div>
+      `;
+    }
+
+    html += `</div>`;
+  }
+
+  return html;
+}
+
+/**
+ * Render the snapshot preview view.
+ *
+ * @param category - The snapshot category
+ * @param filename - The original filename
+ * @param content - The snapshot content (including header comments)
+ * @returns HTML string for the snapshot preview
+ */
+export function renderSnapshotPreview(
+  category: string,
+  filename: string,
+  content: string
+): string {
+  const displayName = filename.replace(/\.md$/, "").replace(/_/g, " ");
+  const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
+
+  // Extract the actual content (skip the header comments)
+  const lines = content.split("\n");
+  let contentStart = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === "" && i > 2) {
+      contentStart = i + 1;
+      break;
+    }
+  }
+  const actualContent = lines.slice(contentStart).join("\n");
+
+  return `<div class="snapshot-preview">
+  <div class="snapshot-preview-header">
+    <button
+      class="btn btn--ghost btn--sm"
+      hx-get="/fragments/settings/snapshots"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+    >← Back to Snapshots</button>
+    <span class="snapshot-preview-filename">${escapeHtml(categoryLabel)} / ${escapeHtml(displayName)}</span>
+  </div>
+  <div class="snapshot-preview-content">
+    <pre>${escapeHtml(actualContent)}</pre>
+  </div>
+  <div class="snapshot-preview-actions">
+    <button
+      class="btn btn--danger"
+      hx-post="/api/snapshots/${encodeURIComponent(`${category}/${filename.replace(/\.md$/, "")}`)}/restore"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-confirm="Are you sure you want to restore this snapshot? This will replace the current ${categoryLabel} / ${displayName} file."
+    >Restore Snapshot</button>
+  </div>
+</div>`;
+}
+
+/**
+ * Format a date string for snapshot display.
+ */
+function formatSnapshotDate(dateStr: string): string {
+  const today = new Date().toISOString().split("T")[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+
+  if (dateStr === today) {
+    return "Today";
+  } else if (dateStr === yesterday) {
+    return "Yesterday";
+  } else {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString(undefined, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }
+}
+
+/**
+ * Format a timestamp for display (just the time portion).
+ */
+function formatTime(timestamp: string): string {
+  // Convert dashes back to colons for time portion (2026-03-02T07-24-15-996Z -> 2026-03-02T07:24:15.996Z)
+  const isoTimestamp = timestamp.replace(/T(\d+)-(\d+)-(\d+)-(\d+)Z$/, 'T$1:$2:$3.$4Z');
+  const date = new Date(isoTimestamp);
+  return date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 

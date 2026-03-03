@@ -27,6 +27,9 @@ import {
   renderFileEditor,
   renderSaveSuccess,
   renderSaveError,
+  renderSnapshotsView,
+  renderSnapshotPreview,
+  escapeHtml,
   type MetricsMap,
 } from "./templates.ts";
 import { updateConversationTitle, deleteConversation, deleteConversations } from "./state-changes.ts";
@@ -1554,4 +1557,305 @@ export async function handleMcpSync(ctx: RouteContext): Promise<Response> {
       }
     );
   }
+}
+
+// =============================================================================
+// Snapshot Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/snapshots - List all snapshots
+ *
+ * Returns snapshots grouped by category with metadata.
+ *
+ * @param ctx - Route context
+ * @returns HTTP Response with JSON result
+ */
+export async function handleListSnapshots(
+  ctx: RouteContext
+): Promise<Response> {
+  // Snapshots are centralized in entity-core - require MCP connection
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Snapshots require entity-core connection. Please enable MCP." }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const result = await ctx.mcpClient.listSnapshots();
+
+  if (!result.success) {
+    return new Response(
+      JSON.stringify({ success: false, error: result.error }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  return new Response(JSON.stringify(result), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle GET /api/snapshots/:id - Get snapshot content
+ *
+ * @param ctx - Route context
+ * @param snapshotId - The snapshot ID (category/filename_timestamp)
+ * @returns HTTP Response with JSON result
+ */
+export async function handleGetSnapshot(
+  ctx: RouteContext,
+  snapshotId: string
+): Promise<Response> {
+  // Snapshots are centralized in entity-core - require MCP connection
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Snapshots require entity-core connection. Please enable MCP." }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const result = await ctx.mcpClient.getSnapshotContent(snapshotId);
+
+  if (!result.success) {
+    return new Response(
+      JSON.stringify({ success: false, error: result.error }),
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  return new Response(JSON.stringify(result), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/snapshots/:id/restore - Restore snapshot
+ *
+ * @param ctx - Route context
+ * @param snapshotId - The snapshot ID to restore
+ * @returns HTTP Response with JSON result
+ */
+export async function handleRestoreSnapshot(
+  ctx: RouteContext,
+  snapshotId: string
+): Promise<Response> {
+  // Snapshots are centralized in entity-core - require MCP connection
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Snapshots require entity-core connection. Please enable MCP.",
+      }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const result = await ctx.mcpClient.restoreSnapshot(snapshotId);
+
+  if (!result.success) {
+    return new Response(
+      JSON.stringify({ success: false, error: result.error }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  return new Response(JSON.stringify(result), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/snapshots/create - Create manual snapshot
+ *
+ * @param ctx - Route context
+ * @returns HTTP Response with JSON result
+ */
+export async function handleCreateSnapshot(
+  ctx: RouteContext
+): Promise<Response> {
+  // Snapshots are centralized in entity-core - require MCP connection
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: "Snapshots require entity-core connection. Please enable MCP.",
+      }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const result = await ctx.mcpClient.createSnapshot();
+
+  if (!result.success) {
+    const html = `<div class="snapshot-error">Failed to create snapshot: ${result.error}</div>`;
+    return new Response(html, {
+      status: 500,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  }
+
+  // Fetch updated list and return HTML
+  const listResult = await ctx.mcpClient.listSnapshots();
+  const html = renderSnapshotsView(listResult.snapshots || []);
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/snapshots - Snapshot list fragment
+ *
+ * @param ctx - Route context
+ * @returns HTTP Response with HTML fragment
+ */
+export async function handleSnapshotsFragment(
+  ctx: RouteContext
+): Promise<Response> {
+  // Snapshots are centralized in entity-core - require MCP connection
+  if (!ctx.mcpClient) {
+    const html = `<div class="snapshot-error">Snapshots require entity-core connection. Please enable MCP.</div>`;
+    return new Response(html, {
+      status: 503,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  }
+
+  const result = await ctx.mcpClient.listSnapshots();
+  const html = renderSnapshotsView(result.snapshots || []);
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/snapshots/:id - Snapshot preview fragment
+ *
+ * @param ctx - Route context
+ * @param snapshotId - The snapshot ID to preview
+ * @returns HTTP Response with HTML fragment
+ */
+export async function handleSnapshotPreviewFragment(
+  ctx: RouteContext,
+  snapshotId: string
+): Promise<Response> {
+  // Snapshots are centralized in entity-core - require MCP connection
+  if (!ctx.mcpClient) {
+    return new Response(
+      `<div class="snapshot-error">Snapshots require entity-core connection. Please enable MCP.</div>`,
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+        },
+      }
+    );
+  }
+
+  // Decode URL-encoded snapshot ID (e.g., self%2Ffilename -> self/filename)
+  const decodedId = decodeURIComponent(snapshotId);
+  const result = await ctx.mcpClient.getSnapshotContent(decodedId);
+
+  if (!result.success || !result.content) {
+    return new Response(
+      `<div class="snapshot-error">Failed to load snapshot: ${escapeHtml(result.error || "Unknown error")}</div>`,
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+        },
+      }
+    );
+  }
+
+  // Parse snapshot ID to get category and filename
+  const match = decodedId.match(/^(.+)\/(.+)_\d{4}-\d{2}-\d{2}T[\d-]+Z$/);
+  if (!match) {
+    return new Response(
+      `<div class="snapshot-error">Invalid snapshot ID</div>`,
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+        },
+      }
+    );
+  }
+
+  const [, category, filenamePart] = match;
+  const filename = `${filenamePart}.md`;
+
+  // Import SnapshotCategory from the types file - use string type
+  type SnapshotCategoryType = "self" | "user" | "relationship" | "custom";
+
+  const html = renderSnapshotPreview(
+    category as SnapshotCategoryType,
+    filename,
+    result.content
+  );
+
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
 }
