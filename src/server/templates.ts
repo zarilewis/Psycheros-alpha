@@ -8,6 +8,7 @@
  */
 
 import type { Conversation, Message, ToolCall, ToolResult, TurnMetrics } from "../types.ts";
+import type { Lorebook, LorebookEntry } from "../lorebook/mod.ts";
 
 // =============================================================================
 // Utilities
@@ -249,6 +250,17 @@ export function renderSidebar(conversations: Conversation[]): string {
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
       <span>Core Prompts</span>
+    </a>
+    <a class="sidebar-settings-link"
+      hx-get="/fragments/settings/lorebooks"
+      hx-target="#chat"
+      hx-swap="innerHTML"
+      onclick="Psycheros.closeSidebarAfterNav()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+      <span>Context Notes</span>
     </a>
   </div>
 </aside>`;
@@ -959,4 +971,341 @@ function formatTime(timestamp: string): string {
     minute: "2-digit",
   });
 }
+
+// =============================================================================
+// Lorebook Templates
+// =============================================================================
+
+/**
+ * Render the main lorebooks list view.
+ */
+export function renderLorebooksView(lorebooks: Lorebook[]): string {
+  let html = `<div class="settings-view">
+    <div class="settings-header">
+      <h1 class="settings-title">Context Books</h1>
+      <p class="settings-desc">Collections of context entries that are injected into context when triggered by keywords.</p>
+    </div>
+    <div class="settings-content" id="settings-content">`;
+
+  html += `<div class="lorebooks-list">`;
+
+  if (lorebooks.length === 0) {
+    html += `<div class="lorebooks-empty">
+      <p>No context books yet. Create one to start adding context entries.</p>
+    </div>`;
+  } else {
+    for (const book of lorebooks) {
+      html += `<div class="lorebook-card ${book.enabled ? '' : 'lorebook-card--disabled'}">
+        <div class="lorebook-card-header">
+          <h3 class="lorebook-card-name">${escapeHtml(book.name)}</h3>
+          <span class="lorebook-card-status">${book.enabled ? 'Enabled' : 'Disabled'}</span>
+        </div>
+        ${book.description ? `<p class="lorebook-card-desc">${escapeHtml(book.description)}</p>` : ''}
+        <div class="lorebook-card-actions">
+          <button
+            class="btn btn--ghost btn--sm"
+            hx-get="/fragments/settings/lorebooks/${book.id}"
+            hx-target="#settings-content"
+            hx-swap="innerHTML"
+          >View Entries</button>
+          <button
+            class="btn btn--ghost btn--sm"
+            hx-delete="/api/lorebooks/${book.id}"
+            hx-confirm="Delete this context book and all its entries?"
+            hx-target="#settings-content"
+            hx-swap="innerHTML"
+          >Delete</button>
+        </div>
+      </div>`;
+    }
+  }
+
+  html += `</div>`;
+
+  // Add "Create Lorebook" form
+  html += `<div class="lorebook-create">
+    <h3>Create New Context Book</h3>
+    <form
+      hx-post="/api/lorebooks"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+    >
+      <div class="form-group">
+        <label for="lorebook-name">Name</label>
+        <input type="text" id="lorebook-name" name="name" required placeholder="e.g., Character Info" />
+      </div>
+      <div class="form-group">
+        <label for="lorebook-desc">Description (optional)</label>
+        <input type="text" id="lorebook-desc" name="description" placeholder="e.g., Background context for conversations" />
+      </div>
+      <button type="submit" class="btn btn--primary">Create Context Book</button>
+    </form>
+  </div>`;
+
+  html += `</div></div>`; // Close settings-content and settings-view
+
+  return html;
+}
+
+/**
+ * Render a single lorebook with its entries.
+ */
+export function renderLorebookDetailView(book: Lorebook, entries: LorebookEntry[]): string {
+  let html = `<div class="settings-breadcrumb">
+    <button
+      class="btn btn--ghost btn--sm"
+      hx-get="/fragments/settings/lorebooks"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+    >← Back to Context Books</button>
+  </div>
+  <div class="settings-section-header">
+    <h2>${escapeHtml(book.name)}</h2>
+    <p class="settings-section-desc">${book.description ? escapeHtml(book.description) : 'No description'}</p>
+  </div>`;
+
+  // Entries list
+  html += `<div class="lorebook-entries-list">`;
+
+  if (entries.length === 0) {
+    html += `<div class="lorebooks-empty">
+      <p>No entries yet. Add triggers to inject content into context.</p>
+    </div>`;
+  } else {
+    // Sort by priority (highest first)
+    const sortedEntries = [...entries].sort((a, b) => b.priority - a.priority);
+
+    for (const entry of sortedEntries) {
+      html += renderEntryCard(entry);
+    }
+  }
+
+  html += `</div>`;
+
+  // Create entry form
+  html += `<div class="lorebook-entry-create">
+    <h3>Add New Entry</h3>
+    <form
+      hx-post="/api/lorebooks/${book.id}/entries"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      class="lorebook-entry-form"
+    >
+      <div class="form-row">
+        <div class="form-group">
+          <label for="entry-name">Name</label>
+          <input type="text" id="entry-name" name="name" required placeholder="e.g., Character Info" />
+        </div>
+        <div class="form-group form-group--small">
+          <label for="entry-priority">Priority</label>
+          <input type="number" id="entry-priority" name="priority" value="0" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="entry-triggers">Triggers (comma-separated)</label>
+        <input type="text" id="entry-triggers" name="triggers" required placeholder="e.g., alice, character, friend" />
+      </div>
+
+      <div class="form-group">
+        <label for="entry-content">Content</label>
+        <textarea id="entry-content" name="content" rows="4" required placeholder="Information to inject when triggered..."></textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="entry-triggerMode">Trigger Mode</label>
+          <select id="entry-triggerMode" name="triggerMode">
+            <option value="substring">Substring (default)</option>
+            <option value="word">Word Boundary</option>
+            <option value="exact">Exact Match</option>
+            <option value="regex">Regex</option>
+          </select>
+        </div>
+        <div class="form-group form-group--small">
+          <label for="entry-scanDepth">Scan Depth</label>
+          <input type="number" id="entry-scanDepth" name="scanDepth" value="5" min="1" max="50" />
+        </div>
+      </div>
+
+      <div class="form-row form-row--checkboxes">
+        <label class="checkbox-label">
+          <input type="checkbox" name="caseSensitive" />
+          Case Sensitive
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="enabled" checked />
+          Enabled
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" name="sticky" onchange="const durInput = document.getElementById('entry-stickyDuration'); if (this.checked) { durInput.disabled = false; durInput.style.opacity = '1'; durInput.style.pointerEvents = 'auto'; } else { durInput.disabled = true; durInput.style.opacity = '0.5'; durInput.style.pointerEvents = 'none'; }" />
+          Sticky
+        </label>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group form-group--small">
+          <label for="entry-stickyDuration">Sticky Duration (turns)</label>
+          <input type="number" id="entry-stickyDuration" name="stickyDuration" value="0" min="0" disabled style="opacity: 0.5; pointer-events: none;" />
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn--primary">Add Entry</button>
+    </form>
+  </div>`;
+
+  return html;
+}
+
+/**
+ * Render a single entry card.
+ */
+function renderEntryCard(entry: LorebookEntry): string {
+  const triggersHtml = entry.triggers.map(t => `<span class="trigger-tag">${escapeHtml(t)}</span>`).join('');
+
+  return `<div class="entry-card ${entry.enabled ? '' : 'entry-card--disabled'}">
+    <div class="entry-card-header">
+      <h4 class="entry-card-name">${escapeHtml(entry.name)}</h4>
+      <span class="entry-card-priority">Priority: ${entry.priority}</span>
+    </div>
+    <div class="entry-card-triggers">${triggersHtml}</div>
+    <div class="entry-card-content">${escapeHtml(entry.content.substring(0, 200))}${entry.content.length > 200 ? '...' : ''}</div>
+    <div class="entry-card-meta">
+      <span>${entry.triggerMode}</span>
+      ${entry.sticky ? `<span>Sticky: ${entry.stickyDuration} turns</span>` : ''}
+      ${!entry.enabled ? `<span>Disabled</span>` : ''}
+    </div>
+    <div class="entry-card-actions">
+      <button
+        class="btn btn--ghost btn--sm"
+        hx-get="/fragments/settings/lorebooks/${entry.bookId}/entries/${entry.id}/edit"
+        hx-target="#settings-content"
+        hx-swap="innerHTML"
+      >Edit</button>
+      <button
+        class="btn btn--ghost btn--sm"
+        hx-delete="/api/lorebooks/${entry.bookId}/entries/${entry.id}"
+        hx-confirm="Delete this entry?"
+        hx-target="#settings-content"
+        hx-swap="innerHTML"
+      >Delete</button>
+    </div>
+  </div>`;
+}
+
+/**
+ * Render the entry editor form.
+ */
+export function renderEntryEditor(entry: LorebookEntry): string {
+  const triggersStr = entry.triggers.join(', ');
+
+  return `<div class="settings-breadcrumb">
+    <button
+      class="btn btn--ghost btn--sm"
+      hx-get="/fragments/settings/lorebooks/${entry.bookId}"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+    >← Back to Context Book</button>
+  </div>
+  <div class="settings-section-header">
+    <h2>Edit Entry: ${escapeHtml(entry.name)}</h2>
+  </div>
+
+  <form
+    hx-put="/api/lorebooks/${entry.bookId}/entries/${entry.id}"
+    hx-target="#settings-content"
+    hx-swap="innerHTML"
+    class="lorebook-entry-form"
+  >
+    <div class="form-row">
+      <div class="form-group">
+        <label for="entry-name">Name</label>
+        <input type="text" id="entry-name" name="name" value="${escapeHtml(entry.name)}" required />
+      </div>
+      <div class="form-group form-group--small">
+        <label for="entry-priority">Priority</label>
+        <input type="number" id="entry-priority" name="priority" value="${entry.priority}" />
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label for="entry-triggers">Triggers (comma-separated)</label>
+      <input type="text" id="entry-triggers" name="triggers" value="${escapeHtml(triggersStr)}" required />
+    </div>
+
+    <div class="form-group">
+      <label for="entry-content">Content</label>
+      <textarea id="entry-content" name="content" rows="6" required>${escapeHtml(entry.content)}</textarea>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label for="entry-triggerMode">Trigger Mode</label>
+        <select id="entry-triggerMode" name="triggerMode">
+          <option value="substring" ${entry.triggerMode === 'substring' ? 'selected' : ''}>Substring</option>
+          <option value="word" ${entry.triggerMode === 'word' ? 'selected' : ''}>Word Boundary</option>
+          <option value="exact" ${entry.triggerMode === 'exact' ? 'selected' : ''}>Exact Match</option>
+          <option value="regex" ${entry.triggerMode === 'regex' ? 'selected' : ''}>Regex</option>
+        </select>
+      </div>
+      <div class="form-group form-group--small">
+        <label for="entry-scanDepth">Scan Depth</label>
+        <input type="number" id="entry-scanDepth" name="scanDepth" value="${entry.scanDepth}" min="1" max="50" />
+      </div>
+    </div>
+
+    <div class="form-row form-row--checkboxes">
+      <label class="checkbox-label">
+        <input type="checkbox" name="caseSensitive" ${entry.caseSensitive ? 'checked' : ''} />
+        Case Sensitive
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="enabled" ${entry.enabled ? 'checked' : ''} />
+        Enabled
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="sticky" ${entry.sticky ? 'checked' : ''} onchange="const durInput = document.getElementById('entry-stickyDuration'); if (this.checked) { durInput.disabled = false; durInput.style.opacity = '1'; durInput.style.pointerEvents = 'auto'; } else { durInput.disabled = true; durInput.style.opacity = '0.5'; durInput.style.pointerEvents = 'none'; }" />
+        Sticky
+      </label>
+    </div>
+
+    <div class="form-row form-row--checkboxes">
+      <label class="checkbox-label">
+        <input type="checkbox" name="nonRecursable" ${entry.nonRecursable ? 'checked' : ''} />
+        Non-Recursable
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="preventRecursion" ${entry.preventRecursion ? 'checked' : ''} />
+        Prevent Recursion
+      </label>
+      <label class="checkbox-label">
+        <input type="checkbox" name="reTriggerResetsTimer" ${entry.reTriggerResetsTimer ? 'checked' : ''} />
+        Re-trigger Resets Timer
+      </label>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group form-group--small">
+        <label for="entry-stickyDuration">Sticky Duration (turns)</label>
+        <input type="number" id="entry-stickyDuration" name="stickyDuration" value="${entry.stickyDuration}" min="0" ${!entry.sticky ? 'disabled' : ''} style="${!entry.sticky ? 'opacity: 0.5; pointer-events: none;' : ''}" />
+      </div>
+      <div class="form-group form-group--small">
+        <label for="entry-maxTokens">Max Tokens (0 = unlimited)</label>
+        <input type="number" id="entry-maxTokens" name="maxTokens" value="${entry.maxTokens}" min="0" />
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn--primary">Save Changes</button>
+      <button
+        type="button"
+        class="btn btn--ghost"
+        hx-get="/fragments/settings/lorebooks/${entry.bookId}"
+        hx-target="#settings-content"
+        hx-swap="innerHTML"
+      >Cancel</button>
+    </div>
+  </form>`;
+}
+
 
