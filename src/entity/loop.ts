@@ -41,7 +41,7 @@ import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
  * Uses the TZ environment variable for timezone, defaults to UTC.
  * Format: [YYYY-MM-DD HH:MM]
  */
-function formatMessageTimestamp(date: Date): string {
+export function formatMessageTimestamp(date: Date): string {
   const timeZone = Deno.env.get("TZ") || "UTC";
   const year = date.toLocaleDateString("en-US", { timeZone, year: "numeric" });
   const month = date.toLocaleDateString("en-US", { timeZone, month: "2-digit" });

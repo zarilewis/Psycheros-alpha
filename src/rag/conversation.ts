@@ -8,6 +8,7 @@
 import type { Database } from "@db/sqlite";
 import { getEmbedder } from "./embedder.ts";
 import { getVecVersion, serializeVector, deserializeVector } from "../db/vector.ts";
+import { formatMessageTimestamp } from "../entity/loop.ts";
 
 /**
  * Options for chat history search.
@@ -192,39 +193,36 @@ export class ConversationRAG {
   ): RetrievedMessage[] {
     const serialized = serializeVector(queryEmbedding);
 
-    // Build query based on whether we're filtering by conversation
-    let sql: string;
-    let params: (string | Uint8Array | number)[];
+    // Use subquery to apply LIMIT directly to vec0 query (required by sqlite-vec)
+    // We fetch more results than needed and filter in memory if conversationId is specified
+    const fetchLimit = options.conversationId ? options.limit * 3 : options.limit;
 
+    const sql = `
+      SELECT e.id, e.message_id, e.conversation_id, e.role, e.content, e.created_at, v.distance
+      FROM (
+        SELECT rowid, distance
+        FROM vec_messages
+        WHERE embedding MATCH ?
+        ORDER BY distance
+        LIMIT ?
+      ) v
+      JOIN message_embeddings e ON e.rowid = v.rowid
+      ${options.conversationId ? "WHERE e.conversation_id = ?" : ""}
+      ORDER BY v.distance
+    `;
+
+    const params: (string | Uint8Array | number)[] = [serialized, fetchLimit];
     if (options.conversationId) {
-      sql = `
-        SELECT e.id, e.message_id, e.conversation_id, e.role, e.content, e.created_at, v.distance
-        FROM message_embeddings e
-        JOIN vec_messages v ON e.rowid = v.rowid
-        WHERE v.embedding MATCH ? AND e.conversation_id = ?
-        ORDER BY v.distance
-        LIMIT ?
-      `;
-      params = [serialized, options.conversationId, options.limit];
-    } else {
-      sql = `
-        SELECT e.id, e.message_id, e.conversation_id, e.role, e.content, e.created_at, v.distance
-        FROM message_embeddings e
-        JOIN vec_messages v ON e.rowid = v.rowid
-        WHERE v.embedding MATCH ?
-        ORDER BY v.distance
-        LIMIT ?
-      `;
-      params = [serialized, options.limit];
+      params.push(options.conversationId);
     }
 
     const stmt = this.db.prepare(sql);
-    const rows = stmt.all<MessageVectorSearchRow>(...params);
+    const allRows = stmt.all<MessageVectorSearchRow>(...params);
     stmt.finalize();
 
     const results: RetrievedMessage[] = [];
 
-    for (const row of rows) {
+    for (const row of allRows) {
       // Convert distance to similarity (cosine distance = 1 - similarity)
       const similarity = 1 - row.distance;
 
@@ -237,6 +235,11 @@ export class ConversationRAG {
           score: similarity,
           createdAt: new Date(row.created_at),
         });
+      }
+
+      // Stop if we have enough results
+      if (results.length >= options.limit) {
+        break;
       }
     }
 
@@ -484,7 +487,8 @@ export function formatChatHistoryForContext(
   let totalTokens = estimateTokens(lines[0]);
 
   for (const msg of messages) {
-    const line = `[${msg.role}]: ${msg.content}`;
+    const timestamp = formatMessageTimestamp(msg.createdAt);
+    const line = `[${msg.role}]: ${timestamp} ${msg.content}`;
     const lineTokens = estimateTokens(line);
 
     if (totalTokens + lineTokens > maxTokens) {
