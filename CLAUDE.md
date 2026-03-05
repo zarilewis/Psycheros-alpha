@@ -151,5 +151,12 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 - `LLMContextSnapshot` type in `src/types.ts`
 - Yielded as first event in SSE stream from `EntityTurn.process()`
 
+**Temporal Awareness**:
+- Every message includes a timestamp prefix the entity can see
+- Format: `[YYYY-MM-DD HH:MM]` (e.g., `[2026-03-05 15:17]`)
+- Allows entity to understand when events occurred and time gaps
+- Timezone configurable via `TZ` environment variable (defaults to UTC)
+- Implemented in `src/entity/loop.ts` via `formatMessageTimestamp()`
+
 # currentDate
 Today's date is 2026-03-02.

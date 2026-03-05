@@ -34,6 +34,7 @@ open http://localhost:3000
 | `PSYCHEROS_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
 | `PSYCHEROS_TOOLS` | No | (none) | Comma-separated list of enabled tools |
 | `PSYCHEROS_MEMORY_HOUR` | No | `4` | Hour to run daily summarization (0-23) |
+| `TZ` | No | `UTC` | Timezone for message timestamps (e.g., `America/Los_Angeles`) |
 
 ### Available Tools
 
@@ -296,6 +297,21 @@ identity/
 - Are sorted alphabetically (no predefined order)
 
 When MCP is enabled, these are loaded from entity-core. Otherwise, they're read from local files.
+
+### Temporal Awareness
+
+The entity has temporal awareness through conversation - every message includes a timestamp that the entity can see. This allows the entity to understand when events occurred and how much time has passed between messages.
+
+**Format**: `[YYYY-MM-DD HH:MM]` (e.g., `[2026-03-05 15:17]`)
+
+**Example**:
+```
+[user]: [2026-03-03 14:22] Hey, what did you think about our conversation yesterday?
+[assistant]: [2026-03-03 14:23] I enjoyed our discussion about...
+[user]: [2026-03-05 15:17] Can you summarize what we talked about?
+```
+
+**Timezone**: Set the `TZ` environment variable to configure the timezone (e.g., `TZ=America/Los_Angeles`). Defaults to UTC if not set.
 
 ### Core Prompts UI
 

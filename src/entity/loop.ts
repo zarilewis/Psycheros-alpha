@@ -30,10 +30,30 @@ import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics, LLMContextSn
 import type { Retriever } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
+import type { LorebookManager } from "../lorebook/mod.ts";
 import { loadSelfContent, loadUserContent, loadRelationshipContent, loadCustomContent, buildSystemMessage } from "./context.ts";
 import { buildRAGContext, formatChatHistoryForContext } from "../rag/mod.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
 import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
+
+/**
+ * Format a timestamp for message content.
+ * Uses the TZ environment variable for timezone, defaults to UTC.
+ * Format: [YYYY-MM-DD HH:MM]
+ */
+function formatMessageTimestamp(date: Date): string {
+  const timeZone = Deno.env.get("TZ") || "UTC";
+  const year = date.toLocaleDateString("en-US", { timeZone, year: "numeric" });
+  const month = date.toLocaleDateString("en-US", { timeZone, month: "2-digit" });
+  const day = date.toLocaleDateString("en-US", { timeZone, day: "2-digit" });
+  const time = date.toLocaleTimeString("en-US", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return `[${year}-${month}-${day} ${time}]`;
+}
 
 /**
  * Configuration for the entity turn processor.
@@ -49,6 +69,8 @@ export interface EntityConfig {
   chatRAG?: ConversationRAG;
   /** Optional MCP client for syncing with entity-core */
   mcpClient?: MCPClient;
+  /** Optional lorebook manager for world info/triggered content */
+  lorebookManager?: LorebookManager;
 }
 
 /**
@@ -167,7 +189,43 @@ export class EntityTurn {
       }
     }
 
-    const systemMessage = buildSystemMessage(selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent);
+    // Evaluate lorebook triggers if manager is available
+    let lorebookContent: string | undefined;
+    if (this.config.lorebookManager) {
+      try {
+        // Get conversation history for lorebook evaluation (before adding current user message)
+        const history = this.db.getMessages(conversationId);
+        const historyForLorebook = history.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        }));
+
+        const result = this.config.lorebookManager.evaluate(
+          userMessage,
+          historyForLorebook,
+          conversationId
+        );
+
+        if (result.context) {
+          lorebookContent = result.context;
+          console.log(
+            "[Lorebook] Triggered",
+            result.entries.length,
+            "entries (",
+            result.totalTokens,
+            "tokens)"
+          );
+        }
+      } catch (error) {
+        // Non-fatal: log and continue without lorebook content
+        console.error(
+          "EntityTurn: Lorebook evaluation failed:",
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+
+    const systemMessage = buildSystemMessage(selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent);
 
     // Get conversation history from DB
     const history = this.db.getMessages(conversationId);
@@ -218,6 +276,7 @@ export class EntityTurn {
       relationshipContent,
       memoriesContent,
       chatHistoryContent,
+      lorebookContent,
       messages: messages.slice(1).map((msg) => ({
         role: msg.role,
         content: msg.content,
@@ -390,18 +449,20 @@ export class EntityTurn {
       }
 
       // Add assistant message with tool calls to the messages array
+      const assistantTimestamp = formatMessageTimestamp(new Date());
       const assistantMsg: ChatMessage = {
         role: "assistant",
-        content: assistantContent,
+        content: `${assistantTimestamp} ${assistantContent || ""}`,
         tool_calls: toolCalls,
       };
       messages.push(assistantMsg);
 
       // Add tool results to messages for next LLM call
       for (const result of toolResults) {
+        const toolTimestamp = formatMessageTimestamp(new Date());
         const toolMsg: ChatMessage = {
           role: "tool",
-          content: result.content,
+          content: `${toolTimestamp} ${result.content}`,
           tool_call_id: result.toolCallId,
         };
         messages.push(toolMsg);
@@ -433,6 +494,7 @@ export class EntityTurn {
 
   /**
    * Build the messages array for the LLM request.
+   * Each message includes a timestamp prefix for temporal awareness.
    *
    * @param systemMessage - The system message with SBy.md content
    * @param history - Previous messages from the database
@@ -446,17 +508,18 @@ export class EntityTurn {
   ): ChatMessage[] {
     const messages: ChatMessage[] = [];
 
-    // Add system message
+    // Add system message (no timestamp - has its own in content)
     messages.push({
       role: "system",
       content: systemMessage,
     });
 
-    // Add history (convert from DB format to LLM format)
+    // Add history with timestamps (convert from DB format to LLM format)
     for (const msg of history) {
+      const timestamp = formatMessageTimestamp(msg.createdAt);
       const chatMsg: ChatMessage = {
         role: msg.role,
-        content: msg.content,
+        content: `${timestamp} ${msg.content}`,
       };
 
       // Add tool call ID if present (for tool role messages)
@@ -472,10 +535,11 @@ export class EntityTurn {
       messages.push(chatMsg);
     }
 
-    // Add the new user message
+    // Add the new user message with timestamp
+    const now = formatMessageTimestamp(new Date());
     messages.push({
       role: "user",
-      content: userMessage,
+      content: `${now} ${userMessage}`,
     });
 
     return messages;
