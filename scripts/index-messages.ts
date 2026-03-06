@@ -84,7 +84,7 @@ async function main() {
 
   // Determine database path
   const projectRoot = Deno.cwd();
-  const dbPath = join(projectRoot, ".sby", "sby.db");
+  const dbPath = join(projectRoot, ".psycheros", "psycheros.db");
 
   console.log(`Database: ${dbPath}`);
   console.log(`Dry run: ${args.dryRun}`);
@@ -142,6 +142,18 @@ async function main() {
     console.log("\nMessages already indexed. Use --force to re-index.");
     db.close();
     return;
+  }
+
+  // Clear existing data if force mode
+  if (args.force) {
+    console.log("\nClearing existing indexed data...");
+    rawDb.exec("DELETE FROM message_embeddings");
+    if (useVectorExt) {
+      // Drop and recreate the virtual table (DELETE doesn't work reliably on vec0 tables)
+      rawDb.exec("DROP TABLE IF EXISTS vec_messages");
+      rawDb.exec(`CREATE VIRTUAL TABLE vec_messages USING vec0(embedding FLOAT[384])`);
+    }
+    console.log("Cleared.");
   }
 
   if (args.dryRun) {
