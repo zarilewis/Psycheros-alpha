@@ -13,4 +13,7 @@ Likes horror movies sometimes
 
 <!-- Added 2026-03-02 -->
 Interests and preferences: Enjoys horror movies sometimes
+
+<!-- Added 2026-03-02 -->
+Horror tolerance has decreased since becoming a parent - less stomach for tragedy now, especially when it involves children
 </user_preferences>

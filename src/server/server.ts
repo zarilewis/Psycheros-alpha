@@ -12,8 +12,10 @@ import { createDefaultClient, type LLMClient } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import { catchUpSummarization, needsConsolidation, runConsolidation } from "../memory/mod.ts";
+import { createFullSnapshot, cleanupOldSnapshots } from "../snapshot/mod.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
+import { LorebookManager } from "../lorebook/mod.ts";
 import { join } from "@std/path";
 import {
   handleBatchDeleteConversations,
@@ -38,6 +40,25 @@ import {
   handleSaveSettingsFile,
   handleStaticFile,
   handleUpdateTitle,
+  handleListSnapshots,
+  handleGetSnapshot,
+  handleCreateSnapshot,
+  handleRestoreSnapshot,
+  handleSnapshotsFragment,
+  handleSnapshotPreviewFragment,
+  handleListLorebooks,
+  handleCreateLorebook,
+  handleGetLorebook,
+  handleUpdateLorebook,
+  handleDeleteLorebook,
+  handleListLorebookEntries,
+  handleCreateLorebookEntry,
+  handleUpdateLorebookEntry,
+  handleDeleteLorebookEntry,
+  handleResetLorebookState,
+  handleLorebooksFragment,
+  handleLorebookDetailFragment,
+  handleLorebookEntryEditFragment,
   type RouteContext,
 } from "./routes.ts";
 import { getBroadcaster } from "./broadcaster.ts";
@@ -97,6 +118,7 @@ export class Server {
   private config: ServerConfig;
   private keepaliveInterval: number | null = null;
   private mcpClient: MCPClient | null = null;
+  private lorebookManager: LorebookManager;
 
   /**
    * Create a new Server instance.
@@ -133,6 +155,9 @@ export class Server {
 
     // Store MCP client if provided
     this.mcpClient = config.mcpClient ?? null;
+
+    // Initialize lorebook manager
+    this.lorebookManager = new LorebookManager(this.db);
 
     // Create abort controller for graceful shutdown
     this.abortController = new AbortController();
@@ -250,6 +275,22 @@ export class Server {
           console.error("[Memory] Yearly consolidation cron failed:", error instanceof Error ? error.message : String(error));
         }
       });
+
+      // Daily identity snapshot - runs at configured hour (default 3 AM)
+      const snapshotHour = parseInt(Deno.env.get("PSYCHEROS_SNAPSHOT_HOUR") || "3");
+      const snapshotRetention = parseInt(Deno.env.get("PSYCHEROS_SNAPSHOT_RETENTION_DAYS") || "30");
+
+      Deno.cron("identity-daily-snapshot", `0 ${snapshotHour} * * *`, async () => {
+        console.log("[Snapshot] Running daily identity snapshot");
+        try {
+          const snapshots = await createFullSnapshot(this.config.projectRoot, "scheduled", "psycheros");
+          console.log(`[Snapshot] Created ${snapshots.length} snapshots`);
+          const cleanup = await cleanupOldSnapshots(this.config.projectRoot, snapshotRetention);
+          console.log(`[Snapshot] Cleanup: deleted ${cleanup.deleted}, kept ${cleanup.kept}`);
+        } catch (error) {
+          console.error("[Snapshot] Daily snapshot cron failed:", error instanceof Error ? error.message : String(error));
+        }
+      });
     }
 
     // Start keepalive timer for persistent SSE connections
@@ -304,6 +345,7 @@ export class Server {
       ragConfig: this.ragConfig,
       memoryEnabled: this.config.memoryEnabled ?? true,
       mcpClient: this.mcpClient ?? undefined,
+      lorebookManager: this.lorebookManager,
     };
   }
 
@@ -434,6 +476,88 @@ export class Server {
       return await handleMcpSync(ctx);
     }
 
+    // GET /api/snapshots - List all snapshots
+    if (method === "GET" && path === "/api/snapshots") {
+      return await handleListSnapshots(ctx);
+    }
+
+    // POST /api/snapshots/create - Create manual snapshot
+    if (method === "POST" && path === "/api/snapshots/create") {
+      return await handleCreateSnapshot(ctx);
+    }
+
+    // GET /api/snapshots/:id - Get snapshot content
+    const snapshotMatch = path.match(/^\/api\/snapshots\/(.+)$/);
+    if (method === "GET" && snapshotMatch) {
+      return await handleGetSnapshot(ctx, snapshotMatch[1]);
+    }
+
+    // POST /api/snapshots/:id/restore - Restore snapshot
+    const snapshotRestoreMatch = path.match(/^\/api\/snapshots\/(.+)\/restore$/);
+    if (method === "POST" && snapshotRestoreMatch) {
+      return await handleRestoreSnapshot(ctx, snapshotRestoreMatch[1]);
+    }
+
+    // Lorebook Routes
+    // GET /api/lorebooks - List lorebooks
+    if (method === "GET" && path === "/api/lorebooks") {
+      return handleListLorebooks(ctx);
+    }
+
+    // POST /api/lorebooks - Create lorebook
+    if (method === "POST" && path === "/api/lorebooks") {
+      return await handleCreateLorebook(ctx, request);
+    }
+
+    // Lorebook entry routes - must match before :id routes
+    // GET /api/lorebooks/:id/entries - List entries
+    const lorebookEntriesMatch = path.match(/^\/api\/lorebooks\/([^/]+)\/entries$/);
+    if (lorebookEntriesMatch) {
+      const lorebookId = lorebookEntriesMatch[1];
+      if (method === "GET") {
+        return handleListLorebookEntries(ctx, lorebookId);
+      }
+      if (method === "POST") {
+        return await handleCreateLorebookEntry(ctx, lorebookId, request);
+      }
+    }
+
+    // Entry-specific routes
+    const lorebookEntryMatch = path.match(/^\/api\/lorebooks\/([^/]+)\/entries\/([^/]+)$/);
+    if (lorebookEntryMatch) {
+      const lorebookId = lorebookEntryMatch[1];
+      const entryId = lorebookEntryMatch[2];
+      if (method === "PUT") {
+        return await handleUpdateLorebookEntry(ctx, lorebookId, entryId, request);
+      }
+      if (method === "DELETE") {
+        return handleDeleteLorebookEntry(ctx, lorebookId, entryId);
+      }
+    }
+
+    // GET /api/lorebooks/:id - Get lorebook
+    // PUT /api/lorebooks/:id - Update lorebook
+    // DELETE /api/lorebooks/:id - Delete lorebook
+    const lorebookMatch = path.match(/^\/api\/lorebooks\/([^/]+)$/);
+    if (lorebookMatch) {
+      const lorebookId = lorebookMatch[1];
+      if (method === "GET") {
+        return handleGetLorebook(ctx, lorebookId);
+      }
+      if (method === "PUT") {
+        return await handleUpdateLorebook(ctx, lorebookId, request);
+      }
+      if (method === "DELETE") {
+        return handleDeleteLorebook(ctx, lorebookId);
+      }
+    }
+
+    // DELETE /api/lorebooks/state/:conversationId - Reset sticky state
+    const lorebookStateMatch = path.match(/^\/api\/lorebooks\/state\/([^/]+)$/);
+    if (method === "DELETE" && lorebookStateMatch) {
+      return handleResetLorebookState(ctx, lorebookStateMatch[1]);
+    }
+
     // 404 for unknown API routes
     return new Response(
       JSON.stringify({ error: "API endpoint not found" }),
@@ -501,6 +625,35 @@ export class Server {
     const settingsFileMatch = path.match(/^\/fragments\/settings\/file\/([^/]+)\/([^/]+)$/);
     if (settingsFileMatch) {
       return await handleSettingsFileEditorFragment(ctx, settingsFileMatch[1], settingsFileMatch[2]);
+    }
+
+    // GET /fragments/settings/snapshots - Snapshots list fragment
+    if (path === "/fragments/settings/snapshots") {
+      return await handleSnapshotsFragment(ctx);
+    }
+
+    // GET /fragments/settings/snapshots/:id - Snapshot preview fragment
+    const snapshotPreviewMatch = path.match(/^\/fragments\/settings\/snapshots\/(.+)$/);
+    if (snapshotPreviewMatch) {
+      return await handleSnapshotPreviewFragment(ctx, snapshotPreviewMatch[1]);
+    }
+
+    // Lorebook Fragment Routes
+    // GET /fragments/settings/lorebooks - Lorebooks list fragment
+    if (path === "/fragments/settings/lorebooks") {
+      return handleLorebooksFragment(ctx);
+    }
+
+    // GET /fragments/settings/lorebooks/:id - Single lorebook view
+    const lorebookDetailMatch = path.match(/^\/fragments\/settings\/lorebooks\/([^/]+)$/);
+    if (lorebookDetailMatch) {
+      return handleLorebookDetailFragment(ctx, lorebookDetailMatch[1]);
+    }
+
+    // GET /fragments/settings/lorebooks/:bookId/entries/:entryId/edit - Entry editor
+    const lorebookEntryEditMatch = path.match(/^\/fragments\/settings\/lorebooks\/([^/]+)\/entries\/([^/]+)\/edit$/);
+    if (lorebookEntryEditMatch) {
+      return handleLorebookEntryEditFragment(ctx, lorebookEntryEditMatch[1], lorebookEntryEditMatch[2]);
     }
 
     // Serve static files from web/ directory

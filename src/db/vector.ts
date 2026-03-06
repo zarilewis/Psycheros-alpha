@@ -6,51 +6,47 @@
  */
 
 import type { Database } from "@db/sqlite";
+import { join, dirname, fromFileUrl } from "@std/path";
 
-// Dynamically import sqlite-vec to handle loading failures gracefully
-let sqliteVecModule: { load: (db: Database) => void } | null = null;
-let loadAttempted = false;
+// Track extension loading state
+let extensionLoaded = false;
 let loadError: string | null = null;
 
-async function loadSqliteVecModule(): Promise<{ load: (db: Database) => void } | null> {
-  if (loadAttempted) {
-    return sqliteVecModule;
-  }
-  loadAttempted = true;
-
+/**
+ * Get the path to the sqlite-vec extension file.
+ * Looks for vec0.so in the lib/ directory relative to this module.
+ */
+function getExtensionPath(): string | null {
   try {
-    // Use fully dynamic import with npm specifier to avoid compile-time validation
-    // This allows the server to start even if sqlite-vec optional deps fail
-    const module = await import("npm:sqlite-vec@0.0.1-alpha.9");
-    sqliteVecModule = module as { load: (db: Database) => void };
-    return sqliteVecModule;
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : String(error);
-    console.warn("[Vector] Failed to load sqlite-vec module:", loadError);
-    console.warn("[Vector] Vector search will fall back to in-memory calculation.");
+    // Get the directory containing this module
+    const moduleDir = dirname(fromFileUrl(import.meta.url));
+    // Go up to project root (src/db -> src -> root) then into lib
+    const extPath = join(moduleDir, "..", "..", "lib", "vec0.so");
+    return extPath;
+  } catch {
     return null;
   }
 }
 
 /**
- * Check if the sqlite-vec module was loaded successfully.
- * Call ensureVectorModule() first to attempt loading.
+ * Check if the sqlite-vec extension is loaded.
  *
- * @returns true if the module is available
+ * @returns true if the extension is loaded
  */
 export function isVectorModuleAvailable(): boolean {
-  return sqliteVecModule !== null;
+  return extensionLoaded;
 }
 
 /**
- * Ensure the sqlite-vec module is loaded.
- * Call this before using vector functionality if you need to wait for the module to load.
+ * Ensure the sqlite-vec extension is loaded.
+ * This is now synchronous since we load from file instead of npm package.
  *
- * @returns Promise that resolves to true if module loaded successfully
+ * @returns Promise that resolves to true if extension loaded successfully
  */
 export async function ensureVectorModule(): Promise<boolean> {
-  const module = await loadSqliteVecModule();
-  return module !== null;
+  // Extension loading is now done in loadVectorExtension
+  // This function exists for backwards compatibility
+  return extensionLoaded;
 }
 
 /**
@@ -61,20 +57,47 @@ export async function ensureVectorModule(): Promise<boolean> {
  * @returns true if extension loaded successfully, false otherwise
  */
 export function loadVectorExtension(db: Database): boolean {
-  if (!sqliteVecModule) {
-    return false;
+  if (extensionLoaded) {
+    return true;
   }
 
   try {
     db.enableLoadExtension = true;
-    sqliteVecModule.load(db);
+
+    // Try loading from local file first
+    const extPath = getExtensionPath();
+    if (extPath) {
+      try {
+        db.exec(`SELECT load_extension('${extPath}')`);
+        extensionLoaded = true;
+        db.enableLoadExtension = false;
+        return true;
+      } catch {
+        // File load failed, will try npm package below
+      }
+    }
+
+    // Fallback: try npm package (may fail on some systems)
+    // Using dynamic import to avoid compile-time errors
+    import("npm:sqlite-vec@0.0.1-alpha.9")
+      .then((module) => {
+        module.load(db);
+        extensionLoaded = true;
+      })
+      .catch((error) => {
+        loadError = error instanceof Error ? error.message : String(error);
+        console.warn("[Vector] Failed to load sqlite-vec:", loadError);
+        console.warn("[Vector] Vector search will fall back to in-memory calculation.");
+      });
+
     db.enableLoadExtension = false;
-    return true;
+    return extensionLoaded;
   } catch (error) {
     console.warn(
       "[Vector] Failed to load sqlite-vec extension:",
       error instanceof Error ? error.message : String(error)
     );
+    db.enableLoadExtension = false;
     return false;
   }
 }

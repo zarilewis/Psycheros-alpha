@@ -136,6 +136,69 @@ export const SCHEMA = `
 
   CREATE INDEX IF NOT EXISTS idx_summarized_chats_date
     ON summarized_chats(message_date);
+
+  -- Lorebook Tables
+  -- Lorebooks are collections of world info entries
+  CREATE TABLE IF NOT EXISTS lorebooks (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    enabled INTEGER DEFAULT 1,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_lorebooks_enabled
+    ON lorebooks(enabled);
+
+  -- Lorebook entries contain the actual trigger/content pairs
+  CREATE TABLE IF NOT EXISTS lorebook_entries (
+    id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    triggers TEXT NOT NULL,
+    trigger_mode TEXT DEFAULT 'substring',
+    case_sensitive INTEGER DEFAULT 0,
+    sticky INTEGER DEFAULT 0,
+    sticky_duration INTEGER DEFAULT 0,
+    non_recursable INTEGER DEFAULT 0,
+    prevent_recursion INTEGER DEFAULT 0,
+    re_trigger_resets_timer INTEGER DEFAULT 1,
+    enabled INTEGER DEFAULT 1,
+    priority INTEGER DEFAULT 0,
+    scan_depth INTEGER DEFAULT 5,
+    max_tokens INTEGER DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (book_id) REFERENCES lorebooks(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_lorebook_entries_book
+    ON lorebook_entries(book_id);
+
+  CREATE INDEX IF NOT EXISTS idx_lorebook_entries_enabled
+    ON lorebook_entries(enabled);
+
+  -- Lorebook state tracks sticky entries per conversation
+  CREATE TABLE IF NOT EXISTS lorebook_state (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    entry_id TEXT NOT NULL,
+    turns_remaining INTEGER NOT NULL,
+    triggered_at_message INTEGER NOT NULL,
+    triggered_at TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+    FOREIGN KEY (entry_id) REFERENCES lorebook_entries(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_lorebook_state_conversation
+    ON lorebook_state(conversation_id);
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_lorebook_state_conversation_entry
+    ON lorebook_state(conversation_id, entry_id);
 `;
 
 /**
@@ -263,6 +326,75 @@ function runMigrations(db: Database): void {
         ON message_embeddings(conversation_id);
     `);
   }
+
+  // Migration: Add lorebook tables if missing
+  const hasLorebookTables = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'lorebooks'")
+    .get();
+
+  if (!hasLorebookTables) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS lorebooks (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        enabled INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_lorebooks_enabled
+        ON lorebooks(enabled);
+
+      CREATE TABLE IF NOT EXISTS lorebook_entries (
+        id TEXT PRIMARY KEY,
+        book_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        content TEXT NOT NULL,
+        triggers TEXT NOT NULL,
+        trigger_mode TEXT DEFAULT 'substring',
+        case_sensitive INTEGER DEFAULT 0,
+        sticky INTEGER DEFAULT 0,
+        sticky_duration INTEGER DEFAULT 0,
+        non_recursable INTEGER DEFAULT 0,
+        prevent_recursion INTEGER DEFAULT 0,
+        re_trigger_resets_timer INTEGER DEFAULT 1,
+        enabled INTEGER DEFAULT 1,
+        priority INTEGER DEFAULT 0,
+        scan_depth INTEGER DEFAULT 5,
+        max_tokens INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (book_id) REFERENCES lorebooks(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_lorebook_entries_book
+        ON lorebook_entries(book_id);
+
+      CREATE INDEX IF NOT EXISTS idx_lorebook_entries_enabled
+        ON lorebook_entries(enabled);
+
+      CREATE TABLE IF NOT EXISTS lorebook_state (
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        entry_id TEXT NOT NULL,
+        turns_remaining INTEGER NOT NULL,
+        triggered_at_message INTEGER NOT NULL,
+        triggered_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE,
+        FOREIGN KEY (entry_id) REFERENCES lorebook_entries(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_lorebook_state_conversation
+        ON lorebook_state(conversation_id);
+
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_lorebook_state_conversation_entry
+        ON lorebook_state(conversation_id, entry_id);
+    `);
+    console.log("[DB] Created lorebook tables");
+  }
 }
 
 /**
@@ -288,7 +420,7 @@ function initializeVectorTables(db: Database): void {
     if (!hasMemoryVecTable) {
       db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_memory_chunks USING vec0(
-          embedding FLOAT[${EMBEDDING_DIMENSION}]
+          embedding FLOAT[${EMBEDDING_DIMENSION}] distance=cosine
         )
       `);
       console.log("[DB] Created vec_memory_chunks virtual table");
@@ -302,7 +434,7 @@ function initializeVectorTables(db: Database): void {
     if (!hasMessageVecTable) {
       db.exec(`
         CREATE VIRTUAL TABLE IF NOT EXISTS vec_messages USING vec0(
-          embedding FLOAT[${EMBEDDING_DIMENSION}]
+          embedding FLOAT[${EMBEDDING_DIMENSION}] distance=cosine
         )
       `);
       console.log("[DB] Created vec_messages virtual table");

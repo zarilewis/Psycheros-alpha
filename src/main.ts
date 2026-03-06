@@ -12,12 +12,16 @@ const VERSION = "0.1.0";
 
 /**
  * Parse the PSYCHEROS_TOOLS environment variable into an array of tool names.
- * Returns empty array if not set (secure by default - no tools enabled).
+ * Defaults to all tools enabled.
+ * Use PSYCHEROS_TOOLS=none to disable all tools.
+ * Use PSYCHEROS_TOOLS=all to explicitly enable all tools.
+ * Use PSYCHEROS_TOOLS=tool1,tool2 to enable specific tools.
  */
 function parseAllowedTools(): string[] {
   const toolsEnv = Deno.env.get("PSYCHEROS_TOOLS");
   if (!toolsEnv || toolsEnv.trim() === "") {
-    return [];
+    // Default: all tools enabled
+    return ["all"];
   }
   return toolsEnv
     .split(",")

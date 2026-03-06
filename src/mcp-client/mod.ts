@@ -794,6 +794,153 @@ export class MCPClient {
   }
 
   /**
+   * Create a snapshot of all identity files via MCP.
+   */
+  async createSnapshot(): Promise<{
+    success: boolean;
+    snapshots?: Array<{
+      id: string;
+      category: string;
+      filename: string;
+      timestamp: string;
+    }>;
+    error?: string;
+  }> {
+    if (!this.client) {
+      return { success: false, error: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "snapshot_create",
+        arguments: {},
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        return JSON.parse(textContent);
+      }
+      return { success: false, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] snapshot_create failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * List available snapshots via MCP.
+   */
+  async listSnapshots(options?: {
+    category?: string;
+    filename?: string;
+  }): Promise<{
+    success: boolean;
+    snapshots?: Array<{
+      id: string;
+      category: string;
+      filename: string;
+      timestamp: string;
+      date: string;
+      reason: string;
+    }>;
+    error?: string;
+  }> {
+    if (!this.client) {
+      return { success: false, error: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "snapshot_list",
+        arguments: {
+          category: options?.category,
+          filename: options?.filename,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        return JSON.parse(textContent);
+      }
+      return { success: false, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] snapshot_list failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Get snapshot content via MCP.
+   */
+  async getSnapshotContent(snapshotId: string): Promise<{
+    success: boolean;
+    content?: string;
+    error?: string;
+  }> {
+    if (!this.client) {
+      return { success: false, error: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "snapshot_get",
+        arguments: {
+          snapshotId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        if (response.success && response.content) {
+          return { success: true, content: response.content };
+        }
+        return { success: false, error: response.error || "Failed to get snapshot content" };
+      }
+      return { success: false, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] getSnapshotContent failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Restore a snapshot via MCP.
+   */
+  async restoreSnapshot(snapshotId: string): Promise<{
+    success: boolean;
+    message?: string;
+    error?: string;
+  }> {
+    if (!this.client) {
+      return { success: false, error: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "snapshot_restore",
+        arguments: {
+          snapshotId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        if (response.success) {
+          // Pull to update local cache
+          await this.pull();
+        }
+        return response;
+      }
+      return { success: false, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] snapshot_restore failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
    * Start periodic sync.
    * Does a full sync: pull first (to get remote changes), then push (to send local changes).
    */

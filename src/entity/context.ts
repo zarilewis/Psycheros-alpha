@@ -288,7 +288,7 @@ export async function loadCustomContent(
 
 /**
  * Build the system message from self/, user/, relationship/, custom/ directory content,
- * and optional RAG-retrieved memories and chat history.
+ * optional RAG-retrieved memories, chat history, and lorebook content.
  * This gets included at the start of every LLM request.
  *
  * @param selfContent - The concatenated contents of self/*.md files
@@ -297,6 +297,7 @@ export async function loadCustomContent(
  * @param customContent - The concatenated contents of custom/*.md files
  * @param memoriesContent - Optional RAG-retrieved memories content
  * @param chatHistoryContent - Optional chat history content from Chat RAG
+ * @param lorebookContent - Optional lorebook-triggered content
  * @returns The formatted system message
  */
 export function buildSystemMessage(
@@ -306,6 +307,7 @@ export function buildSystemMessage(
   customContent?: string,
   memoriesContent?: string,
   chatHistoryContent?: string,
+  lorebookContent?: string,
 ): string {
   const timestamp = new Date().toISOString();
 
@@ -362,6 +364,11 @@ ${relationshipContent}`);
 Custom files (from identity/custom/ directory):
 
 ${customContent}`);
+  }
+
+  // Add lorebook-triggered content if present
+  if (lorebookContent && lorebookContent.trim()) {
+    sections.push(lorebookContent);
   }
 
   // Add RAG-retrieved memories if present

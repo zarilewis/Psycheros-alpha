@@ -130,18 +130,23 @@ export class MemoryRetriever implements Retriever {
     config: RAGConfig
   ): RetrievalResult[] {
     const serialized = serializeVector(queryEmbedding);
+    const limit = config.maxChunks * 2;
 
-    // Use a larger limit initially, then filter by score
+    // Use subquery to apply LIMIT directly to vec0 query (required by sqlite-vec)
     const stmt = this.db.prepare(
       `SELECT m.id, m.content, m.source_file, m.token_count, m.metadata, m.created_at, v.distance
-       FROM memory_chunks m
-       JOIN vec_memory_chunks v ON m.rowid = v.rowid
-       WHERE v.embedding MATCH ?
-       ORDER BY v.distance
-       LIMIT ?`
+       FROM (
+         SELECT rowid, distance
+         FROM vec_memory_chunks
+         WHERE embedding MATCH ?
+         ORDER BY distance
+         LIMIT ?
+       ) v
+       JOIN memory_chunks m ON m.rowid = v.rowid
+       ORDER BY v.distance`
     );
 
-    const rows = stmt.all<VectorSearchRow>(serialized, config.maxChunks * 2);
+    const rows = stmt.all<VectorSearchRow>(serialized, limit);
     stmt.finalize();
 
     const instanceBoost = config.instanceBoost ?? 0.1;

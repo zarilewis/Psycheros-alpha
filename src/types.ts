@@ -170,6 +170,8 @@ export interface LLMContextSnapshot {
   memoriesContent?: string;
   /** ChatRAG-retrieved chat history context */
   chatHistoryContent?: string;
+  /** Lorebook-triggered world info content */
+  lorebookContent?: string;
   /** The messages array sent to the LLM (excluding system) */
   messages: Array<{
     role: string;

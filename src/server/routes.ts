@@ -15,6 +15,7 @@ import type { ToolRegistry } from "../tools/mod.ts";
 import type { Retriever, RAGConfig } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
+import type { LorebookManager } from "../lorebook/mod.ts";
 import { EntityTurn, type EntityYield, generateAndSetTitle } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
 import {
@@ -29,6 +30,9 @@ import {
   renderSaveError,
   renderSnapshotsView,
   renderSnapshotPreview,
+  renderLorebooksView,
+  renderLorebookDetailView,
+  renderEntryEditor,
   escapeHtml,
   type MetricsMap,
 } from "./templates.ts";
@@ -60,6 +64,8 @@ export interface RouteContext {
   memoryEnabled?: boolean;
   /** Optional MCP client for syncing with entity-core */
   mcpClient?: MCPClient;
+  /** Optional lorebook manager for world info */
+  lorebookManager?: LorebookManager;
 }
 
 /**
@@ -673,6 +679,7 @@ export async function handleChat(
             ragRetriever: ctx.ragRetriever,
             chatRAG: ctx.chatRAG,
             mcpClient: ctx.mcpClient,
+            lorebookManager: ctx.lorebookManager,
           }
         );
 
@@ -1857,5 +1864,699 @@ export async function handleSnapshotPreviewFragment(
     headers: {
       "Content-Type": "text/html; charset=utf-8",
     },
+  });
+}
+
+// =============================================================================
+// Lorebook Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/lorebooks - List all lorebooks
+ */
+export function handleListLorebooks(ctx: RouteContext): Response {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook system not available" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const lorebooks = ctx.lorebookManager.listLorebooks();
+  return new Response(JSON.stringify(lorebooks), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/lorebooks - Create a new lorebook
+ */
+export async function handleCreateLorebook(
+  ctx: RouteContext,
+  request: Request
+): Promise<Response> {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook system not available" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    const contentType = request.headers.get("content-type") || "";
+    let name: string;
+    let description: string | undefined;
+
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      const formData = await request.formData();
+      name = formData.get("name") as string;
+      description = formData.get("description") as string || undefined;
+    } else {
+      const body = await request.json();
+      name = body.name;
+      description = body.description;
+    }
+
+    if (!name || typeof name !== "string") {
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid name" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    ctx.lorebookManager.createLorebook({
+      name,
+      description,
+      enabled: true,
+    });
+
+    // Return updated list for HTMX
+    const lorebooks = ctx.lorebookManager.listLorebooks();
+    const html = renderLorebooksView(lorebooks);
+    return new Response(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ error: message }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
+/**
+ * Handle GET /api/lorebooks/:id - Get a lorebook with entries
+ */
+export function handleGetLorebook(
+  ctx: RouteContext,
+  lorebookId: string
+): Response {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook system not available" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const lorebook = ctx.lorebookManager.getLorebook(lorebookId);
+  if (!lorebook) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook not found" }),
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const entries = ctx.lorebookManager.listEntries(lorebookId);
+
+  return new Response(JSON.stringify({ ...lorebook, entries }), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle PUT /api/lorebooks/:id - Update a lorebook
+ */
+export async function handleUpdateLorebook(
+  ctx: RouteContext,
+  lorebookId: string,
+  request: Request
+): Promise<Response> {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook system not available" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const lorebook = ctx.lorebookManager.updateLorebook(lorebookId, body);
+
+    if (!lorebook) {
+      return new Response(
+        JSON.stringify({ error: "Lorebook not found" }),
+        {
+          status: 404,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    return new Response(JSON.stringify(lorebook), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ error: message }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
+/**
+ * Handle DELETE /api/lorebooks/:id - Delete a lorebook
+ */
+export function handleDeleteLorebook(
+  ctx: RouteContext,
+  lorebookId: string
+): Response {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook system not available" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const deleted = ctx.lorebookManager.deleteLorebook(lorebookId);
+  if (!deleted) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook not found" }),
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Return updated list for HTMX
+  const lorebooks = ctx.lorebookManager.listLorebooks();
+  const html = renderLorebooksView(lorebooks);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /api/lorebooks/:id/entries - List entries for a lorebook
+ */
+export function handleListLorebookEntries(
+  ctx: RouteContext,
+  lorebookId: string
+): Response {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook system not available" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const entries = ctx.lorebookManager.listEntries(lorebookId);
+  return new Response(JSON.stringify(entries), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/lorebooks/:id/entries - Create an entry
+ */
+export async function handleCreateLorebookEntry(
+  ctx: RouteContext,
+  lorebookId: string,
+  request: Request
+): Promise<Response> {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook system not available" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    const contentType = request.headers.get("content-type") || "";
+    let name: string;
+    let content: string;
+    let triggers: string[];
+    let triggerMode: string | undefined;
+    let caseSensitive: boolean = false;
+    let sticky: boolean = false;
+    let stickyDuration: number = 0;
+    let nonRecursable: boolean = false;
+    let preventRecursion: boolean = false;
+    let reTriggerResetsTimer: boolean = true;
+    let enabled: boolean = true;
+    let priority: number = 0;
+    let scanDepth: number = 5;
+    let maxTokens: number = 0;
+
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      const formData = await request.formData();
+      name = formData.get("name") as string;
+      content = formData.get("content") as string;
+      triggers = (formData.get("triggers") as string)
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+      triggerMode = formData.get("triggerMode") as string || undefined;
+      caseSensitive = formData.has("caseSensitive");
+      sticky = formData.has("sticky");
+      nonRecursable = formData.has("nonRecursable");
+      preventRecursion = formData.has("preventRecursion");
+      reTriggerResetsTimer = formData.has("reTriggerResetsTimer");
+      enabled = formData.has("enabled");
+      stickyDuration = parseInt(formData.get("stickyDuration") as string) || 0;
+      priority = parseInt(formData.get("priority") as string) || 0;
+      scanDepth = parseInt(formData.get("scanDepth") as string) || 5;
+      maxTokens = parseInt(formData.get("maxTokens") as string) || 0;
+    } else {
+      const body = await request.json();
+      name = body.name;
+      content = body.content;
+      triggers = body.triggers;
+      triggerMode = body.triggerMode;
+      caseSensitive = body.caseSensitive ?? false;
+      sticky = body.sticky ?? false;
+      stickyDuration = body.stickyDuration ?? 0;
+      nonRecursable = body.nonRecursable ?? false;
+      preventRecursion = body.preventRecursion ?? false;
+      reTriggerResetsTimer = body.reTriggerResetsTimer ?? true;
+      enabled = body.enabled ?? true;
+      priority = body.priority ?? 0;
+      scanDepth = body.scanDepth ?? 5;
+      maxTokens = body.maxTokens ?? 0;
+    }
+
+    if (!name || typeof name !== "string") {
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid name" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+    if (!content || typeof content !== "string") {
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid content" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+    if (!triggers || !Array.isArray(triggers) || triggers.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid triggers array" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    ctx.lorebookManager.createEntry(lorebookId, {
+      name,
+      content,
+      triggers,
+      triggerMode: triggerMode as "substring" | "word" | "exact" | "regex" | undefined,
+      caseSensitive,
+      sticky,
+      stickyDuration,
+      nonRecursable,
+      preventRecursion,
+      reTriggerResetsTimer,
+      enabled,
+      priority,
+      scanDepth,
+      maxTokens,
+    });
+
+    // Return updated view for HTMX
+    const lorebook = ctx.lorebookManager.getLorebook(lorebookId);
+    const entries = ctx.lorebookManager.listEntries(lorebookId);
+    if (!lorebook) {
+      return new Response(
+        JSON.stringify({ error: "Lorebook not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const html = renderLorebookDetailView(lorebook, entries);
+    return new Response(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ error: message }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
+/**
+ * Handle PUT /api/lorebooks/:bookId/entries/:entryId - Update an entry
+ */
+export async function handleUpdateLorebookEntry(
+  ctx: RouteContext,
+  _lorebookId: string,
+  entryId: string,
+  request: Request
+): Promise<Response> {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook system not available" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    const contentType = request.headers.get("content-type") || "";
+    let updateData: Record<string, unknown> = {};
+
+    if (contentType.includes("application/x-www-form-urlencoded")) {
+      const formData = await request.formData();
+      if (formData.get("name")) updateData.name = formData.get("name");
+      if (formData.get("content")) updateData.content = formData.get("content");
+      if (formData.get("triggers")) {
+        updateData.triggers = (formData.get("triggers") as string)
+          .split(",")
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0);
+      }
+      if (formData.get("triggerMode")) updateData.triggerMode = formData.get("triggerMode");
+      updateData.caseSensitive = formData.has("caseSensitive");
+      updateData.sticky = formData.has("sticky");
+      updateData.nonRecursable = formData.has("nonRecursable");
+      updateData.preventRecursion = formData.has("preventRecursion");
+      updateData.reTriggerResetsTimer = formData.has("reTriggerResetsTimer");
+      updateData.enabled = formData.has("enabled");
+      if (formData.get("stickyDuration")) updateData.stickyDuration = parseInt(formData.get("stickyDuration") as string);
+      if (formData.get("priority")) updateData.priority = parseInt(formData.get("priority") as string);
+      if (formData.get("scanDepth")) updateData.scanDepth = parseInt(formData.get("scanDepth") as string);
+      if (formData.get("maxTokens")) updateData.maxTokens = parseInt(formData.get("maxTokens") as string);
+    } else {
+      const body = await request.json();
+      updateData = body;
+    }
+
+    const entry = ctx.lorebookManager.updateEntry(entryId, updateData);
+
+    if (!entry) {
+      return new Response(
+        JSON.stringify({ error: "Entry not found" }),
+        {
+          status: 404,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    // Return updated view for HTMX
+    const lorebook = ctx.lorebookManager.getLorebook(entry.bookId);
+    const entries = ctx.lorebookManager.listEntries(entry.bookId);
+    if (!lorebook) {
+      return new Response(
+        JSON.stringify({ error: "Lorebook not found" }),
+        { status: 404, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const html = renderLorebookDetailView(lorebook, entries);
+    return new Response(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return new Response(
+      JSON.stringify({ error: message }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
+/**
+ * Handle DELETE /api/lorebooks/:bookId/entries/:entryId - Delete an entry
+ */
+export function handleDeleteLorebookEntry(
+  ctx: RouteContext,
+  lorebookId: string,
+  entryId: string
+): Response {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook system not available" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const deleted = ctx.lorebookManager.deleteEntry(entryId);
+  if (!deleted) {
+    return new Response(
+      JSON.stringify({ error: "Entry not found" }),
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Return updated view for HTMX
+  const lorebook = ctx.lorebookManager.getLorebook(lorebookId);
+  const entries = ctx.lorebookManager.listEntries(lorebookId);
+  if (!lorebook) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook not found" }),
+      { status: 404, headers: { "Content-Type": "application/json" } }
+    );
+  }
+  const html = renderLorebookDetailView(lorebook, entries);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle DELETE /api/lorebooks/state/:conversationId - Reset sticky state
+ */
+export function handleResetLorebookState(
+  ctx: RouteContext,
+  conversationId: string
+): Response {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      JSON.stringify({ error: "Lorebook system not available" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  ctx.lorebookManager.resetState(conversationId);
+
+  return new Response(
+    JSON.stringify({ success: true }),
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    }
+  );
+}
+
+// =============================================================================
+// Lorebook Fragment Handlers
+// =============================================================================
+
+/**
+ * Handle GET /fragments/settings/lorebooks - Lorebooks list view
+ */
+export function handleLorebooksFragment(ctx: RouteContext): Response {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      '<div class="error">Lorebook system not available</div>',
+      { headers: { "Content-Type": "text/html; charset=utf-8" } }
+    );
+  }
+
+  const lorebooks = ctx.lorebookManager.listLorebooks();
+  const html = renderLorebooksView(lorebooks);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/lorebooks/:id - Single lorebook view
+ */
+export function handleLorebookDetailFragment(
+  ctx: RouteContext,
+  lorebookId: string
+): Response {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      '<div class="error">Lorebook system not available</div>',
+      { headers: { "Content-Type": "text/html; charset=utf-8" } }
+    );
+  }
+
+  const lorebook = ctx.lorebookManager.getLorebook(lorebookId);
+  if (!lorebook) {
+    return new Response(
+      '<div class="error">Lorebook not found</div>',
+      { status: 404, headers: { "Content-Type": "text/html; charset=utf-8" } }
+    );
+  }
+
+  const entries = ctx.lorebookManager.listEntries(lorebookId);
+  const html = renderLorebookDetailView(lorebook, entries);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/lorebooks/:bookId/entries/:entryId/edit - Entry editor
+ */
+export function handleLorebookEntryEditFragment(
+  ctx: RouteContext,
+  _bookId: string,
+  entryId: string
+): Response {
+  if (!ctx.lorebookManager) {
+    return new Response(
+      '<div class="error">Lorebook system not available</div>',
+      { headers: { "Content-Type": "text/html; charset=utf-8" } }
+    );
+  }
+
+  const entry = ctx.lorebookManager.getEntry(entryId);
+  if (!entry) {
+    return new Response(
+      '<div class="error">Entry not found</div>',
+      { status: 404, headers: { "Content-Type": "text/html; charset=utf-8" } }
+    );
+  }
+
+  const html = renderEntryEditor(entry);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
   });
 }

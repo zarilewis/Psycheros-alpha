@@ -167,25 +167,44 @@ export class ToolRegistry {
 /**
  * Create a registry with only the specified tools enabled.
  *
- * @param allowedTools - Array of tool names to enable (empty = no tools)
+ * @param allowedTools - Array of tool names to enable. Special values:
+ *   - ["all"] or including "all": enable all available tools (default)
+ *   - ["none"] or empty array: no tools enabled
+ *   - ["tool1", "tool2"]: enable specific tools only
  * @returns A new ToolRegistry with only allowed tools registered
  *
  * @example
  * ```typescript
+ * // Enable all tools (default)
+ * const registry = createDefaultRegistry(["all"]);
+ *
  * // Enable only shell tool
  * const registry = createDefaultRegistry(["shell"]);
  *
- * // No tools enabled (secure default)
- * const registry = createDefaultRegistry([]);
+ * // No tools enabled
+ * const registry = createDefaultRegistry(["none"]);
  * ```
  */
-export function createDefaultRegistry(allowedTools: string[] = []): ToolRegistry {
+export function createDefaultRegistry(allowedTools: string[] = ["all"]): ToolRegistry {
   const registry = new ToolRegistry();
 
   // Normalize tool names to lowercase for matching
   const normalizedAllowed = new Set(allowedTools.map((t) => t.toLowerCase()));
 
-  // Register only allowed tools
+  // Handle special "none" value
+  if (normalizedAllowed.has("none")) {
+    return registry;
+  }
+
+  // If "all" is specified, enable all available tools
+  if (normalizedAllowed.has("all")) {
+    for (const tool of Object.values(AVAILABLE_TOOLS)) {
+      registry.register(tool);
+    }
+    return registry;
+  }
+
+  // Register only specified tools
   for (const toolName of normalizedAllowed) {
     const tool = AVAILABLE_TOOLS[toolName];
     if (tool) {
