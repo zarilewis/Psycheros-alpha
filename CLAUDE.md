@@ -126,7 +126,8 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 **ChatRAG**:
 - Semantic search over conversation history
 - Automatic indexing: every message embedded when saved (non-blocking)
-- Tiered search: current conversation first, expands to all if score < 0.6
+- Tiered search: current conversation first, expands to all if score < 0.5
+- Minimum similarity score: 0.3 (configurable in code)
 - One-time migration: `deno run -A scripts/index-messages.ts`
 
 **MCP Integration (entity-core)**:

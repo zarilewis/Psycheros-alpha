@@ -246,8 +246,8 @@ Psycheros uses two RAG systems working together:
 **Chat RAG** provides semantic search over conversation history:
 
 1. **Automatic Indexing**: Every message is embedded and indexed when saved
-2. **Tiered Search**: First searches current conversation; if no good matches (score < 0.6), expands to all conversations
-3. **Relevance Filtering**: Only messages above minimum similarity score are included
+2. **Tiered Search**: First searches current conversation; if no good matches (score < 0.5), expands to all conversations
+3. **Relevance Filtering**: Only messages above minimum similarity score (0.3) are included
 4. **Historical Context**: Helps the entity remember what was discussed previously
 
 **Vector Search Backend**:

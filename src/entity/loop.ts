@@ -172,8 +172,8 @@ export class EntityTurn {
           query: userMessage,
           conversationId: conversationId,
           limit: 5,
-          minScore: 0.5,
-          currentThreshold: 0.6,
+          minScore: 0.3,
+          currentThreshold: 0.5,
         });
         console.log("[ChatRAG] Found", chatMessages.length, "relevant messages");
         chatHistoryContent = formatChatHistoryForContext(chatMessages);
