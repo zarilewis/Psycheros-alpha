@@ -166,6 +166,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (input) {
     input.focus();
   }
+
+  // Scroll to bottom when chat content is swapped via HTMX (sidebar clicks)
+  document.body.addEventListener('htmx:afterSwap', (e) => {
+    if (e.detail.target.id === 'chat') {
+      scrollToBottom();
+    }
+  });
 });
 
 // =============================================================================
@@ -238,6 +245,9 @@ async function loadConversationFromUrl(conversationId) {
     if (chat) {
       chat.innerHTML = doc.body.innerHTML;
     }
+
+    // Scroll to bottom to show most recent messages
+    scrollToBottom();
 
     // Mark as active in sidebar after it loads
     // Use a small delay to wait for the sidebar conversation list to load
