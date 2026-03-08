@@ -167,3 +167,12 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 - CSS classes: `.user-text` for user messages, `.assistant-text` for assistant messages
 - Supports: headers, lists (bullets/numbered), code blocks, blockquotes, tables, links, emphasis
 - Dependencies: `jsdom` provides DOM environment for DOMPurify sanitization
+
+**Stop Generation**:
+- Two-tap confirmation prevents accidental cancellation
+- States: "Stop" (orange) → "Tap again" (pulsing amber, 3s timeout) → stops
+- Partial response is NOT persisted when stopped (only saved after streaming completes)
+- User message IS persisted (saved before streaming begins)
+- Conversation switching also aborts streams and restores button state
+- Implemented in `web/js/psycheros.js`: `requestStopGeneration()`, `stopGeneration()`
+- CSS styles in `web/css/components.css`: `.stop-btn`, `.stop-confirm`

@@ -570,6 +570,69 @@
   cursor: not-allowed;
 }
 
+/* Stop button - replaces send button during streaming */
+.stop-btn {
+  font-family: var(--font-mono);
+  padding: 0 var(--sp-6);
+  background-color: var(--c-error);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  min-width: 80px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: background-color var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+
+.stop-btn:hover:not(:disabled) {
+  background-color: #ff6666;
+  box-shadow: 0 0 12px rgba(255, 68, 68, 0.4);
+}
+
+.stop-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* First tap - orange warning state requiring confirmation */
+.stop-btn.stop-confirm {
+  background-color: #f59e0b;
+  border-color: #f59e0b;
+  color: #000;
+  animation: pulse-warning 0.5s ease-in-out infinite alternate;
+}
+
+.stop-btn.stop-confirm:hover:not(:disabled) {
+  background-color: #fbbf24;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.5);
+}
+
+@keyframes pulse-warning {
+  from { opacity: 1; }
+  to { opacity: 0.7; }
+}
+
+/* Stop icon styling */
+.stop-icon {
+  margin-right: var(--sp-1);
+}
+
+/* ==========================================================================
+   Stopped Indicator
+   ========================================================================== */
+.stopped-indicator {
+  display: inline-block;
+  margin-top: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  background-color: var(--c-bg-sunken);
+  border-radius: var(--radius-sm);
+  opacity: 0.7;
+}
+
 /* ==========================================================================
    Empty State
    ========================================================================== */

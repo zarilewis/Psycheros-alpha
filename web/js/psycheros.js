@@ -349,11 +349,17 @@ function selectConversation(id) {
     item.classList.toggle('active', item.dataset.convId === id);
   });
 
-  // Re-enable input
+  // Re-enable input and restore send button
   const input = document.getElementById('message-input');
   const sendBtn = document.getElementById('send-btn');
   if (input) input.disabled = false;
-  if (sendBtn) sendBtn.disabled = false;
+  if (sendBtn) {
+    sendBtn.textContent = 'Send';
+    sendBtn.onclick = Psycheros.sendMessage;
+    sendBtn.classList.remove('stop-btn');
+    sendBtn.classList.add('send-btn');
+    sendBtn.disabled = false;
+  }
 
   // Close sidebar after selecting conversation
   toggleSidebar();
@@ -372,6 +378,50 @@ function handleKeyDown(event) {
   if (event.key === 'Enter' && !event.shiftKey) {
     event.preventDefault();
     sendMessage();
+  }
+}
+
+// Track if stop button has been pressed once (for double-tap confirmation)
+let stopConfirmed = false;
+
+/**
+ * Handle first tap on stop button - require confirmation.
+ * Shows a red confirm state, then stops on second tap.
+ */
+function requestStopGeneration() {
+  const sendBtn = document.getElementById('send-btn');
+  if (!sendBtn || !isStreaming) return;
+
+  if (stopConfirmed) {
+    // Second tap - actually stop
+    stopGeneration();
+  } else {
+    // First tap - show confirmation state (orange warning)
+    stopConfirmed = true;
+    sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Tap again';
+    sendBtn.classList.add('stop-confirm');
+
+    // Reset confirmation after 3 seconds if not tapped again
+    setTimeout(() => {
+      if (stopConfirmed && isStreaming) {
+        stopConfirmed = false;
+        sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Stop';
+        sendBtn.classList.remove('stop-confirm');
+      }
+    }, 3000);
+  }
+}
+
+/**
+ * Stop the current generation by aborting the request.
+ * This prevents the partial assistant message from being persisted.
+ */
+function stopGeneration() {
+  if (currentAbortController && isStreaming) {
+    currentAbortController.abort();
+    currentAbortController = null;
+    stopConfirmed = false;
+    // The finally block in sendMessage will handle cleanup
   }
 }
 
@@ -408,7 +458,15 @@ async function sendMessage() {
   input.value = '';
   input.style.height = 'auto';
   input.disabled = true;
-  sendBtn.disabled = true;
+
+  // Switch send button to stop button (requires double-tap)
+  stopConfirmed = false;
+  sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Stop';
+  sendBtn.onclick = Psycheros.requestStopGeneration;
+  sendBtn.classList.add('stop-btn');
+  sendBtn.classList.remove('send-btn', 'stop-confirm');
+  sendBtn.disabled = false; // Enable so user can click stop
+
   isStreaming = true;
 
   // Remove empty state if present
@@ -508,7 +566,12 @@ async function sendMessage() {
     }
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.log('Request aborted');
+      console.log('Request aborted by user');
+      // Show stopped indicator
+      const stoppedEl = document.createElement('div');
+      stoppedEl.className = 'stopped-indicator';
+      stoppedEl.textContent = '[Stopped]';
+      assistantEl.querySelector('.msg-content')?.appendChild(stoppedEl);
       return;
     }
 
@@ -531,7 +594,16 @@ async function sendMessage() {
 
     // Re-enable input
     if (input) input.disabled = false;
-    if (sendBtn) sendBtn.disabled = false;
+
+    // Restore send button from stop button
+    if (sendBtn) {
+      sendBtn.textContent = 'Send';
+      sendBtn.onclick = Psycheros.sendMessage;
+      sendBtn.classList.remove('stop-btn', 'stop-confirm');
+      sendBtn.classList.add('send-btn');
+      sendBtn.disabled = false;
+    }
+
     isStreaming = false;
     input?.focus();
   }
@@ -1727,6 +1799,8 @@ globalThis.Psycheros = {
   autoResize,
   handleKeyDown,
   sendMessage,
+  requestStopGeneration,
+  stopGeneration,
   // Selection mode
   enterSelectionMode,
   exitSelectionMode,

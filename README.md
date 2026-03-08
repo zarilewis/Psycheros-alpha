@@ -400,6 +400,20 @@ A built-in debugging tool for inspecting the full context sent to the LLM. Click
 
 The context is captured automatically for each message and can be inspected at any time during or after the response.
 
+### Stop Generation
+
+During message streaming, the Send button transforms into a Stop button with two-tap confirmation to prevent accidental cancellation:
+
+**States:**
+1. **Stop** (orange with warning icon) - Initial state during streaming
+2. **Tap again** (pulsing amber) - Confirmation required, resets after 3 seconds if not tapped again
+3. **[Stopped]** - Shown in the message when generation is halted
+
+**Behavior:**
+- The partial assistant response is **not persisted** to the database when stopped
+- The user message **is persisted** (saved before streaming begins)
+- Switching conversations mid-stream also aborts the generation and restores the Send button
+
 ### API Endpoints
 
 | Method | Path | Description |
