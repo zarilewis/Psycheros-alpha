@@ -439,11 +439,58 @@ function initializeVectorTables(db: Database): void {
       `);
       console.log("[DB] Created vec_messages virtual table");
     }
+
+    // Verify and repair vector table sync
+    verifyVectorTableSync(db);
   } catch (error) {
     // Log warning but don't fail - vector search is optional
     console.warn(
       "[DB] Failed to initialize sqlite-vec extension. Vector search will fall back to in-memory calculation.",
       error instanceof Error ? error.message : String(error)
     );
+  }
+}
+
+/**
+ * Verify that virtual tables are in sync with main tables.
+ * If out of sync, clear the tracking tables to force a full reindex.
+ */
+function verifyVectorTableSync(db: Database): void {
+  // Check memory_chunks vs vec_memory_chunks
+  const memoryChunksCount = db
+    .prepare("SELECT COUNT(*) as count FROM memory_chunks")
+    .get<{ count: number }>()?.count ?? 0;
+
+  const vecMemoryCount = db
+    .prepare("SELECT COUNT(*) as count FROM vec_memory_chunks")
+    .get<{ count: number }>()?.count ?? 0;
+
+  if (memoryChunksCount !== vecMemoryCount) {
+    console.warn(
+      `[DB] Vector table mismatch: memory_chunks=${memoryChunksCount}, vec_memory_chunks=${vecMemoryCount}. Clearing index to force reindex.`
+    );
+    // Clear both tables to force a full reindex on next startup
+    db.exec("DELETE FROM vec_memory_chunks");
+    db.exec("DELETE FROM memory_chunks");
+    db.exec("DELETE FROM indexed_memories");
+  }
+
+  // Check message_embeddings vs vec_messages
+  const messageEmbeddingsCount = db
+    .prepare("SELECT COUNT(*) as count FROM message_embeddings")
+    .get<{ count: number }>()?.count ?? 0;
+
+  const vecMessagesCount = db
+    .prepare("SELECT COUNT(*) as count FROM vec_messages")
+    .get<{ count: number }>()?.count ?? 0;
+
+  if (messageEmbeddingsCount !== vecMessagesCount) {
+    console.warn(
+      `[DB] Vector table mismatch: message_embeddings=${messageEmbeddingsCount}, vec_messages=${vecMessagesCount}. Clearing to force reindex.`
+    );
+    // Clear both tables to force reindexing
+    db.exec("DELETE FROM vec_messages");
+    db.exec("DELETE FROM message_embeddings");
+    // Note: We don't need to clear any tracking table here since messages are reindexed on-demand
   }
 }

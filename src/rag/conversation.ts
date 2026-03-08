@@ -483,7 +483,7 @@ export function formatChatHistoryForContext(
   // Simple token estimation: ~4 chars per token
   const estimateTokens = (text: string) => Math.ceil(text.length / 4);
 
-  const lines: string[] = ["Relevant past conversation:"];
+  const lines: string[] = ["Relevant Chat History via RAG:"];
   let totalTokens = estimateTokens(lines[0]);
 
   for (const msg of messages) {

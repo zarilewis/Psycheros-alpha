@@ -7,6 +7,7 @@
 import "@std/dotenv/load";
 import { Server } from "./server/mod.ts";
 import { createMCPClient, type MCPClient } from "./mcp-client/mod.ts";
+import { initialize } from "./init/mod.ts";
 
 const VERSION = "0.1.0";
 
@@ -63,6 +64,9 @@ console.log(`
 ║  Entity Harness Daemon                ║
 ╚═══════════════════════════════════════╝
 `);
+
+// Initialize user data directories from templates
+await initialize(config.projectRoot);
 
 console.log(`Starting server on http://${config.hostname}:${config.port}`);
 console.log(`Project root: ${config.projectRoot}`);

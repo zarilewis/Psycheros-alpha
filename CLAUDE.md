@@ -60,6 +60,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/types.ts` | Shared types (SSEEvent, LLMContextSnapshot, ToolCall, etc.) |
 | `src/entity/loop.ts` | Agentic loop - LLM calls, tool execution, context capture |
 | `src/entity/context.ts` | Context loading (supports MCP client) |
+| `src/init/mod.ts` | Initialization - copies templates to empty identity directories |
 | `src/server/routes.ts` | API endpoints and handlers (chat, conversations, snapshots) |
 | `src/server/broadcaster.ts` | Persistent SSE for background updates |
 | `src/server/state-changes.ts` | Unified state mutations |
@@ -73,11 +74,14 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/memory/types.ts` | Memory types with instance tagging |
 | `src/memory/consolidator.ts` | Weekly/monthly/yearly consolidation |
 | `src/rag/mod.ts` | RAG retrieval system |
+| `src/rag/context-builder.ts` | Formats retrieved memories for context (labeled "via RAG") |
 | `src/rag/retriever.ts` | Memory similarity search with instance boost |
 | `src/rag/conversation.ts` | ChatRAG - semantic search over chat history |
 | `src/rag/indexer.ts` | Memory indexing with sqlite-vec sync |
+| `src/db/schema.ts` | Database schema, migrations, and vector table sync verification |
 | `src/db/vector.ts` | sqlite-vec helpers, serialization, search |
 | `src/mcp-client/mod.ts` | MCP client for entity-core connection |
+| `templates/identity/` | Default identity templates (tracked in git) |
 | `scripts/migrate-to-entity-core.ts` | Migration script for entity-core |
 | `scripts/index-messages.ts` | Index existing messages for ChatRAG |
 | `web/js/psycheros.js` | Client-side SSE handling, context viewer |
@@ -123,6 +127,14 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 - Retrieves top-k similar chunks before each LLM call
 - Instance relevance boost: memories from same embodiment get +0.1 score
 - Vector search: sqlite-vec (primary) or in-memory cosine similarity (fallback)
+- Context headers explicitly labeled "via RAG" so entity understands their retrieval mechanism
+- Auto-repair: startup verification detects vector table sync issues and forces reindex
+
+**User Data Protection**:
+- `identity/`, `memories/`, `.snapshots/` directories are in `.gitignore` (protected from git overwrites)
+- Fresh installations get default identity files from `templates/identity/` via `src/init/mod.ts`
+- Local user data is never overwritten by `git pull`
+- Entity-core remains the canonical source of identity data (Psycheros `identity/` is a local cache)
 
 **ChatRAG**:
 - Semantic search over conversation history

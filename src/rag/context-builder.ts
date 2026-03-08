@@ -26,7 +26,7 @@ export function formatMemories(results: RetrievalResult[]): string {
   return `
 
 ---
-Relevant Memories:
+Relevant Memories via RAG:
 
 ${sections.join("\n\n")}`;
 }
