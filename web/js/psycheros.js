@@ -440,6 +440,7 @@ async function sendMessage() {
 
   let currentThinking = null;
   let currentContent = null;
+  let currentRawContent = ""; // Buffer for raw markdown during streaming
 
   // Create abort controller
   currentAbortController = new AbortController();
@@ -495,7 +496,10 @@ async function sendMessage() {
             getThinking: () => currentThinking,
             setThinking: (el) => currentThinking = el,
             getContent: () => currentContent,
-            setContent: (el) => currentContent = el
+            setContent: (el) => currentContent = el,
+            getRawContent: () => currentRawContent,
+            setRawContent: (text) => currentRawContent = text,
+            appendRawContent: (text) => currentRawContent += text
           });
           currentEventType = 'content';
           dataLines = [];
@@ -523,6 +527,7 @@ async function sendMessage() {
     // Clear state
     pendingToolCalls.clear();
     currentAbortController = null;
+    currentRawContent = ""; // Reset markdown buffer
 
     // Re-enable input
     if (input) input.disabled = false;
@@ -564,6 +569,8 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         contentContainer.appendChild(contentEl);
         state.setContent(contentEl);
       }
+      // Store raw markdown and show it during streaming
+      state.appendRawContent(data);
       state.getContent().textContent += data;
       break;
 
@@ -647,6 +654,18 @@ function handleSSEEvent(eventType, data, messageEl, state) {
       contentContainer.querySelectorAll('.thinking.expanded, .tool.expanded').forEach(el => {
         el.classList.remove('expanded');
       });
+      // Render markdown in content element after streaming completes
+      const contentEl = state.getContent();
+      const rawContent = state.getRawContent();
+      if (contentEl && rawContent) {
+        try {
+          const parsedHtml = marked.parse(rawContent);
+          contentEl.innerHTML = DOMPurify.sanitize(parsedHtml);
+        } catch (e) {
+          console.error('Failed to parse markdown:', e);
+          // Fallback: keep raw text
+        }
+      }
       break;
   }
 

@@ -50,7 +50,7 @@
     text-decoration: none;
   }
 
-  ul,
-  ol {
+  nav ul,
+  nav ol {
     list-style: none;
   }

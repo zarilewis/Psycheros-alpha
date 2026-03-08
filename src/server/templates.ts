@@ -9,6 +9,7 @@
 
 import type { Conversation, Message, ToolCall, ToolResult, TurnMetrics } from "../types.ts";
 import type { Lorebook, LorebookEntry } from "../lorebook/mod.ts";
+import { renderMarkdown } from "./markdown.ts";
 
 // =============================================================================
 // Utilities
@@ -169,13 +170,15 @@ export function renderAppShell(): string {
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Psycheros</title>
-  <link rel="stylesheet" href="/css/main.css?v=10">
+  <link rel="stylesheet" href="/css/main.css?v=11">
   ${getAccentColorOverride()}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.svg">
   <script src="/lib/htmx.min.js"></script>
   <script src="/lib/htmx-sse.js"></script>
+  <script src="/lib/marked.min.js"></script>
+  <script src="/lib/dompurify.min.js"></script>
 </head>
 <body>
   <div class="app">
@@ -378,7 +381,7 @@ export function renderMessage(msg: Message, metrics?: TurnMetrics): string {
 export function renderUserMessage(content: string): string {
   return `<div class="msg msg--user">
   <div class="msg-header">You</div>
-  <div class="msg-content">${escapeHtml(content)}</div>
+  <div class="msg-content user-text">${renderMarkdown(content)}</div>
 </div>`;
 }
 
@@ -402,9 +405,9 @@ export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics): str
     }
   }
 
-  // Main content
+  // Main content - render markdown for assistant messages
   if (msg.content) {
-    html += `<div class="assistant-text">${escapeHtml(msg.content)}</div>`;
+    html += `<div class="assistant-text">${renderMarkdown(msg.content)}</div>`;
   }
 
   html += `</div></div>`;

@@ -238,7 +238,6 @@
   background-color: var(--c-bg-raised);
   color: var(--c-fg);
   border: 1px solid var(--c-border);
-  white-space: pre-wrap;
   word-wrap: break-word;
   font-size: var(--font-size-base);
   line-height: 1.6;
@@ -258,6 +257,69 @@
   line-height: var(--line-height);
   letter-spacing: -0.01em;
 }
+
+/* Markdown styles for assistant text */
+.assistant-text h1 { font-size: 1.5em; margin: var(--sp-3) 0 var(--sp-2); font-weight: var(--font-weight-semibold); }
+.assistant-text h2 { font-size: 1.3em; margin: var(--sp-3) 0 var(--sp-2); font-weight: var(--font-weight-semibold); }
+.assistant-text h3 { font-size: 1.15em; margin: var(--sp-2) 0 var(--sp-1); font-weight: var(--font-weight-medium); }
+.assistant-text h4 { font-size: 1em; margin: var(--sp-2) 0 var(--sp-1); font-weight: var(--font-weight-medium); }
+.assistant-text ul, .assistant-text ol { margin: var(--sp-2) 0; padding-left: var(--sp-6); list-style-position: outside; }
+.assistant-text ul { list-style-type: disc; }
+.assistant-text ol { list-style-type: decimal; }
+.assistant-text li { margin: var(--sp-1) 0; display: list-item; }
+.assistant-text blockquote { border-left: 3px solid var(--c-accent); padding-left: var(--sp-3); margin: var(--sp-3) 0; color: var(--c-fg-muted); }
+.assistant-text a { color: var(--c-accent); text-decoration: underline; }
+.assistant-text hr { border: none; border-top: 1px solid var(--c-border); margin: var(--sp-4) 0; }
+.assistant-text p { margin: var(--sp-2) 0; }
+.assistant-text p:first-child { margin-top: 0; }
+.assistant-text p:last-child { margin-bottom: 0; }
+.assistant-text table { border-collapse: collapse; width: 100%; margin: var(--sp-3) 0; }
+.assistant-text th, .assistant-text td { border: 1px solid var(--c-border); padding: var(--sp-2); text-align: left; }
+.assistant-text th { background: var(--c-bg-sunken); }
+.assistant-text img { max-width: 100%; border-radius: var(--radius-sm); }
+.assistant-text strong { font-weight: var(--font-weight-semibold); }
+.assistant-text em { font-style: italic; }
+.assistant-text del { text-decoration: line-through; color: var(--c-fg-muted); }
+
+/* User message markdown styles */
+.user-text h1,
+.user-text h2,
+.user-text h3,
+.user-text h4,
+.user-text h5,
+.user-text h6 { color: var(--c-accent); margin-top: var(--sp-3); margin-bottom: var(--sp-2); }
+
+.user-text h1 { font-size: 1.5em; font-weight: var(--font-weight-bold); }
+.user-text h2 { font-size: 1.3em; font-weight: var(--font-weight-bold); }
+.user-text h3 { font-size: 1.15em; font-weight: var(--font-weight-semibold); }
+.user-text p { margin: var(--sp-2) 0; }
+
+.user-text ul,
+.user-text ol { padding-left: var(--sp-6); margin: var(--sp-2) 0; list-style-position: outside; }
+
+.user-text li { margin: var(--sp-1) 0; display: list-item; }
+
+.user-text ul li { list-style-type: disc; }
+.user-text ol li { list-style-type: decimal; }
+
+.user-text blockquote { border-left: 3px solid var(--c-accent); padding-left: var(--sp-3); margin: var(--sp-3) 0; color: var(--c-fg-muted); }
+
+.user-text hr { border: none; border-top: 1px solid var(--c-border); margin: var(--sp-4) 0; }
+
+.user-text table { border-collapse: collapse; width: 100%; margin: var(--sp-3) 0; }
+
+.user-text th,
+.user-text td { border: 1px solid var(--c-border); padding: var(--sp-2); text-align: left; }
+
+.user-text th { background: var(--c-bg-sunken); }
+
+.user-text img { max-width: 100%; border-radius: var(--radius-sm); }
+
+.user-text strong { font-weight: var(--font-weight-semibold); }
+
+.user-text em { font-style: italic; }
+
+.user-text del { text-decoration: line-through; color: var(--c-fg-muted); }
 
 /* ==========================================================================
    Thinking Section - Muted/Monochrome

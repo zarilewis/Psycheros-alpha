@@ -14,7 +14,10 @@
     "@std/fs": "jsr:@std/fs@^1",
     "@db/sqlite": "jsr:@db/sqlite@^0.12",
     "@xenova/transformers": "npm:@huggingface/transformers@3.3.1",
-    "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1"
+    "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1",
+    "marked": "npm:marked@^15",
+    "dompurify": "npm:dompurify@^3",
+    "jsdom": "npm:jsdom@^26"
   },
   "lint": {
     "exclude": ["web/lib/"]

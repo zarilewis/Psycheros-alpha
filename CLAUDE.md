@@ -82,6 +82,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `scripts/index-messages.ts` | Index existing messages for ChatRAG |
 | `web/js/psycheros.js` | Client-side SSE handling, context viewer |
 | `web/css/components.css` | UI component styles including context viewer |
+| `src/server/markdown.ts` | Server-side markdown rendering with DOMPurify sanitization |
 
 ## Patterns
 
@@ -159,5 +160,10 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 - Timezone configurable via `TZ` environment variable (defaults to UTC)
 - Implemented in `src/entity/loop.ts` via `formatMessageTimestamp()`
 
-# currentDate
-Today's date is 2026-03-02.
+**Markdown Rendering**:
+- Both user and assistant messages render markdown formatting
+- Server-side: `renderMarkdown()` in `src/server/markdown.ts` uses `marked` + `DOMPurify`
+- Client-side: Raw text shown during streaming, parsed to markdown on `done` event
+- CSS classes: `.user-text` for user messages, `.assistant-text` for assistant messages
+- Supports: headers, lists (bullets/numbered), code blocks, blockquotes, tables, links, emphasis
+- Dependencies: `jsdom` provides DOM environment for DOMPurify sanitization
