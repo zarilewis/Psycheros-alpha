@@ -33,6 +33,7 @@ import {
   renderLorebooksView,
   renderLorebookDetailView,
   renderEntryEditor,
+  renderGraphView,
   escapeHtml,
   type MetricsMap,
 } from "./templates.ts";
@@ -2558,5 +2559,248 @@ export function handleLorebookEntryEditFragment(
   const html = renderEntryEditor(entry);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+// =============================================================================
+// Knowledge Graph Routes
+// =============================================================================
+
+/**
+ * Handle GET /graph - Knowledge Graph visualization page
+ *
+ * @param ctx - Route context
+ * @returns HTTP Response with graph visualization HTML
+ */
+export async function handleGraphView(ctx: RouteContext): Promise<Response> {
+  // Graph data is in entity-core - require MCP connection
+  if (!ctx.mcpClient) {
+    return new Response(
+      `<div class="error">Knowledge Graph requires entity-core connection. Please enable MCP.</div>`,
+      {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      }
+    );
+  }
+
+  // Get initial stats
+  const stats = await ctx.mcpClient.getGraphStats();
+  const html = renderGraphView(stats);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /api/graph/data - Get full graph data for visualization
+ *
+ * @param ctx - Route context
+ * @returns HTTP Response with JSON graph data
+ */
+export async function handleGetGraphData(ctx: RouteContext): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({ error: "Knowledge Graph requires entity-core connection" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    const [nodes, edges, stats] = await Promise.all([
+      ctx.mcpClient.getGraphNodes({ limit: 500 }),
+      ctx.mcpClient.getGraphEdges(),
+      ctx.mcpClient.getGraphStats(),
+    ]);
+
+    return new Response(
+      JSON.stringify({ nodes, edges, stats }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  } catch (error) {
+    console.error("[Graph] Failed to get graph data:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to fetch graph data" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
+/**
+ * Handle POST /api/graph/nodes - Create a graph node
+ *
+ * @param ctx - Route context
+ * @param request - HTTP request with node data
+ * @returns HTTP Response with result
+ */
+export async function handleCreateGraphNode(
+  ctx: RouteContext,
+  request: Request
+): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Knowledge Graph requires entity-core connection" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const result = await ctx.mcpClient.createGraphNode(body);
+    return new Response(JSON.stringify(result), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Graph] Failed to create node:", error);
+    return new Response(
+      JSON.stringify({ success: false, error: String(error) }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
+/**
+ * Handle POST /api/graph/edges - Create a graph edge
+ *
+ * @param ctx - Route context
+ * @param request - HTTP request with edge data
+ * @returns HTTP Response with result
+ */
+export async function handleCreateGraphEdge(
+  ctx: RouteContext,
+  request: Request
+): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Knowledge Graph requires entity-core connection" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const result = await ctx.mcpClient.createGraphEdge(body);
+    return new Response(JSON.stringify(result), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Graph] Failed to create edge:", error);
+    return new Response(
+      JSON.stringify({ success: false, error: String(error) }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
+/**
+ * Handle DELETE /api/graph/nodes/:id - Delete a graph node
+ *
+ * @param ctx - Route context
+ * @param nodeId - Node ID to delete
+ * @returns HTTP Response with result
+ */
+export async function handleDeleteGraphNode(
+  ctx: RouteContext,
+  nodeId: string
+): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Knowledge Graph requires entity-core connection" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const result = await ctx.mcpClient.deleteGraphNode(nodeId);
+  return new Response(JSON.stringify(result), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle DELETE /api/graph/edges/:id - Delete a graph edge
+ *
+ * @param ctx - Route context
+ * @param edgeId - Edge ID to delete
+ * @returns HTTP Response with result
+ */
+export async function handleDeleteGraphEdge(
+  ctx: RouteContext,
+  edgeId: string
+): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Knowledge Graph requires entity-core connection" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const result = await ctx.mcpClient.deleteGraphEdge(edgeId);
+  return new Response(JSON.stringify(result), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
   });
 }

@@ -59,6 +59,12 @@ import {
   handleLorebooksFragment,
   handleLorebookDetailFragment,
   handleLorebookEntryEditFragment,
+  handleGraphView,
+  handleGetGraphData,
+  handleCreateGraphNode,
+  handleCreateGraphEdge,
+  handleDeleteGraphNode,
+  handleDeleteGraphEdge,
   type RouteContext,
 } from "./routes.ts";
 import { getBroadcaster } from "./broadcaster.ts";
@@ -558,6 +564,37 @@ export class Server {
       return handleResetLorebookState(ctx, lorebookStateMatch[1]);
     }
 
+    // ========================================
+    // Knowledge Graph API Routes
+    // ========================================
+
+    // GET /api/graph - Get full graph data
+    if (method === "GET" && path === "/api/graph") {
+      return await handleGetGraphData(ctx);
+    }
+
+    // POST /api/graph/nodes - Create node
+    if (method === "POST" && path === "/api/graph/nodes") {
+      return await handleCreateGraphNode(ctx, request);
+    }
+
+    // POST /api/graph/edges - Create edge
+    if (method === "POST" && path === "/api/graph/edges") {
+      return await handleCreateGraphEdge(ctx, request);
+    }
+
+    // DELETE /api/graph/nodes/:id - Delete node
+    const graphNodeMatch = path.match(/^\/api\/graph\/nodes\/([^/]+)$/);
+    if (method === "DELETE" && graphNodeMatch) {
+      return await handleDeleteGraphNode(ctx, graphNodeMatch[1]);
+    }
+
+    // DELETE /api/graph/edges/:id - Delete edge
+    const graphEdgeMatch = path.match(/^\/api\/graph\/edges\/([^/]+)$/);
+    if (method === "DELETE" && graphEdgeMatch) {
+      return await handleDeleteGraphEdge(ctx, graphEdgeMatch[1]);
+    }
+
     // 404 for unknown API routes
     return new Response(
       JSON.stringify({ error: "API endpoint not found" }),
@@ -654,6 +691,15 @@ export class Server {
     const lorebookEntryEditMatch = path.match(/^\/fragments\/settings\/lorebooks\/([^/]+)\/entries\/([^/]+)\/edit$/);
     if (lorebookEntryEditMatch) {
       return handleLorebookEntryEditFragment(ctx, lorebookEntryEditMatch[1], lorebookEntryEditMatch[2]);
+    }
+
+    // ========================================
+    // Knowledge Graph Fragment Routes
+    // ========================================
+
+    // GET /fragments/settings/graph - Graph visualization fragment
+    if (path === "/fragments/settings/graph") {
+      return await handleGraphView(ctx);
     }
 
     // Serve static files from web/ directory

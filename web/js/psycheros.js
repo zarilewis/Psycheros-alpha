@@ -171,6 +171,11 @@ document.addEventListener('DOMContentLoaded', () => {
   document.body.addEventListener('htmx:afterSwap', (e) => {
     if (e.detail.target.id === 'chat') {
       scrollToBottom();
+
+      // Initialize graph view if present
+      if (document.getElementById('graph-container')) {
+        loadGraphView();
+      }
     }
   });
 });
@@ -1794,6 +1799,59 @@ async function deleteCustomFile(filename) {
   } catch (error) {
     console.error('Failed to delete custom file:', error);
     showToast('Failed to delete file');
+  }
+}
+
+// =============================================================================
+// Graph View
+// =============================================================================
+
+let graphViewLoaded = false;
+
+/**
+ * Load and initialize the graph view.
+ * Dynamically loads vis-network and graph-view.js if needed.
+ */
+async function loadGraphView() {
+  if (graphViewLoaded) return;
+  graphViewLoaded = true;
+
+  console.log('[Psycheros] Loading graph view...');
+
+  // Load vis-network if not already loaded
+  if (typeof vis === 'undefined') {
+    console.log('[Psycheros] Loading vis-network...');
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://unpkg.com/vis-network/standalone/umd/vis-network.min.js';
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+    console.log('[Psycheros] vis-network loaded');
+  }
+
+  // Load graph-view.js if not already loaded
+  if (typeof initGraph === 'undefined') {
+    console.log('[Psycheros] Loading graph-view.js...');
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = '/js/graph-view.js?v=' + Date.now();
+      script.onload = () => {
+        console.log('[Psycheros] graph-view.js loaded, initGraph type:', typeof initGraph);
+        resolve();
+      };
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  // Initialize the graph
+  if (typeof initGraph === 'function') {
+    console.log('[Psycheros] Initializing graph...');
+    initGraph();
+  } else {
+    console.error('[Psycheros] initGraph is not a function:', typeof initGraph, initGraph);
   }
 }
 

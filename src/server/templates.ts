@@ -192,7 +192,7 @@ export function renderAppShell(): string {
       </div>
     </div>
   </div>
-  <script type="module" src="/js/psycheros.js?v=10"></script>
+  <script type="module" src="/js/psycheros.js?v=11"></script>
 </body>
 </html>`;
 }
@@ -264,6 +264,20 @@ export function renderSidebar(conversations: Conversation[]): string {
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
       </svg>
       <span>Context Notes</span>
+    </a>
+    <a class="sidebar-settings-link"
+      hx-get="/fragments/settings/graph"
+      hx-target="#chat"
+      hx-swap="innerHTML"
+      onclick="Psycheros.closeSidebarAfterNav()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="3"/>
+        <circle cx="19" cy="5" r="2"/>
+        <circle cx="5" cy="19" r="2"/>
+        <line x1="14.5" y1="9.5" x2="17.5" y2="6.5"/>
+        <line x1="9.5" y1="14.5" x2="6.5" y2="17.5"/>
+      </svg>
+      <span>Knowledge Graph</span>
     </a>
   </div>
 </aside>`;
@@ -818,7 +832,7 @@ export function renderSnapshotsView(
     timestamp: string;
     date: string;
     reason: string;
-    source: string;
+    source?: string;
   }>
 ): string {
   // Group snapshots by date
@@ -1311,4 +1325,390 @@ export function renderEntryEditor(entry: LorebookEntry): string {
   </form>`;
 }
 
+
+
+// =============================================================================
+// Knowledge Graph Templates
+// =============================================================================
+
+/**
+ * Render the Knowledge Graph visualization view.
+ */
+export function renderGraphView(stats: {
+  totalNodes: number;
+  totalEdges: number;
+  nodesByType: Record<string, number>;
+  edgesByType: Record<string, number>;
+  vectorSearchAvailable: boolean;
+} | null): string {
+  const nodeCount = stats?.totalNodes ?? 0;
+  const edgeCount = stats?.totalEdges ?? 0;
+  const vectorStatus = stats?.vectorSearchAvailable ? "Enabled" : "Disabled";
+
+  return `
+<div class="graph-view">
+  <div class="graph-header">
+    <h2>Knowledge Graph</h2>
+    <div class="graph-stats">
+      <span class="stat"><strong>${nodeCount}</strong> nodes</span>
+      <span class="stat"><strong>${edgeCount}</strong> edges</span>
+      <span class="stat">Vector search: ${vectorStatus}</span>
+    </div>
+  </div>
+
+  <div class="graph-toolbar">
+    <div class="toolbar-left">
+      <button id="graph-zoom-fit" class="btn btn--ghost" title="Fit to view">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+        </svg>
+        Fit
+      </button>
+      <button id="graph-zoom-in" class="btn btn--ghost" title="Zoom in">+</button>
+      <button id="graph-zoom-out" class="btn btn--ghost" title="Zoom out">−</button>
+    </div>
+    <div class="toolbar-center">
+      <input type="text" id="graph-search" placeholder="Search nodes..." class="search-input" />
+    </div>
+    <div class="toolbar-right">
+      <select id="graph-filter-type" class="filter-select">
+        <option value="">All Types</option>
+      </select>
+      <button id="graph-refresh" class="btn btn--ghost">Refresh</button>
+    </div>
+  </div>
+
+  <div id="graph-container" class="graph-container">
+    <div class="graph-loading">
+      <div class="spinner"></div>
+      <p>Loading graph data...</p>
+    </div>
+  </div>
+
+  <div id="graph-node-panel" class="graph-node-panel hidden">
+    <div class="panel-header">
+      <h3 id="panel-node-label">Node Details</h3>
+      <button id="panel-close" class="btn btn--ghost btn--small">×</button>
+    </div>
+    <div class="panel-content" id="panel-content">
+      <!-- Node details populated by JS -->
+    </div>
+  </div>
+
+  <div id="graph-create-modal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Create Node</h3>
+      <form id="create-node-form">
+        <div class="form-group">
+          <label for="node-type">Type</label>
+          <select id="node-type" name="type" required>
+            <option value="person">Person</option>
+            <option value="emotion">Emotion</option>
+            <option value="event">Event</option>
+            <option value="topic">Topic</option>
+            <option value="preference">Preference</option>
+            <option value="place">Place</option>
+            <option value="goal">Goal</option>
+            <option value="health">Health</option>
+            <option value="boundary">Boundary</option>
+            <option value="tradition">Tradition</option>
+            <option value="insight">Insight</option>
+            <option value="memory_ref">Memory Reference</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="node-label">Label</label>
+          <input type="text" id="node-label" name="label" required placeholder="Enter a label..." />
+        </div>
+        <div class="form-group">
+          <label for="node-description">Description</label>
+          <textarea id="node-description" name="description" rows="3" placeholder="Optional description..."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="node-perspective">Perspective</label>
+          <select id="node-perspective" name="perspective">
+            <option value="shared">Shared</option>
+            <option value="user">User</option>
+            <option value="entity">Entity</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="node-confidence">Confidence</label>
+          <input type="range" id="node-confidence" name="confidence" min="0" max="1" step="0.1" value="0.5" />
+          <span id="confidence-value">0.5</span>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn--primary">Create</button>
+          <button type="button" class="btn btn--ghost" id="cancel-create">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="graph-actions">
+    <button id="graph-create-node" class="btn btn--primary">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Create Node
+    </button>
+    <button id="graph-create-edge" class="btn btn--secondary" disabled>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+      Connect Nodes
+    </button>
+    <button id="graph-delete" class="btn btn--danger" disabled>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+      Delete
+    </button>
+  </div>
+</div>
+
+<style>
+.graph-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-secondary);
+}
+
+.graph-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.graph-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.graph-stats {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.stat strong {
+  color: var(--accent-color);
+}
+
+.graph-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  background: var(--bg-primary);
+  border-bottom: 1px solid var(--border-color);
+  gap: 1rem;
+}
+
+.toolbar-left, .toolbar-right {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.toolbar-center {
+  flex: 1;
+  max-width: 300px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.filter-select {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.graph-container {
+  flex: 1;
+  position: relative;
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.graph-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--border-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.graph-node-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 100%;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border-color);
+  box-shadow: -2px 0 8px rgba(0,0,0,0.2);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+.graph-node-panel.hidden {
+  transform: translateX(100%);
+  transition: transform 0.2s ease;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.panel-content {
+  padding: 1rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.graph-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-color);
+}
+
+.graph-actions .btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: var(--bg-primary);
+  padding: 1.5rem;
+  border-radius: 8px;
+  max-width: 400px;
+  width: 90%;
+}
+
+.modal-content h3 {
+  margin: 0 0 1rem;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.detail-label {
+  color: var(--text-secondary);
+}
+
+.detail-section {
+  margin-top: 1rem;
+}
+
+.detail-section h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.connection-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.connection-list li {
+  padding: 0.25rem 0;
+}
+
+.node-id {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.graph-empty, .graph-error {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.graph-error .error-message {
+  color: var(--danger-color);
+  margin: 0.5rem 0;
+}
+
+/* vis.js network overrides */
+.vis-network {
+  outline: none !important;
+}
+</style>
+`;
+}
 

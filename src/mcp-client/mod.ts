@@ -960,6 +960,287 @@ export class MCPClient {
       }
     }, this.config.syncInterval!);
   }
+
+  // ========================================
+  // GRAPH METHODS
+  // ========================================
+
+  /**
+   * Get graph statistics via MCP.
+   */
+  async getGraphStats(): Promise<{
+    totalNodes: number;
+    totalEdges: number;
+    nodesByType: Record<string, number>;
+    edgesByType: Record<string, number>;
+    vectorSearchAvailable: boolean;
+  } | null> {
+    if (!this.client) {
+      console.log("[MCP] Not connected, cannot get graph stats");
+      return null;
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_stats",
+        arguments: {},
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        return JSON.parse(textContent);
+      }
+      return null;
+    } catch (error) {
+      console.error("[MCP] Graph stats failed:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all nodes via MCP.
+   */
+  async getGraphNodes(options?: {
+    type?: string;
+    perspective?: string;
+    limit?: number;
+  }): Promise<Array<{
+    id: string;
+    type: string;
+    label: string;
+    description: string;
+    perspective: string;
+    confidence: number;
+    createdAt: string;
+    updatedAt: string;
+  }>> {
+    if (!this.client) {
+      console.log("[MCP] Not connected, cannot get graph nodes");
+      return [];
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_node_list",
+        arguments: {
+          type: options?.type,
+          perspective: options?.perspective,
+          limit: options?.limit ?? 500,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return response.nodes ?? [];
+      }
+      return [];
+    } catch (error) {
+      console.error("[MCP] Get graph nodes failed:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Get edges via MCP.
+   */
+  async getGraphEdges(options?: {
+    fromId?: string;
+    toId?: string;
+    type?: string;
+  }): Promise<Array<{
+    id: string;
+    fromId: string;
+    toId: string;
+    type: string;
+    customType?: string;
+    perspective: string;
+    weight: number;
+  }>> {
+    if (!this.client) {
+      console.log("[MCP] Not connected, cannot get graph edges");
+      return [];
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_edge_get",
+        arguments: {
+          fromId: options?.fromId,
+          toId: options?.toId,
+          type: options?.type,
+          onlyValid: true,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return response.edges ?? [];
+      }
+      return [];
+    } catch (error) {
+      console.error("[MCP] Get graph edges failed:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Create a graph node via MCP.
+   */
+  async createGraphNode(input: {
+    type: string;
+    label: string;
+    description?: string;
+    perspective?: string;
+    properties?: Record<string, unknown>;
+    confidence?: number;
+    sourceMemoryId?: string;
+  }): Promise<{ success: boolean; nodeId?: string; error?: string }> {
+    if (!this.client) {
+      return { success: false, error: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_node_create",
+        arguments: {
+          type: input.type,
+          label: input.label,
+          description: input.description,
+          perspective: input.perspective ?? "shared",
+          properties: input.properties ?? {},
+          confidence: input.confidence ?? 0.5,
+          sourceMemoryId: input.sourceMemoryId,
+          instanceId: this.config.instanceId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return {
+          success: response.success,
+          nodeId: response.node?.id,
+          error: response.success ? undefined : response.message,
+        };
+      }
+      return { success: false, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] Create graph node failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Create a graph edge via MCP.
+   */
+  async createGraphEdge(input: {
+    fromId: string;
+    toId: string;
+    type: string;
+    customType?: string;
+    perspective?: string;
+    weight?: number;
+    evidence?: string;
+  }): Promise<{ success: boolean; edgeId?: string; error?: string }> {
+    if (!this.client) {
+      return { success: false, error: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_edge_create",
+        arguments: {
+          fromId: input.fromId,
+          toId: input.toId,
+          type: input.type,
+          customType: input.customType,
+          perspective: input.perspective ?? "shared",
+          weight: input.weight ?? 0.5,
+          evidence: input.evidence,
+          instanceId: this.config.instanceId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return {
+          success: response.success,
+          edgeId: response.edge?.id,
+          error: response.success ? undefined : response.message,
+        };
+      }
+      return { success: false, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] Create graph edge failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Delete a graph node via MCP.
+   */
+  async deleteGraphNode(nodeId: string, permanent = false): Promise<{ success: boolean; error?: string }> {
+    if (!this.client) {
+      return { success: false, error: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_node_delete",
+        arguments: {
+          id: nodeId,
+          permanent,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return {
+          success: response.success,
+          error: response.success ? undefined : response.message,
+        };
+      }
+      return { success: false, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] Delete graph node failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Delete a graph edge via MCP.
+   */
+  async deleteGraphEdge(edgeId: string): Promise<{ success: boolean; error?: string }> {
+    if (!this.client) {
+      return { success: false, error: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_edge_delete",
+        arguments: {
+          id: edgeId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return {
+          success: response.success,
+          error: response.success ? undefined : response.message,
+        };
+      }
+      return { success: false, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] Delete graph edge failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }
 }
 
 /**

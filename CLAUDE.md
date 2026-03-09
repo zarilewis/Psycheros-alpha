@@ -80,8 +80,10 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/rag/indexer.ts` | Memory indexing with sqlite-vec sync |
 | `src/db/schema.ts` | Database schema, migrations, and vector table sync verification |
 | `src/db/vector.ts` | sqlite-vec helpers, serialization, search |
-| `src/mcp-client/mod.ts` | MCP client for entity-core connection |
+| `src/mcp-client/mod.ts` | MCP client for entity-core connection (includes graph methods) |
 | `templates/identity/` | Default identity templates (tracked in git) |
+| `web/js/graph-view.js` | Knowledge graph visualization (vis-network) |
+| `src/server/routes.ts` | API endpoints (includes graph API routes) |
 | `scripts/migrate-to-entity-core.ts` | Migration script for entity-core |
 | `scripts/index-messages.ts` | Index existing messages for ChatRAG |
 | `web/js/psycheros.js` | Client-side SSE handling, context viewer |
@@ -188,3 +190,19 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 - Conversation switching also aborts streams and restores button state
 - Implemented in `web/js/psycheros.js`: `requestStopGeneration()`, `stopGeneration()`
 - CSS styles in `web/css/components.css`: `.stop-btn`, `.stop-confirm`
+
+**Knowledge Graph Visualization**:
+- Interactive graph viewer for the knowledge graph stored in entity-core
+- Access via "Knowledge Graph" link in sidebar (under Settings)
+- Uses vis-network library for interactive visualization
+- Features:
+  - Create/delete nodes (person, emotion, event, topic, preference, place, goal, health, boundary, tradition, insight)
+  - Create edges between selected nodes (close_to, feels_about, mentions, etc.)
+  - Search nodes by label/description
+  - Filter by node type
+  - Zoom/fit controls
+  - Node details panel showing connections
+- Requires MCP connection to entity-core (`PSYCHEROS_MCP_ENABLED=true`)
+- API endpoints: GET `/api/graph`, POST `/api/graph/nodes`, POST `/api/graph/edges`, DELETE `/api/graph/nodes/:id`, DELETE `/api/graph/edges/:id`
+- Client-side JS: `web/js/graph-view.js`
+- Dynamically loaded via `loadGraphView()` in psycheros.js when graph fragment is displayed

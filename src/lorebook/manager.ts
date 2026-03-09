@@ -292,7 +292,7 @@ export class LorebookManager {
     const now = new Date().toISOString();
 
     const updates: string[] = [];
-    const values: unknown[] = [];
+    const values: (string | number | null)[] = [];
 
     if (data.name !== undefined) {
       updates.push("name = ?");
