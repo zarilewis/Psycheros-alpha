@@ -278,12 +278,19 @@ export async function summarizeDay(
 
   const dateStr = date.toISOString().split("T")[0];
 
-  // Check if we've already summarized this date
+  // Check if we've already created a memory summary for this date (more reliable than chat-level check)
+  const existingSummary = db.getMemorySummary(dateStr, "daily");
+  if (existingSummary) {
+    console.log(`[Memory] Date ${dateStr} already has a summary record, skipping`);
+    return null;
+  }
+
+  // Also check if all chats are already marked as summarized (secondary check for consistency)
   const existingChatIds = db.getConversationIdsByDate(dateStr);
   const allSummarized = existingChatIds.every((chatId) => db.isChatSummarized(chatId, dateStr));
 
   if (allSummarized && existingChatIds.length > 0) {
-    console.log(`[Memory] Date ${dateStr} already summarized, skipping`);
+    console.log(`[Memory] Date ${dateStr} already summarized (via chat check), skipping`);
     return null;
   }
 
@@ -376,9 +383,9 @@ export async function consolidateWeek(
     return null;
   }
 
-  // Get all daily files for this week
+  // Get all daily files for this week (including archived)
   const { readMemoryFile, listMemoryFiles, archiveDailyMemory } = await import("./file-writer.ts");
-  const dailyFiles = await listMemoryFiles("daily", projectRoot);
+  const dailyFiles = await listMemoryFiles("daily", projectRoot, true);
 
   // Filter to files from this week
   const weekStart = getWeekStart(weekDate);
@@ -387,7 +394,8 @@ export async function consolidateWeek(
 
   const weekFiles: string[] = [];
   for (const file of dailyFiles) {
-    const match = file.match(/daily\/(\d{4}-\d{2}-\d{2})\.md$/);
+    // Match both daily/YYYY-MM-DD.md and archive/daily/YYYY-MM-DD.md
+    const match = file.match(/(?:^|\/)daily\/(\d{4}-\d{2}-\d{2})\.md$/);
     if (match) {
       const fileDate = new Date(match[1]);
       if (fileDate >= weekStart && fileDate <= weekEnd) {
@@ -514,7 +522,7 @@ export async function consolidateMonth(
   }
 
   const { readMemoryFile, listMemoryFiles, archiveDailyMemory } = await import("./file-writer.ts");
-  const weeklyFiles = await listMemoryFiles("weekly", projectRoot);
+  const weeklyFiles = await listMemoryFiles("weekly", projectRoot, true);
 
   // Filter to files from this month
   const monthStart = getMonthStart(monthDate);
@@ -524,7 +532,8 @@ export async function consolidateMonth(
 
   const monthFiles: string[] = [];
   for (const file of weeklyFiles) {
-    const match = file.match(/weekly\/(\d{4}-W\d{2})\.md$/);
+    // Match both weekly/YYYY-WNN.md and archive/weekly/YYYY-WNN.md
+    const match = file.match(/(?:^|\/)weekly\/(\d{4}-W\d{2})\.md$/);
     if (match) {
       // Parse week file date - get the Monday of that ISO week
       const weekStr = match[1];
@@ -638,13 +647,14 @@ export async function consolidateYear(
   }
 
   const { readMemoryFile, listMemoryFiles, archiveDailyMemory } = await import("./file-writer.ts");
-  const monthlyFiles = await listMemoryFiles("monthly", projectRoot);
+  const monthlyFiles = await listMemoryFiles("monthly", projectRoot, true);
 
   // Filter to files from this year
   const year = yearDate.getFullYear();
   const yearFiles: string[] = [];
   for (const file of monthlyFiles) {
-    const match = file.match(/monthly\/(\d{4})-\d{2}\.md$/);
+    // Match both monthly/YYYY-MM.md and archive/monthly/YYYY-MM.md
+    const match = file.match(/(?:^|\/)monthly\/(\d{4})-\d{2}\.md$/);
     if (match) {
       const fileYear = parseInt(match[1]);
       if (fileYear === year) {

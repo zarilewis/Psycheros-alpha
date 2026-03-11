@@ -37,8 +37,8 @@ export async function writeMemoryFile(
       return true;
     }
 
-    // Record in database for consolidatable granularities
-    const summaryId = db.createMemorySummary(
+    // Record in database for consolidatable granularities (use upsert to prevent duplicates)
+    const summaryId = db.upsertMemorySummary(
       memory.date,
       memory.granularity as "daily" | "weekly" | "monthly" | "yearly",
       `memories/${memory.path}`,
@@ -131,15 +131,18 @@ export async function readMemoryFile(
  *
  * @param granularity - The granularity level
  * @param projectRoot - Root directory of the project
+ * @param includeArchive - Whether to include archived files (default: false)
  * @returns Array of file paths (relative to memories directory)
  */
 export async function listMemoryFiles(
   granularity: Granularity,
-  projectRoot: string
+  projectRoot: string,
+  includeArchive = false
 ): Promise<string[]> {
-  const dirPath = `${projectRoot}/memories/${granularity}`;
   const files: string[] = [];
 
+  // Read from active directory
+  const dirPath = `${projectRoot}/memories/${granularity}`;
   try {
     for await (const entry of Deno.readDir(dirPath)) {
       if (entry.isFile && entry.name.endsWith(".md") && entry.name !== ".gitkeep") {
@@ -149,6 +152,22 @@ export async function listMemoryFiles(
   } catch (error) {
     if (!(error instanceof Deno.errors.NotFound)) {
       throw error;
+    }
+  }
+
+  // Read from archive directory if requested
+  if (includeArchive) {
+    const archivePath = `${projectRoot}/memories/archive/${granularity}`;
+    try {
+      for await (const entry of Deno.readDir(archivePath)) {
+        if (entry.isFile && entry.name.endsWith(".md") && entry.name !== ".gitkeep") {
+          files.push(`archive/${granularity}/${entry.name}`);
+        }
+      }
+    } catch (error) {
+      if (!(error instanceof Deno.errors.NotFound)) {
+        throw error;
+      }
     }
   }
 

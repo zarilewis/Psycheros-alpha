@@ -680,6 +680,27 @@ export class DBClient {
   // ===========================================================================
 
   /**
+   * Gets an existing memory summary record.
+   *
+   * @param date - The date being summarized
+   * @param granularity - The granularity level
+   * @returns The summary record or null if not found
+   */
+  getMemorySummary(
+    date: string,
+    granularity: "daily" | "weekly" | "monthly" | "yearly"
+  ): { id: string; filePath: string; chatIds: string[] } | null {
+    const stmt = this.db.prepare(
+      `SELECT id, file_path, chat_ids FROM memory_summaries
+       WHERE date = ? AND granularity = ?`
+    );
+    const row = stmt.get<{ id: string; file_path: string; chat_ids: string }>(date, granularity);
+    stmt.finalize();
+    if (!row) return null;
+    return { id: row.id, filePath: row.file_path, chatIds: JSON.parse(row.chat_ids) };
+  }
+
+  /**
    * Creates a new memory summary record.
    *
    * @param date - The date being summarized
@@ -704,6 +725,32 @@ export class DBClient {
     );
 
     return id;
+  }
+
+  /**
+   * Creates a memory summary record or returns existing ID if one already exists.
+   * Prevents duplicate records for the same (date, granularity) pair.
+   *
+   * @param date - The date being summarized
+   * @param granularity - The granularity level
+   * @param filePath - Path to the memory file
+   * @param chatIds - Array of chat IDs included in the summary
+   * @returns The summary ID (existing or newly created)
+   */
+  upsertMemorySummary(
+    date: string,
+    granularity: "daily" | "weekly" | "monthly" | "yearly",
+    filePath: string,
+    chatIds: string[]
+  ): string {
+    // Check for existing record first
+    const existing = this.getMemorySummary(date, granularity);
+    if (existing) {
+      console.log(`[DB] Memory summary already exists for ${date} (${granularity}), reusing ID ${existing.id}`);
+      return existing.id;
+    }
+    // Insert new
+    return this.createMemorySummary(date, granularity, filePath, chatIds);
   }
 
   /**
