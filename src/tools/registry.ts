@@ -18,6 +18,15 @@ import { appendToUserTool } from "./identity-casual.ts";
 import { appendToRelationshipTool } from "./identity-casual.ts";
 import { maintainIdentityTool } from "./identity-maintain.ts";
 import { listIdentitySnapshotsTool } from "./identity-maintain.ts";
+// Graph read tools
+import {
+  graphSearchNodesTool,
+  graphGetNodeTool,
+  graphGetEdgesTool,
+  graphTraverseTool,
+  graphGetSubgraphTool,
+  graphStatsTool,
+} from "./graph-read.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -40,6 +49,13 @@ const AVAILABLE_TOOLS: Record<string, Tool> = {
   // Tier 2: Maintenance tools (full suite for intentional reorganization)
   maintain_identity: maintainIdentityTool,
   list_identity_snapshots: listIdentitySnapshotsTool,
+  // Graph read tools (query the knowledge graph)
+  graph_search_nodes: graphSearchNodesTool,
+  graph_get_node: graphGetNodeTool,
+  graph_get_edges: graphGetEdgesTool,
+  graph_traverse: graphTraverseTool,
+  graph_get_subgraph: graphGetSubgraphTool,
+  graph_stats: graphStatsTool,
 };
 
 /**

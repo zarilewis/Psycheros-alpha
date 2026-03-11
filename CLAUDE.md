@@ -123,7 +123,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 - Archived dailies moved to `memories/archive/daily/`
 
 **RAG Retrieval**:
-- Two RAG systems: Memory RAG (memories/) and ChatRAG (chat history)
+- Three RAG systems: Memory RAG (memories/), ChatRAG (chat history), and Graph RAG (knowledge graph)
 - Enabled by default, configured via `PSYCHEROS_RAG_*` env vars
 - Embeds memory files on startup using HuggingFace transformers (all-MiniLM-L6-v2, 384 dims)
 - Retrieves top-k similar chunks before each LLM call
@@ -131,6 +131,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 - Vector search: sqlite-vec (primary) or in-memory cosine similarity (fallback)
 - Context headers explicitly labeled "via RAG" so entity understands their retrieval mechanism
 - Auto-repair: startup verification detects vector table sync issues and forces reindex
+- **Graph RAG**: When MCP is enabled, knowledge graph context is retrieved and injected into the system prompt alongside memories
 
 **User Data Protection**:
 - `identity/`, `memories/`, `.snapshots/` directories are in `.gitignore` (protected from git overwrites)

@@ -228,8 +228,8 @@ function renderGraph() {
  * Handle network click
  */
 function handleNetworkClick(params) {
-  // Update selection
-  selectedNodes = params.nodes || [];
+  // Update selection - use network.getSelectedNodes() for accurate multi-select
+  selectedNodes = network.getSelectedNodes() || [];
   updateButtonStates();
 
   // Show node details panel
@@ -439,11 +439,11 @@ function setupEventListeners() {
     e.preventDefault();
     const form = e.target;
     const data = {
-      type: form.nodeType.value,
-      label: form.nodeLabel.value,
-      description: form.nodeDescription.value,
-      perspective: form.nodePerspective.value,
-      confidence: parseFloat(form.nodeConfidence.value)
+      type: form.type.value,
+      label: form.label.value,
+      description: form.description.value,
+      perspective: form.perspective.value,
+      confidence: parseFloat(form.confidence.value)
     };
 
     try {

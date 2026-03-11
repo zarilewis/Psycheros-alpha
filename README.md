@@ -50,6 +50,12 @@ open http://localhost:3000
 | `append_to_relationship` | Add relationship understanding (Tier 1) |
 | `maintain_identity` | Full identity file maintenance (Tier 2) |
 | `list_identity_snapshots` | View available backups (Tier 2) |
+| `graph_search_nodes` | Search knowledge graph for relevant nodes |
+| `graph_get_node` | Get a specific node by ID |
+| `graph_get_edges` | Get relationships from the graph |
+| `graph_traverse` | Traverse graph from a starting node |
+| `graph_get_subgraph` | Extract a subgraph centered on a node |
+| `graph_stats` | Get knowledge graph statistics |
 
 ### RAG Settings
 
@@ -234,7 +240,7 @@ memories/
 
 ### RAG System
 
-Psycheros uses two RAG systems working together:
+Psycheros uses three RAG systems working together:
 
 **Memory RAG** retrieves relevant memories before each LLM call:
 
@@ -249,6 +255,13 @@ Psycheros uses two RAG systems working together:
 2. **Tiered Search**: First searches current conversation; if no good matches (score < 0.5), expands to all conversations
 3. **Relevance Filtering**: Only messages above minimum similarity score (0.3) are included
 4. **Historical Context**: Helps the entity remember what was discussed previously
+
+**Graph RAG** retrieves knowledge graph context when MCP is enabled:
+
+1. **Semantic Search**: Queries the knowledge graph for relevant nodes using vector similarity
+2. **Graph Traversal**: Follows edges to find connected concepts (depth 1 by default)
+3. **Context Injection**: Relevant nodes and relationships are formatted and added to the system prompt
+4. **Temporal Awareness**: Nodes include timestamps for when knowledge was learned/confirmed
 
 **Vector Search Backend**:
 - Primary: sqlite-vec extension for efficient vector similarity search

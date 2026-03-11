@@ -53,7 +53,12 @@ export { MemoryIndexer, createIndexer } from "./indexer.ts";
 export { MemoryRetriever, createRetriever } from "./retriever.ts";
 
 // Context Builder
-export { formatMemories, buildRAGContext } from "./context-builder.ts";
+export {
+  formatMemories,
+  buildRAGContext,
+  buildGraphContext,
+} from "./context-builder.ts";
+export type { BuildGraphContextOptions, GraphContextResult } from "./context-builder.ts";
 
 // Conversational RAG
 export {

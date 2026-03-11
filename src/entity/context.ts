@@ -288,7 +288,7 @@ export async function loadCustomContent(
 
 /**
  * Build the system message from self/, user/, relationship/, custom/ directory content,
- * optional RAG-retrieved memories, chat history, and lorebook content.
+ * optional RAG-retrieved memories, chat history, lorebook content, and graph context.
  * This gets included at the start of every LLM request.
  *
  * @param selfContent - The concatenated contents of self/*.md files
@@ -298,6 +298,7 @@ export async function loadCustomContent(
  * @param memoriesContent - Optional RAG-retrieved memories content
  * @param chatHistoryContent - Optional chat history content from Chat RAG
  * @param lorebookContent - Optional lorebook-triggered content
+ * @param graphContent - Optional knowledge graph context
  * @returns The formatted system message
  */
 export function buildSystemMessage(
@@ -308,6 +309,7 @@ export function buildSystemMessage(
   memoriesContent?: string,
   chatHistoryContent?: string,
   lorebookContent?: string,
+  graphContent?: string,
 ): string {
   const timestamp = new Date().toISOString();
 
@@ -381,6 +383,11 @@ ${customContent}`);
     sections.push(`---
 
 ${chatHistoryContent}`);
+  }
+
+  // Add graph context if present
+  if (graphContent && graphContent.trim()) {
+    sections.push(graphContent);
   }
 
   return sections.join("\n");

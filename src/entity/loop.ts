@@ -32,7 +32,7 @@ import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
 import { loadSelfContent, loadUserContent, loadRelationshipContent, loadCustomContent, buildSystemMessage } from "./context.ts";
-import { buildRAGContext, formatChatHistoryForContext } from "../rag/mod.ts";
+import { buildRAGContext, formatChatHistoryForContext, buildGraphContext } from "../rag/mod.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
 import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
 
@@ -225,7 +225,43 @@ export class EntityTurn {
       }
     }
 
-    const systemMessage = buildSystemMessage(selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent);
+    // Retrieve relevant knowledge graph context if MCP client is available
+    let graphContent: string | undefined;
+    if (this.config.mcpClient) {
+      console.log("[Graph] Searching knowledge graph for:", userMessage.substring(0, 50));
+      try {
+        const graphResult = await buildGraphContext(
+          userMessage,
+          this.config.mcpClient,
+          {
+            maxNodes: 8,
+            minScore: 0.3,
+            includeRelated: true,
+            traversalDepth: 1,
+          }
+        );
+        if (graphResult.context) {
+          graphContent = graphResult.context;
+          console.log(
+            "[Graph] Found",
+            graphResult.nodeCount,
+            "nodes and",
+            graphResult.edgeCount,
+            "edges (",
+            graphContent.length,
+            "chars)"
+          );
+        }
+      } catch (error) {
+        // Non-fatal: log and continue without graph context
+        console.error(
+          "EntityTurn: Graph context retrieval failed:",
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+
+    const systemMessage = buildSystemMessage(selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent, graphContent);
 
     // Get conversation history from DB
     const history = this.db.getMessages(conversationId);
@@ -277,6 +313,7 @@ export class EntityTurn {
       memoriesContent,
       chatHistoryContent,
       lorebookContent,
+      graphContent,
       messages: messages.slice(1).map((msg) => ({
         role: msg.role,
         content: msg.content,

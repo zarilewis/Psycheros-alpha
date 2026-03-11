@@ -1241,6 +1241,215 @@ export class MCPClient {
       return { success: false, error: String(error) };
     }
   }
+
+  /**
+   * Get a single graph node by ID via MCP.
+   */
+  async getGraphNode(nodeId: string): Promise<{
+    id: string;
+    type: string;
+    label: string;
+    description: string;
+    perspective: string;
+    confidence: number;
+  } | null> {
+    if (!this.client) {
+      return null;
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_node_get",
+        arguments: {
+          id: nodeId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (!textContent) {
+        return null;
+      }
+
+      const response = JSON.parse(textContent);
+      return response.node ?? null;
+    } catch (error) {
+      console.error("[MCP] Get graph node failed:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Search graph nodes via MCP.
+   */
+  async searchGraphNodes(
+    query: string,
+    type?: string,
+    limit?: number,
+    minScore?: number
+  ): Promise<Array<{
+    id: string;
+    type: string;
+    label: string;
+    description: string;
+    confidence: number;
+    createdAt: string;
+    updatedAt: string;
+    score: number;
+  }>> {
+    if (!this.client) {
+      return [];
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_node_search",
+        arguments: {
+          query,
+          type,
+          limit: limit ?? 10,
+          minScore: minScore ?? 0.3,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (!textContent) {
+        return [];
+      }
+
+      const response = JSON.parse(textContent);
+      return (response.results ?? []).map((r: { node: { id: string; type: string; label: string; description: string; perspective: string; confidence: number; createdAt: string; updatedAt: string }; score: number }) => ({
+        id: r.node.id,
+        type: r.node.type,
+        label: r.node.label,
+        description: r.node.description,
+        perspective: r.node.perspective,
+        confidence: r.node.confidence,
+        createdAt: r.node.createdAt,
+        updatedAt: r.node.updatedAt,
+        score: r.score,
+      }));
+    } catch (error) {
+      console.error("[MCP] Search graph nodes failed:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Traverse graph from a starting node.
+   */
+  async traverseGraph(
+    startNodeId: string,
+    direction?: "out" | "in" | "both",
+    maxDepth?: number,
+    edgeTypes?: string[]
+  ): Promise<{
+    startNode?: { id: string; label: string; type: string };
+    results: Array<{
+      node: { id: string; label: string; type: string; description?: string };
+      path: string[];
+      depth: number;
+    }>;
+  }> {
+    if (!this.client) {
+      return { startNode: undefined, results: [] };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_traverse",
+        arguments: {
+          startNodeId,
+          direction: direction ?? "both",
+          maxDepth: maxDepth ?? 2,
+          edgeTypes,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (!textContent) {
+        return { startNode: undefined, results: [] };
+      }
+
+      const response = JSON.parse(textContent);
+      return {
+        startNode: response.startNode ? {
+          id: response.startNode.id,
+          label: response.startNode.label,
+          type: response.startNode.type,
+        } : undefined,
+        results: (response.results ?? []).map((r: { node: { id: string; label: string; type: string; description?: string }; path: string[]; depth: number }) => ({
+          node: {
+            id: r.node.id,
+            label: r.node.label,
+            type: r.node.type,
+            description: r.node.description,
+          },
+          path: r.path,
+          depth: r.depth,
+        })),
+      };
+    } catch (error) {
+      console.error("[MCP] Traverse graph failed:", error);
+      return { startNode: undefined, results: [] };
+    }
+  }
+
+  /**
+   * Get a subgraph centered on a node.
+   */
+  async getGraphSubgraph(
+    nodeId: string,
+    depth?: number
+  ): Promise<{
+    node?: { id: string; label: string; type: string };
+    nodes: Array<{ id: string; label: string; type: string; description?: string }>;
+    edges: Array<{ id: string; fromId: string; toId: string; type: string; customType?: string; weight: number }>;
+  }> {
+    if (!this.client) {
+      return { node: undefined, nodes: [], edges: [] };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_subgraph",
+        arguments: {
+          nodeId,
+          depth: depth ?? 2,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (!textContent) {
+        return { node: undefined, nodes: [], edges: [] };
+      }
+
+      const response = JSON.parse(textContent);
+      return {
+        node: response.node ? {
+          id: response.node.id,
+          label: response.node.label,
+          type: response.node.type,
+        } : undefined,
+        nodes: (response.nodes ?? []).map((n: { id: string; label: string; type: string; description?: string }) => ({
+          id: n.id,
+          label: n.label,
+          type: n.type,
+          description: n.description,
+        })),
+        edges: (response.edges ?? []).map((e: { id: string; fromId: string; toId: string; type: string; customType?: string; weight: number }) => ({
+          id: e.id,
+          fromId: e.fromId,
+          toId: e.toId,
+          type: e.type,
+          customType: e.customType,
+          weight: e.weight ?? 0.5,
+        })),
+      };
+    } catch (error) {
+      console.error("[MCP] Get graph subgraph failed:", error);
+      return { node: undefined, nodes: [], edges: [] };
+    }
+  }
 }
 
 /**

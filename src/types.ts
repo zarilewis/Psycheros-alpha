@@ -172,6 +172,8 @@ export interface LLMContextSnapshot {
   chatHistoryContent?: string;
   /** Lorebook-triggered world info content */
   lorebookContent?: string;
+  /** Knowledge graph context */
+  graphContent?: string;
   /** The messages array sent to the LLM (excluding system) */
   messages: Array<{
     role: string;
