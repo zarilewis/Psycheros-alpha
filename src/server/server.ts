@@ -65,6 +65,10 @@ import {
   handleCreateGraphEdge,
   handleDeleteGraphNode,
   handleDeleteGraphEdge,
+  handleAppearanceSettingsFragment,
+  handleListBackgrounds,
+  handleUploadBackground,
+  handleDeleteBackground,
   type RouteContext,
 } from "./routes.ts";
 import { getBroadcaster } from "./broadcaster.ts";
@@ -595,6 +599,28 @@ export class Server {
       return await handleDeleteGraphEdge(ctx, graphEdgeMatch[1]);
     }
 
+    // ========================================
+    // Background Image API Routes
+    // ========================================
+
+    // GET /api/backgrounds - List background images
+    // POST /api/backgrounds - Upload background image
+    if (path === "/api/backgrounds") {
+      if (method === "GET") {
+        return await handleListBackgrounds(ctx);
+      }
+      if (method === "POST") {
+        return await handleUploadBackground(ctx, request);
+      }
+    }
+
+    // DELETE /api/backgrounds/:filename - Delete background image
+    const backgroundDeleteMatch = path.match(/^\/api\/backgrounds\/([^/]+)$/);
+    if (method === "DELETE" && backgroundDeleteMatch) {
+      const filename = backgroundDeleteMatch[1];
+      return await handleDeleteBackground(ctx, filename);
+    }
+
     // 404 for unknown API routes
     return new Response(
       JSON.stringify({ error: "API endpoint not found" }),
@@ -700,6 +726,21 @@ export class Server {
     // GET /fragments/settings/graph - Graph visualization fragment
     if (path === "/fragments/settings/graph") {
       return await handleGraphView(ctx);
+    }
+
+    // ========================================
+    // Appearance Settings Routes
+    // ========================================
+
+    // GET /fragments/settings/appearance - Appearance settings fragment
+    if (path === "/fragments/settings/appearance") {
+      return handleAppearanceSettingsFragment(ctx);
+    }
+
+    // GET /backgrounds/:filename - Serve background image files
+    if (path.startsWith("/backgrounds/")) {
+      const filename = path.replace("/backgrounds/", "");
+      return await handleStaticFile(ctx, `/backgrounds/${filename}`);
     }
 
     // Serve static files from web/ directory

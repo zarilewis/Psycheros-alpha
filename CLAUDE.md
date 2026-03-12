@@ -89,6 +89,8 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `web/js/psycheros.js` | Client-side SSE handling, context viewer |
 | `web/css/components.css` | UI component styles including context viewer |
 | `src/server/markdown.ts` | Server-side markdown rendering with DOMPurify sanitization |
+| `web/js/theme.js` | Client-side theme management (colors, backgrounds, glass effect) |
+| `web/css/tokens.css` | CSS custom properties (colors, spacing, glassmorphism) |
 
 ## Patterns
 
@@ -207,3 +209,31 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 - API endpoints: GET `/api/graph`, POST `/api/graph/nodes`, POST `/api/graph/edges`, DELETE `/api/graph/nodes/:id`, DELETE `/api/graph/edges/:id`
 - Client-side JS: `web/js/graph-view.js`
 - Dynamically loaded via `loadGraphView()` in psycheros.js when graph fragment is displayed
+
+**Appearance Settings**:
+- Customizable UI theming accessible via "Appearance" link in sidebar (under Settings)
+- Features:
+  - **Color Themes**: 8 preset themes (Cosmic, Ocean, Forest, Sunset, Lavender, Midnight, Ember, Frost) with distinct accent colors
+  - **Custom Accent Color**: Color picker for personalized accent color
+  - **Background Images**:
+    - Upload custom background images (JPEG, PNG, GIF, WebP up to 5MB)
+    - Apply backgrounds from URL
+    - Gallery of uploaded backgrounds with thumbnails
+    - Delete uploaded backgrounds
+  - **Background Controls**:
+    - Blur slider (0-20px) for background image blur effect
+    - Overlay opacity slider (0-100%) for dark overlay on background
+  - **Glass Effect**: Frosted glass (glassmorphism) effect on UI panels when background is active
+    - Uses `backdrop-filter: blur()` with semi-transparent backgrounds
+    - Automatically hides dark overlay when enabled for proper blur visibility
+- Theme preferences persisted to localStorage via `web/js/theme.js`
+- CSS variables defined in `web/css/tokens.css` (colors, glass effect values)
+- Background image styles in `web/css/layout.css`
+- API endpoints:
+  - GET `/api/backgrounds` - List uploaded backgrounds
+  - POST `/api/backgrounds` - Upload new background
+  - DELETE `/api/backgrounds/:filename` - Delete background
+  - GET `/backgrounds/:filename` - Serve background image file
+- Background images stored in `web/backgrounds/` directory
+- Fragment route: GET `/fragments/settings/appearance`
+- Template: `renderAppearanceSettings()` in `src/server/templates.ts`

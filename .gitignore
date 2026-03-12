@@ -11,6 +11,9 @@ deno.lock
 # User data directories (protected from git overwrites)
 /identity/
 /memories/
+/backgrounds/
+web/backgrounds/*
+!web/backgrounds/.gitkeep
 .psycheros/
 /.snapshots/
 

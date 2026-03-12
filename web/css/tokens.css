@@ -77,4 +77,22 @@
   --header-height: 52px;
   --input-height: 48px;
   --content-max-width: 720px;
+
+  /* Theme system */
+  --theme-mode: dark;
+
+  /* Background image */
+  --bg-image: none;
+  --bg-image-url: "";
+  --bg-blur: 0px;
+  --bg-overlay-opacity: 0;
+
+  /* Glassmorphism */
+  --glass-bg: rgba(10, 10, 10, 0.85);
+  --glass-blur: 12px;
+  --glass-border: rgba(255, 255, 255, 0.08);
+
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
 }

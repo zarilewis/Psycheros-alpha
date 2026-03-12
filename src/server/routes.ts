@@ -34,6 +34,7 @@ import {
   renderLorebookDetailView,
   renderEntryEditor,
   renderGraphView,
+  renderAppearanceSettings,
   escapeHtml,
   type MetricsMap,
 } from "./templates.ts";
@@ -89,6 +90,21 @@ const MIME_TYPES: Record<string, string> = {
   ".ttf": "font/ttf",
   ".eot": "application/vnd.ms-fontobject",
 };
+
+/**
+ * Allowed image MIME types for background uploads.
+ */
+const ALLOWED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+];
+
+/**
+ * Maximum file size for background uploads (5MB).
+ */
+const MAX_BACKGROUND_SIZE = 5 * 1024 * 1024;
 
 /**
  * Get MIME type for a file path.
@@ -2803,4 +2819,240 @@ export async function handleDeleteGraphEdge(
       "Access-Control-Allow-Origin": "*",
     },
   });
+}
+
+// =============================================================================
+// Appearance Settings Routes
+// =============================================================================
+
+/**
+ * Handle GET /fragments/settings/appearance - Appearance settings fragment
+ *
+ * @param _ctx - Route context
+ * @returns HTTP Response with appearance settings HTML fragment
+ */
+export function handleAppearanceSettingsFragment(_ctx: RouteContext): Response {
+  const html = renderAppearanceSettings();
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+// =============================================================================
+// Background Image Upload Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/backgrounds - List uploaded background images
+ *
+ * @param ctx - Route context
+ * @returns HTTP Response with JSON array of backgrounds
+ */
+export async function handleListBackgrounds(ctx: RouteContext): Promise<Response> {
+  const backgroundsDir = `${ctx.projectRoot}/web/backgrounds`;
+  const backgrounds: Array<{ filename: string; url: string }> = [];
+
+  try {
+    for await (const entry of Deno.readDir(backgroundsDir)) {
+      if (entry.isFile && /\.(jpg|jpeg|png|gif|webp)$/i.test(entry.name)) {
+        backgrounds.push({
+          filename: entry.name,
+          url: `/backgrounds/${entry.name}`,
+        });
+      }
+    }
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) {
+      throw error;
+    }
+  }
+
+  return new Response(JSON.stringify({ backgrounds }), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/backgrounds - Upload a background image
+ *
+ * @param ctx - Route context
+ * @param request - HTTP Request with multipart form data
+ * @returns HTTP Response with JSON result
+ */
+export async function handleUploadBackground(
+  ctx: RouteContext,
+  request: Request
+): Promise<Response> {
+  try {
+    const formData = await request.formData();
+    const file = formData.get("background");
+
+    if (!file || !(file instanceof File)) {
+      return new Response(
+        JSON.stringify({ error: "No file provided" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    // Validate file type
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid file type. Allowed: JPEG, PNG, GIF, WebP" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    // Validate file size
+    if (file.size > MAX_BACKGROUND_SIZE) {
+      return new Response(
+        JSON.stringify({ error: "File too large. Maximum size: 5MB" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+
+    // Ensure backgrounds directory exists (inside web/ for static serving)
+    const backgroundsDir = `${ctx.projectRoot}/web/backgrounds`;
+    await Deno.mkdir(backgroundsDir, { recursive: true });
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+    const filename = `bg-${timestamp}-${randomSuffix}.${ext}`;
+
+    // Write file
+    const filePath = `${backgroundsDir}/${filename}`;
+    const arrayBuffer = await file.arrayBuffer();
+    await Deno.writeFile(filePath, new Uint8Array(arrayBuffer));
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        filename,
+        url: `/backgrounds/${filename}`,
+      }),
+      {
+        status: 201,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Upload failed";
+    return new Response(
+      JSON.stringify({ error: message }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
+/**
+ * Handle DELETE /api/backgrounds/:filename - Delete a background image
+ *
+ * @param ctx - Route context
+ * @param filename - The filename to delete
+ * @returns HTTP Response with JSON result
+ */
+export async function handleDeleteBackground(
+  ctx: RouteContext,
+  filename: string
+): Promise<Response> {
+  // Sanitize filename - only allow safe characters
+  const decodedFilename = decodeURIComponent(filename);
+  if (!/^[a-zA-Z0-9_.-]+$/.test(decodedFilename)) {
+    return new Response(
+      JSON.stringify({ error: "Invalid filename" }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Only allow image files
+  if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(decodedFilename)) {
+    return new Response(
+      JSON.stringify({ error: "Invalid file type" }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    const filePath = `${ctx.projectRoot}/web/backgrounds/${decodedFilename}`;
+    await Deno.remove(filePath);
+
+    return new Response(
+      JSON.stringify({ success: true, message: "Background deleted" }),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      return new Response(
+        JSON.stringify({ error: "File not found" }),
+        {
+          status: 404,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        }
+      );
+    }
+    const message = error instanceof Error ? error.message : "Delete failed";
+    return new Response(
+      JSON.stringify({ error: message }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
 }

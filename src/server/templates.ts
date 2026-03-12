@@ -181,6 +181,8 @@ export function renderAppShell(): string {
   <script src="/lib/dompurify.min.js"></script>
 </head>
 <body>
+  <div class="bg-layer"></div>
+  <div class="bg-overlay"></div>
   <div class="app">
     ${renderHeader()}
     <div class="main">
@@ -192,6 +194,7 @@ export function renderAppShell(): string {
       </div>
     </div>
   </div>
+  <script src="/js/theme.js?v=1"></script>
   <script type="module" src="/js/psycheros.js?v=11"></script>
 </body>
 </html>`;
@@ -278,6 +281,24 @@ export function renderSidebar(conversations: Conversation[]): string {
         <line x1="9.5" y1="14.5" x2="6.5" y2="17.5"/>
       </svg>
       <span>Knowledge Graph</span>
+    </a>
+    <a class="sidebar-settings-link"
+      hx-get="/fragments/settings/appearance"
+      hx-target="#chat"
+      hx-swap="innerHTML"
+      onclick="Psycheros.closeSidebarAfterNav()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="5"/>
+        <line x1="12" y1="1" x2="12" y2="3"/>
+        <line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/>
+        <line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+      <span>Appearance</span>
     </a>
   </div>
 </aside>`;
@@ -1712,3 +1733,549 @@ export function renderGraphView(stats: {
 `;
 }
 
+// =============================================================================
+// Appearance Settings Templates
+// =============================================================================
+
+/**
+ * Render the Appearance Settings view.
+ */
+export function renderAppearanceSettings(): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <h1 class="settings-title">Appearance</h1>
+    <p class="settings-desc">Customize colors, background images, and visual effects</p>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <!-- Color Theme Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Color Theme</h3>
+      <p class="theme-section-desc">Choose a predefined accent color or create your own</p>
+      <div class="theme-grid" id="theme-grid">
+        <button class="theme-swatch" data-theme="phosphor" title="Phosphor Green" style="--swatch-color: #39ff14">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Phosphor</span>
+        </button>
+        <button class="theme-swatch" data-theme="ocean" title="Ocean Blue" style="--swatch-color: #00d4ff">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Ocean</span>
+        </button>
+        <button class="theme-swatch" data-theme="sunset" title="Sunset Orange" style="--swatch-color: #ff6b35">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Sunset</span>
+        </button>
+        <button class="theme-swatch" data-theme="violet" title="Violet Dream" style="--swatch-color: #a855f7">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Violet</span>
+        </button>
+        <button class="theme-swatch" data-theme="rose" title="Rose" style="--swatch-color: #f43f5e">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Rose</span>
+        </button>
+        <button class="theme-swatch" data-theme="amber" title="Amber" style="--swatch-color: #f59e0b">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Amber</span>
+        </button>
+        <button class="theme-swatch" data-theme="mint" title="Mint" style="--swatch-color: #10b981">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Mint</span>
+        </button>
+        <button class="theme-swatch" data-theme="slate" title="Slate" style="--swatch-color: #64748b">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Slate</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Custom Color Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Custom Accent Color</h3>
+      <p class="theme-section-desc">Enter a hex color or use the color picker</p>
+      <div class="custom-color-input">
+        <input type="color" id="custom-color-picker" class="color-picker" value="#39ff14">
+        <input type="text" id="custom-color-hex" class="color-hex-input" placeholder="#39ff14" maxlength="7">
+        <button class="btn btn--ghost btn--sm" onclick="Theme.reset()">Reset to Default</button>
+      </div>
+    </section>
+
+    <!-- Background Image Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Background Image</h3>
+      <p class="theme-section-desc">Add a background image for a personalized look</p>
+
+      <div class="bg-controls">
+        <div class="bg-url-input">
+          <input type="url" id="bg-url" class="input-field" placeholder="Enter image URL...">
+          <button class="btn btn--primary btn--sm" onclick="applyBackgroundUrl()">Apply URL</button>
+        </div>
+
+        <div class="bg-upload-area">
+          <span class="bg-upload-label">Or upload an image:</span>
+          <label class="btn btn--ghost btn--sm upload-btn">
+            <input type="file" id="bg-file-input" accept="image/*" onchange="handleBackgroundUpload(this)" hidden>
+            Choose File
+          </label>
+        </div>
+
+        <div class="bg-gallery" id="bg-gallery">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="bg-sliders">
+          <div class="slider-group">
+            <label for="bg-blur">Blur</label>
+            <input type="range" id="bg-blur" min="0" max="50" value="0" oninput="updateBgBlur(this.value)">
+            <span id="bg-blur-value">0px</span>
+          </div>
+          <div class="slider-group">
+            <label for="bg-overlay">Overlay</label>
+            <input type="range" id="bg-overlay" min="0" max="100" value="0" oninput="updateBgOverlay(this.value)">
+            <span id="bg-overlay-value">0%</span>
+          </div>
+        </div>
+
+        <button class="btn btn--ghost btn--sm" onclick="clearBackground()">Clear Background</button>
+      </div>
+    </section>
+
+    <!-- Glass Effect Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Glass Effect</h3>
+      <p class="theme-section-desc">Enable frosted glass effect on UI panels when background is active</p>
+      <label class="toggle-label">
+        <input type="checkbox" id="glass-toggle" onchange="toggleGlass(this.checked)">
+        <span class="toggle-slider"></span>
+        <span class="toggle-text">Enable Glass Effect</span>
+      </label>
+    </section>
+
+  </div>
+</div>
+
+<style>
+.theme-section {
+  margin-bottom: var(--sp-6);
+  padding: var(--sp-4);
+  background: var(--c-bg-raised);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.theme-section-title {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--c-fg);
+}
+
+.theme-section-desc {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--font-size-sm);
+  color: var(--c-fg-muted);
+}
+
+/* Theme swatch grid */
+.theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: var(--sp-3);
+}
+
+.theme-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--c-bg);
+  border: 2px solid var(--c-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.theme-swatch:hover {
+  border-color: var(--swatch-color);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+}
+
+.theme-swatch.active {
+  border-color: var(--swatch-color);
+  background: rgba(var(--swatch-color), 0.1);
+  box-shadow: 0 0 12px var(--swatch-color);
+}
+
+.swatch-preview {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--swatch-color);
+  box-shadow: 0 0 8px var(--swatch-color);
+}
+
+.swatch-name {
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  font-family: var(--font-sans);
+}
+
+/* Custom color input */
+.custom-color-input {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.color-picker {
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid var(--c-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: transparent;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+  padding: 4px;
+}
+
+.color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+.color-hex-input {
+  width: 120px;
+  padding: var(--sp-2) var(--sp-3);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  background: var(--c-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-fg);
+}
+
+.color-hex-input:focus {
+  outline: none;
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px var(--c-accent-subtle);
+}
+
+/* Background controls */
+.bg-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.bg-url-input {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.bg-url-input .input-field {
+  flex: 1;
+  padding: var(--sp-2) var(--sp-3);
+  font-size: var(--font-size-sm);
+}
+
+.bg-upload-area {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.bg-upload-label {
+  font-size: var(--font-size-sm);
+  color: var(--c-fg-muted);
+}
+
+.upload-btn {
+  cursor: pointer;
+}
+
+/* Background gallery */
+.bg-gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--sp-2);
+  min-height: 0;
+}
+
+.bg-gallery-item {
+  position: relative;
+  aspect-ratio: 16/9;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color var(--transition);
+}
+
+.bg-gallery-item:hover {
+  border-color: var(--c-accent);
+}
+
+.bg-gallery-item.active {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 8px var(--c-accent-glow);
+}
+
+.bg-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bg-gallery-item .delete-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 50%;
+  color: #ff4444;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.bg-gallery-item:hover .delete-btn {
+  opacity: 1;
+}
+
+/* Sliders */
+.bg-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  padding: var(--sp-3);
+  background: var(--c-bg);
+  border-radius: var(--radius-sm);
+}
+
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.slider-group label {
+  width: 60px;
+  font-size: var(--font-size-sm);
+  color: var(--c-fg-muted);
+}
+
+.slider-group input[type="range"] {
+  flex: 1;
+  height: 4px;
+  background: var(--c-border);
+  border-radius: 2px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: var(--c-accent);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 8px var(--c-accent-glow);
+}
+
+.slider-group span {
+  width: 40px;
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  color: var(--c-fg-muted);
+  text-align: right;
+}
+
+/* Toggle */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  cursor: pointer;
+}
+
+.toggle-label input {
+  display: none;
+}
+
+.toggle-slider {
+  width: 44px;
+  height: 24px;
+  background: var(--c-border);
+  border-radius: 12px;
+  position: relative;
+  transition: background var(--transition);
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: var(--c-fg-muted);
+  border-radius: 50%;
+  transition: all var(--transition);
+}
+
+.toggle-label input:checked + .toggle-slider {
+  background: var(--c-accent);
+}
+
+.toggle-label input:checked + .toggle-slider::after {
+  transform: translateX(20px);
+  background: #000;
+}
+
+.toggle-text {
+  font-size: var(--font-size-sm);
+  color: var(--c-fg);
+}
+</style>
+
+<script>
+// Initialize appearance settings from saved theme
+(function() {
+  const theme = Theme.get();
+
+  // Update swatches
+  document.querySelectorAll('.theme-swatch').forEach(el => {
+    el.classList.toggle('active', el.dataset.theme === theme.preset);
+    el.onclick = () => {
+      document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+      el.classList.add('active');
+      Theme.setPreset(el.dataset.theme);
+    };
+  });
+
+  // Update custom color
+  const colorPicker = document.getElementById('custom-color-picker');
+  const colorHex = document.getElementById('custom-color-hex');
+  if (theme.customAccent) {
+    colorPicker.value = theme.customAccent;
+    colorHex.value = theme.customAccent;
+  }
+  colorPicker.oninput = () => {
+    colorHex.value = colorPicker.value;
+    document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+    Theme.setCustomAccent(colorPicker.value);
+  };
+  colorHex.onchange = () => {
+    if (/^#[0-9a-fA-F]{6}$/.test(colorHex.value)) {
+      colorPicker.value = colorHex.value;
+      document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+      Theme.setCustomAccent(colorHex.value);
+    }
+  };
+
+  // Update background controls
+  const bgBlur = document.getElementById('bg-blur');
+  const bgOverlay = document.getElementById('bg-overlay');
+  const glassToggle = document.getElementById('glass-toggle');
+  bgBlur.value = theme.bgBlur;
+  bgOverlay.value = Math.round(theme.bgOverlayOpacity * 100);
+  glassToggle.checked = theme.glassEnabled;
+  document.getElementById('bg-blur-value').textContent = theme.bgBlur + 'px';
+  document.getElementById('bg-overlay-value').textContent = Math.round(theme.bgOverlayOpacity * 100) + '%';
+
+  // Load background gallery
+  loadBackgroundGallery();
+})();
+
+function updateBgBlur(value) {
+  document.getElementById('bg-blur-value').textContent = value + 'px';
+  Theme.setBackgroundBlur(parseInt(value));
+}
+
+function updateBgOverlay(value) {
+  document.getElementById('bg-overlay-value').textContent = value + '%';
+  Theme.setBackgroundOverlay(parseInt(value) / 100);
+}
+
+function toggleGlass(enabled) {
+  Theme.setGlassEnabled(enabled);
+}
+
+async function applyBackgroundUrl() {
+  const url = document.getElementById('bg-url').value.trim();
+  if (url) {
+    Theme.setBackground(url);
+    await loadBackgroundGallery();
+  }
+}
+
+function handleBackgroundUpload(input) {
+  if (input.files && input.files[0]) {
+    uploadBackground(input.files[0]);
+  }
+}
+
+async function uploadBackground(file) {
+  const result = await Theme.uploadBackground(file);
+  if (result.success) {
+    Theme.setBackground(result.url);
+    await loadBackgroundGallery();
+  } else {
+    alert('Upload failed: ' + result.error);
+  }
+}
+
+async function loadBackgroundGallery() {
+  const gallery = document.getElementById('bg-gallery');
+  const backgrounds = await Theme.listBackgrounds();
+  const currentTheme = Theme.get();
+
+  gallery.innerHTML = backgrounds.map(bg => \`
+    <div class="bg-gallery-item \${currentTheme.bgImage === bg.url ? 'active' : ''}" onclick="selectBackground('\${bg.url}')">
+      <img src="\${bg.url}" alt="\${bg.filename}">
+      <button class="delete-btn" onclick="event.stopPropagation(); deleteBackground('\${bg.filename}')" title="Delete">×</button>
+    </div>
+  \`).join('');
+}
+
+function selectBackground(url) {
+  Theme.setBackground(url);
+  document.querySelectorAll('.bg-gallery-item').forEach(el => {
+    el.classList.toggle('active', el.querySelector('img').src === url);
+  });
+}
+
+async function deleteBackground(filename) {
+  if (confirm('Delete this background image?')) {
+    const result = await Theme.deleteBackground(filename);
+    if (result.success) {
+      // Clear if it was active
+      const theme = Theme.get();
+      if (theme.bgImage && theme.bgImage.includes(filename)) {
+        Theme.setBackground(null);
+      }
+      await loadBackgroundGallery();
+    } else {
+      alert('Delete failed: ' + result.error);
+    }
+  }
+}
+
+function clearBackground() {
+  Theme.setBackground(null);
+  document.getElementById('bg-url').value = '';
+  document.querySelectorAll('.bg-gallery-item').forEach(el => el.classList.remove('active'));
+}
+</script>
+`;
+}

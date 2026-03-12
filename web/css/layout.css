@@ -3,6 +3,73 @@
  * App structure with slide-out sidebar overlay.
  */
 
+/* Background layer - only visible when image is set */
+.bg-layer {
+  position: fixed;
+  inset: 0;
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  filter: blur(var(--bg-blur));
+  z-index: -2;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+body.has-bg-image .bg-layer {
+  opacity: 1;
+}
+
+/* Overlay layer for text readability */
+.bg-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, var(--bg-overlay-opacity));
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+body.has-bg-image .bg-overlay {
+  opacity: 1;
+}
+
+/* Hide overlay when glass is enabled - glass panels provide their own readability */
+body.glass-enabled .bg-overlay {
+  opacity: 0;
+}
+
+/* Glass effect base */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-color: var(--glass-border);
+}
+
+body.glass-enabled .sidebar,
+body.glass-enabled .header,
+body.glass-enabled .input-area {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+}
+
+body.glass-enabled .sidebar {
+  border-color: var(--glass-border);
+}
+
+body.glass-enabled .header {
+  border-color: var(--glass-border);
+}
+
+body.glass-enabled .input-area {
+  border-color: var(--glass-border);
+}
+
 /* App shell */
 .app {
   display: grid;
