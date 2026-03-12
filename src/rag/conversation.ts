@@ -427,6 +427,70 @@ export class ConversationRAG {
   }
 
   /**
+   * Update the embedding for an edited message.
+   *
+   * @param messageId - The message ID
+   * @param conversationId - The conversation ID
+   * @param role - Message role
+   * @param content - New message content
+   * @returns true if successful, false otherwise
+   */
+  async updateMessageEmbedding(
+    messageId: string,
+    _conversationId: string,
+    _role: "user" | "assistant" | "system" | "tool",
+    content: string
+  ): Promise<boolean> {
+    try {
+      // Generate new embedding
+      const embedder = getEmbedder();
+      await embedder.initialize();
+      const embedding = await embedder.embed(content);
+
+      this.db.exec("BEGIN TRANSACTION");
+
+      try {
+        // Update the main embeddings table
+        this.db.exec(
+          `UPDATE message_embeddings SET embedding = ?, content = ? WHERE message_id = ?`,
+          [serializeVector(embedding), content, messageId]
+        );
+
+        // If sqlite-vec is available, also update virtual table
+        if (this.useVectorExt) {
+          // First get the rowid
+          const stmt = this.db.prepare("SELECT rowid FROM message_embeddings WHERE message_id = ?");
+          const row = stmt.get<{ rowid: number }>(messageId);
+          stmt.finalize();
+
+          if (row) {
+            // Delete old vector and insert new one
+            this.db.exec("DELETE FROM vec_messages WHERE rowid = ?", [row.rowid]);
+            this.db.exec(
+              `INSERT INTO vec_messages (rowid, embedding) VALUES (?, ?)`,
+              [row.rowid, serializeVector(embedding)]
+            );
+          }
+        }
+
+        this.db.exec("COMMIT");
+        return true;
+      } catch (error) {
+        this.db.exec("ROLLBACK");
+        console.error(
+          `[ChatRAG] Failed to update message embedding for ${messageId}: ${error instanceof Error ? error.message : String(error)}`
+        );
+        return false;
+      }
+    } catch (error) {
+      console.error(
+        `[ChatRAG] Failed to generate embedding for message ${messageId}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return false;
+    }
+  }
+
+  /**
    * Get statistics about indexed messages.
    */
   getStats(): { messageCount: number; conversationCount: number } {

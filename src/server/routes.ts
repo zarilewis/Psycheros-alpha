@@ -8,7 +8,7 @@
  * @module
  */
 
-import type { SSEEvent } from "../types.ts";
+import type { SSEEvent, TurnMetrics } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
@@ -38,7 +38,7 @@ import {
   escapeHtml,
   type MetricsMap,
 } from "./templates.ts";
-import { updateConversationTitle, deleteConversation, deleteConversations } from "./state-changes.ts";
+import { updateConversationTitle, deleteConversation, deleteConversations, updateMessageContent } from "./state-changes.ts";
 import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
 import { MAX_SSE_MESSAGE_SIZE, SSE_TRUNCATION_SUFFIX } from "../constants.ts";
 import { getBroadcaster } from "./broadcaster.ts";
@@ -405,6 +405,115 @@ export function handleGetMessages(
   return new Response(JSON.stringify(messages), {
     headers: {
       "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle PUT /api/messages/:id - Update message content
+ *
+ * Updates a message's content, regenerates embedding, and returns updated HTML.
+ *
+ * @param ctx - Route context
+ * @param messageId - The message ID
+ * @param request - HTTP Request with body { content: string, conversationId: string }
+ * @returns HTTP Response with updated message HTML for HTMX swap
+ */
+export async function handleUpdateMessage(
+  ctx: RouteContext,
+  messageId: string,
+  request: Request
+): Promise<Response> {
+  // Parse request body
+  let content: string;
+  let conversationId: string;
+  try {
+    const body = await request.json();
+    if (!body.content || typeof body.content !== "string") {
+      throw new Error("Missing or invalid content");
+    }
+    if (!body.conversationId || typeof body.conversationId !== "string") {
+      throw new Error("Missing or invalid conversationId");
+    }
+    content = body.content;
+    conversationId = body.conversationId;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Invalid request body";
+    return new Response(
+      JSON.stringify({ error: errorMessage }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Perform the state change
+  const result = updateMessageContent(ctx.db, conversationId, messageId, content);
+
+  if (!result.success) {
+    return new Response(
+      JSON.stringify({ error: result.error }),
+      {
+        status: result.error?.includes("not found") ? 404 : 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Get the updated message
+  const messages = ctx.db.getMessages(conversationId);
+  const updatedMsg = messages.find((m) => m.id === messageId);
+
+  if (!updatedMsg) {
+    return new Response(
+      JSON.stringify({ error: "Updated message not found" }),
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Regenerate embedding in RAG (non-blocking)
+  if (ctx.chatRAG && (updatedMsg.role === "user" || updatedMsg.role === "assistant")) {
+    ctx.chatRAG.updateMessageEmbedding(
+      messageId,
+      conversationId,
+      updatedMsg.role,
+      updatedMsg.content
+    ).catch((error) => {
+      console.error(
+        `[Routes] Failed to update embedding for message ${messageId}:`,
+        error instanceof Error ? error.message : String(error)
+      );
+    });
+  }
+
+  // Get metrics for assistant messages
+  let metrics: TurnMetrics | undefined = undefined;
+  if (updatedMsg.role === "assistant") {
+    const dbMetrics = ctx.db.getMetricsByMessageId(messageId);
+    metrics = dbMetrics ?? undefined;
+  }
+
+  // Render updated message HTML for HTMX swap
+  const { renderMessage } = await import("./templates.ts");
+  const html = renderMessage(updatedMsg, metrics);
+
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
       "Access-Control-Allow-Origin": "*",
     },
   });

@@ -327,6 +327,16 @@ function runMigrations(db: Database): void {
     `);
   }
 
+  // Migration: Add edited_at column to messages if missing
+  const hasEditedAt = db
+    .prepare("SELECT 1 FROM pragma_table_info('messages') WHERE name = 'edited_at'")
+    .get();
+
+  if (!hasEditedAt) {
+    db.exec("ALTER TABLE messages ADD COLUMN edited_at TEXT");
+    console.log("[DB] Added edited_at column to messages table");
+  }
+
   // Migration: Add lorebook tables if missing
   const hasLorebookTables = db
     .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'lorebooks'")

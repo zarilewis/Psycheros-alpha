@@ -554,9 +554,11 @@ export class EntityTurn {
     // Add history with timestamps (convert from DB format to LLM format)
     for (const msg of history) {
       const timestamp = formatMessageTimestamp(msg.createdAt);
+      // Prepend [edited] marker if message was edited
+      const editedPrefix = msg.editedAt ? "[edited] " : "";
       const chatMsg: ChatMessage = {
         role: msg.role,
-        content: `${timestamp} ${msg.content}`,
+        content: `${timestamp} ${editedPrefix}${msg.content}`,
       };
 
       // Add tool call ID if present (for tool role messages)

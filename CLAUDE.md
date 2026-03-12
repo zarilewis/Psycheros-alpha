@@ -194,6 +194,18 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 - Implemented in `web/js/psycheros.js`: `requestStopGeneration()`, `stopGeneration()`
 - CSS styles in `web/css/components.css`: `.stop-btn`, `.stop-confirm`
 
+**Message Editing**:
+- Edit button (pencil icon) on both user and assistant messages
+- Inline editing with textarea replacing message content
+- Save/Cancel buttons for confirming or discarding changes
+- Server-side update via PUT `/api/messages/:id`
+- Edited messages marked with `[edited]` in the UI
+- `edited_at` timestamp stored in database
+- ChatRAG re-indexing: When a message is edited, its embedding is automatically regenerated
+- Implemented in `web/js/psycheros.js`: `startMessageEdit()`, `cancelMessageEdit()`, `saveMessageEdit()`
+- Server-side in `src/server/routes.ts`: PUT `/api/messages/:id` endpoint
+- State change in `src/server/state-changes.ts`: `updateMessageContent()`
+
 **Knowledge Graph Visualization**:
 - Interactive graph viewer for the knowledge graph stored in entity-core
 - Access via "Knowledge Graph" link in sidebar (under Settings)

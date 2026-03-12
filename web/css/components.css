@@ -1906,3 +1906,76 @@
   font-size: var(--font-size-sm);
   color: var(--c-fg-muted);
 }
+
+/* ==========================================================================
+   Message Edit
+   ========================================================================== */
+
+/* Edit button - hidden until hover */
+.msg-edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--c-fg-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: all var(--transition);
+  margin-left: var(--sp-2);
+}
+
+.msg:hover .msg-edit-btn {
+  opacity: 1;
+}
+
+.msg-edit-btn:hover {
+  background-color: var(--c-bg-hover);
+  color: var(--c-accent);
+}
+
+/* Edited indicator */
+.msg-edited-indicator {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--c-fg-muted);
+  opacity: 0.6;
+  margin-left: var(--sp-2);
+}
+
+/* Inline editing container */
+.msg-edit-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.msg-edit-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: var(--sp-3);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+  color: var(--c-fg);
+  background-color: var(--c-bg-sunken);
+  border: 1px solid var(--c-accent);
+  border-radius: 6px;
+  resize: vertical;
+  outline: none;
+}
+
+.msg-edit-textarea:focus {
+  box-shadow: 0 0 0 2px var(--c-accent-subtle);
+}
+
+.msg-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+}

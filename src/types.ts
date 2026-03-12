@@ -20,6 +20,8 @@ export interface Message {
   toolCalls?: ToolCall[];
   reasoningContent?: string;
   createdAt: Date;
+  /** When this message was last edited (if ever) */
+  editedAt?: Date;
 }
 
 // =============================================================================

@@ -30,6 +30,7 @@ import {
   handleDeleteCustomFile,
   handleEvents,
   handleGetMessages,
+  handleUpdateMessage,
   handleIndex,
   handleListConversations,
   handleMemoryConsolidate,
@@ -434,6 +435,13 @@ export class Server {
     if (method === "GET" && messagesMatch) {
       const conversationId = messagesMatch[1];
       return handleGetMessages(ctx, conversationId);
+    }
+
+    // PUT /api/messages/:id - Update message content
+    const updateMessageMatch = path.match(/^\/api\/messages\/([^/]+)$/);
+    if (method === "PUT" && updateMessageMatch) {
+      const messageId = updateMessageMatch[1];
+      return await handleUpdateMessage(ctx, messageId, request);
     }
 
     // PATCH /api/conversations/:id/title - Update title

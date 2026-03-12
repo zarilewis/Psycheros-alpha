@@ -141,3 +141,49 @@ export function deleteConversations(
     affectedRegions: ["conv-list"],
   };
 }
+
+/**
+ * Update the content of a message.
+ *
+ * Affects UI regions: chat-view
+ *
+ * @param db - Database client
+ * @param conversationId - The conversation ID
+ * @param messageId - The message ID
+ * @param content - The new content
+ * @returns StateChangeResult with the updated message info
+ */
+export function updateMessageContent(
+  db: DBClient,
+  conversationId: string,
+  messageId: string,
+  content: string
+): StateChangeResult<{ messageId: string; conversationId: string }> {
+  // Validate content
+  const trimmedContent = content.trim();
+
+  if (trimmedContent.length === 0) {
+    return {
+      success: false,
+      error: "Message content cannot be empty",
+      affectedRegions: [],
+    };
+  }
+
+  // Perform the update
+  const updated = db.updateMessage(messageId, trimmedContent);
+
+  if (!updated) {
+    return {
+      success: false,
+      error: `Message not found: ${messageId}`,
+      affectedRegions: [],
+    };
+  }
+
+  return {
+    success: true,
+    data: { messageId, conversationId },
+    affectedRegions: ["chat-view"],
+  };
+}

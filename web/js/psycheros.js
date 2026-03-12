@@ -1859,6 +1859,171 @@ async function loadGraphView() {
 // Global Export
 // =============================================================================
 
+// =============================================================================
+// Message Editing
+// =============================================================================
+
+/**
+ * Start inline editing of a message.
+ * Replaces message content with a textarea.
+ */
+function startMessageEdit(messageId) {
+  const msgElement = document.querySelector(`[data-message-id="${messageId}"]`);
+  if (!msgElement) return;
+
+  // Get the content element
+  const contentEl = msgElement.querySelector('.msg-content');
+  if (!contentEl) return;
+
+  // Get original content (text only, without markdown)
+  const originalContent = contentEl.textContent || '';
+
+  // Store original content for cancel
+  msgElement.dataset.originalContent = originalContent;
+
+  // Hide the content
+  contentEl.style.display = 'none';
+
+  // Hide edit button
+  const editBtn = msgElement.querySelector('.msg-edit-btn');
+  if (editBtn) editBtn.style.display = 'none';
+
+  // Create edit container
+  const editContainer = document.createElement('div');
+  editContainer.className = 'msg-edit-container';
+
+  // Create textarea
+  const textarea = document.createElement('textarea');
+  textarea.className = 'msg-edit-textarea';
+  textarea.value = originalContent;
+  textarea.rows = Math.min(10, Math.max(3, originalContent.split('\n').length + 1));
+
+  // Create actions
+  const actions = document.createElement('div');
+  actions.className = 'msg-edit-actions';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn btn--ghost btn--sm';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.onclick = () => cancelMessageEdit(messageId);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'btn btn--primary btn--sm';
+  saveBtn.textContent = 'Save';
+  saveBtn.onclick = () => saveMessageEdit(messageId);
+
+  actions.appendChild(cancelBtn);
+  actions.appendChild(saveBtn);
+
+  editContainer.appendChild(textarea);
+  editContainer.appendChild(actions);
+
+  // Insert after content
+  contentEl.after(editContainer);
+
+  // Focus textarea
+  textarea.focus();
+  textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+}
+
+/**
+ * Cancel message edit and restore original content.
+ */
+function cancelMessageEdit(messageId) {
+  const msgElement = document.querySelector(`[data-message-id="${messageId}"]`);
+  if (!msgElement) return;
+
+  // Remove edit container
+  const editContainer = msgElement.querySelector('.msg-edit-container');
+  if (editContainer) editContainer.remove();
+
+  // Show content
+  const contentEl = msgElement.querySelector('.msg-content');
+  if (contentEl) contentEl.style.display = '';
+
+  // Show edit button
+  const editBtn = msgElement.querySelector('.msg-edit-btn');
+  if (editBtn) editBtn.style.display = '';
+
+  // Clean up stored content
+  delete msgElement.dataset.originalContent;
+}
+
+/**
+ * Save message edit to server.
+ */
+async function saveMessageEdit(messageId) {
+  const msgElement = document.querySelector(`[data-message-id="${messageId}"]`);
+  if (!msgElement) return;
+
+  const textarea = msgElement.querySelector('.msg-edit-textarea');
+  if (!textarea) return;
+  if (!textarea) return;
+
+  const newContent = textarea.value.trim();
+  if (!newContent) {
+    showToast('Message content cannot be empty');
+    return;
+  }
+
+  // Get conversation ID from URL
+  const pathParts = window.location.pathname.split('/');
+  const conversationId = pathParts[2]; // /c/{id}
+
+  if (!conversationId) {
+    showToast('Cannot determine conversation ID');
+    return;
+  }
+
+  // Disable save button
+  const saveBtn = msgElement.querySelector('.msg-edit-actions .btn--primary');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+  }
+
+  try {
+    const response = await fetch(`/api/messages/${messageId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: newContent,
+        conversationId,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update message');
+    }
+
+    // Get updated message HTML
+    const updatedHtml = await response.text();
+
+    // Replace the entire message element with the updated one
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = updatedHtml;
+    const newMsgElement = tempDiv.firstElementChild;
+
+    if (newMsgElement) {
+      msgElement.replaceWith(newMsgElement);
+    }
+
+    showToast('Message updated');
+  } catch (error) {
+    console.error('Failed to save message edit:', error);
+    showToast(error instanceof Error ? error.message : 'Failed to update message');
+
+    // Re-enable save button
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save';
+    }
+  }
+}
+
 globalThis.Psycheros = {
   toggleSidebar,
   closeSidebarAfterNav,
@@ -1879,6 +2044,10 @@ globalThis.Psycheros = {
   confirmDelete,
   // Inline edit
   startTitleEdit,
+  // Message edit
+  startMessageEdit,
+  cancelMessageEdit,
+  saveMessageEdit,
   // Context viewer
   toggleContextViewer,
   hideContextViewer,

@@ -403,7 +403,7 @@ export function renderMessages(messages: Message[], metricsMap?: MetricsMap): st
  */
 export function renderMessage(msg: Message, metrics?: TurnMetrics): string {
   if (msg.role === "user") {
-    return renderUserMessage(msg.content);
+    return renderUserMessage(msg.content, msg.id, msg.editedAt);
   } else if (msg.role === "assistant") {
     return renderAssistantMessage(msg, metrics);
   }
@@ -412,10 +412,35 @@ export function renderMessage(msg: Message, metrics?: TurnMetrics): string {
 
 /**
  * Render a user message.
+ *
+ * @param content - Message content
+ * @param messageId - Optional message ID (for edit functionality)
+ * @param editedAt - Optional timestamp when message was edited
  */
-export function renderUserMessage(content: string): string {
-  return `<div class="msg msg--user">
-  <div class="msg-header">You</div>
+export function renderUserMessage(
+  content: string,
+  messageId?: string,
+  editedAt?: Date
+): string {
+  const editedIndicator = editedAt
+    ? `<span class="msg-edited-indicator">(edited)</span>`
+    : "";
+  const editBtn = messageId
+    ? `<button class="msg-edit-btn" onclick="Psycheros.startMessageEdit('${escapeHtml(messageId)}')" title="Edit message">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>`
+    : "";
+  const dataAttr = messageId ? `data-message-id="${escapeHtml(messageId)}"` : "";
+
+  return `<div class="msg msg--user" ${dataAttr}>
+  <div class="msg-header">
+    <span>You</span>
+    ${editedIndicator}
+    ${editBtn}
+  </div>
   <div class="msg-content user-text">${renderMarkdown(content)}</div>
 </div>`;
 }
@@ -424,8 +449,25 @@ export function renderUserMessage(content: string): string {
  * Render an assistant message with optional thinking, tool calls, and metrics.
  */
 export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics): string {
-  let html = `<div class="msg msg--assistant">
-  <div class="msg-header">Assistant${metrics ? renderMetricsIndicator(metrics) : ""}</div>
+  const editedIndicator = msg.editedAt
+    ? `<span class="msg-edited-indicator">(edited)</span>`
+    : "";
+  const editBtn = msg.id
+    ? `<button class="msg-edit-btn" onclick="Psycheros.startMessageEdit('${escapeHtml(msg.id)}')" title="Edit message">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>`
+    : "";
+
+  let html = `<div class="msg msg--assistant" data-message-id="${escapeHtml(msg.id)}">
+  <div class="msg-header">
+    <span>Assistant</span>
+    ${editedIndicator}
+    ${metrics ? renderMetricsIndicator(metrics) : ""}
+    ${editBtn}
+  </div>
   <div class="msg-content">`;
 
   // Thinking section

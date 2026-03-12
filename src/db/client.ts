@@ -36,6 +36,7 @@ interface MessageRow {
   tool_call_id: string | null;
   tool_calls: string | null;
   created_at: string;
+  edited_at: string | null;
 }
 
 /**
@@ -407,7 +408,7 @@ export class DBClient {
   getMessages(conversationId: string): Message[] {
     const stmt = this.db.prepare(
       `SELECT id, conversation_id, role, content, reasoning_content,
-              tool_call_id, tool_calls, created_at
+              tool_call_id, tool_calls, created_at, edited_at
        FROM messages
        WHERE conversation_id = ?
        ORDER BY created_at ASC`
@@ -452,7 +453,67 @@ export class DBClient {
       toolCallId: row.tool_call_id ?? undefined,
       toolCalls,
       createdAt: new Date(row.created_at),
+      editedAt: row.edited_at ? new Date(row.edited_at) : undefined,
     };
+  }
+
+  /**
+   * Updates a message's content.
+   *
+   * @param id - The message ID
+   * @param content - The new content
+   * @returns The updated message or null if not found
+   */
+  updateMessage(id: string, content: string): Message | null {
+    const now = new Date();
+    const nowISO = now.toISOString();
+
+    this.db.exec("BEGIN TRANSACTION");
+
+    try {
+      // Check if message exists
+      const checkStmt = this.db.prepare("SELECT conversation_id FROM messages WHERE id = ?");
+      const existing = checkStmt.get<{ conversation_id: string }>(id);
+      checkStmt.finalize();
+
+      if (!existing) {
+        this.db.exec("ROLLBACK");
+        return null;
+      }
+
+      // Update the message
+      this.db.exec(
+        `UPDATE messages SET content = ?, edited_at = ? WHERE id = ?`,
+        [content, nowISO, id]
+      );
+
+      // Update conversation's updated_at timestamp
+      this.db.exec(
+        `UPDATE conversations SET updated_at = ? WHERE id = ?`,
+        [nowISO, existing.conversation_id]
+      );
+
+      this.db.exec("COMMIT");
+
+      // Return the updated message by re-fetching it
+      const getUpdatedStmt = this.db.prepare(
+        `SELECT id, conversation_id, role, content, reasoning_content,
+                tool_call_id, tool_calls, created_at, edited_at
+         FROM messages WHERE id = ?`
+      );
+      const updatedRow = getUpdatedStmt.get<MessageRow>(id);
+      getUpdatedStmt.finalize();
+
+      if (!updatedRow) {
+        // Should not happen, but handle gracefully
+        return null;
+      }
+
+      return this.rowToMessage(updatedRow);
+    } catch (error) {
+      this.db.exec("ROLLBACK");
+      throw error;
+    }
   }
 
   // ===========================================================================

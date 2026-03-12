@@ -427,6 +427,30 @@ During message streaming, the Send button transforms into a Stop button with two
 - The user message **is persisted** (saved before streaming begins)
 - Switching conversations mid-stream also aborts the generation and restores the Send button
 
+### Message Editing
+
+Both user and assistant messages can be edited after they're sent:
+
+**Features:**
+- **Edit button**: Pencil icon appears on hover for each message
+- **Inline editing**: Click edit to replace message content with a textarea
+- **Save/Cancel**: Confirm changes or discard them
+- **Edited marker**: Messages show `[edited]` after modification
+- **ChatRAG sync**: Edited messages are automatically re-indexed for semantic search
+
+**API:**
+| Method | Path | Description |
+|--------|------|-------------|
+| `PUT` | `/api/messages/:id` | Update message content |
+
+**Request body:**
+```json
+{
+  "content": "New message content",
+  "conversationId": "conversation-uuid"
+}
+```
+
 ### API Endpoints
 
 | Method | Path | Description |
@@ -438,6 +462,7 @@ During message streaming, the Send button transforms into a Stop button with two
 | `GET` | `/api/conversations` | List conversations |
 | `POST` | `/api/conversations` | Create conversation |
 | `GET` | `/api/conversations/:id/messages` | Get messages |
+| `PUT` | `/api/messages/:id` | Update message content |
 | `PATCH` | `/api/conversations/:id/title` | Update title |
 | `DELETE` | `/api/conversations/:id` | Delete conversation |
 | `DELETE` | `/api/conversations` | Batch delete conversations |
