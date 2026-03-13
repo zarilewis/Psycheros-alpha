@@ -32,6 +32,77 @@ const touchState = {
 let contextViewerOpen = false;
 let currentContext = null;
 
+// Tokenizer state
+let tokenizer = null;
+let tokenizerReady = false;
+let tokenizerFailed = false;
+
+// =============================================================================
+// Tokenizer
+// =============================================================================
+
+const TOKENIZER_RANKS_URL = 'https://tiktoken.pages.dev/js/cl100k_base.json';
+
+/**
+ * Estimate tokens using the simple chars/4 heuristic (fallback).
+ */
+function estimateTokens(text) {
+  return Math.ceil((text || '').length / 4);
+}
+
+/**
+ * Count tokens using the loaded tokenizer, or fall back to estimate.
+ */
+function countTokens(text) {
+  if (tokenizerReady && tokenizer) {
+    try {
+      return tokenizer.encode(text || '').length;
+    } catch {
+      return estimateTokens(text);
+    }
+  }
+  return estimateTokens(text);
+}
+
+/**
+ * Initialize the tokenizer by loading js-tiktoken from esm.sh and
+ * fetching cl100k_base ranks from tiktoken CDN.
+ */
+async function initTokenizer() {
+  try {
+    const { Tiktoken } = await import('https://esm.sh/js-tiktoken@1.0.21/lite');
+    const res = await fetch(TOKENIZER_RANKS_URL);
+    if (!res.ok) throw new Error(`Failed to fetch ranks: ${res.status}`);
+    const ranks = await res.json();
+    tokenizer = new Tiktoken(ranks);
+    tokenizerReady = true;
+    // Re-render if context viewer is open
+    renderContextViewer();
+    // Update editor token count if visible
+    updateEditorTokenCount();
+  } catch (e) {
+    console.warn('Tokenizer init failed, using estimate:', e);
+    tokenizerFailed = true;
+  }
+}
+
+// Start loading the tokenizer immediately
+initTokenizer();
+
+/**
+ * Update the token count display in the file editor.
+ * If no textarea is passed, finds one from the DOM.
+ */
+function updateEditorTokenCount(textarea) {
+  const el = document.getElementById('settings-editor-tokens');
+  if (!el) return;
+  const ta = textarea || document.querySelector('[data-tokenize]');
+  if (!ta) return;
+  const tokens = countTokens(ta.value);
+  const label = tokenizerReady ? 'tokens' : 'est. tokens';
+  el.textContent = `${tokens.toLocaleString()} ${label}`;
+}
+
 // =============================================================================
 // Persistent SSE Connection
 // =============================================================================
@@ -103,6 +174,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize persistent SSE connection for background updates
   initPersistentSSE();
+
+  // Event delegation for token counting in the file editor textarea
+  document.addEventListener('input', (e) => {
+    if (e.target.matches('[data-tokenize]')) {
+      updateEditorTokenCount(e.target);
+    }
+  });
+
+  // Initial token count for any editor that may already be loaded
+  updateEditorTokenCount();
 
   // Event delegation for conversation list clicks
   // This avoids inline onclick handlers (XSS prevention)
@@ -1589,6 +1670,9 @@ function renderContextTab(tabName) {
  * Render the System tab content.
  */
 function renderSystemTab() {
+  const systemTokens = countTokens(currentContext.systemMessage);
+  const tokenLabel = tokenizerReady ? 'Tokens' : 'Est. Tokens';
+  const tokenPrefix = tokenizerReady ? '' : '~';
   return `
     <div class="context-section expanded">
       <div class="context-section-header" onclick="this.parentElement.classList.toggle('expanded')">
@@ -1601,8 +1685,9 @@ function renderSystemTab() {
     </div>
     <div class="context-metrics">
       <div>System Length: ${currentContext.metrics.systemMessageLength.toLocaleString()} chars</div>
+      <div>System ${tokenLabel}: ${tokenPrefix}${systemTokens.toLocaleString()}</div>
       <div>Total Messages: ${currentContext.metrics.totalMessages}</div>
-      <div>Estimated Tokens: ~${currentContext.metrics.estimatedTokens.toLocaleString()}</div>
+      <div>Estimated Total: ~${currentContext.metrics.estimatedTokens.toLocaleString()}</div>
     </div>
   `;
 }

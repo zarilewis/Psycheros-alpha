@@ -849,6 +849,7 @@ export function renderFileEditor(
       ← Back
     </button>
     <span class="settings-editor-filename">${escapeHtml(displayName)}</span>
+    <span class="settings-editor-tokens" id="settings-editor-tokens">...</span>
   </div>
   <form
     class="settings-editor-form"
@@ -859,6 +860,7 @@ export function renderFileEditor(
     <textarea
       class="settings-textarea"
       name="content"
+      data-tokenize
       placeholder="Enter prompt content..."
       rows="20"
     >${safeContent}</textarea>

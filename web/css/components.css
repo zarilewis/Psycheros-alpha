@@ -1276,6 +1276,14 @@
   text-transform: capitalize;
 }
 
+.settings-editor-tokens {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  white-space: nowrap;
+}
+
 .settings-editor-form {
   display: flex;
   flex-direction: column;
