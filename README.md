@@ -261,7 +261,7 @@ Psycheros uses three RAG systems working together:
 1. **Semantic Search**: Queries the knowledge graph for relevant nodes using vector similarity
 2. **Graph Traversal**: Follows edges to find connected concepts (depth 1 by default)
 3. **Context Injection**: Relevant nodes and relationships are formatted and added to the system prompt
-4. **Temporal Awareness**: Nodes include timestamps for when knowledge was learned/confirmed
+4. **Temporal Awareness**: Nodes include timestamps for when knowledge was learned/confirmed (uses XML-tagged format for LLM context)
 
 **Vector Search Backend**:
 - Primary: sqlite-vec extension for efficient vector similarity search
@@ -313,15 +313,17 @@ When MCP is enabled, these are loaded from entity-core. Otherwise, they're read 
 
 ### Temporal Awareness
 
-The entity has temporal awareness through conversation - every message includes a timestamp that the entity can see. This allows the entity to understand when events occurred and how much time has passed between messages.
+The entity has temporal awareness through conversation - every message includes an XML-tagged timestamp that the entity can see. This allows the entity to understand when events occurred and how much time has passed between messages. Using XML tags prevents the entity from parroting timestamps back in its responses.
 
-**Format**: `[YYYY-MM-DD HH:MM]` (e.g., `[2026-03-05 15:17]`)
+**Format**: `<t>YYYY-MM-DD HH:MM</t>` (e.g., `<t>2026-03-05 15:17</t>`)
+
+XML tags are used so the LLM treats timestamps as structural metadata rather than content to reproduce in its responses.
 
 **Example**:
 ```
-[user]: [2026-03-03 14:22] Hey, what did you think about our conversation yesterday?
-[assistant]: [2026-03-03 14:23] I enjoyed our discussion about...
-[user]: [2026-03-05 15:17] Can you summarize what we talked about?
+[user]: <t>2026-03-03 14:22</t> Hey, what did you think about our conversation yesterday?
+[assistant]: <t>2026-03-03 14:23</t> I enjoyed our discussion about...
+[user]: <t>2026-03-05 15:17</t> Can you summarize what we talked about?
 ```
 
 **Timezone**: Set the `TZ` environment variable to configure the timezone (e.g., `TZ=America/Los_Angeles`). Defaults to UTC if not set.
@@ -435,7 +437,7 @@ Both user and assistant messages can be edited after they're sent:
 - **Edit button**: Pencil icon appears on hover for each message
 - **Inline editing**: Click edit to replace message content with a textarea
 - **Save/Cancel**: Confirm changes or discard them
-- **Edited marker**: Messages show `[edited]` after modification
+- **Edited marker**: Messages show `<edited/>` tag after modification
 - **ChatRAG sync**: Edited messages are automatically re-indexed for semantic search
 
 **API:**

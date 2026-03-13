@@ -39,7 +39,10 @@ import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
 /**
  * Format a timestamp for message content.
  * Uses the TZ environment variable for timezone, defaults to UTC.
- * Format: [YYYY-MM-DD HH:MM]
+ * Format: <t>YYYY-MM-DD HH:MM</t>
+ *
+ * XML tags are used so the LLM treats timestamps as structural
+ * metadata rather than content to reproduce.
  */
 export function formatMessageTimestamp(date: Date): string {
   const timeZone = Deno.env.get("TZ") || "UTC";
@@ -52,7 +55,7 @@ export function formatMessageTimestamp(date: Date): string {
     minute: "2-digit",
     hour12: false,
   });
-  return `[${year}-${month}-${day} ${time}]`;
+  return `<t>${year}-${month}-${day} ${time}</t>`;
 }
 
 /**
@@ -554,8 +557,8 @@ export class EntityTurn {
     // Add history with timestamps (convert from DB format to LLM format)
     for (const msg of history) {
       const timestamp = formatMessageTimestamp(msg.createdAt);
-      // Prepend [edited] marker if message was edited
-      const editedPrefix = msg.editedAt ? "[edited] " : "";
+      // Prepend edited marker if message was edited
+      const editedPrefix = msg.editedAt ? "<edited/> " : "";
       const chatMsg: ChatMessage = {
         role: msg.role,
         content: `${timestamp} ${editedPrefix}${msg.content}`,
