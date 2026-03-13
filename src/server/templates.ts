@@ -1107,7 +1107,7 @@ export function renderSnapshotPreview(
       hx-post="/api/snapshots/${encodeURIComponent(`${category}/${filename.replace(/\.md$/, "")}`)}/restore"
       hx-target="#settings-content"
       hx-swap="innerHTML"
-      hx-confirm="Are you sure you want to restore this snapshot? This will replace the current ${categoryLabel} / ${displayName} file."
+      hx-confirm="Are you sure you want to restore this snapshot? This will replace the current ${escapeHtml(categoryLabel)} / ${escapeHtml(displayName)} file."
     >Restore Snapshot</button>
   </div>
 </div>`;
@@ -2403,15 +2403,19 @@ async function uploadBackground(file) {
   }
 }
 
+function escapeAttr(s) {
+  return s.replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 async function loadBackgroundGallery() {
   const gallery = document.getElementById('bg-gallery');
   const backgrounds = await Theme.listBackgrounds();
   const currentTheme = Theme.get();
 
   gallery.innerHTML = backgrounds.map(bg => \`
-    <div class="bg-gallery-item \${currentTheme.bgImage === bg.url ? 'active' : ''}" onclick="selectBackground('\${bg.url}')">
-      <img src="\${bg.url}" alt="\${bg.filename}">
-      <button class="delete-btn" onclick="event.stopPropagation(); deleteBackground('\${bg.filename}')" title="Delete">×</button>
+    <div class="bg-gallery-item \${currentTheme.bgImage === bg.url ? 'active' : ''}" onclick="selectBackground('\${escapeAttr(bg.url)}')">
+      <img src="\${escapeAttr(bg.url)}" alt="\${escapeAttr(bg.filename)}">
+      <button class="delete-btn" onclick="event.stopPropagation(); deleteBackground('\${escapeAttr(bg.filename)}')" title="Delete">×</button>
     </div>
   \`).join('');
 }

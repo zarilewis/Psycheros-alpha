@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Scroll to bottom when chat content is swapped via HTMX (sidebar clicks)
   document.body.addEventListener('htmx:afterSwap', (e) => {
-    if (e.detail.target.id === 'chat') {
+    if (e.detail.target?.id === 'chat') {
       scrollToBottom();
 
       // Initialize graph view if present

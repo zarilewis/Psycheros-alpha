@@ -68,7 +68,7 @@ if (document.readyState === 'loading') {
 
 // Also listen for HTMX load events
 document.body.addEventListener('htmx:afterSwap', (e) => {
-  if (e.detail.target.id === 'chat' && document.getElementById('graph-container')) {
+  if (e.detail.target?.id === 'chat' && document.getElementById('graph-container')) {
     initGraph();
   }
 });
