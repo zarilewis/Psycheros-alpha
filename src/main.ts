@@ -122,7 +122,7 @@ const server = new Server({
 await server.init();
 
 // Handle graceful shutdown
-Deno.addSignalListener("SIGINT", async () => {
+async function shutdown() {
   console.log("\nShutting down...");
 
   // Disconnect MCP client (triggers final sync)
@@ -133,6 +133,9 @@ Deno.addSignalListener("SIGINT", async () => {
 
   server.stop();
   Deno.exit(0);
-});
+}
+
+Deno.addSignalListener("SIGINT", shutdown);
+Deno.addSignalListener("SIGTERM", shutdown);
 
 await server.start();
