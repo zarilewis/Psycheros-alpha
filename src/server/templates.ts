@@ -213,7 +213,7 @@ export function renderHeader(): string {
         <path d="M3 12h18M3 6h18M3 18h18"/>
       </svg>
     </button>
-    <div class="logo">Psycheros</div>
+    <div class="logo">Psycheros <span class="logo-sub" id="header-title"></span></div>
   </div>
   <div class="header-right">
     <button class="context-toggle" onclick="Psycheros.toggleContextViewer()" aria-label="Toggle context viewer" title="View LLM Context">
