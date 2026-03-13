@@ -1,5 +1,5 @@
 /**
- * SBy Service Worker
+ * Psycheros Service Worker
  *
  * Caching strategy:
  * - /api/*       - Network-first (dynamic JSON data)
@@ -8,13 +8,16 @@
  * - Static assets - Cache-first with background update
  */
 
-const CACHE_NAME = 'sby-v4';
+const CACHE_NAME = 'psycheros-v1';
 const STATIC_ASSETS = [
   '/',
   '/css/main.css',
-  '/js/sby.js',
+  '/js/psycheros.js',
+  '/js/theme.js',
   '/lib/htmx.min.js',
   '/lib/htmx-sse.js',
+  '/lib/marked.min.js',
+  '/lib/dompurify.min.js',
   '/manifest.json'
 ];
 
