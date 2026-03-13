@@ -1,7 +1,7 @@
 /**
  * Tools Module
  *
- * This module provides the tool execution system for the SBy entity.
+ * This module provides the tool execution system for the Psycheros entity.
  * Tools enable the entity to perform actions like executing shell commands,
  * file operations, and other system interactions.
  *

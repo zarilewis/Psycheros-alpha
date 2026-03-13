@@ -1,5 +1,5 @@
 /**
- * SBy Database Client
+ * Psycheros Database Client
  *
  * Provides a clean interface for database operations including
  * conversation and message management.
@@ -63,7 +63,7 @@ interface TurnMetricsRow {
 type MessageInput = Omit<Message, "id" | "createdAt">;
 
 /**
- * Database client for SBy persistence operations.
+ * Database client for Psycheros persistence operations.
  */
 export class DBClient {
   private db: Database;

@@ -1,7 +1,7 @@
 /**
  * Server Module
  *
- * HTTP server for the SBy daemon.
+ * HTTP server for the Psycheros daemon.
  * This module provides the web interface and API endpoints for
  * interacting with the entity.
  *

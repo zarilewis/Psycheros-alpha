@@ -1,5 +1,5 @@
 /**
- * SBy Database Schema
+ * Psycheros Database Schema
  *
  * Defines the SQLite database schema and initialization function
  * for persisting conversations and messages.
@@ -9,7 +9,7 @@ import type { Database } from "@db/sqlite";
 import { loadVectorExtension, getVecVersion } from "./vector.ts";
 
 /**
- * SQL schema for the SBy database.
+ * SQL schema for the Psycheros database.
  * Creates tables for conversations and messages with proper indexes.
  */
 export const SCHEMA = `

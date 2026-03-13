@@ -163,10 +163,10 @@ interface GraphSearchNodesArgs {
 }
 
 async function executeGraphSearchNodes(
-  args: GraphSearchNodesArgs,
+  args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { query, type, limit = 10 } = args;
+  const { query, type, limit = 10 } = args as unknown as GraphSearchNodesArgs;
 
   if (!ctx.config.mcpClient) {
     return {
@@ -211,10 +211,10 @@ interface GraphGetNodeArgs {
 }
 
 async function executeGraphGetNode(
-  args: GraphGetNodeArgs,
+  args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { id } = args;
+  const { id } = args as unknown as GraphGetNodeArgs;
 
   if (!ctx.config.mcpClient) {
     return {
@@ -257,10 +257,10 @@ interface GraphGetEdgesArgs {
 }
 
 async function executeGraphGetEdges(
-  args: GraphGetEdgesArgs,
+  args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { fromId, toId, type } = args;
+  const { fromId, toId, type } = args as GraphGetEdgesArgs;
 
   if (!ctx.config.mcpClient) {
     return {
@@ -309,10 +309,10 @@ interface GraphTraverseArgs {
 }
 
 async function executeGraphTraverse(
-  args: GraphTraverseArgs,
+  args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { startNodeId, direction = "both", maxDepth = 2, edgeTypes } = args;
+  const { startNodeId, direction = "both", maxDepth = 2, edgeTypes } = args as unknown as GraphTraverseArgs;
 
   if (!ctx.config.mcpClient) {
     return {
@@ -358,10 +358,10 @@ interface GraphGetSubgraphArgs {
 }
 
 async function executeGraphGetSubgraph(
-  args: GraphGetSubgraphArgs,
+  args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { nodeId } = args;
+  const { nodeId } = args as unknown as GraphGetSubgraphArgs;
 
   if (!ctx.config.mcpClient) {
     return {
@@ -469,27 +469,27 @@ Vector search: ${stats.vectorSearchAvailable ? "Available" : "Not available"}`,
 
 export const graphSearchNodesTool: Tool = {
   definition: graphSearchNodesDef,
-  execute: executeGraphSearchNodes as (args: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>,
+  execute: executeGraphSearchNodes,
 };
 
 export const graphGetNodeTool: Tool = {
   definition: graphGetNodeDef,
-  execute: executeGraphGetNode as (args: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>,
+  execute: executeGraphGetNode,
 };
 
 export const graphGetEdgesTool: Tool = {
   definition: graphGetEdgesDef,
-  execute: executeGraphGetEdges as (args: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>,
+  execute: executeGraphGetEdges,
 };
 
 export const graphTraverseTool: Tool = {
   definition: graphTraverseDef,
-  execute: executeGraphTraverse as (args: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>,
+  execute: executeGraphTraverse,
 };
 
 export const graphGetSubgraphTool: Tool = {
   definition: graphGetSubgraphDef,
-  execute: executeGraphGetSubgraph as (args: Record<string, unknown>, ctx: ToolContext) => Promise<ToolResult>,
+  execute: executeGraphGetSubgraph,
 };
 
 export const graphStatsTool: Tool = {

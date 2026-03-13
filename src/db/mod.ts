@@ -1,7 +1,7 @@
 /**
- * SBy Database Module
+ * Psycheros Database Module
  *
- * Exports database functionality for the SBy daemon.
+ * Exports database functionality for the Psycheros daemon.
  */
 
 export { DBClient } from "./client.ts";

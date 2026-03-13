@@ -3,7 +3,7 @@
  *
  * Provides the LLM client for communicating with the Z.ai API.
  * This module exports all types and the client class for use
- * throughout the SBy daemon.
+ * throughout the Psycheros daemon.
  */
 
 // Re-export types (only those used externally)

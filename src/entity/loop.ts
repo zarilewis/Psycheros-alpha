@@ -62,7 +62,7 @@ export function formatMessageTimestamp(date: Date): string {
  * Configuration for the entity turn processor.
  */
 export interface EntityConfig {
-  /** Root directory of the project (where SBy.md lives) */
+  /** Root directory of the project (where Psycheros identity files live) */
   projectRoot: string;
   /** Maximum tool iterations before stopping (prevents infinite loops) */
   maxToolIterations?: number;
@@ -112,7 +112,7 @@ export class EntityTurn {
    * Process a user message and yield stream chunks.
    *
    * This handles the full agentic loop:
-   * 1. Load SBy.md and build context
+   * 1. Load identity files and build context
    * 2. Get conversation history from DB
    * 3. Stream LLM response
    * 4. If tool calls, execute them and continue
@@ -536,7 +536,7 @@ export class EntityTurn {
    * Build the messages array for the LLM request.
    * Each message includes a timestamp prefix for temporal awareness.
    *
-   * @param systemMessage - The system message with SBy.md content
+   * @param systemMessage - The system message with Psycheros identity content
    * @param history - Previous messages from the database
    * @param userMessage - The new user message
    * @returns Array of ChatMessage for the LLM

@@ -1,7 +1,7 @@
 /**
  * Route Handlers
  *
- * HTTP route handlers for the SBy server. Handles serving the web UI,
+ * HTTP route handlers for the Psycheros server. Handles serving the web UI,
  * API endpoints for conversation management, and SSE streaming for
  * chat responses.
  *

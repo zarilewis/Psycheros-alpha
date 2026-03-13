@@ -1,7 +1,7 @@
 /**
- * SBy Shared Type Definitions
+ * Psycheros Shared Type Definitions
  *
- * Core types used throughout the SBy daemon for messages,
+ * Core types used throughout the Psycheros daemon for messages,
  * tools, SSE events, and conversations.
  */
 

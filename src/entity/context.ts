@@ -143,7 +143,7 @@ async function loadFilesFromDirectory(
  * @param projectRoot - The root directory of the project
  * @returns The concatenated contents of all self/*.md files
  */
-export async function loadSByMd(projectRoot: string): Promise<string> {
+export async function loadSelfMd(projectRoot: string): Promise<string> {
   return await loadFilesFromDirectory(projectRoot, SELF_DIR, SELF_FILE_ORDER);
 }
 
@@ -221,7 +221,7 @@ export async function loadSelfContent(
       return identityFilesToString(identity.self, SELF_FILE_ORDER);
     }
   }
-  return await loadSByMd(projectRoot);
+  return await loadSelfMd(projectRoot);
 }
 
 /**

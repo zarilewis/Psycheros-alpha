@@ -1,7 +1,7 @@
 /**
  * RAG Module
  *
- * Retrieval-Augmented Generation system for SBy.
+ * Retrieval-Augmented Generation system for Psycheros.
  * Provides local-first semantic search over the memories directory
  * and conversational history.
  *

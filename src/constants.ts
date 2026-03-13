@@ -1,5 +1,5 @@
 /**
- * SBy Constants
+ * Psycheros Constants
  *
  * Shared configuration constants used across modules.
  *

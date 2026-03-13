@@ -71,8 +71,8 @@ open http://localhost:3000
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PSYCHEROS_MCP_ENABLED` | `false` | Enable connection to entity-core |
-| `PSYCHEROS_MCP_COMMAND` | `/home/zari/.deno/bin/deno` | Command to spawn entity-core |
-| `PSYCHEROS_MCP_ARGS` | `run -A ~/projects/entity-core/src/mod.ts` | Arguments for entity-core |
+| `PSYCHEROS_MCP_COMMAND` | `deno` | Command to spawn entity-core |
+| `PSYCHEROS_MCP_ARGS` | `run -A --unstable-cron <path>/entity-core/src/mod.ts` | Arguments for entity-core |
 | `PSYCHEROS_MCP_INSTANCE` | `psycheros-harness` | Instance ID for this embodiment |
 
 When MCP is enabled, Psycheros pulls identity files (identity/self/, identity/user/, identity/relationship/, identity/custom/) from entity-core on startup and syncs changes back periodically.
@@ -542,6 +542,45 @@ deno run -A scripts/migrate-to-entity-core.ts
 ```
 
 Use `--dry-run` to preview without making changes.
+
+## Docker Deployment
+
+Psycheros ships with a Dockerfile that bundles both Psycheros and entity-core into a single container.
+
+### Quick Start
+
+```bash
+docker build --platform linux/amd64 -t psycheros .
+docker run -d \
+  --name psycheros \
+  -p 3000:3000 \
+  -e ZAI_API_KEY=<your-key> \
+  -e TZ=America/Los_Angeles \
+  -v /path/to/entity-core-data:/app/entity-core/data \
+  -v /path/to/db:/app/Psycheros/.psycheros \
+  -v /path/to/snapshots:/app/Psycheros/.snapshots \
+  psycheros
+```
+
+On first run, the entrypoint script seeds entity-core identity files from Psycheros templates.
+
+### Volume Mounts
+
+| Container Path | Purpose |
+|---------------|---------|
+| `/app/entity-core/data` | Canonical identity, memories, knowledge graph |
+| `/app/Psycheros/.psycheros` | Conversations DB and RAG index |
+| `/app/Psycheros/.snapshots` | Identity file backups |
+
+### CI/CD
+
+A GitHub Actions workflow (`.github/workflows/docker-build.yml`) builds and pushes the image to GHCR on manual trigger:
+
+```bash
+gh workflow run docker-build.yml
+```
+
+See the parent workspace `docs/deployment/` for detailed Docker strategy, CI/CD pipeline, and UnRAID setup instructions.
 
 ## Design Principles
 
