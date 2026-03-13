@@ -251,7 +251,7 @@
 
 .assistant-text {
   color: var(--c-fg);
-  white-space: pre-wrap;
+  white-space: normal;
   word-wrap: break-word;
   font-size: var(--font-size-base);
   line-height: var(--line-height);

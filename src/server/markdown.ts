@@ -8,7 +8,7 @@ const purify = DOMPurify(jsdom.window);
 
 // Configure marked for Deno-compatible settings
 marked.setOptions({
-  breaks: true, // Convert \n to <br>
+  breaks: false, // Use standard markdown line break rules
   gfm: true, // GitHub Flavored Markdown
 });
 
