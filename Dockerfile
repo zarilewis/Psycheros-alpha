@@ -11,7 +11,8 @@ FROM denoland/deno:2.6.7 AS deps
 WORKDIR /app
 
 # Copy dependency manifests first for cache-friendly layers
-COPY Psycheros/deno.json Psycheros/deno.lock Psycheros/
+# Psycheros: deno.lock is gitignored, so only copy deno.json
+COPY Psycheros/deno.json Psycheros/
 COPY entity-core/deno.json entity-core/deno.lock entity-core/
 
 # Copy just enough source for deno cache to resolve all imports
