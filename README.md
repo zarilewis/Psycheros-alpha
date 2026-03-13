@@ -34,6 +34,8 @@ open http://localhost:3000
 | `PSYCHEROS_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
 | `PSYCHEROS_TOOLS` | No | (none) | Comma-separated list of enabled tools |
 | `PSYCHEROS_MEMORY_HOUR` | No | `4` | Hour to run daily summarization (0-23) |
+| `PSYCHEROS_SNAPSHOT_HOUR` | No | `3` | Hour to run daily identity snapshots (0-23) |
+| `PSYCHEROS_SNAPSHOT_RETENTION_DAYS` | No | `30` | Days to retain snapshots before cleanup |
 | `TZ` | No | `UTC` | Timezone for message timestamps (e.g., `America/Los_Angeles`) |
 
 ### Available Tools
@@ -185,6 +187,14 @@ src/
 │   ├── consolidator.ts # Period-based consolidation
 │   ├── file-writer.ts # Memory file operations
 │   └── trigger.ts    # Day-change detection
+├── lorebook/         # Lorebook/world info system
+│   ├── mod.ts
+│   ├── types.ts      # Lorebook, entry, and state types
+│   ├── manager.ts    # CRUD operations for lorebooks and entries
+│   ├── evaluator.ts  # Trigger evaluation against conversation context
+│   ├── trigger-matcher.ts # Pattern matching for entry triggers
+│   ├── context-builder.ts # Formats matched entries for LLM context
+│   └── state-manager.ts   # Per-conversation activation state tracking
 ├── mcp-client/       # Entity-core MCP client
 │   └── mod.ts        # MCPClient for sync/pull/push operations
 ├── entity/           # Agentic loop
@@ -459,6 +469,7 @@ Both user and assistant messages can be edited after they're sent:
 |--------|------|-------------|
 | `GET` | `/` | App shell HTML |
 | `GET` | `/c/:id` | Conversation page |
+| `GET` | `/health` | Health check endpoint |
 | `GET` | `/api/events` | Persistent SSE channel |
 | `POST` | `/api/chat` | Send message, stream response |
 | `GET` | `/api/conversations` | List conversations |
@@ -470,9 +481,34 @@ Both user and assistant messages can be edited after they're sent:
 | `DELETE` | `/api/conversations` | Batch delete conversations |
 | `POST` | `/api/memory/consolidate/:granularity` | Trigger consolidation |
 | `POST` | `/api/settings/file/:dir/:filename` | Save core prompt file |
+| `POST` | `/api/settings/custom` | Create custom identity file |
+| `DELETE` | `/api/settings/custom/:filename` | Delete custom identity file |
 | `GET` | `/api/snapshots` | List snapshots (requires MCP) |
 | `POST` | `/api/snapshots/create` | Create manual snapshot |
 | `POST` | `/api/snapshots/:id/restore` | Restore from snapshot |
+| `GET` | `/api/lorebooks` | List all lorebooks |
+| `POST` | `/api/lorebooks` | Create new lorebook |
+| `GET` | `/api/lorebooks/:id` | Get specific lorebook |
+| `PUT` | `/api/lorebooks/:id` | Update lorebook |
+| `DELETE` | `/api/lorebooks/:id` | Delete lorebook |
+| `GET` | `/api/lorebooks/:id/entries` | List lorebook entries |
+| `POST` | `/api/lorebooks/:id/entries` | Create lorebook entry |
+| `PUT` | `/api/lorebooks/:id/entries/:entryId` | Update lorebook entry |
+| `DELETE` | `/api/lorebooks/:id/entries/:entryId` | Delete lorebook entry |
+| `DELETE` | `/api/lorebooks/state/:conversationId` | Reset lorebook state |
+| `GET` | `/api/graph` | Get full knowledge graph |
+| `POST` | `/api/graph/nodes` | Create graph node |
+| `POST` | `/api/graph/edges` | Create graph edge |
+| `DELETE` | `/api/graph/nodes/:id` | Delete graph node |
+| `DELETE` | `/api/graph/edges/:id` | Delete graph edge |
+| `GET` | `/api/backgrounds` | List uploaded backgrounds |
+| `POST` | `/api/backgrounds` | Upload background image |
+| `DELETE` | `/api/backgrounds/:filename` | Delete background image |
+| `GET` | `/backgrounds/:filename` | Serve background image file |
+| `GET` | `/api/llm-settings` | Get current LLM settings |
+| `POST` | `/api/llm-settings` | Save LLM settings |
+| `POST` | `/api/llm-settings/test` | Test LLM connection |
+| `POST` | `/api/mcp/sync` | Manually trigger MCP sync |
 | `GET` | `/fragments/*` | HTML fragments for HTMX |
 
 ## Project Structure

@@ -175,7 +175,7 @@ export function renderAppShell(): string {
   <link rel="stylesheet" href="/css/main.css?v=11">
   ${getAccentColorOverride()}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="manifest" href="/manifest.json">
+  <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.svg">
   <script src="/lib/htmx.min.js"></script>
   <script src="/lib/htmx-sse.js"></script>

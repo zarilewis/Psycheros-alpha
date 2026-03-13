@@ -8,7 +8,7 @@
  * - Static assets - Cache-first with background update
  */
 
-const CACHE_NAME = 'psycheros-v1';
+const CACHE_NAME = 'psycheros-v2';
 const STATIC_ASSETS = [
   '/',
   '/css/main.css',
@@ -17,8 +17,7 @@ const STATIC_ASSETS = [
   '/lib/htmx.min.js',
   '/lib/htmx-sse.js',
   '/lib/marked.min.js',
-  '/lib/dompurify.min.js',
-  '/manifest.json'
+  '/lib/dompurify.min.js'
 ];
 
 // Install - cache static assets

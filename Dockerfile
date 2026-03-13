@@ -19,9 +19,9 @@ COPY entity-core/deno.json entity-core/deno.lock entity-core/
 COPY Psycheros/src/ Psycheros/src/
 COPY entity-core/src/ entity-core/src/
 
-# Cache dependencies for both projects
-RUN cd /app/Psycheros && deno cache src/main.ts \
-    && cd /app/entity-core && deno cache src/mod.ts
+# Install dependencies for both projects (deno install fully resolves npm packages)
+RUN cd /app/Psycheros && deno install --entrypoint src/main.ts \
+    && cd /app/entity-core && deno install --entrypoint src/mod.ts
 
 # --- Runtime stage ---
 FROM denoland/deno:2.6.7

@@ -61,7 +61,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/entity/loop.ts` | Agentic loop - LLM calls, tool execution, context capture |
 | `src/entity/context.ts` | Context loading (supports MCP client) |
 | `src/init/mod.ts` | Initialization - copies templates to empty identity directories |
-| `src/server/routes.ts` | API endpoints and handlers (chat, conversations, snapshots) |
+| `src/server/routes.ts` | API endpoints and handlers (chat, conversations, snapshots, lorebooks, graph, backgrounds, LLM settings) |
 | `src/server/broadcaster.ts` | Persistent SSE for background updates |
 | `src/server/state-changes.ts` | Unified state mutations |
 | `src/server/templates.ts` | HTML templates including header with context viewer |
@@ -81,9 +81,9 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/db/schema.ts` | Database schema, migrations, and vector table sync verification |
 | `src/db/vector.ts` | sqlite-vec helpers, serialization, search |
 | `src/mcp-client/mod.ts` | MCP client for entity-core connection (includes graph methods) |
+| `src/lorebook/mod.ts` | Lorebook/world info system (triggers, context injection, state) |
 | `templates/identity/` | Default identity templates (tracked in git) |
 | `web/js/graph-view.js` | Knowledge graph visualization (vis-network) |
-| `src/server/routes.ts` | API endpoints (includes graph API routes) |
 | `scripts/migrate-to-entity-core.ts` | Migration script for entity-core |
 | `scripts/index-messages.ts` | Index existing messages for ChatRAG |
 | `web/js/psycheros.js` | Client-side SSE handling, context viewer |
@@ -172,7 +172,7 @@ deno run -A scripts/migrate-to-entity-core.ts            # Run migration
 
 **Temporal Awareness**:
 - Every message includes a timestamp prefix the entity can see
-- Format: `[YYYY-MM-DD HH:MM]` (e.g., `[2026-03-05 15:17]`)
+- Format: `<t>YYYY-MM-DD HH:MM</t>` (e.g., `<t>2026-03-05 15:17</t>`)
 - Allows entity to understand when events occurred and time gaps
 - Timezone configurable via `TZ` environment variable (defaults to UTC)
 - Implemented in `src/entity/loop.ts` via `formatMessageTimestamp()`
