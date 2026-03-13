@@ -63,6 +63,9 @@ ENV PSYCHEROS_ENTITY_CORE_DATA_DIR=/app/entity-core/data
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD deno eval "const r = await fetch('http://localhost:3000/health'); if (!r.ok) Deno.exit(1);"
 
+# Set working directory to Psycheros so Deno.cwd() resolves static files correctly
+WORKDIR /app/Psycheros
+
 # Entrypoint seeds identity templates, then execs into dumb-init → deno
 ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["deno", "run", "-A", "--unstable-cron", "/app/Psycheros/src/main.ts"]
