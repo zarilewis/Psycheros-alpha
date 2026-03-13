@@ -617,6 +617,8 @@ async function sendMessage() {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let currentEventType = 'content';
+    let dataLines = [];
 
     while (true) {
       const { done, value } = await reader.read();
@@ -628,9 +630,6 @@ async function sendMessage() {
       // Per SSE spec, multiple data: lines should be joined with newlines
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
-
-      let currentEventType = 'content';
-      let dataLines = [];
 
       for (const line of lines) {
         if (line.startsWith('event: ')) {
