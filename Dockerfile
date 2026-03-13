@@ -14,10 +14,16 @@ WORKDIR /app
 COPY Psycheros/ ./Psycheros/
 COPY entity-core/ ./entity-core/
 
-# Install all dependencies — this populates /deno-dir and any project-local
-# caches (lock files, .deno dirs) that deno run needs to skip network fetches.
+# Install statically-analyzable dependencies
 RUN cd /app/Psycheros && deno install --entrypoint src/main.ts \
     && cd /app/entity-core && deno install --entrypoint src/mod.ts
+
+# Cache dynamic imports that deno install can't statically analyze:
+#   - @xenova/transformers (dynamic import in src/rag/embedder.ts)
+#     → pulls ~80 transitive npm deps (express, protobufjs, sharp, etc.)
+#   - npm:sqlite-vec (bare specifier in dynamic import in src/db/vector.ts)
+RUN cd /app/Psycheros && deno cache npm:@huggingface/transformers@3.3.1 \
+    && deno cache "npm:sqlite-vec@0.0.1-alpha.9" || true
 
 # --- Runtime stage ---
 FROM denoland/deno:2.6.7
