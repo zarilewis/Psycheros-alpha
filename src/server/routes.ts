@@ -37,6 +37,7 @@ import {
   renderGraphView,
   renderAppearanceSettings,
   renderLLMSettings,
+  renderSettingsHub,
   escapeHtml,
   type MetricsMap,
 } from "./templates.ts";
@@ -1113,6 +1114,22 @@ function isValidFilename(filename: string, isCustom: boolean = false): boolean {
   }
   // Standard files: alphanumeric, underscores, hyphens (no spaces)
   return /^[a-zA-Z0-9_-]+$/.test(baseName);
+}
+
+/**
+ * Handle GET /fragments/settings - Settings hub page fragment.
+ * Returns the settings hub view listing all settings categories.
+ *
+ * @param _ctx - Route context
+ * @returns HTTP Response with settings hub HTML fragment
+ */
+export function handleSettingsHubFragment(_ctx: RouteContext): Response {
+  const html = renderSettingsHub();
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
 }
 
 /**

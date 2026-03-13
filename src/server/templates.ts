@@ -235,6 +235,137 @@ export function renderHeaderTitle(title?: string): string {
 }
 
 /**
+ * Render a back button that returns to the settings hub.
+ */
+function renderSettingsBackButton(): string {
+  return `<a class="settings-back-btn"
+    hx-get="/fragments/settings"
+    hx-target="#chat"
+    hx-swap="innerHTML">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+    <span>Settings</span>
+  </a>`;
+}
+
+/**
+ * Render the settings hub page listing all 5 settings categories as cards.
+ */
+export function renderSettingsHub(): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <h1 class="settings-title">Settings</h1>
+    <p class="settings-desc">Manage entity behavior, appearance, and model configuration</p>
+  </div>
+  <div class="settings-content" id="settings-content">
+    <div class="settings-hub-grid">
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/core-prompts"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Core Prompts</span>
+          <span class="settings-hub-card-desc">Edit prompt files that define the entity's core behavior</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/lorebooks"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Context Notes</span>
+          <span class="settings-hub-card-desc">Manage lorebooks and context entries</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/graph"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <circle cx="19" cy="5" r="2"/>
+            <circle cx="5" cy="19" r="2"/>
+            <line x1="14.5" y1="9.5" x2="17.5" y2="6.5"/>
+            <line x1="9.5" y1="14.5" x2="6.5" y2="17.5"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Knowledge Graph</span>
+          <span class="settings-hub-card-desc">Interactive knowledge graph visualization</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/appearance"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Appearance</span>
+          <span class="settings-hub-card-desc">Customize colors, backgrounds, and visual effects</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/llm"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+            <rect x="9" y="9" width="6" height="6"/>
+            <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">LLM Settings</span>
+          <span class="settings-hub-card-desc">Configure model connection and generation parameters</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+    </div>
+  </div>
+</div>`;
+}
+/**
  * Render the sidebar with conversation list.
  */
 export function renderSidebar(conversations: Conversation[]): string {
@@ -247,9 +378,8 @@ export function renderSidebar(conversations: Conversation[]): string {
     ${renderConversationList(conversations)}
   </nav>
   <div class="sidebar-footer">
-    <span class="sidebar-title">Settings</span>
     <a class="sidebar-settings-link"
-      hx-get="/fragments/settings/core-prompts"
+      hx-get="/fragments/settings"
       hx-target="#chat"
       hx-swap="innerHTML"
       onclick="Psycheros.closeSidebarAfterNav()">
@@ -257,62 +387,7 @@ export function renderSidebar(conversations: Conversation[]): string {
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
-      <span>Core Prompts</span>
-    </a>
-    <a class="sidebar-settings-link"
-      hx-get="/fragments/settings/lorebooks"
-      hx-target="#chat"
-      hx-swap="innerHTML"
-      onclick="Psycheros.closeSidebarAfterNav()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-      </svg>
-      <span>Context Notes</span>
-    </a>
-    <a class="sidebar-settings-link"
-      hx-get="/fragments/settings/graph"
-      hx-target="#chat"
-      hx-swap="innerHTML"
-      onclick="Psycheros.closeSidebarAfterNav()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3"/>
-        <circle cx="19" cy="5" r="2"/>
-        <circle cx="5" cy="19" r="2"/>
-        <line x1="14.5" y1="9.5" x2="17.5" y2="6.5"/>
-        <line x1="9.5" y1="14.5" x2="6.5" y2="17.5"/>
-      </svg>
-      <span>Knowledge Graph</span>
-    </a>
-    <a class="sidebar-settings-link"
-      hx-get="/fragments/settings/appearance"
-      hx-target="#chat"
-      hx-swap="innerHTML"
-      onclick="Psycheros.closeSidebarAfterNav()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="5"/>
-        <line x1="12" y1="1" x2="12" y2="3"/>
-        <line x1="12" y1="21" x2="12" y2="23"/>
-        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-        <line x1="1" y1="12" x2="3" y2="12"/>
-        <line x1="21" y1="12" x2="23" y2="12"/>
-        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-      </svg>
-      <span>Appearance</span>
-    </a>
-    <a class="sidebar-settings-link"
-      hx-get="/fragments/settings/llm"
-      hx-target="#chat"
-      hx-swap="innerHTML"
-      onclick="Psycheros.closeSidebarAfterNav()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="4" y="4" width="16" height="16" rx="2"/>
-        <rect x="9" y="9" width="6" height="6"/>
-        <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/>
-      </svg>
-      <span>LLM Settings</span>
+      <span>Settings</span>
     </a>
   </div>
 </aside>`;
@@ -733,8 +808,13 @@ export function renderCorePromptsSettings(activeDir: PromptDirectory = "self"): 
 
   return `<div class="settings-view">
   <div class="settings-header">
-    <h1 class="settings-title">Core Prompts</h1>
-    <p class="settings-desc">Edit the prompt files that define the entity's core behavior.</p>
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Core Prompts</h1>
+        <p class="settings-desc">Edit the prompt files that define the entity's core behavior.</p>
+      </div>
+    </div>
   </div>
   <div class="settings-tabs">
     ${tabsHtml}
@@ -1078,8 +1158,13 @@ function formatTime(timestamp: string): string {
 export function renderLorebooksView(lorebooks: Lorebook[]): string {
   let html = `<div class="settings-view">
     <div class="settings-header">
-      <h1 class="settings-title">Context Books</h1>
-      <p class="settings-desc">Collections of context entries that are injected into context when triggered by keywords.</p>
+      <div class="settings-header-row">
+        ${renderSettingsBackButton()}
+        <div>
+          <h1 class="settings-title">Context Books</h1>
+          <p class="settings-desc">Collections of context entries that are injected into context when triggered by keywords.</p>
+        </div>
+      </div>
     </div>
     <div class="settings-content" id="settings-content">`;
 
@@ -1427,6 +1512,7 @@ export function renderGraphView(stats: {
   return `
 <div class="graph-view">
   <div class="graph-header">
+    ${renderSettingsBackButton()}
     <h2>Knowledge Graph</h2>
     <div class="graph-stats">
       <span class="stat"><strong>${nodeCount}</strong> nodes</span>
@@ -1563,6 +1649,7 @@ export function renderGraphView(stats: {
   padding: 1rem;
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-color);
+  gap: 1rem;
 }
 
 .graph-header h2 {
@@ -1787,6 +1874,24 @@ export function renderGraphView(stats: {
 .vis-network {
   outline: none !important;
 }
+
+.graph-header .settings-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.graph-header .settings-back-btn:hover {
+  color: var(--accent-color);
+  background: rgba(255,255,255,0.05);
+}
 </style>
 `;
 }
@@ -1801,8 +1906,13 @@ export function renderGraphView(stats: {
 export function renderAppearanceSettings(): string {
   return `<div class="settings-view">
   <div class="settings-header">
-    <h1 class="settings-title">Appearance</h1>
-    <p class="settings-desc">Customize colors, background images, and visual effects</p>
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Appearance</h1>
+        <p class="settings-desc">Customize colors, background images, and visual effects</p>
+      </div>
+    </div>
   </div>
   <div class="settings-content" id="settings-content">
 
@@ -2350,8 +2460,13 @@ export function renderLLMSettings(settings: LLMSettings): string {
 
   return `<div class="settings-view">
   <div class="settings-header">
-    <h1 class="settings-title">LLM Settings</h1>
-    <p class="settings-desc">Configure model connection, sampling parameters, and generation limits</p>
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">LLM Settings</h1>
+        <p class="settings-desc">Configure model connection, sampling parameters, and generation limits</p>
+      </div>
+    </div>
   </div>
   <div class="settings-content" id="settings-content">
 

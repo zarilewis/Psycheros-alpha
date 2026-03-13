@@ -306,7 +306,7 @@ identity/
 **Custom Files**: The `identity/custom/` directory allows creating arbitrary identity files with any valid filename. These are useful for storing specialized context (e.g., `project_notes.md`, `favorite_books.md`). Custom files:
 - Must use single-word filenames (letters, numbers, underscores only)
 - Are automatically wrapped in XML tags matching the filename
-- Can be created and deleted via the Settings → Core Prompts UI
+- Can be created and deleted via the Settings hub (sidebar → Settings → Core Prompts)
 - Are sorted alphabetically (no predefined order)
 
 When MCP is enabled, these are loaded from entity-core. Otherwise, they're read from local files.
@@ -328,9 +328,9 @@ XML tags are used so the LLM treats timestamps as structural metadata rather tha
 
 **Timezone**: Set the `TZ` environment variable to configure the timezone (e.g., `TZ=America/Los_Angeles`). Defaults to UTC if not set.
 
-### Core Prompts UI
+### Core Prompts UI (Settings Hub)
 
-The Settings → Core Prompts UI provides a web interface for managing identity files:
+The Core Prompts UI (accessible via Settings hub in the sidebar) provides a web interface for managing identity files:
 
 **Tabs**:
 - **Self**: Entity identity files (my_identity, my_persona, etc.)

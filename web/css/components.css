@@ -1116,7 +1116,6 @@
   align-items: center;
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
-  margin-top: var(--sp-2);
   border-radius: 6px;
   color: var(--c-fg-muted);
   font-family: var(--font-sans);
@@ -1162,6 +1161,117 @@
   font-size: var(--font-size-sm);
   color: var(--c-fg-muted);
   margin: 0;
+}
+
+/* ==========================================================================
+   Settings Header Row (back button + title layout)
+   ========================================================================== */
+.settings-header-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+}
+
+.settings-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: 6px;
+  color: var(--c-fg-muted);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  transition: color var(--transition), background-color var(--transition);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.settings-back-btn:hover {
+  color: var(--c-accent);
+  background-color: var(--c-bg-hover);
+}
+
+/* ==========================================================================
+   Settings Hub Cards
+   ========================================================================== */
+.settings-hub-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-4);
+}
+
+.settings-hub-card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  border-radius: 8px;
+  background: var(--c-bg-sunken);
+  border: 1px solid var(--c-border);
+  text-decoration: none;
+  color: var(--c-fg);
+  transition: border-color var(--transition), background-color var(--transition);
+  cursor: pointer;
+}
+
+.settings-hub-card:hover {
+  border-color: var(--c-accent);
+  background-color: var(--c-bg-hover);
+}
+
+.settings-hub-card:hover .settings-hub-card-title {
+  color: var(--c-accent);
+}
+
+.settings-hub-card:hover .settings-hub-card-arrow {
+  color: var(--c-accent);
+}
+
+.settings-hub-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: var(--c-bg);
+  color: var(--c-accent);
+  flex-shrink: 0;
+}
+
+.settings-hub-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-hub-card-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--c-fg);
+  transition: color var(--transition);
+}
+
+.settings-hub-card-desc {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-sm);
+  color: var(--c-fg-muted);
+}
+
+.settings-hub-card-arrow {
+  color: var(--c-fg-muted);
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: color var(--transition), opacity var(--transition);
+}
+
+.settings-hub-card:hover .settings-hub-card-arrow {
+  opacity: 1;
 }
 
 .settings-tabs {

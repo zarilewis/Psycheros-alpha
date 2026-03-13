@@ -38,6 +38,7 @@ import {
   handleSettingsFileEditorFragment,
   handleSettingsFileListFragment,
   handleSettingsFragment,
+  handleSettingsHubFragment,
   handleSaveSettingsFile,
   handleStaticFile,
   handleUpdateTitle,
@@ -761,6 +762,11 @@ export class Server {
     // GET /fragments/conv-list - Conversation list fragment
     if (path === "/fragments/conv-list") {
       return handleConversationListFragment(ctx);
+    }
+
+    // GET /fragments/settings - Settings hub page fragment
+    if (path === "/fragments/settings") {
+      return handleSettingsHubFragment(ctx);
     }
 
     // GET /fragments/settings/core-prompts - Settings page fragment
