@@ -119,6 +119,8 @@ const server = new Server({
   mcpClient,
 });
 
+await server.init();
+
 // Handle graceful shutdown
 Deno.addSignalListener("SIGINT", async () => {
   console.log("\nShutting down...");

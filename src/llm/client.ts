@@ -222,12 +222,33 @@ export class LLMClient {
       request.tool_choice = "auto";
     }
 
+    // Per-call options override config-level defaults
     if (options?.temperature !== undefined) {
       request.temperature = options.temperature;
+    } else if (this.config.temperature !== undefined) {
+      request.temperature = this.config.temperature;
     }
 
     if (options?.maxTokens !== undefined) {
       request.max_tokens = options.maxTokens;
+    } else if (this.config.maxTokens !== undefined) {
+      request.max_tokens = this.config.maxTokens;
+    }
+
+    if (this.config.topP !== undefined) {
+      request.top_p = this.config.topP;
+    }
+
+    if (this.config.topK !== undefined && this.config.topK > 0) {
+      request.top_k = this.config.topK;
+    }
+
+    if (this.config.frequencyPenalty !== undefined) {
+      request.frequency_penalty = this.config.frequencyPenalty;
+    }
+
+    if (this.config.presencePenalty !== undefined) {
+      request.presence_penalty = this.config.presencePenalty;
     }
 
     return request;

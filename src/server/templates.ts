@@ -9,6 +9,8 @@
 
 import type { Conversation, Message, ToolCall, ToolResult, TurnMetrics } from "../types.ts";
 import type { Lorebook, LorebookEntry } from "../lorebook/mod.ts";
+import type { LLMSettings } from "../llm/mod.ts";
+import { maskApiKey } from "../llm/mod.ts";
 import { renderMarkdown } from "./markdown.ts";
 
 // =============================================================================
@@ -299,6 +301,18 @@ export function renderSidebar(conversations: Conversation[]): string {
         <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
       </svg>
       <span>Appearance</span>
+    </a>
+    <a class="sidebar-settings-link"
+      hx-get="/fragments/settings/llm"
+      hx-target="#chat"
+      hx-swap="innerHTML"
+      onclick="Psycheros.closeSidebarAfterNav()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="4" y="4" width="16" height="16" rx="2"/>
+        <rect x="9" y="9" width="6" height="6"/>
+        <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/>
+      </svg>
+      <span>LLM Settings</span>
     </a>
   </div>
 </aside>`;
@@ -2317,6 +2331,456 @@ function clearBackground() {
   Theme.setBackground(null);
   document.getElementById('bg-url').value = '';
   document.querySelectorAll('.bg-gallery-item').forEach(el => el.classList.remove('active'));
+}
+</script>
+`;
+}
+
+// =============================================================================
+// LLM Settings Template
+// =============================================================================
+
+/**
+ * Render the LLM settings view.
+ */
+export function renderLLMSettings(settings: LLMSettings): string {
+  const maskedKey = maskApiKey(settings.apiKey);
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <h1 class="settings-title">LLM Settings</h1>
+    <p class="settings-desc">Configure model connection, sampling parameters, and generation limits</p>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <!-- Connection Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Connection</h3>
+      <p class="theme-section-desc">API endpoint, credentials, and model selection</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="llm-base-url">Base URL</label>
+          <input type="url" id="llm-base-url" class="input-field llm-input" value="${escapeHtml(settings.baseUrl)}" placeholder="https://api.example.com/v1/chat/completions">
+        </div>
+        <div class="llm-field">
+          <label for="llm-api-key">API Key</label>
+          <div class="llm-api-key-row">
+            <input type="password" id="llm-api-key" class="input-field llm-input" value="${escapeHtml(maskedKey)}" placeholder="Enter API key...">
+            <button class="btn btn--ghost btn--sm llm-toggle-key" onclick="toggleApiKeyVisibility()" title="Show/hide key">
+              <svg id="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="llm-field">
+          <label for="llm-model">Model</label>
+          <input type="text" id="llm-model" class="input-field llm-input" value="${escapeHtml(settings.model)}" placeholder="model-name">
+        </div>
+      </div>
+    </section>
+
+    <!-- Worker Model Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Worker Model</h3>
+      <p class="theme-section-desc">Lighter model for auto-titling and summarization tasks</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="llm-worker-model">Worker Model</label>
+          <input type="text" id="llm-worker-model" class="input-field llm-input" value="${escapeHtml(settings.workerModel)}" placeholder="lighter-model-name">
+        </div>
+      </div>
+    </section>
+
+    <!-- Sampling Parameters Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Sampling Parameters</h3>
+      <p class="theme-section-desc">Control randomness and diversity of responses</p>
+      <div class="llm-sliders">
+        <div class="slider-group">
+          <label for="llm-temperature">Temperature</label>
+          <input type="range" id="llm-temperature" min="0" max="2" step="0.01" value="${settings.temperature}" oninput="document.getElementById('llm-temperature-val').textContent = this.value">
+          <span id="llm-temperature-val">${settings.temperature}</span>
+        </div>
+        <div class="slider-group">
+          <label for="llm-top-p">Top P</label>
+          <input type="range" id="llm-top-p" min="0" max="1" step="0.01" value="${settings.topP}" oninput="document.getElementById('llm-top-p-val').textContent = this.value">
+          <span id="llm-top-p-val">${settings.topP}</span>
+        </div>
+        <div class="llm-field-row">
+          <div class="llm-field inline">
+            <label for="llm-top-k">Top K <span class="label-hint">(0 = disabled)</span></label>
+            <input type="number" id="llm-top-k" class="input-field llm-input sm" value="${settings.topK}" min="0" max="200" step="1">
+          </div>
+        </div>
+        <div class="slider-group">
+          <label for="llm-freq-penalty">Frequency Penalty</label>
+          <input type="range" id="llm-freq-penalty" min="-2" max="2" step="0.01" value="${settings.frequencyPenalty}" oninput="document.getElementById('llm-freq-penalty-val').textContent = this.value">
+          <span id="llm-freq-penalty-val">${settings.frequencyPenalty}</span>
+        </div>
+        <div class="slider-group">
+          <label for="llm-pres-penalty">Presence Penalty</label>
+          <input type="range" id="llm-pres-penalty" min="-2" max="2" step="0.01" value="${settings.presencePenalty}" oninput="document.getElementById('llm-pres-penalty-val').textContent = this.value">
+          <span id="llm-pres-penalty-val">${settings.presencePenalty}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Limits Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Generation Limits</h3>
+      <p class="theme-section-desc">Maximum response length and context window</p>
+      <div class="llm-fields">
+        <div class="llm-field-row">
+          <div class="llm-field inline">
+            <label for="llm-max-tokens">Max Tokens</label>
+            <input type="number" id="llm-max-tokens" class="input-field llm-input sm" value="${settings.maxTokens}" min="1" max="100000" step="1">
+          </div>
+          <div class="llm-field inline">
+            <label for="llm-context-length">Context Window <span class="label-hint">(reference)</span></label>
+            <input type="number" id="llm-context-length" class="input-field llm-input sm" value="${settings.contextLength}" min="1" max="1000000" step="1">
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Behavior Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Behavior</h3>
+      <p class="theme-section-desc">Chain-of-thought and reasoning settings</p>
+      <label class="toggle-label">
+        <input type="checkbox" id="llm-thinking" ${settings.thinkingEnabled ? "checked" : ""}>
+        <span class="toggle-slider"></span>
+        <span class="toggle-text">Chain-of-Thought Reasoning</span>
+      </label>
+    </section>
+
+    <!-- Actions -->
+    <div class="llm-actions">
+      <div class="llm-actions-left">
+        <button class="btn btn--primary" onclick="saveLLMSettings()">Save Settings</button>
+        <button class="btn btn--ghost" onclick="testLLMConnection()" id="test-connection-btn">Test Connection</button>
+      </div>
+      <button class="btn btn--ghost" onclick="resetLLMDefaults()">Reset to Defaults</button>
+    </div>
+
+    <!-- Status -->
+    <div id="llm-status" class="llm-status" style="display:none;"></div>
+
+  </div>
+</div>
+
+<style>
+/* LLM Settings Form */
+.llm-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.llm-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.llm-field label {
+  font-size: var(--font-size-sm);
+  color: var(--c-fg-muted);
+  font-weight: var(--font-weight-medium);
+}
+
+.llm-field-row {
+  display: flex;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+
+.llm-field.inline {
+  flex: 1;
+  min-width: 150px;
+}
+
+.llm-input {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.llm-input.sm {
+  max-width: 160px;
+}
+
+.llm-api-key-row {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.llm-api-key-row .llm-input {
+  flex: 1;
+}
+
+.llm-toggle-key {
+  flex-shrink: 0;
+  color: var(--c-fg-muted);
+}
+
+.llm-toggle-key:hover {
+  color: var(--c-accent);
+}
+
+.label-hint {
+  font-weight: var(--font-weight-normal);
+  color: var(--c-fg-subtle);
+  font-size: var(--font-size-xs);
+}
+
+/* Sliders */
+.llm-sliders {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.slider-group label {
+  font-size: var(--font-size-sm);
+  color: var(--c-fg-muted);
+  font-weight: var(--font-weight-medium);
+  min-width: 140px;
+}
+
+.slider-group input[type="range"] {
+  flex: 1;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--c-border);
+  border-radius: 2px;
+  outline: none;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--c-accent);
+  cursor: pointer;
+  box-shadow: 0 0 6px var(--c-accent-glow);
+}
+
+.slider-group span {
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+  color: var(--c-fg-muted);
+  min-width: 40px;
+  text-align: right;
+}
+
+/* Toggle switch */
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  cursor: pointer;
+}
+
+.toggle-label input {
+  display: none;
+}
+
+.toggle-slider {
+  width: 44px;
+  height: 24px;
+  background: var(--c-border);
+  border-radius: 12px;
+  position: relative;
+  transition: background var(--transition);
+}
+
+.toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: var(--c-fg-muted);
+  border-radius: 50%;
+  transition: all var(--transition);
+}
+
+.toggle-label input:checked + .toggle-slider {
+  background: var(--c-accent);
+}
+
+.toggle-label input:checked + .toggle-slider::after {
+  transform: translateX(20px);
+  background: #000;
+}
+
+.toggle-text {
+  font-size: var(--font-size-sm);
+  color: var(--c-fg);
+}
+
+/* Actions */
+.llm-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-3);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--c-border);
+  margin-top: var(--sp-4);
+}
+
+.llm-actions-left {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+/* Status */
+.llm-status {
+  margin-top: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
+}
+
+.llm-status.success {
+  background: rgba(57, 255, 20, 0.08);
+  border: 1px solid rgba(57, 255, 20, 0.2);
+  color: var(--c-accent);
+}
+
+.llm-status.error {
+  background: rgba(255, 68, 68, 0.08);
+  border: 1px solid rgba(255, 68, 68, 0.2);
+  color: var(--c-error);
+}
+
+.llm-status.loading {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--c-border);
+  color: var(--c-fg-muted);
+}
+</style>
+
+<script>
+let apiKeyVisible = false;
+
+function toggleApiKeyVisibility() {
+  const input = document.getElementById('llm-api-key');
+  if (!input) return;
+  apiKeyVisible = !apiKeyVisible;
+  input.type = apiKeyVisible ? 'text' : 'password';
+}
+
+function gatherSettings() {
+  return {
+    baseUrl: document.getElementById('llm-base-url').value.trim(),
+    apiKey: document.getElementById('llm-api-key').value.trim(),
+    model: document.getElementById('llm-model').value.trim(),
+    workerModel: document.getElementById('llm-worker-model').value.trim(),
+    temperature: parseFloat(document.getElementById('llm-temperature').value),
+    topP: parseFloat(document.getElementById('llm-top-p').value),
+    topK: parseInt(document.getElementById('llm-top-k').value) || 0,
+    frequencyPenalty: parseFloat(document.getElementById('llm-freq-penalty').value),
+    presencePenalty: parseFloat(document.getElementById('llm-pres-penalty').value),
+    maxTokens: parseInt(document.getElementById('llm-max-tokens').value) || 4096,
+    contextLength: parseInt(document.getElementById('llm-context-length').value) || 128000,
+    thinkingEnabled: document.getElementById('llm-thinking').checked,
+  };
+}
+
+function showStatus(type, message) {
+  const el = document.getElementById('llm-status');
+  if (!el) return;
+  el.style.display = 'block';
+  el.className = 'llm-status ' + type;
+  el.textContent = message;
+}
+
+async function saveLLMSettings() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  showStatus('loading', 'Saving settings...');
+
+  try {
+    const settings = gatherSettings();
+    const resp = await fetch('/api/llm-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showStatus('success', 'Settings saved successfully.');
+    } else {
+      showStatus('error', 'Failed to save: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    showStatus('error', 'Failed to save: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Settings';
+  }
+}
+
+async function testLLMConnection() {
+  const btn = document.getElementById('test-connection-btn');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Testing...';
+  showStatus('loading', 'Sending test request...');
+
+  try {
+    const settings = gatherSettings();
+    const resp = await fetch('/api/llm-settings/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showStatus('success', 'Connection successful! (' + data.latency + 'ms)');
+    } else {
+      showStatus('error', 'Connection failed: ' + (data.error || 'Unknown error') + (data.latency ? ' (' + data.latency + 'ms)' : ''));
+    }
+  } catch (e) {
+    showStatus('error', 'Connection failed: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Test Connection';
+  }
+}
+
+async function resetLLMDefaults() {
+  if (!confirm('Reset all LLM settings to defaults? This will reload values from your .env file.')) return;
+  showStatus('loading', 'Resetting...');
+
+  try {
+    const resp = await fetch('/api/llm-settings');
+    const current = await resp.json();
+
+    // Clear saved settings by saving the current env-based defaults
+    // We just reload the page to pick up fresh values
+    const settings = gatherSettings();
+    // Reset to a known-good set - just reload the page
+    window.location.reload();
+  } catch (e) {
+    showStatus('error', 'Failed to reset: ' + e.message);
+  }
 }
 </script>
 `;

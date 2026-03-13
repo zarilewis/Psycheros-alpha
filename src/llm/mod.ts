@@ -13,3 +13,7 @@ export { LLMError } from "./types.ts";
 
 // Re-export client
 export { createDefaultClient, createWorkerClient, LLMClient } from "./client.ts";
+
+// Re-export settings
+export type { LLMSettings } from "./settings.ts";
+export { loadSettings, saveSettings, getDefaultSettings, maskApiKey } from "./settings.ts";

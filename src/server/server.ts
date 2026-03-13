@@ -8,7 +8,7 @@
  */
 
 import { DBClient } from "../db/mod.ts";
-import { createDefaultClient, type LLMClient } from "../llm/mod.ts";
+import { createDefaultClient, type LLMClient, type LLMSettings, loadSettings, saveSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import { catchUpSummarization, needsConsolidation, runConsolidation } from "../memory/mod.ts";
@@ -67,6 +67,10 @@ import {
   handleDeleteGraphNode,
   handleDeleteGraphEdge,
   handleAppearanceSettingsFragment,
+  handleGetLLMSettings,
+  handleSaveLLMSettings,
+  handleTestLLMConnection,
+  handleLLMSettingsFragment,
   handleListBackgrounds,
   handleUploadBackground,
   handleDeleteBackground,
@@ -130,6 +134,7 @@ export class Server {
   private keepaliveInterval: number | null = null;
   private mcpClient: MCPClient | null = null;
   private lorebookManager: LorebookManager;
+  private llmSettings: LLMSettings;
 
   /**
    * Create a new Server instance.
@@ -143,8 +148,22 @@ export class Server {
     const dbPath = config.dbPath || `${config.projectRoot}/.psycheros/psycheros.db`;
     this.db = new DBClient(dbPath);
 
-    // Initialize LLM client with defaults
+    // Initialize LLM client with defaults (will be reloaded from settings in init())
     this.llm = createDefaultClient();
+    this.llmSettings = {
+      baseUrl: Deno.env.get("ZAI_BASE_URL") || "https://api.z.ai/api/coding/paas/v4/chat/completions",
+      apiKey: Deno.env.get("ZAI_API_KEY") || "",
+      model: Deno.env.get("ZAI_MODEL") || "glm-4.7",
+      workerModel: Deno.env.get("ZAI_WORKER_MODEL") || "GLM-4.5-Air",
+      temperature: 0.7,
+      topP: 1,
+      topK: 0,
+      frequencyPenalty: 0,
+      presencePenalty: 0,
+      maxTokens: 4096,
+      contextLength: 128000,
+      thinkingEnabled: true,
+    };
 
     // Initialize tool registry with only allowed tools
     this.tools = createDefaultRegistry(config.allowedTools ?? []);
@@ -172,6 +191,48 @@ export class Server {
 
     // Create abort controller for graceful shutdown
     this.abortController = new AbortController();
+  }
+
+  /**
+   * Initialize async dependencies (must be called before start()).
+   */
+  async init(): Promise<void> {
+    this.llmSettings = await loadSettings(this.config.projectRoot);
+    this.reloadLLMClient();
+  }
+
+  /**
+   * Get the current LLM settings.
+   */
+  getLLMSettings(): LLMSettings {
+    return this.llmSettings;
+  }
+
+  /**
+   * Update LLM settings, persist to disk, and hot-reload the client.
+   */
+  async updateLLMSettings(settings: LLMSettings): Promise<void> {
+    this.llmSettings = settings;
+    await saveSettings(this.config.projectRoot, settings);
+    this.reloadLLMClient();
+  }
+
+  /**
+   * Re-create the LLM client from current settings.
+   */
+  private reloadLLMClient(): void {
+    this.llm = createDefaultClient({
+      baseUrl: this.llmSettings.baseUrl,
+      apiKey: this.llmSettings.apiKey,
+      model: this.llmSettings.model,
+      thinkingEnabled: this.llmSettings.thinkingEnabled,
+      temperature: this.llmSettings.temperature,
+      topP: this.llmSettings.topP,
+      topK: this.llmSettings.topK,
+      frequencyPenalty: this.llmSettings.frequencyPenalty,
+      presencePenalty: this.llmSettings.presencePenalty,
+      maxTokens: this.llmSettings.maxTokens,
+    });
   }
 
   /**
@@ -357,6 +418,8 @@ export class Server {
       memoryEnabled: this.config.memoryEnabled ?? true,
       mcpClient: this.mcpClient ?? undefined,
       lorebookManager: this.lorebookManager,
+      getLLMSettings: () => this.llmSettings,
+      updateLLMSettings: (settings) => this.updateLLMSettings(settings),
     };
   }
 
@@ -629,6 +692,25 @@ export class Server {
       return await handleDeleteBackground(ctx, filename);
     }
 
+    // ========================================
+    // LLM Settings API Routes
+    // ========================================
+
+    // GET /api/llm-settings - Get current settings
+    if (method === "GET" && path === "/api/llm-settings") {
+      return handleGetLLMSettings(ctx);
+    }
+
+    // POST /api/llm-settings - Save settings
+    if (method === "POST" && path === "/api/llm-settings") {
+      return await handleSaveLLMSettings(ctx, request);
+    }
+
+    // POST /api/llm-settings/test - Test connection
+    if (method === "POST" && path === "/api/llm-settings/test") {
+      return await handleTestLLMConnection(ctx, request);
+    }
+
     // 404 for unknown API routes
     return new Response(
       JSON.stringify({ error: "API endpoint not found" }),
@@ -743,6 +825,15 @@ export class Server {
     // GET /fragments/settings/appearance - Appearance settings fragment
     if (path === "/fragments/settings/appearance") {
       return handleAppearanceSettingsFragment(ctx);
+    }
+
+    // ========================================
+    // LLM Settings Fragment Route
+    // ========================================
+
+    // GET /fragments/settings/llm - LLM settings UI fragment
+    if (path === "/fragments/settings/llm") {
+      return handleLLMSettingsFragment(ctx);
     }
 
     // GET /backgrounds/:filename - Serve background image files

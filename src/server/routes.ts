@@ -10,7 +10,8 @@
 
 import type { SSEEvent, TurnMetrics } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
-import type { LLMClient } from "../llm/mod.ts";
+import type { LLMClient, LLMSettings } from "../llm/mod.ts";
+import { maskApiKey } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { Retriever, RAGConfig } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
@@ -35,6 +36,7 @@ import {
   renderEntryEditor,
   renderGraphView,
   renderAppearanceSettings,
+  renderLLMSettings,
   escapeHtml,
   type MetricsMap,
 } from "./templates.ts";
@@ -68,6 +70,10 @@ export interface RouteContext {
   mcpClient?: MCPClient;
   /** Optional lorebook manager for world info */
   lorebookManager?: LorebookManager;
+  /** Get current LLM settings */
+  getLLMSettings: () => LLMSettings;
+  /** Update LLM settings and hot-reload */
+  updateLLMSettings: (settings: LLMSettings) => Promise<void>;
 }
 
 /**
@@ -3164,4 +3170,176 @@ export async function handleDeleteBackground(
       }
     );
   }
+}
+
+// =============================================================================
+// LLM Settings Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/llm-settings - Return current LLM settings (API key masked).
+ */
+export function handleGetLLMSettings(ctx: RouteContext): Response {
+  const settings = ctx.getLLMSettings();
+  const response = {
+    ...settings,
+    apiKey: maskApiKey(settings.apiKey),
+  };
+  return new Response(JSON.stringify(response), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/llm-settings - Save and apply LLM settings.
+ * If the API key field contains the masked value, it keeps the existing key.
+ */
+export async function handleSaveLLMSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<LLMSettings>;
+    const current = ctx.getLLMSettings();
+
+    const updated: LLMSettings = {
+      baseUrl: body.baseUrl ?? current.baseUrl,
+      apiKey: (body.apiKey && !body.apiKey.includes("••••")) ? body.apiKey : current.apiKey,
+      model: body.model ?? current.model,
+      workerModel: body.workerModel ?? current.workerModel,
+      temperature: body.temperature ?? current.temperature,
+      topP: body.topP ?? current.topP,
+      topK: body.topK ?? current.topK,
+      frequencyPenalty: body.frequencyPenalty ?? current.frequencyPenalty,
+      presencePenalty: body.presencePenalty ?? current.presencePenalty,
+      maxTokens: body.maxTokens ?? current.maxTokens,
+      contextLength: body.contextLength ?? current.contextLength,
+      thinkingEnabled: body.thinkingEnabled ?? current.thinkingEnabled,
+    };
+
+    await ctx.updateLLMSettings(updated);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to save settings";
+    return new Response(
+      JSON.stringify({ error: message }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+/**
+ * Handle POST /api/llm-settings/test - Test the API connection.
+ * Sends a minimal request and reports success/failure with latency.
+ */
+export async function handleTestLLMConnection(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    // Allow testing with provided settings before saving
+    let settings = ctx.getLLMSettings();
+    try {
+      const body = await request.json() as Partial<LLMSettings> | undefined;
+      if (body) {
+        const current = ctx.getLLMSettings();
+        settings = {
+          ...current,
+          ...body,
+          apiKey: (body.apiKey && !body.apiKey.includes("••••")) ? body.apiKey : current.apiKey,
+        };
+      }
+    } catch {
+      // No body or invalid JSON - use current settings
+    }
+
+    const startTime = performance.now();
+
+    const response = await fetch(settings.baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${settings.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: settings.model,
+        messages: [{ role: "user", content: "Hi" }],
+        max_tokens: 5,
+        stream: false,
+      }),
+    });
+
+    const latency = Math.round(performance.now() - startTime);
+
+    if (response.ok) {
+      return new Response(
+        JSON.stringify({ success: true, latency }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        },
+      );
+    } else {
+      let errorMsg = `HTTP ${response.status}`;
+      try {
+        const errBody = await response.json();
+        if (errBody.error?.message) {
+          errorMsg = errBody.error.message;
+        }
+      } catch {
+        errorMsg = `${errorMsg}: ${response.statusText}`;
+      }
+      return new Response(
+        JSON.stringify({ success: false, error: errorMsg, latency }),
+        {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        },
+      );
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Connection failed";
+    return new Response(
+      JSON.stringify({ success: false, error: message }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/llm - LLM settings UI fragment.
+ */
+export function handleLLMSettingsFragment(ctx: RouteContext): Response {
+  const html = renderLLMSettings(ctx.getLLMSettings());
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
 }

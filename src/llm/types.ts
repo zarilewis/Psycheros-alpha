@@ -24,6 +24,18 @@ export interface LLMConfig {
   model: string;
   /** Whether to enable chain-of-thought reasoning */
   thinkingEnabled: boolean;
+  /** Default sampling temperature (0-2) */
+  temperature?: number;
+  /** Default top-p (nucleus) sampling (0-1) */
+  topP?: number;
+  /** Default top-k sampling (0 = disabled) */
+  topK?: number;
+  /** Default frequency penalty (-2 to 2) */
+  frequencyPenalty?: number;
+  /** Default presence penalty (-2 to 2) */
+  presencePenalty?: number;
+  /** Default max tokens for responses */
+  maxTokens?: number;
 }
 
 // =============================================================================
@@ -53,6 +65,10 @@ export interface ChatRequest {
   tool_choice?: "auto";
   temperature?: number;
   max_tokens?: number;
+  top_p?: number;
+  top_k?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
 }
 
 // =============================================================================
