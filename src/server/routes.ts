@@ -1637,7 +1637,7 @@ export async function handleMcpSync(ctx: RouteContext): Promise<Response> {
     return new Response(
       JSON.stringify({
         success: false,
-        error: "MCP is not enabled. Set SBY_MCP_ENABLED=true to use entity-core sync.",
+        error: "MCP is not enabled. Set PSYCHEROS_MCP_ENABLED=true to use entity-core sync.",
       }),
       {
         status: 400,
