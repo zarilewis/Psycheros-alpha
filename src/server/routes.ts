@@ -446,9 +446,9 @@ export async function handleUpdateMessage(
     content = body.content;
     conversationId = body.conversationId;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Invalid request body";
+    console.error("[Routes] handleUpdateMessage parse error:", error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "Invalid request body" }),
       {
         status: 400,
         headers: {
@@ -551,9 +551,9 @@ export async function handleUpdateTitle(
     }
     title = body.title;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Invalid request body";
+    console.error("[Routes] handleUpdateTitle parse error:", error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "Invalid request body" }),
       {
         status: 400,
         headers: {
@@ -673,9 +673,9 @@ export async function handleBatchDeleteConversations(
     }
     ids = body.ids.filter((id: unknown) => typeof id === "string");
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Invalid request body";
+    console.error("[Routes] handleBatchDeleteConversations parse error:", error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "Invalid request body" }),
       {
         status: 400,
         headers: {
@@ -757,9 +757,9 @@ export async function handleChat(
       throw new Error("Missing or invalid message");
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : "Invalid request body";
+    console.error("[Routes] handleChat parse error:", error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "Invalid request body" }),
       {
         status: 400,
         headers: {
@@ -836,8 +836,8 @@ export async function handleChat(
         }
 
         // If EntityTurn doesn't exist yet, send an error event
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        console.error("Chat error:", errorMessage);
+        const errorMessage = "An error occurred while processing your message";
+        console.error("[Routes] Chat streaming error:", error);
 
         // Send error as a status event
         controller.enqueue({
@@ -1337,8 +1337,8 @@ export async function handleSaveSettingsFile(
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to save file";
-    return new Response(renderSaveError(message), {
+    console.error("[Routes] handleSaveSettingsFile error:", error);
+    return new Response(renderSaveError("Failed to save file"), {
       status: 500,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
@@ -1417,9 +1417,9 @@ export async function handleCreateCustomFile(
       }
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to create file";
+    console.error("[Routes] handleCreateCustomFile error:", error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Failed to create file" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -1495,9 +1495,9 @@ export async function handleDeleteCustomFile(
         }
       );
     }
-    const message = error instanceof Error ? error.message : "Failed to delete file";
+    console.error("[Routes] handleDeleteCustomFile error:", error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Failed to delete file" }),
       {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -1605,9 +1605,9 @@ export async function handleMemoryConsolidate(
       );
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Routes] handleMemoryConsolidate error:", error);
     return new Response(
-      JSON.stringify({ success: false, error: message }),
+      JSON.stringify({ success: false, error: "Consolidation failed" }),
       {
         status: 500,
         headers: {
@@ -1711,9 +1711,9 @@ export async function handleMcpSync(ctx: RouteContext): Promise<Response> {
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Routes] handleMcpSync error:", error);
     return new Response(
-      JSON.stringify({ success: false, error: message }),
+      JSON.stringify({ success: false, error: "MCP sync failed" }),
       {
         status: 500,
         headers: {
@@ -2117,9 +2117,9 @@ export async function handleCreateLorebook(
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Routes] handleCreateLorebook error:", error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Failed to create lorebook" }),
       {
         status: 500,
         headers: {
@@ -2220,9 +2220,9 @@ export async function handleUpdateLorebook(
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Routes] handleUpdateLorebook error:", error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Failed to update lorebook" }),
       {
         status: 500,
         headers: {
@@ -2448,9 +2448,9 @@ export async function handleCreateLorebookEntry(
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Routes] handleCreateLorebookEntry error:", error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Failed to create entry" }),
       {
         status: 500,
         headers: {
@@ -2543,9 +2543,9 @@ export async function handleUpdateLorebookEntry(
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Routes] handleUpdateLorebookEntry error:", error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Failed to update entry" }),
       {
         status: 500,
         headers: {
@@ -2837,7 +2837,7 @@ export async function handleCreateGraphNode(
   } catch (error) {
     console.error("[Graph] Failed to create node:", error);
     return new Response(
-      JSON.stringify({ success: false, error: String(error) }),
+      JSON.stringify({ success: false, error: "Failed to create node" }),
       {
         status: 500,
         headers: {
@@ -2885,7 +2885,7 @@ export async function handleCreateGraphEdge(
   } catch (error) {
     console.error("[Graph] Failed to create edge:", error);
     return new Response(
-      JSON.stringify({ success: false, error: String(error) }),
+      JSON.stringify({ success: false, error: "Failed to create edge" }),
       {
         status: 500,
         headers: {
@@ -3105,9 +3105,9 @@ export async function handleUploadBackground(
       }
     );
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Upload failed";
+    console.error("[Routes] handleUploadBackground error:", error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Upload failed" }),
       {
         status: 500,
         headers: {
@@ -3185,9 +3185,9 @@ export async function handleDeleteBackground(
         }
       );
     }
-    const message = error instanceof Error ? error.message : "Delete failed";
+    console.error("[Routes] handleDeleteBackground error:", error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Delete failed" }),
       {
         status: 500,
         headers: {
@@ -3256,9 +3256,9 @@ export async function handleSaveLLMSettings(
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to save settings";
+    console.error("[Routes] handleSaveLLMSettings error:", error);
     return new Response(
-      JSON.stringify({ error: message }),
+      JSON.stringify({ error: "Failed to save settings" }),
       {
         status: 500,
         headers: {
@@ -3345,9 +3345,9 @@ export async function handleTestLLMConnection(
       );
     }
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Connection failed";
+    console.error("[Routes] handleTestLLMConnection error:", error);
     return new Response(
-      JSON.stringify({ success: false, error: message }),
+      JSON.stringify({ success: false, error: "Connection failed" }),
       {
         status: 200,
         headers: {

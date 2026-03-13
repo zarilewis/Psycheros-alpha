@@ -14,6 +14,16 @@
 export const MAX_TITLE_LENGTH = 200;
 
 // =============================================================================
+// Request Body Limits
+// =============================================================================
+
+/** Maximum request body size for JSON/form endpoints (1MB) */
+export const MAX_REQUEST_BODY_SIZE = 1 * 1024 * 1024;
+
+/** Maximum request body size for file upload endpoints (10MB) */
+export const MAX_UPLOAD_BODY_SIZE = 10 * 1024 * 1024;
+
+// =============================================================================
 // SSE Streaming
 // =============================================================================
 

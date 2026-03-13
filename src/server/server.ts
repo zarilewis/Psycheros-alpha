@@ -17,6 +17,7 @@ import type { MCPClient } from "../mcp-client/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import { LorebookManager } from "../lorebook/mod.ts";
 import { join } from "@std/path";
+import { MAX_REQUEST_BODY_SIZE, MAX_UPLOAD_BODY_SIZE } from "../constants.ts";
 import {
   handleBatchDeleteConversations,
   handleChat,
@@ -447,6 +448,27 @@ export class Server {
       return handleHealth();
     }
 
+    // Enforce request body size limits
+    if (method !== "GET" && method !== "OPTIONS" && method !== "HEAD") {
+      const contentLength = request.headers.get("content-length");
+      if (contentLength) {
+        const size = parseInt(contentLength);
+        const limit = path === "/api/backgrounds" ? MAX_UPLOAD_BODY_SIZE : MAX_REQUEST_BODY_SIZE;
+        if (size > limit) {
+          return new Response(
+            JSON.stringify({ error: `Request body too large (max ${Math.round(limit / 1024 / 1024)}MB)` }),
+            {
+              status: 413,
+              headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": "*",
+              },
+            }
+          );
+        }
+      }
+    }
+
     try {
       // API Routes
       if (path.startsWith("/api/")) {
@@ -456,10 +478,9 @@ export class Server {
       // Static file and UI routes
       return await this.handleStaticRoute(ctx, method, path);
     } catch (error) {
-      console.error("Request error:", error);
-      const message = error instanceof Error ? error.message : "Internal server error";
+      console.error("[Server] Request error:", error);
       return new Response(
-        JSON.stringify({ error: message }),
+        JSON.stringify({ error: "Internal server error" }),
         {
           status: 500,
           headers: {
