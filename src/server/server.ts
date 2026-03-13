@@ -24,6 +24,7 @@ import {
   handleConversationListFragment,
   handleConversationView,
   handleCORS,
+  handleHealth,
   handleCreateConversation,
   handleCreateCustomFile,
   handleDeleteConversation,
@@ -439,6 +440,11 @@ export class Server {
     // Handle CORS preflight
     if (method === "OPTIONS") {
       return handleCORS();
+    }
+
+    // Health check (lightweight, no middleware)
+    if (method === "GET" && path === "/health") {
+      return handleHealth();
     }
 
     try {

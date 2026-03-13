@@ -999,6 +999,16 @@ export async function handleStaticFile(
 }
 
 /**
+ * Handle health check requests.
+ */
+export function handleHealth(): Response {
+  return new Response(JSON.stringify({ status: "ok" }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/**
  * Handle CORS preflight requests.
  *
  * @returns HTTP Response with CORS headers
