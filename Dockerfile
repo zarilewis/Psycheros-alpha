@@ -1,9 +1,6 @@
 # Psycheros + entity-core single-container image
 # Target: linux/amd64 (UnRAID homelab)
 #
-# Single-stage build — avoids BuildKit COPY --from issues that caused
-# npm cache loss in multi-stage builds.
-#
 # Build context is the Zari workspace root (parent of both repos).
 # Usage:
 #   docker build --platform linux/amd64 -t psycheros .
@@ -25,13 +22,23 @@ COPY entity-core/ ./entity-core/
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Install all dependencies into /deno-dir (no multi-stage copy needed)
+# Enable nodeModulesDir in both projects (Docker only, not in source repos).
+# This creates local node_modules/ directories instead of relying on the
+# global /deno-dir cache, which has proven unreliable across build environments.
+RUN cd /app/Psycheros && deno eval "\
+    const j = JSON.parse(Deno.readTextFileSync('deno.json')); \
+    j.nodeModulesDir = 'auto'; \
+    Deno.writeTextFileSync('deno.json', JSON.stringify(j, null, 2) + '\n');" \
+    && cd /app/entity-core && deno eval "\
+    const j = JSON.parse(Deno.readTextFileSync('deno.json')); \
+    j.nodeModulesDir = 'auto'; \
+    Deno.writeTextFileSync('deno.json', JSON.stringify(j, null, 2) + '\n');"
+
+# Install all dependencies into local node_modules/ directories
 RUN cd /app/Psycheros && deno install --entrypoint src/main.ts \
     && cd /app/entity-core && deno install --entrypoint src/mod.ts
 
-# Cache dynamic imports that deno install can't statically analyze:
-#   - @huggingface/transformers (dynamic import in src/rag/embedder.ts)
-#   - sqlite-vec (bare npm specifier in dynamic import in src/db/vector.ts)
+# Cache dynamic imports that deno install can't statically analyze
 RUN cd /app/Psycheros && deno cache npm:@huggingface/transformers@3.3.1 \
     && deno cache "npm:sqlite-vec@0.0.1-alpha.9" || true
 
