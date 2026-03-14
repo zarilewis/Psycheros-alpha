@@ -235,7 +235,7 @@
 
 /* User messages - subtle, recede */
 .msg--user .msg-content {
-  background-color: var(--c-bg-raised);
+  background-color: rgba(0, 0, 0, 0.5);
   color: var(--c-fg);
   border: 1px solid var(--c-border);
   word-wrap: break-word;
