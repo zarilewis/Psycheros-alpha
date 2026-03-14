@@ -2,7 +2,7 @@
 
 Persistent AI entity harness daemon built on Deno 2.x. Web chat UI with streaming LLM, tool execution, hierarchical memory, RAG, knowledge graph, lorebook, and identity management. Runs on port 3000.
 
-Psycheros is an **embodiment** — an interface through which the AI entity exists and interacts. The entity's canonical identity lives in [entity-core](../entity-core/) (MCP server). Psycheros syncs with it when `PSYCHEROS_MCP_ENABLED=true`.
+Psycheros is an **embodiment** — an interface through which the AI entity exists and interacts. The entity's canonical identity lives in [entity-core](https://github.com/zarilewis/entity-core) (MCP server). Psycheros syncs with it when `PSYCHEROS_MCP_ENABLED=true`.
 
 ## First-Person Convention
 
@@ -123,4 +123,4 @@ Before significant commits:
 
 ## Related Projects
 
-- [entity-core](../entity-core/) — MCP server holding the entity's canonical identity and memories
+- [entity-core](https://github.com/zarilewis/entity-core) — MCP server holding the entity's canonical identity and memories

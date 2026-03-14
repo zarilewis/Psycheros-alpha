@@ -2,7 +2,7 @@
 
 A persistent AI entity harness daemon built on Deno. Unlike traditional CLI-based AI assistants, Psycheros runs as a web service with durable state, tool execution, and real-time streaming.
 
-Psycheros is an **embodiment** — an interface through which the AI entity interacts. The entity's core identity and memories live in [entity-core](../entity-core/), a separate MCP server that provides centralized identity persistence across multiple embodiments.
+Psycheros is an **embodiment** — an interface through which the AI entity interacts. The entity's core identity and memories live in [entity-core](https://github.com/zarilewis/entity-core), a separate MCP server that provides centralized identity persistence across multiple embodiments.
 
 All prompts and system messages use the entity's first-person perspective. See [docs/entity-philosophy.md](docs/entity-philosophy.md) for the rationale.
 
@@ -190,7 +190,7 @@ For detailed Docker strategy, CI/CD pipeline, and UnRAID setup, see the parent w
 
 ## Related Projects
 
-- [entity-core](../entity-core/) — MCP server holding the entity's canonical identity and memories
+- [entity-core](https://github.com/zarilewis/entity-core) — MCP server holding the entity's canonical identity and memories
 
 ## License
 
