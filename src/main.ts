@@ -5,6 +5,9 @@
  */
 
 import "@std/dotenv/load";
+import { initLogCapture } from "./server/logger.ts";
+initLogCapture();
+
 import { Server } from "./server/mod.ts";
 import { createMCPClient, type MCPClient } from "./mcp-client/mod.ts";
 import { initialize } from "./init/mod.ts";

@@ -1,0 +1,222 @@
+/**
+ * Admin Panel Styles
+ *
+ * Styles for the system admin/debug panel.
+ * Uses design tokens from tokens.css.
+ */
+
+/* Navigation tabs */
+.admin-nav {
+  display: flex;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+  padding-bottom: var(--sp-2);
+}
+
+.admin-nav-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--c-fg-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition);
+}
+
+.admin-nav-tab:hover {
+  color: var(--c-fg);
+  background: var(--c-bg-hover);
+}
+
+.admin-nav-tab.active {
+  color: var(--c-accent);
+  background: var(--c-accent-subtle);
+}
+
+/* Sections */
+.admin-section {
+  margin-bottom: var(--sp-6);
+}
+
+.admin-section-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--c-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--sp-3);
+}
+
+/* Stats grid */
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-3);
+}
+
+.admin-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3);
+  background: var(--c-bg-raised);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+}
+
+.admin-stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-subtle);
+}
+
+.admin-stat-value {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--c-fg);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+/* Status dots */
+.admin-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.admin-status-ok {
+  background: #22c55e;
+}
+
+.admin-status-error {
+  background: var(--c-error);
+}
+
+/* Tables */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.admin-table th {
+  text-align: left;
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--c-border);
+  color: var(--c-fg-subtle);
+  font-weight: 500;
+  font-size: var(--font-size-xs);
+}
+
+.admin-table td {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--c-border);
+  color: var(--c-fg);
+}
+
+/* Footer */
+.admin-footer {
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--c-border);
+}
+
+.admin-footer-ts {
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-subtle);
+}
+
+/* Log viewer */
+.admin-log-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-3);
+  align-items: center;
+}
+
+.admin-select {
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--c-bg-raised);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-fg);
+  font-size: var(--font-size-xs);
+}
+
+.admin-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  cursor: pointer;
+}
+
+/* Log entries */
+.admin-log-list {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  max-height: 500px;
+  overflow-y: auto;
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+}
+
+.admin-log-row {
+  display: flex;
+  gap: var(--sp-3);
+  padding: 3px var(--sp-3);
+  border-bottom: 1px solid var(--c-border);
+  align-items: baseline;
+}
+
+.admin-log-row:last-child {
+  border-bottom: none;
+}
+
+.admin-log-time {
+  color: var(--c-fg-subtle);
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.admin-log-level-badge {
+  font-weight: 600;
+  white-space: nowrap;
+  min-width: 44px;
+  text-align: center;
+}
+
+.admin-log-component {
+  color: var(--c-accent);
+  white-space: nowrap;
+  min-width: 60px;
+}
+
+.admin-log-message {
+  color: var(--c-fg);
+  word-break: break-word;
+  flex: 1;
+}
+
+/* Level-specific colors */
+.admin-log-error .admin-log-level-badge { color: var(--c-error); }
+.admin-log-warn .admin-log-level-badge { color: #f59e0b; }
+.admin-log-info .admin-log-level-badge { color: #3b82f6; }
+
+.admin-log-error { background: rgba(255, 68, 68, 0.05); }
+
+.admin-empty {
+  padding: var(--sp-6);
+  text-align: center;
+  color: var(--c-fg-subtle);
+  font-size: var(--font-size-sm);
+}

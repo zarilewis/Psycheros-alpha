@@ -361,6 +361,23 @@ export function renderSettingsHub(): string {
           <polyline points="9 18 15 12 9 6"/>
         </svg>
       </a>
+      <a class="settings-hub-card"
+        hx-get="/fragments/admin"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">System Admin</span>
+          <span class="settings-hub-card-desc">Logs, diagnostics, and system health monitoring</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
     </div>
   </div>
 </div>`;

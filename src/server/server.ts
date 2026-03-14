@@ -80,6 +80,15 @@ import {
   type RouteContext,
 } from "./routes.ts";
 import { getBroadcaster } from "./broadcaster.ts";
+import {
+  handleAdminFragment,
+  handleAdminLogsFragment,
+  handleAdminDiagnosticsFragment,
+  handleAdminLogsAPI,
+  handleAdminLogEntriesAPI,
+  handleAdminDiagnosticsAPI,
+} from "./admin-routes.ts";
+import { setServerStartTime } from "./diagnostics.ts";
 
 /**
  * Server configuration options.
@@ -246,6 +255,7 @@ export class Server {
    * If RAG is enabled, indexes memories on startup.
    */
   async start(): Promise<void> {
+    setServerStartTime(new Date());
     const hostname = this.config.hostname || "localhost";
     const port = this.config.port;
 
@@ -739,6 +749,25 @@ export class Server {
       return await handleTestLLMConnection(ctx, request);
     }
 
+    // ========================================
+    // Admin API Routes
+    // ========================================
+
+    // GET /api/admin/logs - JSON log entries with filtering
+    if (method === "GET" && path === "/api/admin/logs") {
+      return handleAdminLogsAPI(ctx, new URL(request.url));
+    }
+
+    // GET /api/admin/logs/entries - HTML partial of log entries
+    if (method === "GET" && path === "/api/admin/logs/entries") {
+      return handleAdminLogEntriesAPI(ctx, new URL(request.url));
+    }
+
+    // GET /api/admin/diagnostics - JSON diagnostics snapshot
+    if (method === "GET" && path === "/api/admin/diagnostics") {
+      return await handleAdminDiagnosticsAPI(ctx);
+    }
+
     // 404 for unknown API routes
     return new Response(
       JSON.stringify({ error: "API endpoint not found" }),
@@ -867,6 +896,25 @@ export class Server {
     // GET /fragments/settings/llm - LLM settings UI fragment
     if (path === "/fragments/settings/llm") {
       return handleLLMSettingsFragment(ctx);
+    }
+
+    // ========================================
+    // Admin Panel Fragment Routes
+    // ========================================
+
+    // GET /fragments/admin - Admin hub
+    if (path === "/fragments/admin") {
+      return handleAdminFragment(ctx);
+    }
+
+    // GET /fragments/admin/logs - Log viewer
+    if (path === "/fragments/admin/logs") {
+      return handleAdminLogsFragment(ctx);
+    }
+
+    // GET /fragments/admin/diagnostics - Diagnostics dashboard
+    if (path === "/fragments/admin/diagnostics") {
+      return await handleAdminDiagnosticsFragment(ctx);
     }
 
     // GET /backgrounds/:filename - Serve background image files
