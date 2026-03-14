@@ -40,8 +40,7 @@ RUN cd /app/Psycheros && deno install --entrypoint src/main.ts \
     && cd /app/entity-core && deno install --entrypoint src/mod.ts
 
 # Cache dynamic imports that deno install can't statically analyze
-RUN cd /app/Psycheros && deno cache npm:@huggingface/transformers@3.3.1 \
-    && deno cache "npm:sqlite-vec@0.0.1-alpha.9" || true
+RUN cd /app/Psycheros && deno cache npm:@huggingface/transformers@3.3.1
 
 # Warm-start both apps to cache any remaining transitive JSR deps
 # (e.g. @denosaurs/plug → @std/path@0.217.0 pulled by @db/sqlite)
@@ -61,7 +60,7 @@ ENV PSYCHEROS_HOST=0.0.0.0
 ENV PSYCHEROS_PORT=3000
 ENV PSYCHEROS_MCP_ENABLED=true
 ENV PSYCHEROS_MCP_COMMAND=deno
-ENV PSYCHEROS_MCP_ARGS="run -A --unstable-cron /app/entity-core/src/mod.ts"
+ENV PSYCHEROS_MCP_ARGS="run -A --cached-only --unstable-cron /app/entity-core/src/mod.ts"
 ENV PSYCHEROS_ENTITY_CORE_DATA_DIR=/app/entity-core/data
 
 # Health check (start-period accounts for embedding model load time)
@@ -73,4 +72,4 @@ WORKDIR /app/Psycheros
 
 # Entrypoint seeds identity templates, then execs into dumb-init → deno
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["deno", "run", "-A", "--unstable-cron", "/app/Psycheros/src/main.ts"]
+CMD ["deno", "run", "-A", "--cached-only", "--unstable-cron", "/app/Psycheros/src/main.ts"]

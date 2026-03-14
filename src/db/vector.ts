@@ -73,25 +73,16 @@ export function loadVectorExtension(db: Database): boolean {
         db.enableLoadExtension = false;
         return true;
       } catch {
-        // File load failed, will try npm package below
+        // File load failed, fall through to in-memory fallback
       }
     }
 
-    // Fallback: try npm package (may fail on some systems)
-    // Using dynamic import to avoid compile-time errors
-    import("npm:sqlite-vec@0.0.1-alpha.9")
-      .then((module) => {
-        module.load(db);
-        extensionLoaded = true;
-      })
-      .catch((error) => {
-        loadError = error instanceof Error ? error.message : String(error);
-        console.warn("[Vector] Failed to load sqlite-vec:", loadError);
-        console.warn("[Vector] Vector search will fall back to in-memory calculation.");
-      });
-
+    // Native extension not available — fall back to in-memory cosine similarity
+    loadError = "sqlite-vec extension not found at expected path";
+    console.warn("[Vector] sqlite-vec extension not available.");
+    console.warn("[Vector] Vector search will fall back to in-memory calculation.");
     db.enableLoadExtension = false;
-    return extensionLoaded;
+    return false;
   } catch (error) {
     console.warn(
       "[Vector] Failed to load sqlite-vec extension:",

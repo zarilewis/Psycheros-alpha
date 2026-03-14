@@ -78,6 +78,7 @@ export class LocalEmbedder implements Embedder {
       // v3 uses ONNX Runtime Web which doesn't require native bindings
       extractor = await pipeline("feature-extraction", this.modelId, {
         quantized: true,
+        dtype: "fp32",
         progress_callback: (progress: { status: string; progress?: number; file?: string }) => {
           if (progress.status === "downloading" && progress.progress !== undefined) {
             const pct = progress.progress.toFixed(0);
