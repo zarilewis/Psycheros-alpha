@@ -67,6 +67,7 @@ Identity files are versioned markdown stored in the `identity/` directory:
 ```
 identity/
 ├── self/               # Entity identity
+│   ├── base_instructions.md   # Core system prompt (loaded first, editable via UI)
 │   ├── my_identity.md
 │   ├── my_persona.md
 │   ├── my_personhood.md
@@ -86,6 +87,17 @@ identity/
 └── custom/             # User-defined files
     └── *.md
 ```
+
+### Base Instructions (`base_instructions.md`)
+
+The `identity/self/base_instructions.md` file holds the entity's core system prompt. It is:
+
+- **Loaded first** into every LLM request, before all other identity files
+- **Wrapped** in `<base_instructions>` and `</base_instructions>` XML tags
+- **Editable** via Settings → Core Prompts → Self in the web UI
+- **Templated** — uses `{{timestamp}}` which is replaced with the current ISO timestamp each turn
+
+On fresh installs, this file is seeded from `templates/identity/self/base_instructions.md`. The file is excluded from the regular self-content loading to avoid duplication, since it's injected separately at the top of the system message.
 
 ### Custom Identity Files
 

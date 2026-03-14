@@ -100,7 +100,7 @@ src/
 ├── entity/           # Agentic loop
 │   ├── mod.ts
 │   ├── loop.ts       # EntityTurn orchestration
-│   ├── context.ts    # Identity loading (local or MCP)
+│   ├── context.ts    # Base instructions, identity loading (local or MCP)
 │   └── auto-title.ts
 └── server/           # HTTP server
     ├── mod.ts

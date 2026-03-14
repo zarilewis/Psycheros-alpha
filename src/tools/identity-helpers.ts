@@ -34,6 +34,7 @@ export interface IdentityOperationResult {
  */
 export const VALID_FILES: Record<IdentityCategory, readonly string[]> = {
   self: [
+    "base_instructions.md",
     "my_identity.md",
     "my_persona.md",
     "my_personhood.md",

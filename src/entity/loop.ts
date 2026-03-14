@@ -31,7 +31,7 @@ import type { Retriever } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
-import { loadSelfContent, loadUserContent, loadRelationshipContent, loadCustomContent, buildSystemMessage } from "./context.ts";
+import { loadBaseInstructions, loadSelfContent, loadUserContent, loadRelationshipContent, loadCustomContent, buildSystemMessage } from "./context.ts";
 import { buildRAGContext, formatChatHistoryForContext, buildGraphContext } from "../rag/mod.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
 import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
@@ -264,7 +264,8 @@ export class EntityTurn {
       }
     }
 
-    const systemMessage = buildSystemMessage(selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent, graphContent);
+    const baseInstructions = await loadBaseInstructions(this.config.projectRoot);
+    const systemMessage = buildSystemMessage(baseInstructions, selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent, graphContent);
 
     // Get conversation history from DB
     const history = this.db.getMessages(conversationId);

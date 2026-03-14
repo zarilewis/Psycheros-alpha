@@ -14,6 +14,11 @@ import type { MCPClient, IdentityContent } from "../mcp-client/mod.ts";
 const SELF_DIR = "identity/self";
 
 /**
+ * The filename for the base instructions file.
+ */
+const BASE_INSTRUCTIONS_FILE = "base_instructions.md";
+
+/**
  * The directory name for the user files.
  */
 const USER_DIR = "identity/user";
@@ -76,12 +81,14 @@ const CUSTOM_FILE_ORDER: string[] = [];
  * @param projectRoot - The root directory of the project
  * @param dirName - The name of the subdirectory to load from
  * @param fileOrder - The order in which files should be loaded
+ * @param excludeFiles - Optional list of filenames to exclude from loading
  * @returns The concatenated contents of all .md files
  */
 async function loadFilesFromDirectory(
   projectRoot: string,
   dirName: string,
   fileOrder: string[],
+  excludeFiles: string[] = [],
 ): Promise<string> {
   const dir = join(projectRoot, dirName);
 
@@ -89,7 +96,7 @@ async function loadFilesFromDirectory(
     // Read all entries in the directory
     const entries: string[] = [];
     for await (const entry of Deno.readDir(dir)) {
-      if (entry.isFile && entry.name.endsWith(".md")) {
+      if (entry.isFile && entry.name.endsWith(".md") && !excludeFiles.includes(entry.name)) {
         entries.push(entry.name);
       }
     }
@@ -138,13 +145,14 @@ async function loadFilesFromDirectory(
 
 /**
  * Load all .md files from the self/ directory and concatenate them.
+ * Excludes base_instructions.md (loaded separately via loadBaseInstructions).
  * Returns empty string if directory doesn't exist or is empty.
  *
  * @param projectRoot - The root directory of the project
- * @returns The concatenated contents of all self/*.md files
+ * @returns The concatenated contents of all self/*.md files except base_instructions.md
  */
 export async function loadSelfMd(projectRoot: string): Promise<string> {
-  return await loadFilesFromDirectory(projectRoot, SELF_DIR, SELF_FILE_ORDER);
+  return await loadFilesFromDirectory(projectRoot, SELF_DIR, SELF_FILE_ORDER, [BASE_INSTRUCTIONS_FILE]);
 }
 
 /**
@@ -179,6 +187,39 @@ export async function loadRelationshipFiles(projectRoot: string): Promise<string
  */
 export async function loadCustomFiles(projectRoot: string): Promise<string> {
   return await loadFilesFromDirectory(projectRoot, CUSTOM_DIR, CUSTOM_FILE_ORDER);
+}
+
+/**
+ * Load the base instructions from identity/self/base_instructions.md.
+ * Replaces {{timestamp}} with the current ISO timestamp.
+ * Returns a fallback default if the file doesn't exist.
+ *
+ * @param projectRoot - The root directory of the project
+ * @returns The base instructions string (with XML tags intact)
+ */
+export async function loadBaseInstructions(projectRoot: string): Promise<string> {
+  const filePath = join(projectRoot, SELF_DIR, BASE_INSTRUCTIONS_FILE);
+
+  try {
+    let content = await Deno.readTextFile(filePath);
+    // Replace timestamp placeholder
+    const timestamp = new Date().toISOString();
+    content = content.replace(/\{\{timestamp\}\}/g, timestamp);
+    return content.trim();
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      // Fallback default if file doesn't exist
+      const timestamp = new Date().toISOString();
+      return `<base_instructions>
+I am Psycheros, a persistent AI companion and assistant.
+
+I have access to tools that let me interact with the system. I use them when the user asks me to perform actions.
+
+Current timestamp: ${timestamp}
+</base_instructions>`;
+    }
+    throw error;
+  }
 }
 
 /**
@@ -287,10 +328,12 @@ export async function loadCustomContent(
 }
 
 /**
- * Build the system message from self/, user/, relationship/, custom/ directory content,
- * optional RAG-retrieved memories, chat history, lorebook content, and graph context.
+ * Build the system message from base instructions, self/, user/, relationship/,
+ * custom/ directory content, optional RAG-retrieved memories, chat history,
+ * lorebook content, and graph context.
  * This gets included at the start of every LLM request.
  *
+ * @param baseInstructions - The processed base instructions content
  * @param selfContent - The concatenated contents of self/*.md files
  * @param userContent - The concatenated contents of user/*.md files
  * @param relationshipContent - The concatenated contents of relationship/*.md files
@@ -302,6 +345,7 @@ export async function loadCustomContent(
  * @returns The formatted system message
  */
 export function buildSystemMessage(
+  baseInstructions: string,
   selfContent: string,
   userContent: string,
   relationshipContent: string,
@@ -311,28 +355,6 @@ export function buildSystemMessage(
   lorebookContent?: string,
   graphContent?: string,
 ): string {
-  const timestamp = new Date().toISOString();
-
-  const baseInstructions = `I am Psycheros, a persistent AI companion and assistant.
-
-I have access to tools that let me interact with the system. I use them when the user asks me to perform actions.
-
-IMPORTANT guidelines for my tool use:
-- I only use tools when explicitly needed to complete a task
-- I don't use tools just to explore or gather information I already have
-- When demonstrating a capability, one example is usually sufficient
-- I stop and respond to the user rather than chaining many tool calls
-
-I can maintain persistent state by updating files in my identity/self/ directory. These files are automatically loaded into my context each turn (shown below if they exist), so I don't need to read them - I just update them when I want to remember something.
-
-I can also learn about the user and update files in my identity/user/ directory to remember what I learn about them.
-
-I can track my relationship with the user in the identity/relationship/ directory.
-
-I can store additional context in custom files in the identity/custom/ directory.
-
-Current timestamp: ${timestamp}`;
-
   // Build sections for self, user, relationship, and custom content
   const sections: string[] = [baseInstructions];
 
