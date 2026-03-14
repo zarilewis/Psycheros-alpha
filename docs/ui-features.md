@@ -2,18 +2,24 @@
 
 Detailed documentation for Psycheros web UI features.
 
-## Context Viewer
+## Context Inspector
 
 Built-in debugging tool for inspecting the full context sent to the LLM. Toggle via the code icon (`</>`) in the header.
 
-**Tabs:**
-- **System**: Complete system prompt with identity files and RAG context
-- **RAG**: Retrieved memories and chat history context
-- **Messages**: Conversation history sent to the LLM
-- **Tools**: Available tool definitions with parameters
-- **Metrics**: Context size and estimated token count
+**Architecture:** Context snapshots are persisted to the `context_snapshots` database table on each turn. The inspector fetches data via `GET /api/conversations/:id/context` — data survives page refresh and conversation switching. Capped at 50 snapshots per conversation (auto-pruned on insert).
 
-Context is captured per message (`LLMContextSnapshot` type in `src/types.ts`) and can be inspected during or after the response. Yielded as the first event in the SSE stream from `EntityTurn.process()`.
+**Turn Navigation:** Use the prev/next arrows to inspect any turn in the conversation, not just the latest.
+
+**Search:** Full-text search across all snapshot content with match highlighting.
+
+**Tabs:**
+- **System**: Identity sections (self, user, relationship) as collapsible sections with size badges, plus the full assembled system message
+- **RAG**: All four retrieval sources — memories, chat history, lorebook entries, knowledge graph
+- **Messages**: Conversation history sent to the LLM with role badges and collapsible content
+- **Tools**: Available tool definitions with parameters
+- **Metrics**: Per-section size breakdown, token counts, and context window utilization bar
+
+**Key types:** `LLMContextSnapshot` (in-memory, `src/types.ts`) and `ContextSnapshotRecord` (persisted, `src/types.ts`). Snapshot built in `EntityTurn.process()` (`src/entity/loop.ts`), persisted via `DBClient.addContextSnapshot()`.
 
 ## Temporal Awareness
 

@@ -92,8 +92,8 @@ Full code review covering code quality, error handling, input validation, SQLite
 - Fix: Cast through `unknown` first, or make the tool registry generic over arg types
 
 ### sqlite-vec on macOS
-- Native extension `lib/vec0.so` is x86-64 Linux only — falls back to in-memory cosine similarity on macOS
-- Acceptable for local dev; loads natively in Docker container
+- Native extensions available for both platforms: `lib/vec0.so` (Linux x86-64) and `lib/vec0.dylib` (macOS aarch64)
+- sqlite-vec loads natively on both macOS and Docker — no fallback needed
 
 ## Confirmed Safe Patterns
 

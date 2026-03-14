@@ -13,14 +13,15 @@ let extensionLoaded = false;
 
 /**
  * Get the path to the sqlite-vec extension file.
- * Looks for vec0.so in the lib/ directory relative to this module.
+ * Looks for vec0 in the lib/ directory relative to this module.
+ * SQLite auto-appends the platform suffix (.so on Linux, .dylib on macOS).
  */
 function getExtensionPath(): string | null {
   try {
     // Get the directory containing this module
     const moduleDir = dirname(fromFileUrl(import.meta.url));
     // Go up to project root (src/db -> src -> root) then into lib
-    const extPath = join(moduleDir, "..", "..", "lib", "vec0.so");
+    const extPath = join(moduleDir, "..", "..", "lib", "vec0");
     return extPath;
   } catch {
     return null;

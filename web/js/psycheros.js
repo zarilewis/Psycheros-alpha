@@ -28,9 +28,11 @@ const touchState = {
   longPressTimer: null,
 };
 
-// Context viewer state
-let contextViewerOpen = false;
-let currentContext = null;
+// Context inspector state
+let contextInspectorOpen = false;
+let contextSnapshots = [];
+let selectedSnapshotIdx = -1;
+let contextSearchQuery = '';
 
 // Tokenizer state
 let tokenizer = null;
@@ -76,8 +78,8 @@ async function initTokenizer() {
     const ranks = await res.json();
     tokenizer = new Tiktoken(ranks);
     tokenizerReady = true;
-    // Re-render if context viewer is open
-    renderContextViewer();
+    // Re-render if context inspector is open
+    renderContextInspector();
     // Update editor token count if visible
     updateEditorTokenCount();
   } catch (e) {
@@ -819,13 +821,9 @@ function handleSSEEvent(eventType, data, messageEl, state) {
       break;
 
     case 'context':
-      try {
-        currentContext = JSON.parse(data);
-        if (contextViewerOpen) {
-          renderContextViewer();
-        }
-      } catch (e) {
-        console.error('Failed to parse context:', e);
+      // SSE context event is a notification — reload from REST if inspector is open
+      if (contextInspectorOpen) {
+        loadContextSnapshots();
       }
       break;
 
@@ -1549,55 +1547,80 @@ async function finishTitleEdit(input) {
 }
 
 // =============================================================================
-// Context Viewer
+// Context Inspector
 // =============================================================================
 
 /**
- * Toggle the context viewer panel open/closed.
+ * Toggle the context inspector panel open/closed.
  */
 function toggleContextViewer() {
-  contextViewerOpen = !contextViewerOpen;
-  if (contextViewerOpen) {
-    showContextViewer();
+  contextInspectorOpen = !contextInspectorOpen;
+  if (contextInspectorOpen) {
+    showContextInspector();
   } else {
     hideContextViewer();
   }
 }
 
 /**
- * Show the context viewer panel.
+ * Show the context inspector panel and load data.
  */
-function showContextViewer() {
+function showContextInspector() {
   let viewer = document.getElementById('context-viewer');
   let backdrop = document.getElementById('context-viewer-backdrop');
 
   if (!viewer) {
-    createContextViewer();
+    createContextInspector();
     viewer = document.getElementById('context-viewer');
     backdrop = document.getElementById('context-viewer-backdrop');
   }
 
   backdrop?.classList.add('visible');
   viewer?.classList.add('visible');
-
-  if (currentContext) {
-    renderContextViewer();
-  }
+  loadContextSnapshots();
 }
 
 /**
- * Hide the context viewer panel.
+ * Hide the context inspector panel.
  */
 function hideContextViewer() {
-  contextViewerOpen = false;
+  contextInspectorOpen = false;
   document.getElementById('context-viewer')?.classList.remove('visible');
   document.getElementById('context-viewer-backdrop')?.classList.remove('visible');
 }
 
 /**
- * Create the context viewer DOM structure.
+ * Fetch context snapshots from the REST API.
  */
-function createContextViewer() {
+async function loadContextSnapshots() {
+  if (!currentConversationId) {
+    contextSnapshots = [];
+    selectedSnapshotIdx = -1;
+    renderContextInspector();
+    return;
+  }
+
+  try {
+    const res = await fetch(`/api/conversations/${currentConversationId}/context`);
+    if (res.status === 204 || !res.ok) {
+      contextSnapshots = [];
+      selectedSnapshotIdx = -1;
+    } else {
+      contextSnapshots = await res.json();
+      selectedSnapshotIdx = contextSnapshots.length > 0 ? contextSnapshots.length - 1 : -1;
+    }
+  } catch (e) {
+    console.warn('Failed to load context snapshots:', e);
+    contextSnapshots = [];
+    selectedSnapshotIdx = -1;
+  }
+  renderContextInspector();
+}
+
+/**
+ * Create the context inspector DOM structure.
+ */
+function createContextInspector() {
   const backdrop = document.createElement('div');
   backdrop.id = 'context-viewer-backdrop';
   backdrop.className = 'context-viewer-backdrop';
@@ -1612,14 +1635,24 @@ function createContextViewer() {
       <h2>Context Inspector</h2>
       <button class="context-viewer-close" onclick="Psycheros.hideContextViewer()">&times;</button>
     </div>
+    <div class="context-turn-selector" id="context-turn-selector">
+      <button class="context-turn-btn" onclick="Psycheros.contextPrevTurn()" title="Previous turn">&lsaquo;</button>
+      <span class="context-turn-label" id="context-turn-label">No data</span>
+      <button class="context-turn-btn" onclick="Psycheros.contextNextTurn()" title="Next turn">&rsaquo;</button>
+    </div>
+    <div class="context-search-bar">
+      <input type="text" class="context-search" id="context-search-input"
+             placeholder="Search context..." oninput="Psycheros.searchContext(this.value)">
+    </div>
     <div class="context-viewer-tabs">
       <button class="context-tab active" data-tab="system">System</button>
       <button class="context-tab" data-tab="rag">RAG</button>
       <button class="context-tab" data-tab="messages">Messages</button>
       <button class="context-tab" data-tab="tools">Tools</button>
+      <button class="context-tab" data-tab="metrics">Metrics</button>
     </div>
     <div class="context-viewer-content" id="context-content">
-      <div class="context-empty">Send a message to see the context</div>
+      <div class="context-empty">No context data available</div>
     </div>
   `;
 
@@ -1633,6 +1666,26 @@ function createContextViewer() {
 }
 
 /**
+ * Navigate to the previous snapshot.
+ */
+function contextPrevTurn() {
+  if (selectedSnapshotIdx > 0) {
+    selectedSnapshotIdx--;
+    renderContextInspector();
+  }
+}
+
+/**
+ * Navigate to the next snapshot.
+ */
+function contextNextTurn() {
+  if (selectedSnapshotIdx < contextSnapshots.length - 1) {
+    selectedSnapshotIdx++;
+    renderContextInspector();
+  }
+}
+
+/**
  * Switch to a different context tab.
  */
 function switchContextTab(tabName) {
@@ -1642,10 +1695,29 @@ function switchContextTab(tabName) {
 }
 
 /**
- * Render the current context in the viewer.
+ * Update search query and re-render.
  */
-function renderContextViewer() {
-  if (!currentContext) return;
+function searchContext(query) {
+  contextSearchQuery = (query || '').trim().toLowerCase();
+  const activeTab = document.querySelector('.context-tab.active')?.dataset.tab || 'system';
+  renderContextTab(activeTab);
+}
+
+/**
+ * Render the context inspector — turn selector + active tab.
+ */
+function renderContextInspector() {
+  // Update turn selector
+  const label = document.getElementById('context-turn-label');
+  if (label) {
+    if (contextSnapshots.length === 0) {
+      label.textContent = 'No data';
+    } else {
+      const snap = contextSnapshots[selectedSnapshotIdx];
+      label.textContent = `Turn ${snap.turnIndex} / ${selectedSnapshotIdx + 1} of ${contextSnapshots.length}`;
+    }
+  }
+
   const activeTab = document.querySelector('.context-tab.active')?.dataset.tab || 'system';
   renderContextTab(activeTab);
 }
@@ -1657,114 +1729,144 @@ function renderContextTab(tabName) {
   const content = document.getElementById('context-content');
   if (!content) return;
 
-  if (!currentContext) {
-    content.innerHTML = '<div class="context-empty">Send a message to see the context</div>';
+  if (contextSnapshots.length === 0 || selectedSnapshotIdx < 0) {
+    content.innerHTML = '<div class="context-empty">No context data yet — send a message to populate</div>';
     return;
   }
 
+  const snap = contextSnapshots[selectedSnapshotIdx];
+
   switch (tabName) {
     case 'system':
-      content.innerHTML = renderSystemTab();
+      content.innerHTML = renderSystemTab(snap);
       break;
     case 'rag':
-      content.innerHTML = renderRagTab();
+      content.innerHTML = renderRagTab(snap);
       break;
     case 'messages':
-      content.innerHTML = renderMessagesTab();
+      content.innerHTML = renderMessagesTab(snap);
       break;
     case 'tools':
-      content.innerHTML = renderToolsTab();
+      content.innerHTML = renderToolsTab(snap);
+      break;
+    case 'metrics':
+      content.innerHTML = renderMetricsTab(snap);
       break;
   }
 }
 
 /**
- * Render the System tab content.
+ * Format a character count as a human-readable size badge.
  */
-function renderSystemTab() {
-  const systemTokens = countTokens(currentContext.systemMessage);
-  const tokenLabel = tokenizerReady ? 'Tokens' : 'Est. Tokens';
-  const tokenPrefix = tokenizerReady ? '' : '~';
+function formatSizeBadge(text) {
+  if (!text) return '0 chars';
+  const chars = text.length;
+  const tokens = countTokens(text);
+  const tokenLabel = tokenizerReady ? 'tok' : '~tok';
+  if (chars >= 1000) {
+    return `${(chars / 1000).toFixed(1)}k chars / ${tokens.toLocaleString()} ${tokenLabel}`;
+  }
+  return `${chars} chars / ${tokens.toLocaleString()} ${tokenLabel}`;
+}
+
+/**
+ * Apply search highlighting to text content.
+ */
+function highlightSearch(text) {
+  if (!contextSearchQuery || !text) return escapeHtml(text || '');
+  const escaped = escapeHtml(text);
+  const query = escapeHtml(contextSearchQuery);
+  const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+  return escaped.replace(regex, '<mark>$1</mark>');
+}
+
+/**
+ * Render a collapsible section.
+ */
+function renderContextSection(title, text, expanded) {
+  const badge = formatSizeBadge(text);
+  const content = text ? highlightSearch(text) : '<span class="context-dim">Not available</span>';
   return `
-    <div class="context-section expanded">
+    <div class="context-section${expanded && text ? ' expanded' : ''}">
       <div class="context-section-header" onclick="this.parentElement.classList.toggle('expanded')">
-        <span>Full System Message</span>
+        <span>${escapeHtml(title)}</span>
+        <span class="context-size-badge">${badge}</span>
         <span class="context-section-toggle">&#9660;</span>
       </div>
       <div class="context-section-content">
-        <pre>${escapeHtml(currentContext.systemMessage)}</pre>
+        <pre>${content}</pre>
       </div>
-    </div>
-    <div class="context-metrics">
-      <div>System Length: ${currentContext.metrics.systemMessageLength.toLocaleString()} chars</div>
-      <div>System ${tokenLabel}: ${tokenPrefix}${systemTokens.toLocaleString()}</div>
-      <div>Total Messages: ${currentContext.metrics.totalMessages}</div>
-      <div>Estimated Total: ~${currentContext.metrics.estimatedTokens.toLocaleString()}</div>
     </div>
   `;
 }
 
 /**
+ * Render the System tab content.
+ */
+function renderSystemTab(snap) {
+  let html = '';
+  html += renderContextSection('Self Identity', snap.selfContent, true);
+  html += renderContextSection('User Context', snap.userContent, true);
+  html += renderContextSection('Relationship', snap.relationshipContent, true);
+  html += renderContextSection('Full System Message', snap.systemMessage, false);
+  return html;
+}
+
+/**
  * Render the RAG tab content.
  */
-function renderRagTab() {
+function renderRagTab(snap) {
   let html = '';
+  html += renderContextSection('Retrieved Memories', snap.memoriesContent, true);
+  html += renderContextSection('Chat History', snap.chatHistoryContent, true);
+  html += renderContextSection('Lorebook Entries', snap.lorebookContent, true);
+  html += renderContextSection('Knowledge Graph', snap.graphContent, true);
 
-  if (currentContext.memoriesContent) {
-    html += `
-      <div class="context-section expanded">
-        <div class="context-section-header" onclick="this.parentElement.classList.toggle('expanded')">
-          <span>Retrieved Memories</span>
-          <span class="context-section-toggle">&#9660;</span>
-        </div>
-        <div class="context-section-content">
-          <pre>${escapeHtml(currentContext.memoriesContent)}</pre>
-        </div>
-      </div>
-    `;
+  const hasAny = snap.memoriesContent || snap.chatHistoryContent || snap.lorebookContent || snap.graphContent;
+  if (!hasAny) {
+    html = '<div class="context-empty">No RAG context retrieved for this turn</div>';
   }
-
-  if (currentContext.chatHistoryContent) {
-    html += `
-      <div class="context-section expanded">
-        <div class="context-section-header" onclick="this.parentElement.classList.toggle('expanded')">
-          <span>Chat History Context</span>
-          <span class="context-section-toggle">&#9660;</span>
-        </div>
-        <div class="context-section-content">
-          <pre>${escapeHtml(currentContext.chatHistoryContent)}</pre>
-        </div>
-      </div>
-    `;
-  }
-
-  if (!html) {
-    html = '<div class="context-empty">No RAG context retrieved for this message</div>';
-  }
-
   return html;
 }
 
 /**
  * Render the Messages tab content.
  */
-function renderMessagesTab() {
-  let html = `<div class="context-info">Total Messages: ${currentContext.messages.length}</div>`;
+function renderMessagesTab(snap) {
+  let messages;
+  try {
+    messages = JSON.parse(snap.messagesJson);
+  } catch {
+    return '<div class="context-empty">Failed to parse messages data</div>';
+  }
 
-  if (currentContext.messages.length === 0) {
+  let html = `<div class="context-info">Total Messages: ${messages.length}</div>`;
+
+  if (messages.length === 0) {
     html += '<div class="context-empty">No messages in context</div>';
     return html;
   }
 
-  currentContext.messages.forEach((msg, i) => {
+  messages.forEach((msg, i) => {
     const roleClass = msg.role === 'user' ? 'role-user' : msg.role === 'assistant' ? 'role-assistant' : 'role-other';
+    const contentText = msg.content || '';
+    const charCount = contentText.length;
     html += `
       <div class="context-message">
         <div class="context-message-header">
           <span class="context-message-role ${roleClass}">${escapeHtml(msg.role)}</span>
           <span class="context-message-index">#${i + 1}</span>
+          <span class="context-size-badge">${charCount.toLocaleString()} chars</span>
         </div>
-        <pre class="context-message-content">${escapeHtml(msg.content || '')}</pre>
+        <div class="context-section">
+          <div class="context-section-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <span>Content</span>
+            <span class="context-section-toggle">&#9660;</span>
+          </div>
+          <div class="context-section-content">
+            <pre class="context-message-content">${highlightSearch(contentText)}</pre>
+          </div>
+        </div>
         ${msg.toolCalls && msg.toolCalls.length > 0 ? `<div class="context-tool-calls">Tool Calls: ${msg.toolCalls.length}</div>` : ''}
       </div>
     `;
@@ -1776,29 +1878,110 @@ function renderMessagesTab() {
 /**
  * Render the Tools tab content.
  */
-function renderToolsTab() {
-  let html = `<div class="context-info">Available Tools: ${currentContext.toolDefinitions.length}</div>`;
+function renderToolsTab(snap) {
+  let tools;
+  try {
+    tools = JSON.parse(snap.toolDefinitionsJson);
+  } catch {
+    return '<div class="context-empty">Failed to parse tool definitions</div>';
+  }
 
-  if (currentContext.toolDefinitions.length === 0) {
+  let html = `<div class="context-info">Available Tools: ${tools.length}</div>`;
+
+  if (tools.length === 0) {
     html += '<div class="context-empty">No tools available</div>';
     return html;
   }
 
-  currentContext.toolDefinitions.forEach(tool => {
+  tools.forEach(tool => {
+    const fn = tool.function || tool;
+    const name = fn.name || 'unnamed';
+    const desc = fn.description || '';
+    const params = fn.parameters ? JSON.stringify(fn.parameters, null, 2) : '{}';
     html += `
       <div class="context-section">
         <div class="context-section-header" onclick="this.parentElement.classList.toggle('expanded')">
-          <span>${escapeHtml(tool.function.name)}</span>
+          <span>${escapeHtml(name)}</span>
           <span class="context-section-toggle">&#9660;</span>
         </div>
         <div class="context-section-content">
-          <p class="tool-description">${escapeHtml(tool.function.description)}</p>
-          <pre>${escapeHtml(JSON.stringify(tool.function.parameters, null, 2))}</pre>
+          <p class="tool-description">${escapeHtml(desc)}</p>
+          <pre>${highlightSearch(params)}</pre>
         </div>
       </div>
     `;
   });
 
+  return html;
+}
+
+/**
+ * Render the Metrics tab content.
+ */
+function renderMetricsTab(snap) {
+  let metrics;
+  try {
+    metrics = JSON.parse(snap.metricsJson);
+  } catch {
+    metrics = {};
+  }
+
+  const sections = [
+    { name: 'Self Identity', text: snap.selfContent },
+    { name: 'User Context', text: snap.userContent },
+    { name: 'Relationship', text: snap.relationshipContent },
+    { name: 'Memories (RAG)', text: snap.memoriesContent },
+    { name: 'Chat History (RAG)', text: snap.chatHistoryContent },
+    { name: 'Lorebook', text: snap.lorebookContent },
+    { name: 'Knowledge Graph', text: snap.graphContent },
+  ];
+
+  const totalSystemChars = metrics.systemMessageLength || (snap.systemMessage || '').length;
+  const totalSystemTokens = countTokens(snap.systemMessage || '');
+  const estimatedTotal = metrics.estimatedTokens || totalSystemTokens;
+  const contextWindow = 128000;
+  const utilizationPct = Math.min(100, Math.round((estimatedTotal / contextWindow) * 100));
+  const tokenLabel = tokenizerReady ? '' : ' (est.)';
+
+  let html = `
+    <div class="context-metrics-overview">
+      <div class="context-metrics-row">
+        <span>System Message</span>
+        <span>${totalSystemChars.toLocaleString()} chars / ${totalSystemTokens.toLocaleString()} tokens${tokenLabel}</span>
+      </div>
+      <div class="context-metrics-row">
+        <span>Total Messages</span>
+        <span>${metrics.totalMessages || '—'}</span>
+      </div>
+      <div class="context-metrics-row">
+        <span>Estimated Total Tokens</span>
+        <span>~${estimatedTotal.toLocaleString()}</span>
+      </div>
+      <div class="context-utilization">
+        <div class="context-utilization-label">Context Window (128k)</div>
+        <div class="context-utilization-bar">
+          <div class="context-utilization-fill" style="width: ${utilizationPct}%"></div>
+        </div>
+        <div class="context-utilization-pct">${utilizationPct}%</div>
+      </div>
+    </div>
+    <h3 class="context-metrics-heading">Section Breakdown</h3>
+    <div class="context-section-grid">
+  `;
+
+  for (const section of sections) {
+    const chars = (section.text || '').length;
+    const tokens = section.text ? countTokens(section.text) : 0;
+    const pct = totalSystemChars > 0 ? Math.round((chars / totalSystemChars) * 100) : 0;
+    html += `
+      <div class="context-metrics-row">
+        <span>${section.name}</span>
+        <span>${chars > 0 ? `${chars.toLocaleString()} chars / ${tokens.toLocaleString()} tok (${pct}%)` : '<span class="context-dim">—</span>'}</span>
+      </div>
+    `;
+  }
+
+  html += '</div>';
   return html;
 }
 
@@ -2145,9 +2328,12 @@ globalThis.Psycheros = {
   startMessageEdit,
   cancelMessageEdit,
   saveMessageEdit,
-  // Context viewer
+  // Context inspector
   toggleContextViewer,
   hideContextViewer,
+  contextPrevTurn,
+  contextNextTurn,
+  searchContext,
   // Custom file management
   createCustomFile,
   deleteCustomFile,

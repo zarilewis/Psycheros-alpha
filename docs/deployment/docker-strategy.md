@@ -84,7 +84,11 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3
 
 ## sqlite-vec
 
-Psycheros ships `lib/vec0.so` — a pre-built x86-64 Linux sqlite-vec binary (v0.1.6). Loads natively in the container. On other architectures (e.g., macOS local dev), falls back to in-memory cosine similarity. There is no npm fallback — the npm `sqlite-vec` package was removed as dead code.
+Psycheros ships pre-built sqlite-vec native extensions for both platforms:
+- **Linux/Docker**: `lib/vec0.so` (x86-64, v0.1.6) — loads natively in the container
+- **macOS**: `lib/vec0.dylib` (aarch64, v0.1.6) — loads natively during local development
+
+The `.dockerignore` excludes `vec0.dylib` from the Docker build context. The code passes `lib/vec0` (no file extension) to `load_extension()` — SQLite auto-appends the platform suffix. On unsupported architectures, the system falls back to in-memory cosine similarity. There is no npm fallback — the npm `sqlite-vec` package was removed as dead code.
 
 ## Graceful Shutdown
 

@@ -199,6 +199,33 @@ export const SCHEMA = `
 
   CREATE UNIQUE INDEX IF NOT EXISTS idx_lorebook_state_conversation_entry
     ON lorebook_state(conversation_id, entry_id);
+
+  -- Context Inspector Snapshots
+  -- Persists the full LLM context for each conversation turn
+  CREATE TABLE IF NOT EXISTS context_snapshots (
+    id TEXT PRIMARY KEY,
+    conversation_id TEXT NOT NULL,
+    turn_index INTEGER NOT NULL,
+    iteration INTEGER NOT NULL DEFAULT 1,
+    timestamp TEXT NOT NULL,
+    user_message TEXT NOT NULL,
+    system_message TEXT NOT NULL,
+    self_content TEXT,
+    user_content TEXT,
+    relationship_content TEXT,
+    memories_content TEXT,
+    chat_history_content TEXT,
+    lorebook_content TEXT,
+    graph_content TEXT,
+    messages_json TEXT NOT NULL,
+    tool_definitions_json TEXT NOT NULL,
+    metrics_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_context_snapshots_conversation
+    ON context_snapshots(conversation_id, turn_index DESC);
 `;
 
 /**
@@ -404,6 +431,41 @@ function runMigrations(db: Database): void {
         ON lorebook_state(conversation_id, entry_id);
     `);
     console.log("[DB] Created lorebook tables");
+  }
+
+  // Migration: Add context_snapshots table if missing
+  const hasContextSnapshots = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'context_snapshots'")
+    .get();
+
+  if (!hasContextSnapshots) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS context_snapshots (
+        id TEXT PRIMARY KEY,
+        conversation_id TEXT NOT NULL,
+        turn_index INTEGER NOT NULL,
+        iteration INTEGER NOT NULL DEFAULT 1,
+        timestamp TEXT NOT NULL,
+        user_message TEXT NOT NULL,
+        system_message TEXT NOT NULL,
+        self_content TEXT,
+        user_content TEXT,
+        relationship_content TEXT,
+        memories_content TEXT,
+        chat_history_content TEXT,
+        lorebook_content TEXT,
+        graph_content TEXT,
+        messages_json TEXT NOT NULL,
+        tool_definitions_json TEXT NOT NULL,
+        metrics_json TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_context_snapshots_conversation
+        ON context_snapshots(conversation_id, turn_index DESC);
+    `);
+    console.log("[DB] Created context_snapshots table");
   }
 }
 

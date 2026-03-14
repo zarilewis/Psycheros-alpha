@@ -332,6 +332,33 @@ export class EntityTurn {
           messages.reduce((acc, m) => acc + Math.ceil((m.content?.length || 0) / 4), 0),
       },
     };
+
+    // Persist context snapshot to database for the Context Inspector
+    const turnIndexStmt = this.db.getRawDb()
+      .prepare("SELECT COUNT(*) as count FROM messages WHERE conversation_id = ? AND role = 'user'");
+    const turnIndexResult = turnIndexStmt.get<{ count: number }>(conversationId);
+    turnIndexStmt.finalize();
+    const turnIndex = turnIndexResult?.count ?? 1;
+
+    this.db.addContextSnapshot({
+      conversationId,
+      turnIndex,
+      iteration: 1,
+      timestamp: contextSnapshot.timestamp,
+      userMessage,
+      systemMessage,
+      selfContent,
+      userContent,
+      relationshipContent,
+      memoriesContent,
+      chatHistoryContent,
+      lorebookContent,
+      graphContent,
+      messagesJson: JSON.stringify(contextSnapshot.messages),
+      toolDefinitionsJson: JSON.stringify(toolDefinitions),
+      metricsJson: JSON.stringify(contextSnapshot.metrics),
+    });
+
     yield { type: "context", context: contextSnapshot };
 
     // Track current iteration for tool loop protection

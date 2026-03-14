@@ -8,7 +8,7 @@
 import { Database } from "@db/sqlite";
 import { initializeSchema } from "./schema.ts";
 import { getVecVersion } from "./vector.ts";
-import type { Conversation, Message, ToolCall, TurnMetrics } from "../types.ts";
+import type { Conversation, Message, ToolCall, TurnMetrics, ContextSnapshotRecord } from "../types.ts";
 
 /**
  * Valid message roles that can be stored in the database.
@@ -55,6 +55,30 @@ interface TurnMetricsRow {
   total_duration: number | null;
   chunk_count: number;
   finish_reason: string | null;
+  created_at: string;
+}
+
+/**
+ * Row type for context_snapshots as stored in SQLite.
+ */
+interface ContextSnapshotRow {
+  id: string;
+  conversation_id: string;
+  turn_index: number;
+  iteration: number;
+  timestamp: string;
+  user_message: string;
+  system_message: string;
+  self_content: string | null;
+  user_content: string | null;
+  relationship_content: string | null;
+  memories_content: string | null;
+  chat_history_content: string | null;
+  lorebook_content: string | null;
+  graph_content: string | null;
+  messages_json: string;
+  tool_definitions_json: string;
+  metrics_json: string;
   created_at: string;
 }
 
@@ -897,6 +921,156 @@ export class DBClient {
     const row = stmt.get<{ date: string }>(granularity);
     stmt.finalize();
     return row?.date ?? null;
+  }
+
+  // ===========================================================================
+  // Context Snapshot Operations
+  // ===========================================================================
+
+  /**
+   * Maximum number of context snapshots to retain per conversation.
+   */
+  private static readonly MAX_SNAPSHOTS_PER_CONVERSATION = 50;
+
+  /**
+   * Persists a context snapshot to the database.
+   * Non-fatal — logs warnings on failure. Prunes old snapshots beyond the cap.
+   *
+   * @param snapshot - The snapshot record to persist
+   * @returns True if the snapshot was persisted successfully
+   */
+  addContextSnapshot(snapshot: Omit<ContextSnapshotRecord, "id" | "createdAt">): boolean {
+    try {
+      const id = crypto.randomUUID();
+      const now = new Date().toISOString();
+
+      this.db.exec(
+        `INSERT INTO context_snapshots
+         (id, conversation_id, turn_index, iteration, timestamp, user_message,
+          system_message, self_content, user_content, relationship_content,
+          memories_content, chat_history_content, lorebook_content, graph_content,
+          messages_json, tool_definitions_json, metrics_json, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          snapshot.conversationId,
+          snapshot.turnIndex,
+          snapshot.iteration,
+          snapshot.timestamp,
+          snapshot.userMessage,
+          snapshot.systemMessage,
+          snapshot.selfContent ?? null,
+          snapshot.userContent ?? null,
+          snapshot.relationshipContent ?? null,
+          snapshot.memoriesContent ?? null,
+          snapshot.chatHistoryContent ?? null,
+          snapshot.lorebookContent ?? null,
+          snapshot.graphContent ?? null,
+          snapshot.messagesJson,
+          snapshot.toolDefinitionsJson,
+          snapshot.metricsJson,
+          now,
+        ]
+      );
+
+      // Prune old snapshots beyond the cap
+      this.db.exec(
+        `DELETE FROM context_snapshots
+         WHERE conversation_id = ?
+           AND id NOT IN (
+             SELECT id FROM context_snapshots
+             WHERE conversation_id = ?
+             ORDER BY turn_index DESC, iteration DESC
+             LIMIT ?
+           )`,
+        [
+          snapshot.conversationId,
+          snapshot.conversationId,
+          DBClient.MAX_SNAPSHOTS_PER_CONVERSATION,
+        ]
+      );
+
+      return true;
+    } catch (error) {
+      console.warn(
+        "Failed to persist context snapshot:",
+        error instanceof Error ? error.message : String(error)
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Retrieves all context snapshots for a conversation.
+   *
+   * @param conversationId - The conversation ID
+   * @returns Array of snapshots, ordered by turn index ascending
+   */
+  getContextSnapshots(conversationId: string): ContextSnapshotRecord[] {
+    const stmt = this.db.prepare(
+      `SELECT id, conversation_id, turn_index, iteration, timestamp, user_message,
+              system_message, self_content, user_content, relationship_content,
+              memories_content, chat_history_content, lorebook_content, graph_content,
+              messages_json, tool_definitions_json, metrics_json, created_at
+       FROM context_snapshots
+       WHERE conversation_id = ?
+       ORDER BY turn_index ASC, iteration ASC`
+    );
+
+    const rows = stmt.all<ContextSnapshotRow>(conversationId);
+    stmt.finalize();
+
+    return rows.map((row) => this.rowToContextSnapshot(row));
+  }
+
+  /**
+   * Retrieves the most recent context snapshot for a conversation.
+   *
+   * @param conversationId - The conversation ID
+   * @returns The latest snapshot or null if none exist
+   */
+  getLatestContextSnapshot(conversationId: string): ContextSnapshotRecord | null {
+    const stmt = this.db.prepare(
+      `SELECT id, conversation_id, turn_index, iteration, timestamp, user_message,
+              system_message, self_content, user_content, relationship_content,
+              memories_content, chat_history_content, lorebook_content, graph_content,
+              messages_json, tool_definitions_json, metrics_json, created_at
+       FROM context_snapshots
+       WHERE conversation_id = ?
+       ORDER BY turn_index DESC, iteration DESC
+       LIMIT 1`
+    );
+
+    const row = stmt.get<ContextSnapshotRow>(conversationId);
+    stmt.finalize();
+
+    return row ? this.rowToContextSnapshot(row) : null;
+  }
+
+  /**
+   * Converts a database row to a ContextSnapshotRecord.
+   */
+  private rowToContextSnapshot(row: ContextSnapshotRow): ContextSnapshotRecord {
+    return {
+      id: row.id,
+      conversationId: row.conversation_id,
+      turnIndex: row.turn_index,
+      iteration: row.iteration,
+      timestamp: row.timestamp,
+      userMessage: row.user_message,
+      systemMessage: row.system_message,
+      selfContent: row.self_content ?? undefined,
+      userContent: row.user_content ?? undefined,
+      relationshipContent: row.relationship_content ?? undefined,
+      memoriesContent: row.memories_content ?? undefined,
+      chatHistoryContent: row.chat_history_content ?? undefined,
+      lorebookContent: row.lorebook_content ?? undefined,
+      graphContent: row.graph_content ?? undefined,
+      messagesJson: row.messages_json,
+      toolDefinitionsJson: row.tool_definitions_json,
+      metricsJson: row.metrics_json,
+      createdAt: row.created_at,
+    };
   }
 
   // ===========================================================================

@@ -193,3 +193,25 @@ export interface LLMContextSnapshot {
   };
 }
 
+/** Persisted context snapshot with DB metadata */
+export interface ContextSnapshotRecord {
+  id: string;
+  conversationId: string;
+  turnIndex: number;
+  iteration: number;
+  timestamp: string;
+  userMessage: string;
+  systemMessage: string;
+  selfContent?: string;
+  userContent?: string;
+  relationshipContent?: string;
+  memoriesContent?: string;
+  chatHistoryContent?: string;
+  lorebookContent?: string;
+  graphContent?: string;
+  messagesJson: string;
+  toolDefinitionsJson: string;
+  metricsJson: string;
+  createdAt: string;
+}
+

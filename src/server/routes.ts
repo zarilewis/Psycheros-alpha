@@ -418,6 +418,47 @@ export function handleGetMessages(
 }
 
 /**
+ * Handle GET /api/conversations/:id/context - Get context snapshots
+ *
+ * Returns all persisted context snapshots for a conversation,
+ * or just the latest if latest=true.
+ *
+ * @param ctx - Route context
+ * @param conversationId - The conversation ID
+ * @param latest - If true, return only the most recent snapshot
+ * @returns HTTP Response with snapshot data
+ */
+export function handleGetContextSnapshots(
+  ctx: RouteContext,
+  conversationId: string,
+  latest: boolean
+): Response {
+  if (latest) {
+    const snapshot = ctx.db.getLatestContextSnapshot(conversationId);
+    if (!snapshot) {
+      return new Response(null, {
+        status: 204,
+        headers: { "Access-Control-Allow-Origin": "*" },
+      });
+    }
+    return new Response(JSON.stringify(snapshot), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  }
+
+  const snapshots = ctx.db.getContextSnapshots(conversationId);
+  return new Response(JSON.stringify(snapshots), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
  * Handle PUT /api/messages/:id - Update message content
  *
  * Updates a message's content, regenerates embedding, and returns updated HTML.
@@ -972,7 +1013,7 @@ function convertToSSEEvent(chunk: EntityYield): SSEEvent {
     case "context":
       return {
         type: "context",
-        data: truncateSSEData(JSON.stringify(chunk.context)),
+        data: JSON.stringify(chunk.context),
       };
 
     case "done":

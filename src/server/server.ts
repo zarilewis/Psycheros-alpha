@@ -32,6 +32,7 @@ import {
   handleDeleteCustomFile,
   handleEvents,
   handleGetMessages,
+  handleGetContextSnapshots,
   handleUpdateMessage,
   handleIndex,
   handleListConversations,
@@ -529,6 +530,18 @@ export class Server {
     // POST /api/conversations - Create conversation
     if (method === "POST" && path === "/api/conversations") {
       return await handleCreateConversation(ctx, request);
+    }
+
+    // GET /api/conversations/:id/context/latest - Get latest context snapshot
+    const contextLatestMatch = path.match(/^\/api\/conversations\/([^/]+)\/context\/latest$/);
+    if (method === "GET" && contextLatestMatch) {
+      return handleGetContextSnapshots(ctx, contextLatestMatch[1], true);
+    }
+
+    // GET /api/conversations/:id/context - Get all context snapshots
+    const contextAllMatch = path.match(/^\/api\/conversations\/([^/]+)\/context$/);
+    if (method === "GET" && contextAllMatch) {
+      return handleGetContextSnapshots(ctx, contextAllMatch[1], false);
     }
 
     // GET /api/conversations/:id/messages - Get messages

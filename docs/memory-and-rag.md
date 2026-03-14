@@ -90,7 +90,9 @@ Requires `PSYCHEROS_MCP_ENABLED=true`.
 ### Vector Search Backend
 
 - **Primary**: sqlite-vec extension for efficient vector similarity search
-- **Fallback**: In-memory cosine similarity calculation when sqlite-vec is unavailable
+  - Linux (Docker): `lib/vec0.so` (x86-64)
+  - macOS: `lib/vec0.dylib` (aarch64)
+- **Fallback**: In-memory cosine similarity calculation when extension is unavailable
 - **Embeddings**: HuggingFace `all-MiniLM-L6-v2` model (384 dimensions)
 
 ## Related Source Files
