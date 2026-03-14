@@ -192,6 +192,6 @@ For detailed Docker strategy, CI/CD pipeline, and UnRAID setup, see the parent w
 
 - [entity-core](https://github.com/zarilewis/entity-core) — MCP server holding the entity's canonical identity and memories
 
-## License
+## Deployment
 
-MIT
+For Docker strategy, CI/CD pipeline, and UnRAID setup, see `docs/deployment/`.

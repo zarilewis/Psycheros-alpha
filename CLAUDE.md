@@ -83,6 +83,11 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | [docs/memory-and-rag.md](docs/memory-and-rag.md) | Memory hierarchy, consolidation, 3 RAG systems, vector search |
 | [docs/ui-features.md](docs/ui-features.md) | Context viewer, stop generation, message editing, appearance, graph viz |
 | [docs/api-reference.md](docs/api-reference.md) | Full API endpoints (49 routes), dual SSE architecture |
+| [docs/code-review-findings.md](docs/code-review-findings.md) | Code review bugs fixed, architectural decisions |
+| [docs/security-audit.md](docs/security-audit.md) | Security audit findings, threat model, accepted risks |
+| [docs/deployment/docker-strategy.md](docs/deployment/docker-strategy.md) | Dockerfile design, volumes, env vars, Deno caching |
+| [docs/deployment/ci-cd.md](docs/deployment/ci-cd.md) | GitHub Actions workflow, GHCR, build pipeline |
+| [docs/deployment/unraid-setup.md](docs/deployment/unraid-setup.md) | UnRAID container config, Authelia, reverse proxy |
 
 ## Documentation System
 
