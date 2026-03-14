@@ -22,16 +22,17 @@ COPY entity-core/ ./entity-core/
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Enable nodeModulesDir in both projects (Docker only, not in source repos).
-# This creates local node_modules/ directories instead of relying on the
-# global /deno-dir cache, which has proven unreliable across build environments.
+# Enable nodeModulesDir + vendor in both projects (Docker only, not in source repos).
+# nodeModulesDir: npm packages go to local node_modules/ instead of /deno-dir
+# vendor: JSR/remote modules go to local vendor/ instead of /deno-dir
+# The global /deno-dir cache is unreliable in CI-built images.
 RUN cd /app/Psycheros && deno eval "\
     const j = JSON.parse(Deno.readTextFileSync('deno.json')); \
-    j.nodeModulesDir = 'auto'; \
+    j.nodeModulesDir = 'auto'; j.vendor = true; \
     Deno.writeTextFileSync('deno.json', JSON.stringify(j, null, 2) + '\n');" \
     && cd /app/entity-core && deno eval "\
     const j = JSON.parse(Deno.readTextFileSync('deno.json')); \
-    j.nodeModulesDir = 'auto'; \
+    j.nodeModulesDir = 'auto'; j.vendor = true; \
     Deno.writeTextFileSync('deno.json', JSON.stringify(j, null, 2) + '\n');"
 
 # Install all dependencies into local node_modules/ directories
