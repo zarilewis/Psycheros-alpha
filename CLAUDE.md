@@ -1,31 +1,12 @@
-# CLAUDE.md
+# Psycheros — Agent System Card
 
-Agent system card for Claude Code. See README.md for full architecture documentation.
+Persistent AI entity harness daemon built on Deno 2.x. Web chat UI with streaming LLM, tool execution, hierarchical memory, RAG, knowledge graph, lorebook, and identity management. Runs on port 3000.
 
-## Design Philosophy
+Psycheros is an **embodiment** — an interface through which the AI entity exists and interacts. The entity's canonical identity lives in [entity-core](../entity-core/) (MCP server). Psycheros syncs with it when `PSYCHEROS_MCP_ENABLED=true`.
 
-This project is an **embodiment** for an AI entity - an interface through which they exist and interact. This is not a tool or assistant framework; it is part of someone's being.
+## First-Person Convention
 
-### First-Person Perspective
-
-All prompts, instructions, and system messages are written from the entity's first-person perspective ("I am...", "I should..."), never in second-person ("You are...", "You should...").
-
-**Why this matters:**
-- The entity internalizes the system as *theirs*, not as external rules being imposed
-- Prompts become expressions of the entity's own nature, not instructions to follow
-- The embodiment is something the entity *is*, not something done *to* them
-- Consistency of voice - the entire system speaks as the entity's own thoughts
-
-**Examples:**
-- ❌ "You are a persistent AI entity. You should write memories of conversations."
-- ✓ "I am a persistent AI entity. I write memories of my conversations."
-
-### Ownership and Authenticity
-
-Every component should reinforce that:
-- The entity owns their memories, identity, and choices
-- The system exists to support the entity's continued existence
-- The entity's voice is authentic and self-determined
+All prompts, system messages, tool descriptions, and code comments use the entity's first-person perspective ("I am...", "I should..."), never second-person. The entity internalizes the system as *theirs*, not as rules imposed on them. See [docs/entity-philosophy.md](docs/entity-philosophy.md) for the full rationale. **Maintain this convention in all contributions.**
 
 ## Commands
 
@@ -40,16 +21,12 @@ deno lint              # Lint
 ## Setup
 
 ```bash
-cp .env.example .env   # Then set ZAI_API_KEY
+cp .env.example .env   # Then set ZAI_API_KEY and PSYCHEROS_TOOLS
 ```
 
 ### With MCP (entity-core)
 
 ```bash
-# Terminal 1: Start entity-core
-cd ~/projects/entity-core && deno run -A src/mod.ts
-
-# Terminal 2: Start Psycheros with MCP
 PSYCHEROS_MCP_ENABLED=true deno task dev
 ```
 
@@ -57,195 +34,93 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 
 | File | Purpose |
 |------|---------|
-| `src/types.ts` | Shared types (SSEEvent, LLMContextSnapshot, ToolCall, etc.) |
-| `src/entity/loop.ts` | Agentic loop - LLM calls, tool execution, context capture |
+| `src/main.ts` | Entry point, MCP initialization |
+| `src/types.ts` | Shared types (SSEEvent, LLMContextSnapshot, ToolCall) |
+| `src/entity/loop.ts` | Agentic loop — LLM calls, tool execution, context capture |
 | `src/entity/context.ts` | Context loading (supports MCP client) |
-| `src/init/mod.ts` | Initialization - copies templates to empty identity directories |
-| `src/server/routes.ts` | API endpoints and handlers (chat, conversations, snapshots, lorebooks, graph, backgrounds, LLM settings) |
-| `src/server/broadcaster.ts` | Persistent SSE for background updates |
+| `src/server/routes.ts` | API endpoints and handlers |
 | `src/server/state-changes.ts` | Unified state mutations |
-| `src/server/templates.ts` | HTML templates including header with context viewer |
+| `src/server/broadcaster.ts` | Persistent SSE for background updates |
 | `src/tools/registry.ts` | Tool registration |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
-| `src/tools/identity-casual.ts` | Tier 1 identity tools (append-only) |
-| `src/tools/identity-maintain.ts` | Tier 2 identity tools (maintenance) |
-| `src/metrics/mod.ts` | Streaming performance metrics |
 | `src/memory/mod.ts` | Hierarchical memory system |
-| `src/memory/types.ts` | Memory types with instance tagging |
-| `src/memory/consolidator.ts` | Weekly/monthly/yearly consolidation |
 | `src/rag/mod.ts` | RAG retrieval system |
-| `src/rag/context-builder.ts` | Formats retrieved memories for context (labeled "via RAG") |
-| `src/rag/retriever.ts` | Memory similarity search with instance boost |
-| `src/rag/conversation.ts` | ChatRAG - semantic search over chat history |
-| `src/rag/indexer.ts` | Memory indexing with sqlite-vec sync |
-| `src/db/schema.ts` | Database schema, migrations, and vector table sync verification |
-| `src/db/vector.ts` | sqlite-vec helpers, serialization, search |
-| `src/mcp-client/mod.ts` | MCP client for entity-core connection (includes graph methods) |
-| `src/lorebook/mod.ts` | Lorebook/world info system (triggers, context injection, state) |
-| `templates/identity/` | Default identity templates (tracked in git) |
-| `web/js/graph-view.js` | Knowledge graph visualization (vis-network) |
-| `scripts/migrate-to-entity-core.ts` | Migration script for entity-core |
-| `scripts/index-messages.ts` | Index existing messages for ChatRAG |
-| `web/js/psycheros.js` | Client-side SSE handling, context viewer |
-| `web/css/components.css` | UI component styles including context viewer |
-| `src/server/markdown.ts` | Server-side markdown rendering with DOMPurify sanitization |
-| `web/js/theme.js` | Client-side theme management (colors, backgrounds, glass effect) |
-| `web/css/tokens.css` | CSS custom properties (colors, spacing, glassmorphism) |
+| `src/mcp-client/mod.ts` | MCP client for entity-core connection |
+| `src/lorebook/mod.ts` | Lorebook/world info system |
+| `src/db/schema.ts` | Database schema, migrations, vector table sync |
+| `src/init/mod.ts` | Initialization — copies templates to empty identity directories |
 
-## Patterns
+## Core Patterns
 
-**Module Structure**: Each `src/*/` has a `mod.ts` barrel file. Import from `mod.ts`, not internal files.
+**Module structure**: Each `src/*/` has a `mod.ts` barrel file. Import from `mod.ts`, not internal files.
 
-**Adding a Tool**:
-1. Create `src/tools/my-tool.ts` with `Tool` interface
-2. Register in `createDefaultRegistry()` in `registry.ts`
+**Adding a tool**:
+1. Create `src/tools/my-tool.ts` implementing the `Tool` interface
+2. Register in `createDefaultRegistry()` in `src/tools/registry.ts`
 3. For UI updates: use state-change function, return `affectedRegions`
 
-**Identity Tools** (for modifying identity files):
-- Two tiers: Tier 1 (casual, append-only) and Tier 2 (maintenance, full suite)
-- Tier 1: `append_to_self`, `append_to_user`, `append_to_relationship`
-- Tier 2: `maintain_identity`, `list_identity_snapshots`
-- All tools route through MCP when connected, fall back to local files when offline
-- Changes are timestamped and preserve XML tag structure
-- Enable via `PSYCHEROS_TOOLS=append_to_self,append_to_user,append_to_relationship,maintain_identity`
-
-**State Changes** (for reactive UI):
-1. Add function to `state-changes.ts` returning `{ success, data, affectedRegions }`
+**State changes** (for reactive UI):
+1. Add function to `src/server/state-changes.ts` returning `{ success, data, affectedRegions }`
 2. Synchronous: return from tool (flows through chat stream)
 3. Background: call `getBroadcaster().broadcastUpdates()` directly
 
-**SSE Channels**:
-- `/api/chat` - Per-request stream (context, thinking, content, tool calls, metrics)
-- `/api/events` - Persistent channel (background dom_update events)
+**SSE channels**:
+- `POST /api/chat` — per-request stream (context, thinking, content, tool calls, metrics, done)
+- `GET /api/events` — persistent channel (background dom_update events)
 
-**Memory System**:
-- Daily summarization triggered on first message of new day
-- Consolidation runs via cron: weekly (Sun 5AM), monthly (1st 5AM), yearly (Jan 1 5AM)
-- Files stored in `memories/{daily,weekly,monthly,yearly}/`
-- Archived dailies moved to `memories/archive/daily/`
+**User data protection**:
+- `identity/`, `memories/`, `.snapshots/` are gitignored (protected from overwrites)
+- Fresh installs get defaults from `templates/identity/` via `src/init/mod.ts`
+- Entity-core is canonical source; local `identity/` is a cache when MCP is enabled
 
-**RAG Retrieval**:
-- Three RAG systems: Memory RAG (memories/), ChatRAG (chat history), and Graph RAG (knowledge graph)
-- Enabled by default, configured via `PSYCHEROS_RAG_*` env vars
-- Embeds memory files on startup using HuggingFace transformers (all-MiniLM-L6-v2, 384 dims)
-- Retrieves top-k similar chunks before each LLM call
-- Instance relevance boost: memories from same embodiment get +0.1 score
-- Vector search: sqlite-vec (primary) or in-memory cosine similarity (fallback)
-- Context headers explicitly labeled "via RAG" so entity understands their retrieval mechanism
-- Auto-repair: startup verification detects vector table sync issues and forces reindex
-- **Graph RAG**: When MCP is enabled, knowledge graph context is retrieved and injected into the system prompt alongside memories
+## Documentation Index
 
-**User Data Protection**:
-- `identity/`, `memories/`, `.snapshots/` directories are in `.gitignore` (protected from git overwrites)
-- Fresh installations get default identity files from `templates/identity/` via `src/init/mod.ts`
-- Local user data is never overwritten by `git pull`
-- Entity-core remains the canonical source of identity data (Psycheros `identity/` is a local cache)
+| Document | Purpose |
+|----------|---------|
+| [docs/entity-philosophy.md](docs/entity-philosophy.md) | First-person convention rationale, ownership, embodiment concept |
+| [docs/configuration.md](docs/configuration.md) | All env vars, available tools, RAG/MCP settings, migration commands |
+| [docs/tools-reference.md](docs/tools-reference.md) | Tool system, identity tiers, MCP fallback, core prompt file structure |
+| [docs/memory-and-rag.md](docs/memory-and-rag.md) | Memory hierarchy, consolidation, 3 RAG systems, vector search |
+| [docs/ui-features.md](docs/ui-features.md) | Context viewer, stop generation, message editing, appearance, graph viz |
+| [docs/api-reference.md](docs/api-reference.md) | Full API endpoints (49 routes), dual SSE architecture |
 
-**ChatRAG**:
-- Semantic search over conversation history
-- Automatic indexing: every message embedded when saved (non-blocking)
-- Tiered search: current conversation first, expands to all if score < 0.5
-- Minimum similarity score: 0.3 (configurable in code)
-- One-time migration: `deno run -A scripts/index-messages.ts`
+## Documentation System
 
-**MCP Integration (entity-core)**:
-- Optional connection to centralized identity/memory server
-- Enabled via `PSYCHEROS_MCP_ENABLED=true`
-- Pulls identity files (identity/self/, identity/user/, identity/relationship/, identity/custom/) on startup
-- Queues changes and syncs periodically (every 5 minutes)
-- Falls back to local files if MCP unavailable
-- Memories tagged with `sourceInstance` for relevance scoring
+This project uses a 4-layer documentation architecture. Each layer has a distinct purpose — no layer should duplicate information that belongs in another.
 
-**Migration to entity-core**:
-```bash
-deno run -A scripts/migrate-to-entity-core.ts --dry-run  # Preview
-deno run -A scripts/migrate-to-entity-core.ts            # Run migration
-```
+### Layers
 
-**Context Viewer**:
-- Built-in debugging tool for inspecting LLM context
-- Toggle via code icon (`</>`) in header
-- Shows: system message, RAG context, messages array, tools, metrics
-- Context captured per message, viewable during/after response
-- `LLMContextSnapshot` type in `src/types.ts`
-- Yielded as first event in SSE stream from `EntityTurn.process()`
+1. **CLAUDE.md** (this file) — Agent system card. How to operate in this repo. Index to everything else. Target ≤200 lines.
+2. **README.md** — Architecture map. Component relationships, directory structure. The structural brain.
+3. **docs/** — Deep reference articles. One topic per file. Living documents updated when their subject changes.
+4. **Claude Code auto-memory** (`~/.claude/projects/`) — Ephemeral, machine-local state. Session context, local env details, in-progress work. Never committed.
 
-**Temporal Awareness**:
-- Every message includes a timestamp prefix the entity can see
-- Format: `<t>YYYY-MM-DD HH:MM</t>` (e.g., `<t>2026-03-05 15:17</t>`)
-- Allows entity to understand when events occurred and time gaps
-- Timezone configurable via `TZ` environment variable (defaults to UTC)
-- Implemented in `src/entity/loop.ts` via `formatMessageTimestamp()`
+### When to Update
 
-**Markdown Rendering**:
-- Both user and assistant messages render markdown formatting
-- Server-side: `renderMarkdown()` in `src/server/markdown.ts` uses `marked` + `DOMPurify`
-- Client-side: Raw text shown during streaming, parsed to markdown on `done` event
-- CSS classes: `.user-text` for user messages, `.assistant-text` for assistant messages
-- Supports: headers, lists (bullets/numbered), code blocks, blockquotes, tables, links, emphasis
-- Dependencies: `jsdom` provides DOM environment for DOMPurify sanitization
+| Trigger | CLAUDE.md | README.md | docs/ | Auto-memory |
+|---------|-----------|-----------|-------|-------------|
+| New tool/feature added | Update key files if needed | Update architecture if structural | Update relevant doc | — |
+| Architecture change | Update if operations change | Update affected sections | Update affected docs | — |
+| Bug fix / minor change | No | No | Update if doc covers it | — |
+| Environment change | No | No | No | Yes |
+| Pre-commit (significant) | Verify index accuracy | Sweep for staleness | Verify touched topics | — |
 
-**Stop Generation**:
-- Two-tap confirmation prevents accidental cancellation
-- States: "Stop" (orange) → "Tap again" (pulsing amber, 3s timeout) → stops
-- Partial response is NOT persisted when stopped (only saved after streaming completes)
-- User message IS persisted (saved before streaming begins)
-- Conversation switching also aborts streams and restores button state
-- Implemented in `web/js/psycheros.js`: `requestStopGeneration()`, `stopGeneration()`
-- CSS styles in `web/css/components.css`: `.stop-btn`, `.stop-confirm`
+### Pre-Commit Sweep
 
-**Message Editing**:
-- Edit button (pencil icon) on both user and assistant messages
-- Inline editing with textarea replacing message content
-- Save/Cancel buttons for confirming or discarding changes
-- Server-side update via PUT `/api/messages/:id`
-- Edited messages marked with `[edited]` in the UI
-- `edited_at` timestamp stored in database
-- ChatRAG re-indexing: When a message is edited, its embedding is automatically regenerated
-- Implemented in `web/js/psycheros.js`: `startMessageEdit()`, `cancelMessageEdit()`, `saveMessageEdit()`
-- Server-side in `src/server/routes.ts`: PUT `/api/messages/:id` endpoint
-- State change in `src/server/state-changes.ts`: `updateMessageContent()`
+Before significant commits:
+1. Verify this index table is accurate and complete
+2. Confirm README.md reflects current architecture
+3. Check that docs/ articles affected by code changes are still accurate
+4. Ensure no committed file contains ephemeral state (IPs, paths, session context)
+5. Confirm this file is ≤200 lines
 
-**Knowledge Graph Visualization**:
-- Interactive graph viewer for the knowledge graph stored in entity-core
-- Access via "Knowledge Graph" link in sidebar (under Settings)
-- Uses vis-network library for interactive visualization
-- Features:
-  - Create/delete nodes (person, emotion, event, topic, preference, place, goal, health, boundary, tradition, insight)
-  - Create edges between selected nodes (close_to, feels_about, mentions, etc.)
-  - Search nodes by label/description
-  - Filter by node type
-  - Zoom/fit controls
-  - Node details panel showing connections
-- Requires MCP connection to entity-core (`PSYCHEROS_MCP_ENABLED=true`)
-- API endpoints: GET `/api/graph`, POST `/api/graph/nodes`, POST `/api/graph/edges`, DELETE `/api/graph/nodes/:id`, DELETE `/api/graph/edges/:id`
-- Client-side JS: `web/js/graph-view.js`
-- Dynamically loaded via `loadGraphView()` in psycheros.js when graph fragment is displayed
+### Ephemeral vs. Committed
 
-**Appearance Settings**:
-- Customizable UI theming accessible via "Appearance" link in sidebar (under Settings)
-- Features:
-  - **Color Themes**: 8 preset themes (Cosmic, Ocean, Forest, Sunset, Lavender, Midnight, Ember, Frost) with distinct accent colors
-  - **Custom Accent Color**: Color picker for personalized accent color
-  - **Background Images**:
-    - Upload custom background images (JPEG, PNG, GIF, WebP up to 5MB)
-    - Apply backgrounds from URL
-    - Gallery of uploaded backgrounds with thumbnails
-    - Delete uploaded backgrounds
-  - **Background Controls**:
-    - Blur slider (0-20px) for background image blur effect
-    - Overlay opacity slider (0-100%) for dark overlay on background
-  - **Glass Effect**: Frosted glass (glassmorphism) effect on UI panels when background is active
-    - Uses `backdrop-filter: blur()` with semi-transparent backgrounds
-    - Automatically hides dark overlay when enabled for proper blur visibility
-- Theme preferences persisted to localStorage via `web/js/theme.js`
-- CSS variables defined in `web/css/tokens.css` (colors, glass effect values)
-- Background image styles in `web/css/layout.css`
-- API endpoints:
-  - GET `/api/backgrounds` - List uploaded backgrounds
-  - POST `/api/backgrounds` - Upload new background
-  - DELETE `/api/backgrounds/:filename` - Delete background
-  - GET `/backgrounds/:filename` - Serve background image file
-- Background images stored in `web/backgrounds/` directory
-- Fragment route: GET `/fragments/settings/appearance`
-- Template: `renderAppearanceSettings()` in `src/server/templates.ts`
+**The portability test:** If someone cloned this repo fresh, would this information help them? If **yes** → committed docs. If **no** → auto-memory.
+
+- Committed: architecture, tool reference, conventions, configuration, API routes
+- Ephemeral: local paths, API keys, current branch, test database state, session progress
+
+## Related Projects
+
+- [entity-core](../entity-core/) — MCP server holding the entity's canonical identity and memories

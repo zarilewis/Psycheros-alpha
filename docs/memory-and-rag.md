@@ -1,0 +1,112 @@
+# Memory System & RAG
+
+Psycheros implements a hierarchical memory system where the entity writes their own memories from conversations. Three RAG systems work together to provide contextual recall.
+
+## Memory Hierarchy
+
+Memories are written in the entity's voice (first-person), with the user in third-person. They are organized hierarchically and consolidated over time via Deno cron jobs.
+
+```
+memories/
+├── daily/           # Daily summaries (auto-generated)
+│   └── 2026-02-22.md
+├── weekly/          # Weekly consolidation (Sundays)
+│   └── 2026-W08.md
+├── monthly/         # Monthly consolidation (1st of month)
+│   └── 2026-02.md
+├── yearly/          # Yearly consolidation (Jan 1st)
+│   └── 2026.md
+├── significant/     # Permanently remembered events (never consolidated)
+│   └── 2026-02-23_first-conversation.md
+└── archive/
+    └── daily/       # Archived daily files after weekly consolidation
+```
+
+### Memory Types
+
+| Type | Description | Created By |
+|------|-------------|------------|
+| **Daily** | Auto-generated conversation summaries | Day-change trigger |
+| **Weekly** | Consolidated from daily entries | Cron (Sunday 5 AM) |
+| **Monthly** | Consolidated from weekly entries | Cron (1st of month 5 AM) |
+| **Yearly** | Consolidated from monthly entries | Cron (January 1st 5 AM) |
+| **Significant** | Emotionally important events, permanently remembered | Entity via `create_significant_memory` tool |
+
+### Trigger
+
+On first message of a new day (detected by date change), the previous day's conversations are summarized into a daily memory.
+
+### Consolidation Schedule
+
+Configured via environment variables:
+- Daily summarization: `PSYCHEROS_MEMORY_HOUR` (default: 4 AM)
+- Weekly: Sunday 5 AM
+- Monthly: 1st of month 5 AM
+- Yearly: January 1st 5 AM
+
+### Instance Tagging
+
+Memories are tagged with `sourceInstance` to track which embodiment created them. This enables instance-aware RAG retrieval.
+
+## RAG Systems
+
+Three RAG systems provide contextual information before each LLM call.
+
+### Memory RAG
+
+Retrieves relevant memories from the hierarchical memory store.
+
+1. **Indexing**: On startup, all memory files are chunked and embedded using HuggingFace `all-MiniLM-L6-v2` (384 dimensions)
+2. **Retrieval**: Before processing each message, top-k chunks are retrieved by similarity
+3. **Instance Boost**: Memories from the same embodiment get +0.1 to similarity score
+4. **Context**: Retrieved memories are injected into the system prompt, explicitly labeled "via RAG" so the entity understands their retrieval mechanism
+5. **Auto-repair**: Startup verification detects vector table sync issues and forces reindex
+
+### Chat RAG
+
+Semantic search over conversation history.
+
+1. **Automatic Indexing**: Every message is embedded when saved (non-blocking)
+2. **Tiered Search**: First searches current conversation; if no good matches (score < 0.5), expands to all conversations
+3. **Relevance Filtering**: Only messages above minimum similarity score (0.3) are included
+4. **Historical Context**: Helps the entity remember what was discussed previously
+
+One-time migration for existing messages:
+```bash
+deno run -A scripts/index-messages.ts
+```
+
+### Graph RAG
+
+Knowledge graph context when MCP is enabled.
+
+1. **Semantic Search**: Queries the knowledge graph for relevant nodes using vector similarity
+2. **Graph Traversal**: Follows edges to find connected concepts (depth 1 by default)
+3. **Context Injection**: Relevant nodes and relationships are formatted and added to the system prompt
+4. **Temporal Awareness**: Nodes include timestamps for when knowledge was learned/confirmed (XML-tagged for LLM context)
+
+Requires `PSYCHEROS_MCP_ENABLED=true`.
+
+### Vector Search Backend
+
+- **Primary**: sqlite-vec extension for efficient vector similarity search
+- **Fallback**: In-memory cosine similarity calculation when sqlite-vec is unavailable
+- **Embeddings**: HuggingFace `all-MiniLM-L6-v2` model (384 dimensions)
+
+## Related Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/memory/mod.ts` | Hierarchical memory system |
+| `src/memory/types.ts` | Memory types with instance tagging |
+| `src/memory/consolidator.ts` | Weekly/monthly/yearly consolidation |
+| `src/memory/summarizer.ts` | Daily summarization |
+| `src/memory/trigger.ts` | Day-change detection |
+| `src/memory/file-writer.ts` | Memory file operations |
+| `src/rag/mod.ts` | RAG retrieval system |
+| `src/rag/embedder.ts` | HuggingFace transformer embeddings |
+| `src/rag/indexer.ts` | Memory indexing with sqlite-vec sync |
+| `src/rag/retriever.ts` | Similarity search with instance boost |
+| `src/rag/conversation.ts` | ChatRAG for chat history |
+| `src/rag/context-builder.ts` | Formats retrieved memories for context |
+| `src/db/vector.ts` | sqlite-vec helpers, serialization, search |

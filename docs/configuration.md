@@ -1,0 +1,93 @@
+# Configuration
+
+All Psycheros configuration is via environment variables. Copy `.env.example` to `.env` and set values as needed.
+
+## Core Settings
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `ZAI_API_KEY` | Yes | — | Z.ai API key |
+| `ZAI_BASE_URL` | No | Z.ai endpoint | API endpoint URL |
+| `ZAI_MODEL` | No | `glm-4.7` | Main model for chat |
+| `ZAI_WORKER_MODEL` | No | `GLM-4.5-Air` | Lightweight model for background tasks (summarization, title generation) |
+| `PSYCHEROS_PORT` | No | `3000` | Server port |
+| `PSYCHEROS_HOST` | No | `0.0.0.0` | Server hostname |
+| `PSYCHEROS_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
+| `PSYCHEROS_TOOLS` | No | (none) | Comma-separated list of enabled tools |
+| `PSYCHEROS_MEMORY_HOUR` | No | `4` | Hour to run daily summarization (0-23) |
+| `PSYCHEROS_SNAPSHOT_HOUR` | No | `3` | Hour to run daily identity snapshots (0-23) |
+| `PSYCHEROS_SNAPSHOT_RETENTION_DAYS` | No | `30` | Days to retain snapshots before cleanup |
+| `TZ` | No | `UTC` | Timezone for message timestamps (e.g., `America/Los_Angeles`) |
+
+## Available Tools
+
+Tools must be explicitly enabled via `PSYCHEROS_TOOLS`. Set to a comma-separated list.
+
+| Tool | Description |
+|------|-------------|
+| `shell` | Execute shell commands |
+| `update_title` | Update conversation titles |
+| `get_metrics` | Retrieve streaming performance metrics |
+| `create_significant_memory` | Create permanent memory files |
+| `sync_mcp` | Sync with entity-core |
+| `append_to_self` | Add knowledge about entity (Tier 1 — append-only) |
+| `append_to_user` | Add knowledge about user (Tier 1) |
+| `append_to_relationship` | Add relationship understanding (Tier 1) |
+| `maintain_identity` | Full identity file maintenance (Tier 2 — includes replace) |
+| `list_identity_snapshots` | View available backups (Tier 2) |
+| `graph_search_nodes` | Search knowledge graph for relevant nodes |
+| `graph_get_node` | Get a specific node by ID |
+| `graph_get_edges` | Get relationships from the graph |
+| `graph_traverse` | Traverse graph from a starting node |
+| `graph_get_subgraph` | Extract a subgraph centered on a node |
+| `graph_stats` | Get knowledge graph statistics |
+
+**Example configurations:**
+```bash
+# Tier 1 identity tools only (safe for everyday use)
+PSYCHEROS_TOOLS=append_to_self,append_to_user,append_to_relationship
+
+# All tools except shell
+PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,append_to_self,append_to_user,append_to_relationship,maintain_identity,list_identity_snapshots,graph_search_nodes,graph_get_node,graph_get_edges,graph_traverse,graph_get_subgraph,graph_stats
+```
+
+## RAG Settings
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PSYCHEROS_RAG_ENABLED` | `true` | Enable RAG memory retrieval |
+| `PSYCHEROS_RAG_MAX_CHUNKS` | `8` | Max memory chunks to retrieve |
+| `PSYCHEROS_RAG_MAX_TOKENS` | `2000` | Max tokens in retrieved context |
+| `PSYCHEROS_RAG_MIN_SCORE` | `0.3` | Minimum similarity score |
+
+## MCP Integration (entity-core)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PSYCHEROS_MCP_ENABLED` | `false` | Enable connection to entity-core |
+| `PSYCHEROS_MCP_COMMAND` | `deno` | Command to spawn entity-core |
+| `PSYCHEROS_MCP_ARGS` | `run -A --unstable-cron <path>/entity-core/src/mod.ts` | Arguments for entity-core |
+| `PSYCHEROS_MCP_INSTANCE` | `psycheros-harness` | Instance ID for this embodiment |
+
+When MCP is enabled, Psycheros:
+- Spawns entity-core as a subprocess on startup
+- Pulls identity files (self, user, relationship, custom) from entity-core
+- Queues changes and syncs back periodically (every 5 minutes)
+- Falls back to local files if MCP is unavailable
+
+## Migration to entity-core
+
+To migrate existing local identity files and memories to entity-core:
+
+```bash
+deno run -A scripts/migrate-to-entity-core.ts --dry-run  # Preview
+deno run -A scripts/migrate-to-entity-core.ts            # Run migration
+```
+
+## Indexing Existing Messages for ChatRAG
+
+```bash
+deno run -A scripts/index-messages.ts           # Index all existing messages
+deno run -A scripts/index-messages.ts --dry-run  # Preview without indexing
+deno run -A scripts/index-messages.ts --force    # Re-index all messages
+```

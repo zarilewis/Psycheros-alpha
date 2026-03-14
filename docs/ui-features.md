@@ -1,0 +1,128 @@
+# UI Features
+
+Detailed documentation for Psycheros web UI features.
+
+## Context Viewer
+
+Built-in debugging tool for inspecting the full context sent to the LLM. Toggle via the code icon (`</>`) in the header.
+
+**Tabs:**
+- **System**: Complete system prompt with identity files and RAG context
+- **RAG**: Retrieved memories and chat history context
+- **Messages**: Conversation history sent to the LLM
+- **Tools**: Available tool definitions with parameters
+- **Metrics**: Context size and estimated token count
+
+Context is captured per message (`LLMContextSnapshot` type in `src/types.ts`) and can be inspected during or after the response. Yielded as the first event in the SSE stream from `EntityTurn.process()`.
+
+## Temporal Awareness
+
+Every message includes an XML-tagged timestamp that the entity can see, enabling understanding of when events occurred and time gaps between messages.
+
+**Format**: `<t>YYYY-MM-DD HH:MM</t>`
+
+XML tags are used so the LLM treats timestamps as structural metadata rather than content to reproduce in responses.
+
+**Example:**
+```
+[user]: <t>2026-03-03 14:22</t> Hey, what did you think about our conversation yesterday?
+[assistant]: <t>2026-03-03 14:23</t> I enjoyed our discussion about...
+[user]: <t>2026-03-05 15:17</t> Can you summarize what we talked about?
+```
+
+**Timezone**: Set `TZ` environment variable (e.g., `TZ=America/Los_Angeles`). Defaults to UTC.
+
+Implemented in `src/entity/loop.ts` via `formatMessageTimestamp()`.
+
+## Stop Generation
+
+During streaming, the Send button transforms into a Stop button with two-tap confirmation to prevent accidental cancellation.
+
+**States:**
+1. **Stop** (orange with warning icon) — initial state during streaming
+2. **Tap again** (pulsing amber) — confirmation required, resets after 3 seconds
+3. **[Stopped]** — shown in the message when generation is halted
+
+**Behavior:**
+- Partial assistant response is **not persisted** when stopped
+- User message **is persisted** (saved before streaming begins)
+- Switching conversations mid-stream also aborts generation
+
+Implemented in `web/js/psycheros.js`: `requestStopGeneration()`, `stopGeneration()`. CSS in `web/css/components.css`.
+
+## Message Editing
+
+Both user and assistant messages can be edited after they're sent.
+
+**Features:**
+- Edit button (pencil icon) appears on hover
+- Inline editing with textarea replacing message content
+- Save/Cancel buttons for confirming or discarding changes
+- Edited messages marked with `[edited]` tag
+- `edited_at` timestamp stored in database
+- ChatRAG re-indexing: edited messages are automatically re-indexed for semantic search
+
+**API:** `PUT /api/messages/:id` with body `{ "content": "...", "conversationId": "..." }`
+
+Implemented in `web/js/psycheros.js` and `src/server/state-changes.ts`.
+
+## Markdown Rendering
+
+Both user and assistant messages render markdown formatting.
+
+- **Server-side**: `renderMarkdown()` in `src/server/markdown.ts` uses `marked` + `DOMPurify`
+- **Client-side**: Raw text shown during streaming, parsed to markdown on `done` event
+- **Supported**: Headers, lists, code blocks, blockquotes, tables, links, emphasis
+- **Dependencies**: `jsdom` provides DOM environment for DOMPurify sanitization
+
+## Appearance Settings
+
+Customizable UI theming accessible via Settings → Appearance in the sidebar.
+
+### Color Themes
+
+8 preset themes: Cosmic, Ocean, Forest, Sunset, Lavender, Midnight, Ember, Frost. Each has distinct accent colors. Custom accent color also available via color picker.
+
+### Background Images
+
+- Upload custom backgrounds (JPEG, PNG, GIF, WebP up to 5MB)
+- Apply backgrounds from URL
+- Gallery with thumbnails, delete support
+- Blur slider (0-20px) and overlay opacity slider (0-100%)
+
+### Glass Effect
+
+Frosted glass (glassmorphism) effect on UI panels when background is active. Uses `backdrop-filter: blur()` with semi-transparent backgrounds. Automatically hides dark overlay when enabled.
+
+### Persistence
+
+Theme preferences stored in localStorage via `web/js/theme.js`. CSS variables in `web/css/tokens.css`.
+
+**API Endpoints:**
+- `GET /api/backgrounds` — list uploaded backgrounds
+- `POST /api/backgrounds` — upload new background
+- `DELETE /api/backgrounds/:filename` — delete background
+- `GET /backgrounds/:filename` — serve background image file
+
+## Knowledge Graph Visualization
+
+Interactive graph viewer for the knowledge graph stored in entity-core. Requires MCP connection (`PSYCHEROS_MCP_ENABLED=true`).
+
+Access via Settings → Knowledge Graph in the sidebar.
+
+**Features:**
+- Create/delete nodes (person, emotion, event, topic, preference, place, goal, health, boundary, tradition, insight)
+- Create edges between selected nodes
+- Search nodes by label/description
+- Filter by node type
+- Zoom/fit controls
+- Node details panel showing connections
+
+Uses vis-network library. Client-side JS in `web/js/graph-view.js`, dynamically loaded when the graph fragment is displayed.
+
+**API Endpoints:**
+- `GET /api/graph` — full graph data
+- `POST /api/graph/nodes` — create node
+- `POST /api/graph/edges` — create edge
+- `DELETE /api/graph/nodes/:id` — delete node
+- `DELETE /api/graph/edges/:id` — delete edge
