@@ -477,12 +477,27 @@ function verifyVectorTableSync(db: Database): void {
 
   if (memoryChunksCount !== vecMemoryCount) {
     console.warn(
-      `[DB] Vector table mismatch: memory_chunks=${memoryChunksCount}, vec_memory_chunks=${vecMemoryCount}. Clearing index to force reindex.`
+      `[DB] Vector table mismatch: memory_chunks=${memoryChunksCount}, vec_memory_chunks=${vecMemoryCount}. Rebuilding vec_memory_chunks.`
     );
-    // Clear both tables to force a full reindex on next startup
     db.exec("DELETE FROM vec_memory_chunks");
-    db.exec("DELETE FROM memory_chunks");
-    db.exec("DELETE FROM indexed_memories");
+
+    const memRows = db
+      .prepare("SELECT rowid, embedding FROM memory_chunks WHERE embedding IS NOT NULL")
+      .all<{ rowid: number; embedding: Uint8Array }>();
+
+    let memRebuilt = 0;
+    for (const row of memRows) {
+      try {
+        db.exec(
+          "INSERT INTO vec_memory_chunks(rowid, embedding) VALUES (?, ?)",
+          [row.rowid, row.embedding]
+        );
+        memRebuilt++;
+      } catch {
+        // Skip rows that fail
+      }
+    }
+    console.log(`[DB] Rebuilt vec_memory_chunks: ${memRebuilt}/${memRows.length} rows restored`);
   }
 
   // Check message_embeddings vs vec_messages
@@ -496,11 +511,27 @@ function verifyVectorTableSync(db: Database): void {
 
   if (messageEmbeddingsCount !== vecMessagesCount) {
     console.warn(
-      `[DB] Vector table mismatch: message_embeddings=${messageEmbeddingsCount}, vec_messages=${vecMessagesCount}. Clearing to force reindex.`
+      `[DB] Vector table mismatch: message_embeddings=${messageEmbeddingsCount}, vec_messages=${vecMessagesCount}. Rebuilding vec_messages from message_embeddings.`
     );
-    // Clear both tables to force reindexing
+    // Rebuild vec_messages from message_embeddings instead of destroying both
     db.exec("DELETE FROM vec_messages");
-    db.exec("DELETE FROM message_embeddings");
-    // Note: We don't need to clear any tracking table here since messages are reindexed on-demand
+
+    const rows = db
+      .prepare("SELECT rowid, embedding FROM message_embeddings WHERE embedding IS NOT NULL")
+      .all<{ rowid: number; embedding: Uint8Array }>();
+
+    let rebuilt = 0;
+    for (const row of rows) {
+      try {
+        db.exec(
+          "INSERT INTO vec_messages(rowid, embedding) VALUES (?, ?)",
+          [row.rowid, row.embedding]
+        );
+        rebuilt++;
+      } catch {
+        // Skip rows that fail (corrupted embeddings, etc.)
+      }
+    }
+    console.log(`[DB] Rebuilt vec_messages: ${rebuilt}/${rows.length} rows restored`);
   }
 }

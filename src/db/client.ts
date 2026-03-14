@@ -7,6 +7,7 @@
 
 import { Database } from "@db/sqlite";
 import { initializeSchema } from "./schema.ts";
+import { getVecVersion } from "./vector.ts";
 import type { Conversation, Message, ToolCall, TurnMetrics } from "../types.ts";
 
 /**
@@ -226,9 +227,18 @@ export class DBClient {
     this.db.exec("BEGIN TRANSACTION");
 
     try {
+      // Clean up vec_messages (vec0 virtual table has no CASCADE support)
+      this.cleanupVecMessages(id);
+
       // Manually cascade: delete metrics first (references both conversations and messages)
       this.db.exec(
         `DELETE FROM turn_metrics WHERE conversation_id = ?`,
+        [id]
+      );
+
+      // Delete message embeddings (before messages, to avoid FK issues)
+      this.db.exec(
+        `DELETE FROM message_embeddings WHERE conversation_id = ?`,
         [id]
       );
 
@@ -272,9 +282,18 @@ export class DBClient {
       let deletedCount = 0;
 
       for (const id of ids) {
+        // Clean up vec_messages (vec0 virtual table has no CASCADE support)
+        this.cleanupVecMessages(id);
+
         // Manually cascade: delete metrics first
         this.db.exec(
           `DELETE FROM turn_metrics WHERE conversation_id = ?`,
+          [id]
+        );
+
+        // Delete message embeddings (before messages, to avoid FK issues)
+        this.db.exec(
+          `DELETE FROM message_embeddings WHERE conversation_id = ?`,
           [id]
         );
 
@@ -297,6 +316,25 @@ export class DBClient {
     } catch (error) {
       this.db.exec("ROLLBACK");
       throw error;
+    }
+  }
+
+  /**
+   * Remove vec_messages entries for a conversation's message_embeddings.
+   * vec0 virtual tables don't support CASCADE, so this must be done manually.
+   */
+  private cleanupVecMessages(conversationId: string): void {
+    // Only needed if sqlite-vec is loaded
+    if (!getVecVersion(this.db)) return;
+
+    const stmt = this.db.prepare(
+      "SELECT rowid FROM message_embeddings WHERE conversation_id = ?"
+    );
+    const rows = stmt.all<{ rowid: number }>(conversationId);
+    stmt.finalize();
+
+    for (const row of rows) {
+      this.db.exec("DELETE FROM vec_messages WHERE rowid = ?", [row.rowid]);
     }
   }
 

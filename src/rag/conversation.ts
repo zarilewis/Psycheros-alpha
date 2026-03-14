@@ -336,6 +336,14 @@ export class ConversationRAG {
       return null;
     }
 
+    // Skip if already indexed
+    const existingStmt = this.db.prepare("SELECT 1 FROM message_embeddings WHERE message_id = ?");
+    const existing = existingStmt.get(messageId);
+    existingStmt.finalize();
+    if (existing) {
+      return null;
+    }
+
     try {
       const embedder = getEmbedder();
       await embedder.initialize();
