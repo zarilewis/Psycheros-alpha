@@ -780,10 +780,23 @@ function handleSSEEvent(eventType, data, messageEl, state) {
       break;
 
     case 'status': {
-      const statusEl = document.createElement('div');
-      statusEl.className = 'status';
-      statusEl.textContent = data;
-      contentContainer.appendChild(statusEl);
+      try {
+        const status = JSON.parse(data);
+        if (status.error) {
+          const errorEl = document.createElement('div');
+          errorEl.className = 'status error';
+          errorEl.style.color = 'var(--c-error)';
+          errorEl.textContent = status.error;
+          contentContainer.appendChild(errorEl);
+          showToast(status.error);
+        }
+      } catch {
+        // Fallback for non-JSON status messages
+        const statusEl = document.createElement('div');
+        statusEl.className = 'status';
+        statusEl.textContent = data;
+        contentContainer.appendChild(statusEl);
+      }
       break;
     }
 

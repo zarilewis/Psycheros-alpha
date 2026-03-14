@@ -36,6 +36,10 @@ export interface LLMConfig {
   presencePenalty?: number;
   /** Default max tokens for responses */
   maxTokens?: number;
+  /** Timeout in ms for the initial API connection (default: 30000) */
+  connectTimeout?: number;
+  /** Timeout in ms for silence between stream chunks (default: 60000) */
+  streamStallTimeout?: number;
 }
 
 // =============================================================================

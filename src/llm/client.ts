@@ -83,7 +83,21 @@ export class LLMClient {
     },
   ): AsyncGenerator<StreamChunk, void, unknown> {
     const request = this.buildRequest(messages, tools, true, options);
+    const streamStallTimeout = this.config.streamStallTimeout ?? 60_000;
+
+    // Log the outgoing request for observability
+    const toolCount = tools?.length ?? 0;
+    const messageCount = messages.length;
+    console.log(
+      `[LLM] Sending request to ${this.config.baseUrl} — model=${this.config.model}, ` +
+      `messages=${messageCount}, tools=${toolCount}, thinking=${this.config.thinkingEnabled}`,
+    );
+    const requestStart = Date.now();
+
     const response = await this.makeRequest(request);
+
+    const connectMs = Date.now() - requestStart;
+    console.log(`[LLM] Connected in ${connectMs}ms — HTTP ${response.status} ${response.statusText}`);
 
     // Record first byte timing if metrics collector is provided
     if (options?.metricsCollector) {
@@ -105,6 +119,11 @@ export class LLMClient {
     let lastFinishReason: string | null = null;
     // Track if we've already emitted a done event
     let doneEmitted = false;
+    // Track content chunks for stall/empty detection
+    let contentChunkCount = 0;
+    // Track consecutive malformed chunks
+    let consecutiveMalformed = 0;
+    const MAX_CONSECUTIVE_MALFORMED = 5;
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -112,7 +131,8 @@ export class LLMClient {
 
     try {
       while (true) {
-        const { done, value } = await reader.read();
+        // Read with stall timeout — if no data arrives for streamStallTimeout ms, abort
+        const { done, value } = await this.readWithTimeout(reader, streamStallTimeout);
 
         if (done) {
           // Flush any remaining bytes from the decoder
@@ -130,10 +150,16 @@ export class LLMClient {
           const chunk = this.parseSSELine(line);
 
           if (chunk === null) {
+            consecutiveMalformed = 0; // Reset on valid (empty/comment) lines
             continue; // Empty line or comment
           }
 
           if (chunk === "done") {
+            const elapsed = Date.now() - requestStart;
+            console.log(
+              `[LLM] Stream complete — ${contentChunkCount} content chunks in ${elapsed}ms, ` +
+              `finish_reason=${lastFinishReason || "stop"}`,
+            );
             // Emit any remaining tool calls before done
             yield* emitAccumulatedToolCalls(toolCallAccumulators);
             // Only emit done if we haven't already (from finish_reason)
@@ -143,6 +169,20 @@ export class LLMClient {
             }
             return;
           }
+
+          if (chunk === "malformed") {
+            consecutiveMalformed++;
+            if (consecutiveMalformed >= MAX_CONSECUTIVE_MALFORMED) {
+              throw new LLMError(
+                `Received ${MAX_CONSECUTIVE_MALFORMED} consecutive malformed SSE chunks from the API — ` +
+                "the upstream response may be corrupted",
+                "MALFORMED_STREAM",
+              );
+            }
+            continue;
+          }
+
+          consecutiveMalformed = 0; // Reset on valid parsed chunk
 
           // Process the chunk
           for (const streamChunk of this.processChunk(
@@ -154,6 +194,9 @@ export class LLMClient {
               lastFinishReason = streamChunk.finishReason;
               // Don't yield the done chunk here - we'll emit it when we see [DONE]
               continue;
+            }
+            if (streamChunk.type === "content" || streamChunk.type === "thinking") {
+              contentChunkCount++;
             }
             // Record chunk timing for metrics
             if (options?.metricsCollector) {
@@ -168,7 +211,7 @@ export class LLMClient {
       // Process any remaining buffer
       if (buffer.trim()) {
         const chunk = this.parseSSELine(buffer);
-        if (chunk && chunk !== "done") {
+        if (chunk && chunk !== "done" && chunk !== "malformed") {
           for (const streamChunk of this.processChunk(
             chunk,
             toolCallAccumulators,
@@ -176,6 +219,9 @@ export class LLMClient {
             if (streamChunk.type === "done") {
               lastFinishReason = streamChunk.finishReason;
               continue;
+            }
+            if (streamChunk.type === "content" || streamChunk.type === "thinking") {
+              contentChunkCount++;
             }
             // Record chunk timing for metrics
             if (options?.metricsCollector) {
@@ -189,13 +235,58 @@ export class LLMClient {
 
       // If we never got a [DONE] signal but the stream ended, emit done now
       if (!doneEmitted) {
+        const elapsed = Date.now() - requestStart;
+        console.warn(
+          `[LLM] Stream ended without [DONE] signal — ${contentChunkCount} content chunks in ${elapsed}ms, ` +
+          `finish_reason=${lastFinishReason || "unknown"}`,
+        );
         // Emit any remaining tool calls
         yield* emitAccumulatedToolCalls(toolCallAccumulators);
         yield { type: "done", finishReason: lastFinishReason || "stop" };
       }
     } finally {
-      reader.releaseLock();
+      try {
+        reader.releaseLock();
+      } catch {
+        // Reader may already be released after cancel() in timeout path
+      }
     }
+  }
+
+  /**
+   * Read from a stream reader with a stall timeout.
+   * If no data arrives within the timeout period, throws an LLMError.
+   */
+  private readWithTimeout(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    timeoutMs: number,
+  ): Promise<ReadableStreamReadResult<Uint8Array>> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        // Cancel the reader to tear down the underlying TCP connection.
+        // This also resolves the pending read() with { done: true },
+        // but since our promise is already rejected, that's a no-op.
+        reader.cancel().catch(() => {});
+        reject(
+          new LLMError(
+            `LLM stream stalled — no data received for ${Math.round(timeoutMs / 1000)}s. ` +
+            "The upstream API may be overloaded or the connection was dropped",
+            "STREAM_STALL_TIMEOUT",
+          ),
+        );
+      }, timeoutMs);
+
+      reader.read().then(
+        (result) => {
+          clearTimeout(timer);
+          resolve(result);
+        },
+        (error) => {
+          clearTimeout(timer);
+          reject(error);
+        },
+      );
+    });
   }
 
   /**
@@ -255,25 +346,39 @@ export class LLMClient {
   }
 
   /**
-   * Make the HTTP request to the API.
+   * Make the HTTP request to the API with a connection timeout.
    *
-   * @throws LLMError on network failures
+   * @throws LLMError on network failures or timeout
    */
   private async makeRequest(request: ChatRequest): Promise<Response> {
+    const connectTimeout = this.config.connectTimeout ?? 30_000;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), connectTimeout);
+
     try {
-      return await fetch(this.config.baseUrl, {
+      const response = await fetch(this.config.baseUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${this.config.apiKey}`,
         },
         body: JSON.stringify(request),
+        signal: controller.signal,
       });
+      return response;
     } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new LLMError(
+          `LLM API connection timed out after ${connectTimeout}ms — the upstream API may be down or unreachable`,
+          "CONNECT_TIMEOUT",
+        );
+      }
       // Wrap network errors in LLMError for consistent error handling
       const message =
         error instanceof Error ? error.message : "Unknown network error";
       throw new LLMError(`Network error: ${message}`, "NETWORK_ERROR");
+    } finally {
+      clearTimeout(timer);
     }
   }
 
@@ -295,6 +400,10 @@ export class LLMClient {
       errorMessage = `${errorMessage}: ${response.statusText}`;
     }
 
+    console.error(
+      `[LLM] API error — HTTP ${response.status}, code=${errorCode || "none"}, message=${errorMessage}`,
+    );
+
     throw new LLMError(errorMessage, errorCode, response.status);
   }
 
@@ -303,7 +412,7 @@ export class LLMClient {
    *
    * @returns The parsed chunk, "done" for end signal, or null for empty/comment lines
    */
-  private parseSSELine(line: string): ChatResponseChunk | "done" | null {
+  private parseSSELine(line: string): ChatResponseChunk | "done" | "malformed" | null {
     const trimmed = line.trim();
 
     // Skip empty lines and comments
@@ -328,9 +437,8 @@ export class LLMClient {
     try {
       return JSON.parse(data) as ChatResponseChunk;
     } catch {
-      // Log but don't throw - malformed chunks can happen
-      console.warn("Failed to parse SSE chunk:", data);
-      return null;
+      console.warn("[LLM] Failed to parse SSE chunk:", data.substring(0, 200));
+      return "malformed";
     }
   }
 

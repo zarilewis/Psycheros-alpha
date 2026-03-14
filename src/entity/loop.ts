@@ -380,7 +380,13 @@ export class EntityTurn {
       } catch (error) {
         // Capture the error but continue to persist what we have
         streamError = error instanceof Error ? error : new Error(String(error));
-        console.error("EntityTurn: LLM stream error:", streamError.message);
+        const errorCode = (error as { code?: string })?.code || "UNKNOWN";
+        const statusCode = (error as { statusCode?: number })?.statusCode;
+        console.error(
+          `[EntityTurn] LLM stream error — code=${errorCode}` +
+          (statusCode ? `, http=${statusCode}` : "") +
+          `: ${streamError.message}`,
+        );
         finishReason = "error";
       }
 

@@ -57,6 +57,33 @@ Full code review covering code quality, error handling, input validation, SQLite
 - **Problem**: 18 catch blocks leaked internal paths to clients
 - **Fix**: Generic messages to clients, real errors logged server-side
 
+## LLM Client Resilience (Session 17)
+
+### No timeout on LLM API fetch (Critical — availability)
+- **Problem**: `fetch()` call to Z.ai API had no timeout. If the API hung or was unreachable, Psycheros would block indefinitely — silent stall, no error, no logging.
+- **Location**: `src/llm/client.ts` — `makeRequest()`
+- **Fix**: Added `AbortController` with 30s connection timeout (configurable via `connectTimeout`). Throws `LLMError` with code `CONNECT_TIMEOUT`.
+
+### No stall detection on streaming response (Critical — availability)
+- **Problem**: `reader.read()` on the SSE stream body had no timeout. If the API accepted the connection (HTTP 200) then stopped sending data mid-stream, the reader blocked indefinitely.
+- **Location**: `src/llm/client.ts` — `chatStream()` read loop
+- **Fix**: Added `readWithTimeout()` wrapper with 60s stall timeout (configurable via `streamStallTimeout`). Cancels the reader on timeout to tear down the TCP connection. Throws `LLMError` with code `STREAM_STALL_TIMEOUT`.
+
+### Silent malformed chunk swallowing (Medium — observability)
+- **Problem**: `parseSSELine()` returned `null` on JSON parse failure, same as empty lines. Consumers silently skipped it. If the API sent consistently malformed data, the user got an empty response with no error.
+- **Location**: `src/llm/client.ts` — `parseSSELine()`
+- **Fix**: Returns `"malformed"` sentinel. After 5 consecutive malformed chunks, throws `LLMError` with code `MALFORMED_STREAM`.
+
+### Generic error message hid failure category (Medium — observability)
+- **Problem**: All LLM errors surfaced as `"An error occurred while processing your message"` — no distinction between timeout, network failure, rate limit, auth error, or server error. Status event sent raw JSON that the client displayed as a string.
+- **Location**: `src/server/routes.ts` — chat catch block; `web/js/psycheros.js` — status event handler
+- **Fix**: Error switch in routes.ts maps error codes to descriptive user-facing messages. Client-side parses JSON status events and displays error text with toast notification.
+
+### No logging on LLM request lifecycle (Low — observability)
+- **Problem**: Zero log output between context-loading and error catch. Impossible to tell from logs whether a request was sent, when connection established, or how long streaming took.
+- **Location**: `src/llm/client.ts`
+- **Fix**: Added `[LLM]` tagged logging: request send (model, message count, tools), connect timing, stream completion stats, abnormal stream termination warnings.
+
 ## Known Issues (deferred)
 
 ### Type errors in `src/tools/graph-read.ts`

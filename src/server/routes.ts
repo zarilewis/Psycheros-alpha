@@ -835,14 +835,49 @@ export async function handleChat(
           return;
         }
 
-        // If EntityTurn doesn't exist yet, send an error event
-        const errorMessage = "An error occurred while processing your message";
-        console.error("[Routes] Chat streaming error:", error);
+        // Extract structured error info for logging
+        const errorCode = (error as { code?: string })?.code || "UNKNOWN";
+        const statusCode = (error as { statusCode?: number })?.statusCode;
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error(
+          `[Routes] Chat streaming error — code=${errorCode}` +
+          (statusCode ? `, http=${statusCode}` : "") +
+          `: ${errorMsg}`,
+        );
 
-        // Send error as a status event
+        // Build a user-facing message that includes the error category
+        // without leaking sensitive internal details
+        let userMessage: string;
+        switch (errorCode) {
+          case "CONNECT_TIMEOUT":
+            userMessage = "The AI service did not respond in time. It may be temporarily unavailable — please try again.";
+            break;
+          case "STREAM_STALL_TIMEOUT":
+            userMessage = "The AI response stalled mid-stream. The service may be overloaded — please try again.";
+            break;
+          case "NETWORK_ERROR":
+            userMessage = "Could not reach the AI service. Please check your connection and try again.";
+            break;
+          case "MALFORMED_STREAM":
+            userMessage = "Received corrupted data from the AI service. Please try again.";
+            break;
+          default:
+            if (statusCode && statusCode >= 500) {
+              userMessage = `The AI service returned an error (HTTP ${statusCode}). Please try again later.`;
+            } else if (statusCode === 429) {
+              userMessage = "Rate limited by the AI service. Please wait a moment and try again.";
+            } else if (statusCode === 401 || statusCode === 403) {
+              userMessage = "Authentication error with the AI service. Check your API key configuration.";
+            } else {
+              userMessage = "An error occurred while processing your message.";
+            }
+            break;
+        }
+
+        // Send error as a status event with descriptive message and code
         controller.enqueue({
           type: "status",
-          data: JSON.stringify({ error: errorMessage }),
+          data: JSON.stringify({ error: userMessage, errorCode }),
         });
 
         // Send done event
