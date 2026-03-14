@@ -10,7 +10,6 @@ import { join, dirname, fromFileUrl } from "@std/path";
 
 // Track extension loading state
 let extensionLoaded = false;
-let loadError: string | null = null;
 
 /**
  * Get the path to the sqlite-vec extension file.
@@ -78,7 +77,6 @@ export function loadVectorExtension(db: Database): boolean {
     }
 
     // Native extension not available — fall back to in-memory cosine similarity
-    loadError = "sqlite-vec extension not found at expected path";
     console.warn("[Vector] sqlite-vec extension not available.");
     console.warn("[Vector] Vector search will fall back to in-memory calculation.");
     db.enableLoadExtension = false;

@@ -125,11 +125,26 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 |--------|------|-------------|
 | `POST` | `/api/mcp/sync` | Manually trigger MCP sync |
 
+### System Admin
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/fragments/admin` | Admin hub with tab navigation |
+| `GET` | `/fragments/admin/diagnostics` | Diagnostics dashboard HTML fragment |
+| `GET` | `/fragments/admin/logs` | Log viewer HTML fragment |
+| `GET` | `/api/admin/diagnostics` | JSON diagnostics snapshot (all subsystems) |
+| `GET` | `/api/admin/logs` | JSON log entries with filtering (`?level=`, `?component=`, `?limit=`, `?since=`) |
+| `GET` | `/api/admin/logs/entries` | HTML partial of log entries (same query params as above) |
+
 ## Related Source Files
 
 | File | Purpose |
 |------|---------|
 | `src/server/routes.ts` | All API endpoint handlers |
+| `src/server/admin-routes.ts` | Admin panel route handlers |
+| `src/server/admin-templates.ts` | Admin panel HTML rendering |
+| `src/server/diagnostics.ts` | Diagnostics snapshot aggregation |
+| `src/server/logger.ts` | Log capture ring buffer |
 | `src/server/sse.ts` | SSE encoding utilities |
 | `src/server/broadcaster.ts` | Persistent SSE channel (EventBroadcaster) |
 | `src/server/state-changes.ts` | Unified state mutations |

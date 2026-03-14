@@ -14,6 +14,7 @@ import { renderAdminHub, renderAdminLogs, renderLogEntries, renderAdminDiagnosti
 
 const HTML_HEADERS = { "Content-Type": "text/html; charset=utf-8" };
 const JSON_HEADERS = { "Content-Type": "application/json" };
+const VALID_LEVELS = new Set<LogLevel>(["debug", "info", "warn", "error"]);
 
 /**
  * GET /fragments/admin — Admin hub with sub-navigation.
@@ -45,13 +46,14 @@ export async function handleAdminDiagnosticsFragment(ctx: RouteContext): Promise
  * Query params: level, component, limit, since
  */
 export function handleAdminLogsAPI(_ctx: RouteContext, url: URL): Response {
-  const level = url.searchParams.get("level") as LogLevel | null;
+  const rawLevel = url.searchParams.get("level");
+  const level: LogLevel | undefined = rawLevel && VALID_LEVELS.has(rawLevel as LogLevel) ? rawLevel as LogLevel : undefined;
   const component = url.searchParams.get("component");
   const limit = parseInt(url.searchParams.get("limit") || "100");
   const since = url.searchParams.get("since");
 
   const entries = queryLogs({
-    level: level || undefined,
+    level,
     component: component || undefined,
     limit: isNaN(limit) ? 100 : limit,
     since: since || undefined,
@@ -68,13 +70,14 @@ export function handleAdminLogsAPI(_ctx: RouteContext, url: URL): Response {
  * Query params: level, component, limit, since
  */
 export function handleAdminLogEntriesAPI(_ctx: RouteContext, url: URL): Response {
-  const level = url.searchParams.get("level") as LogLevel | null;
+  const rawLevel = url.searchParams.get("level");
+  const level: LogLevel | undefined = rawLevel && VALID_LEVELS.has(rawLevel as LogLevel) ? rawLevel as LogLevel : undefined;
   const component = url.searchParams.get("component");
   const limit = parseInt(url.searchParams.get("limit") || "100");
   const since = url.searchParams.get("since");
 
   const entries = queryLogs({
-    level: level || undefined,
+    level,
     component: component || undefined,
     limit: isNaN(limit) ? 100 : limit,
     since: since || undefined,

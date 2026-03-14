@@ -104,6 +104,39 @@ Theme preferences stored in localStorage via `web/js/theme.js`. CSS variables in
 - `DELETE /api/backgrounds/:filename` — delete background
 - `GET /backgrounds/:filename` — serve background image file
 
+## System Admin Panel
+
+Built-in diagnostics and log viewer for inspecting system health without shell access. Access via Settings → System Admin.
+
+### Diagnostics Dashboard
+
+Aggregates health data from 7 subsystems into a single view:
+
+- **Overview**: Uptime, active SSE clients, database file size
+- **Database**: Row counts for conversations, messages, lorebooks, lorebook_entries, memory_summaries
+- **Vector System**: sqlite-vec availability/version, sync status between main tables and vec0 virtual tables
+- **RAG**: Enabled status, indexed file count, chunk count
+- **Memory Consolidation**: Enabled status, summary counts by granularity (daily/weekly/monthly/yearly), summarized chat count
+- **MCP (entity-core)**: Connection status, last sync timestamp, pending identity/memory count
+- **Knowledge Graph**: Node and edge counts
+
+Data cached for 5 seconds to avoid hammering SQLite on rapid refreshes. Manual refresh via button.
+
+### Log Viewer
+
+Ring buffer capturing the last 1,000 log entries from all `console.*` calls. Component tags are parsed from `[Bracket]` prefixes in log messages.
+
+**Filtering:**
+- By level (Error, Warning, Info)
+- By component tag (DB, RAG, MCP, Server, etc.)
+- By entry count limit (50, 100, 250, 500)
+
+**Copy to clipboard** formats logs as markdown with a fenced code block — designed for pasting into an LLM for analysis. Diagnostics copy produces structured markdown with sections matching the dashboard.
+
+Timestamps render in the browser's local timezone (not the server's).
+
+**Source files:** `src/server/logger.ts`, `src/server/diagnostics.ts`, `src/server/admin-routes.ts`, `src/server/admin-templates.ts`, `web/js/admin.js`, `web/css/admin.css`
+
 ## Knowledge Graph Visualization
 
 Interactive graph viewer for the knowledge graph stored in entity-core. Requires MCP connection (`PSYCHEROS_MCP_ENABLED=true`).

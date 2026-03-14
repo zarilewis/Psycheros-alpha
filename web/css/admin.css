@@ -3,9 +3,34 @@
  *
  * Styles for the system admin/debug panel.
  * Uses design tokens from tokens.css.
+ * Follows the Phosphor Terminal aesthetic: accent-color aware,
+ * glow effects, mono typography for data.
  */
 
-/* Navigation tabs */
+/* ==========================================================================
+   Animations
+   ========================================================================== */
+
+@keyframes adminFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes adminStatusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ==========================================================================
+   Navigation Tabs
+   ========================================================================== */
+
 .admin-nav {
   display: flex;
   gap: var(--sp-2);
@@ -20,12 +45,14 @@
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
   background: none;
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
   color: var(--c-fg-muted);
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   cursor: pointer;
-  transition: color var(--transition), background var(--transition);
+  transition: color var(--transition), background var(--transition),
+              border-color var(--transition), box-shadow var(--transition);
 }
 
 .admin-nav-tab:hover {
@@ -33,26 +60,46 @@
   background: var(--c-bg-hover);
 }
 
+.admin-nav-tab:active {
+  transform: scale(0.98);
+}
+
 .admin-nav-tab.active {
   color: var(--c-accent);
   background: var(--c-accent-subtle);
+  border-color: var(--c-accent);
 }
 
-/* Sections */
+/* ==========================================================================
+   Panel Entrance
+   ========================================================================== */
+
+#admin-content {
+  animation: adminFadeIn 0.15s ease both;
+}
+
+/* ==========================================================================
+   Sections
+   ========================================================================== */
+
 .admin-section {
   margin-bottom: var(--sp-6);
 }
 
 .admin-section-title {
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   font-weight: 600;
   color: var(--c-fg-muted);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   margin-bottom: var(--sp-3);
 }
 
-/* Stats grid */
+/* ==========================================================================
+   Stats Grid
+   ========================================================================== */
+
 .admin-stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -68,42 +115,69 @@
   background: var(--c-bg-raised);
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
+  transition: border-color var(--transition), background var(--transition),
+              box-shadow var(--transition);
+}
+
+.admin-stat:hover {
+  border-color: var(--c-accent);
+  background: var(--c-bg-hover);
+  box-shadow: var(--glow-accent);
 }
 
 .admin-stat-label {
+  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--c-fg-subtle);
+  letter-spacing: 0.02em;
 }
 
 .admin-stat-value {
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   font-weight: 500;
   color: var(--c-fg);
   display: flex;
   align-items: center;
   gap: var(--sp-2);
+  transition: color var(--transition);
 }
 
-/* Status dots */
+.admin-stat:hover .admin-stat-value {
+  color: var(--c-accent);
+}
+
+/* ==========================================================================
+   Status Dots
+   ========================================================================== */
+
 .admin-status-dot {
   display: inline-block;
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .admin-status-ok {
-  background: #22c55e;
+  background: var(--c-accent);
+  box-shadow: 0 0 6px var(--c-accent-glow);
+  animation: adminStatusPulse 2s ease-in-out infinite;
 }
 
 .admin-status-error {
   background: var(--c-error);
+  box-shadow: 0 0 6px rgba(255, 68, 68, 0.3);
 }
 
-/* Tables */
+/* ==========================================================================
+   Tables
+   ========================================================================== */
+
 .admin-table {
   width: 100%;
   border-collapse: collapse;
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
 }
 
@@ -114,6 +188,8 @@
   color: var(--c-fg-subtle);
   font-weight: 500;
   font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .admin-table td {
@@ -122,18 +198,67 @@
   color: var(--c-fg);
 }
 
-/* Footer */
+.admin-table tbody tr {
+  transition: background var(--transition);
+}
+
+.admin-table tbody tr:hover {
+  background: var(--c-bg-hover);
+}
+
+/* ==========================================================================
+   Footer
+   ========================================================================== */
+
 .admin-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding-top: var(--sp-3);
   border-top: 1px solid var(--c-border);
 }
 
 .admin-footer-ts {
+  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--c-fg-subtle);
 }
 
-/* Log viewer */
+/* ==========================================================================
+   Refresh Button
+   ========================================================================== */
+
+.admin-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  background: var(--c-bg-raised);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  color: var(--c-fg-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition),
+              background var(--transition), box-shadow var(--transition);
+}
+
+.admin-refresh-btn:hover {
+  color: var(--c-accent);
+  border-color: var(--c-accent-muted);
+  background: var(--c-bg-hover);
+  box-shadow: var(--glow-accent);
+}
+
+.admin-refresh-btn:active {
+  transform: scale(0.98);
+}
+
+/* ==========================================================================
+   Log Viewer — Controls
+   ========================================================================== */
+
 .admin-log-controls {
   display: flex;
   flex-wrap: wrap;
@@ -144,23 +269,26 @@
 
 .admin-select {
   padding: var(--sp-2) var(--sp-3);
-  background: var(--c-bg-raised);
+  background: var(--c-bg-sunken);
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
   color: var(--c-fg);
+  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
+  transition: border-color var(--transition), box-shadow var(--transition);
 }
 
-.admin-checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--font-size-xs);
-  color: var(--c-fg-muted);
-  cursor: pointer;
+.admin-select:focus {
+  outline: none;
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px var(--c-accent-subtle), var(--glow-accent);
 }
 
-/* Log entries */
+
+/* ==========================================================================
+   Log Viewer — Entries
+   ========================================================================== */
+
 .admin-log-list {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
@@ -168,6 +296,27 @@
   overflow-y: auto;
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
+
+  /* Dark scrollbar */
+  scrollbar-width: thin;
+  scrollbar-color: var(--c-border-strong) transparent;
+}
+
+.admin-log-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-log-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-log-list::-webkit-scrollbar-thumb {
+  background: var(--c-border-strong);
+  border-radius: 3px;
+}
+
+.admin-log-list::-webkit-scrollbar-thumb:hover {
+  background: var(--c-fg-subtle);
 }
 
 .admin-log-row {
@@ -175,7 +324,13 @@
   gap: var(--sp-3);
   padding: 3px var(--sp-3);
   border-bottom: 1px solid var(--c-border);
+  border-left: 2px solid transparent;
   align-items: baseline;
+  transition: background var(--transition);
+}
+
+.admin-log-row:hover {
+  background: var(--c-bg-hover);
 }
 
 .admin-log-row:last-child {
@@ -212,11 +367,80 @@
 .admin-log-warn .admin-log-level-badge { color: #f59e0b; }
 .admin-log-info .admin-log-level-badge { color: #3b82f6; }
 
-.admin-log-error { background: rgba(255, 68, 68, 0.05); }
+.admin-log-error {
+  background: rgba(255, 68, 68, 0.05);
+  border-left-color: var(--c-error);
+}
+
+.admin-log-warn {
+  background: rgba(245, 158, 11, 0.05);
+  border-left-color: #f59e0b;
+}
+
+/* ==========================================================================
+   Empty State
+   ========================================================================== */
 
 .admin-empty {
   padding: var(--sp-6);
   text-align: center;
   color: var(--c-fg-subtle);
+  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
+}
+
+/* ==========================================================================
+   Mobile Responsive
+   ========================================================================== */
+
+@media (max-width: 600px) {
+  /* Kill inner scroll — let settings-content handle all scrolling */
+  .admin-log-list {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  /* Log rows: stack vertically instead of horizontal flex */
+  .admin-log-row {
+    flex-wrap: wrap;
+    gap: var(--sp-1);
+    padding: var(--sp-2) var(--sp-3);
+  }
+
+  .admin-log-time {
+    min-width: auto;
+  }
+
+  .admin-log-message {
+    flex-basis: 100%;
+    padding-left: 0;
+  }
+
+  /* Stats grid: 2 columns on narrow screens */
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Tables: horizontal scroll wrapper */
+  .admin-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Footer: wrap buttons below timestamp */
+  .admin-footer {
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+
+  /* Controls: full-width selects */
+  .admin-log-controls {
+    gap: var(--sp-2);
+  }
+
+  .admin-select {
+    flex: 1;
+    min-width: 0;
+  }
 }

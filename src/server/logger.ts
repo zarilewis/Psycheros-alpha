@@ -54,6 +54,7 @@ let originalLog: typeof console.log;
 let originalWarn: typeof console.warn;
 let originalError: typeof console.error;
 let originalInfo: typeof console.info;
+let originalDebug: typeof console.debug;
 
 let initialized = false;
 
@@ -113,6 +114,7 @@ export function initLogCapture(): void {
   originalWarn = console.warn;
   originalError = console.error;
   originalInfo = console.info;
+  originalDebug = console.debug;
 
   console.log = (...args: unknown[]) => {
     addEntry("info", args);
@@ -132,6 +134,11 @@ export function initLogCapture(): void {
   console.error = (...args: unknown[]) => {
     addEntry("error", args);
     originalError.apply(console, args);
+  };
+
+  console.debug = (...args: unknown[]) => {
+    addEntry("debug", args);
+    originalDebug.apply(console, args);
   };
 }
 

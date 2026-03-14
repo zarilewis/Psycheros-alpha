@@ -16,18 +16,22 @@ import { escapeHtml } from "./templates.ts";
  */
 export function renderAdminHub(): string {
   return `<div class="settings-view">
+  <script src="/js/admin.js"></script>
   <div class="settings-header">
-    <button class="back-button"
-      hx-get="/fragments/settings"
-      hx-target="#chat"
-      hx-swap="innerHTML">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="15 18 9 12 15 6"/>
-      </svg>
-      Back to Settings
-    </button>
-    <h1 class="settings-title">System Admin</h1>
-    <p class="settings-desc">System health monitoring, logs, and diagnostics</p>
+    <div class="settings-header-row">
+      <a class="settings-back-btn"
+        hx-get="/fragments/settings"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </a>
+      <div>
+        <h1 class="settings-title">System Admin</h1>
+        <p class="settings-desc">System health monitoring, logs, and diagnostics</p>
+      </div>
+    </div>
   </div>
   <div class="settings-content" id="settings-content">
     <div class="admin-nav">
@@ -109,10 +113,7 @@ export function renderAdminDiagnostics(snapshot: DiagnosticsSnapshot): string {
     ? `${snapshot.knowledgeGraph.stats.totalNodes} nodes, ${snapshot.knowledgeGraph.stats.totalEdges} edges`
     : "unavailable";
 
-  return `<div class="admin-diagnostics"
-  hx-get="/fragments/admin/diagnostics"
-  hx-trigger="every 10s"
-  hx-swap="innerHTML">
+  return `<div class="admin-diagnostics">
 
   <div class="admin-section">
     <h3 class="admin-section-title">Overview</h3>
@@ -254,7 +255,24 @@ export function renderAdminDiagnostics(snapshot: DiagnosticsSnapshot): string {
   </div>
 
   <div class="admin-footer">
-    <span class="admin-footer-ts">Last updated: ${new Date(snapshot.timestamp).toLocaleTimeString()}</span>
+    <span class="admin-footer-ts">Last updated: <time class="admin-local-time" datetime="${snapshot.timestamp}">${snapshot.timestamp}</time></span>
+    <button class="admin-refresh-btn"
+      hx-get="/fragments/admin/diagnostics"
+      hx-target="#admin-content"
+      hx-swap="innerHTML">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"/>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+      </svg>
+      Refresh
+    </button>
+    <button class="admin-refresh-btn" onclick="window.adminCopyDiagnostics(this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+      Copy
+    </button>
   </div>
 </div>`;
 }
@@ -269,7 +287,6 @@ export function renderAdminLogs(entries: LogEntry[], components: string[]): stri
     .join("");
 
   return `<div class="admin-logs">
-  <script src="/js/admin.js"></script>
   <div class="admin-log-controls">
     <select id="admin-log-level" class="admin-select"
       onchange="window.adminRefreshLogs()">
@@ -290,20 +307,29 @@ export function renderAdminLogs(entries: LogEntry[], components: string[]): stri
       <option value="250">250 entries</option>
       <option value="500">500 entries</option>
     </select>
-    <label class="admin-checkbox-label">
-      <input type="checkbox" id="admin-log-auto" checked
-        onchange="window.adminToggleAutoRefresh(this.checked)">
-      Auto-refresh
-    </label>
+    <button class="admin-refresh-btn" onclick="window.adminRefreshLogs()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"/>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+      </svg>
+      Refresh
+    </button>
+    <button class="admin-refresh-btn" onclick="window.adminCopyLogs(this)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+      </svg>
+      Copy
+    </button>
   </div>
-  <div id="admin-log-entries">
+  <div class="admin-log-list" id="admin-log-entries">
     ${renderLogEntries(entries)}
   </div>
 </div>`;
 }
 
 /**
- * Render log entries as HTML table rows.
+ * Render log entries as HTML row divs.
  * Used both in initial render and HTMX partial updates.
  */
 export function renderLogEntries(entries: LogEntry[]): string {
@@ -313,14 +339,13 @@ export function renderLogEntries(entries: LogEntry[]): string {
 
   const rows = entries.map((entry) => {
     const levelClass = `admin-log-${entry.level}`;
-    const time = new Date(entry.timestamp).toLocaleTimeString();
     return `<div class="admin-log-row ${levelClass}">
-      <span class="admin-log-time">${time}</span>
+      <span class="admin-log-time"><time class="admin-local-time" datetime="${entry.timestamp}">${entry.timestamp}</time></span>
       <span class="admin-log-level-badge">${entry.level.toUpperCase()}</span>
       <span class="admin-log-component">${escapeHtml(entry.component)}</span>
       <span class="admin-log-message">${escapeHtml(entry.message)}</span>
     </div>`;
   }).join("");
 
-  return `<div class="admin-log-list">${rows}</div>`;
+  return rows;
 }
