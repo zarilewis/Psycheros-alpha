@@ -42,6 +42,11 @@ RUN cd /app/Psycheros && deno install --entrypoint src/main.ts \
 RUN cd /app/Psycheros && deno cache npm:@huggingface/transformers@3.3.1 \
     && deno cache "npm:sqlite-vec@0.0.1-alpha.9" || true
 
+# Warm-start both apps to cache any remaining transitive JSR deps
+# (e.g. @denosaurs/plug → @std/path@0.217.0 pulled by @db/sqlite)
+RUN cd /app/entity-core && timeout 5s deno run -A --unstable-cron src/mod.ts || true
+RUN cd /app/Psycheros && timeout 10s deno run -A --unstable-cron src/main.ts || true
+
 # Create volume-mounted directories (will be overlaid by volume mounts)
 RUN mkdir -p \
     /app/Psycheros/.snapshots \
