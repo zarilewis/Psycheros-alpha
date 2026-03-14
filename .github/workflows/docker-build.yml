@@ -63,9 +63,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          # GHA cache disabled — was serving stale layers that missed
-          # the deno cache commands for dynamic imports, causing ~80 npm
-          # re-downloads at container startup. Re-enable once a clean
-          # build confirms the fix, then stale cache entries will age out.
-          # cache-from: type=gha
-          # cache-to: type=gha,mode=max
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
