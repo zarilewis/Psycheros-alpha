@@ -56,6 +56,8 @@ RUN mkdir -p \
 EXPOSE 3000
 
 # Default environment — MCP wired up for single-container layout
+# Force UTC to prevent local-time Date methods from drifting
+ENV TZ=UTC
 ENV PSYCHEROS_HOST=0.0.0.0
 ENV PSYCHEROS_PORT=3000
 ENV PSYCHEROS_MCP_ENABLED=true

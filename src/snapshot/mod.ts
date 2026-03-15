@@ -312,7 +312,7 @@ export async function cleanupOldSnapshots(
   retentionDays: number
 ): Promise<SnapshotCleanupResult> {
   const cutoffDate = new Date();
-  cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+  cutoffDate.setUTCDate(cutoffDate.getUTCDate() - retentionDays);
 
   let deleted = 0;
   let kept = 0;

@@ -28,22 +28,22 @@ function getPreviousPeriodStart(granularity: "weekly" | "monthly" | "yearly", no
   switch (granularity) {
     case "weekly": {
       // Get start of previous week (Monday)
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1) - 7;
-      d.setDate(diff);
-      d.setHours(0, 0, 0, 0);
+      const day = d.getUTCDay();
+      const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1) - 7;
+      d.setUTCDate(diff);
+      d.setUTCHours(0, 0, 0, 0);
       return d;
     }
     case "monthly": {
       // Get start of previous month
-      d.setMonth(d.getMonth() - 1, 1);
-      d.setHours(0, 0, 0, 0);
+      d.setUTCMonth(d.getUTCMonth() - 1, 1);
+      d.setUTCHours(0, 0, 0, 0);
       return d;
     }
     case "yearly": {
       // Get start of previous year
-      d.setFullYear(d.getFullYear() - 1, 0, 1);
-      d.setHours(0, 0, 0, 0);
+      d.setUTCFullYear(d.getUTCFullYear() - 1, 0, 1);
+      d.setUTCHours(0, 0, 0, 0);
       return d;
     }
   }
@@ -86,10 +86,10 @@ async function hasUnconsolidatedFiles(
       if (match) {
         fileDateStr = match[1];
         const [year, week] = match[1].split("-W").map(Number);
-        const simple = new Date(year, 0, 1 + (week - 1) * 7);
-        const dayOfWeek = simple.getDay();
+        const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
+        const dayOfWeek = simple.getUTCDay();
         fileDate = new Date(simple);
-        fileDate.setDate(simple.getDate() - dayOfWeek + 1);
+        fileDate.setUTCDate(simple.getUTCDate() - dayOfWeek + 1);
       }
     } else if (sourceGranularity === "monthly") {
       // Match both monthly/YYYY-MM.md and archive/monthly/YYYY-MM.md
@@ -125,14 +125,14 @@ function getTargetDateInfo(
   granularity: Granularity,
   sourceDate: Date
 ): { filePath: string; dateStr: string } {
-  const year = sourceDate.getFullYear();
-  const month = String(sourceDate.getMonth() + 1).padStart(2, "0");
+  const year = sourceDate.getUTCFullYear();
+  const month = String(sourceDate.getUTCMonth() + 1).padStart(2, "0");
 
   switch (granularity) {
     case "weekly": {
-      const jan1 = new Date(year, 0, 1);
+      const jan1 = new Date(Date.UTC(year, 0, 1));
       const daysDiff = Math.floor((sourceDate.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000));
-      const weekNum = String(Math.ceil((daysDiff + jan1.getDay() + 1) / 7)).padStart(2, "0");
+      const weekNum = String(Math.ceil((daysDiff + jan1.getUTCDay() + 1) / 7)).padStart(2, "0");
       const dateStr = `${year}-W${weekNum}`;
       return { filePath: `weekly/${dateStr}.md`, dateStr };
     }

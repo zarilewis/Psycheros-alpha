@@ -356,8 +356,8 @@ export async function summarizePreviousDay(
   config?: Partial<SummarizerConfig>
 ): Promise<MemoryFile | null> {
   const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  yesterday.setHours(0, 0, 0, 0);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  yesterday.setUTCHours(0, 0, 0, 0);
 
   return await summarizeDay(yesterday, db, projectRoot, config);
 }
@@ -390,7 +390,7 @@ export async function consolidateWeek(
   // Filter to files from this week
   const weekStart = getWeekStart(weekDate);
   const weekEnd = new Date(weekStart);
-  weekEnd.setDate(weekEnd.getDate() + 6);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
 
   const weekFiles: string[] = [];
   for (const file of dailyFiles) {
@@ -484,10 +484,10 @@ export async function consolidateWeek(
  */
 function getWeekStart(date: Date): Date {
   const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
+  const day = d.getUTCDay();
+  const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
+  d.setUTCDate(diff);
+  d.setUTCHours(0, 0, 0, 0);
   return d;
 }
 
@@ -495,8 +495,7 @@ function getWeekStart(date: Date): Date {
  * Get the start of the month for a given date.
  */
 function getMonthStart(date: Date): Date {
-  const d = new Date(date.getFullYear(), date.getMonth(), 1);
-  d.setHours(0, 0, 0, 0);
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
   return d;
 }
 
@@ -527,8 +526,8 @@ export async function consolidateMonth(
   // Filter to files from this month
   const monthStart = getMonthStart(monthDate);
   const monthEnd = new Date(monthStart);
-  monthEnd.setMonth(monthEnd.getMonth() + 1);
-  monthEnd.setDate(monthEnd.getDate() - 1);
+  monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
+  monthEnd.setUTCDate(monthEnd.getUTCDate() - 1);
 
   const monthFiles: string[] = [];
   for (const file of weeklyFiles) {
@@ -538,11 +537,11 @@ export async function consolidateMonth(
       // Parse week file date - get the Monday of that ISO week
       const weekStr = match[1];
       const [year, week] = weekStr.split("-W").map(Number);
-      const simple = new Date(year, 0, 1 + (week - 1) * 7);
-      const dayOfWeek = simple.getDay();
+      const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
+      const dayOfWeek = simple.getUTCDay();
       const weekStart = new Date(simple);
-      weekStart.setDate(simple.getDate() - dayOfWeek + 1);
-      weekStart.setHours(0, 0, 0, 0);
+      weekStart.setUTCDate(simple.getUTCDate() - dayOfWeek + 1);
+      weekStart.setUTCHours(0, 0, 0, 0);
 
       if (weekStart >= monthStart && weekStart <= monthEnd) {
         monthFiles.push(file);
@@ -650,7 +649,7 @@ export async function consolidateYear(
   const monthlyFiles = await listMemoryFiles("monthly", projectRoot, true);
 
   // Filter to files from this year
-  const year = yearDate.getFullYear();
+  const year = yearDate.getUTCFullYear();
   const yearFiles: string[] = [];
   for (const file of monthlyFiles) {
     // Match both monthly/YYYY-MM.md and archive/monthly/YYYY-MM.md

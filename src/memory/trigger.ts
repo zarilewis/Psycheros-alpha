@@ -33,7 +33,7 @@ export async function catchUpSummarization(
   // Get all dates with messages that haven't been summarized
   const unsummarizedDates = db.getUnsummarizedDates();
 
-  // Get today's date to skip it (still in progress)
+  // Get today's date in UTC to skip it (still in progress)
   const today = new Date().toISOString().split("T")[0];
 
   let summarized = 0;
