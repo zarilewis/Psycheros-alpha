@@ -101,6 +101,28 @@ Full code review covering code quality, error handling, input validation, SQLite
 - Fix: Added `fromLabel`/`toLabel` support with label-to-ID resolution via `getGraphNodes()` (exact case-insensitive match). Clear error messages for missing nodes.
 - Initial fix used `searchGraphNodes()` (semantic search) which failed for short proper nouns — switched to direct node list lookup
 
+### Phase 4: Resource Finalization & Startup Safety (Session 27)
+
+#### FIXED: MCP connect race condition — fire-and-forget startup
+- **Severity**: High — `mcpClient.connect()` was not awaited; server init ran in parallel. First request after startup could fail if MCP handshake hadn't completed.
+- **Location**: `src/main.ts:108`
+- **Fix**: `await mcpClient.connect()` with try/catch. Offline fallback behavior preserved.
+
+#### FIXED: Prepared statements not finalized on error paths
+- **Severity**: Medium (resource leak) — `stmt.get()`/`stmt.run()` could throw before `stmt.finalize()`, leaking statement handles
+- **Locations**: `src/entity/loop.ts:339`, `src/lorebook/state-manager.ts:92`
+- **Fix**: Wrapped in try/finally blocks for guaranteed finalization
+
+#### FIXED: Shell tool abort listener leak
+- **Severity**: Medium (memory leak) — abort event listener registered without `{ once: true }`, never removed on normal completion
+- **Location**: `src/tools/shell.ts:98`
+- **Fix**: Added `{ once: true }` option to `addEventListener`
+
+#### FIXED: MCP transport not cleaned up on connect failure
+- **Severity**: Medium (resource leak) — if `client.connect()` threw, transport and client objects were left dangling
+- **Location**: `src/mcp-client/mod.ts:164`
+- **Fix**: Cleanup in catch block: `client.close()`, then null both references
+
 ## Confirmed Safe Patterns
 
 - All SQLite queries are parameterized
@@ -108,5 +130,6 @@ Full code review covering code quality, error handling, input validation, SQLite
 - `isValidFilename()` properly checks for path traversal
 - Background upload generates safe filenames server-side
 - Background delete handler regex blocks traversal after URL decoding
+- Prepared statements wrapped in try/finally for guaranteed finalization
 
 See also: [security-audit.md](security-audit.md) for the full security assessment.
