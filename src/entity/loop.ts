@@ -372,15 +372,16 @@ export class EntityTurn {
     // Track current iteration for tool loop protection
     let iteration = 0;
 
+    // Retry configuration for transient upstream errors (e.g. Z.ai "network_error").
+    // Z.ai's failure already takes ~30s, so we use a short fixed delay between retries
+    // rather than exponential backoff — the API already "waited" for us.
+    const MAX_LLM_ATTEMPTS = 3;
+    const RETRY_DELAY_MS = 3000;
+    const EXPECTED_FINISH_REASONS = new Set(["stop", "tool_calls", "length"]);
+
     // Main agentic loop
     while (iteration < this.maxToolIterations) {
       iteration++;
-
-      // Retry configuration for transient upstream errors (e.g. Z.ai "network_error").
-      // Z.ai's failure already takes ~30s, so we use a short fixed delay between retries
-      // rather than exponential backoff — the API already "waited" for us.
-      const MAX_LLM_ATTEMPTS = 3;
-      const RETRY_DELAY_MS = 3000;
 
       let assistantContent = "";
       let assistantReasoning = "";
@@ -398,27 +399,29 @@ export class EntityTurn {
         finishReason = "stop";
         metricsCollector = createCollector(conversationId);
 
-        // Stream LLM response with error handling
+        // Stream LLM response with error handling.
+        // Done events are held back until after the retry decision — yielding
+        // a done event from a failed attempt would cause the frontend to
+        // finalize the message before the retry even starts.
         try {
           for await (const chunk of this.llm.chatStream(messages, toolDefinitions, {
             metricsCollector,
           })) {
-            // Yield all chunks to the caller
-            yield chunk;
-
-            // Accumulate content based on chunk type
             switch (chunk.type) {
               case "thinking":
                 assistantReasoning += chunk.content;
+                yield chunk;
                 break;
               case "content":
                 assistantContent += chunk.content;
+                yield chunk;
                 break;
               case "tool_call":
                 toolCalls.push(chunk.toolCall);
+                yield chunk;
                 break;
               case "done":
-                // Stream finished for this iteration - capture finish reason
+                // Capture but don't yield — we'll yield after retry decision
                 finishReason = chunk.finishReason;
                 setFinishReason(metricsCollector, chunk.finishReason);
                 break;
@@ -440,8 +443,7 @@ export class EntityTurn {
         const hasContentThisAttempt = assistantContent || toolCalls.length > 0 || assistantReasoning;
 
         // Check if this is a retryable failure: unexpected finish_reason with no content
-        const expectedFinishReasons = new Set(["stop", "tool_calls", "length"]);
-        const isRetryableFinish = !expectedFinishReasons.has(finishReason) && !hasContentThisAttempt && !streamError;
+        const isRetryableFinish = !EXPECTED_FINISH_REASONS.has(finishReason) && !hasContentThisAttempt && !streamError;
 
         if (isRetryableFinish && attempt < MAX_LLM_ATTEMPTS) {
           console.warn(
@@ -462,6 +464,9 @@ export class EntityTurn {
         // Either succeeded or non-retryable — break out of retry loop
         break;
       }
+
+      // Now that the retry loop is settled, yield the done event to the frontend
+      yield { type: "done", finishReason };
 
       // Generate message ID upfront so we can link metrics to it
       const hasContent = assistantContent || toolCalls.length > 0 || assistantReasoning;
@@ -510,7 +515,7 @@ export class EntityTurn {
       }
 
       // Detect upstream error finish reasons after all retry attempts exhausted
-      if (!new Set(["stop", "tool_calls", "length"]).has(finishReason) && !hasContent) {
+      if (!EXPECTED_FINISH_REASONS.has(finishReason) && !hasContent) {
         throw new LLMError(
           `LLM stream failed with finish_reason="${finishReason}" after ${MAX_LLM_ATTEMPTS} attempts — ` +
           "the upstream API may be experiencing an outage",

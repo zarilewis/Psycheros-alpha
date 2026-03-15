@@ -10,7 +10,7 @@ Opened per chat request, closes when the response is complete.
 
 Event flow: `context → thinking → content → tool_call → tool_result → metrics → done`
 
-Also emits `dom_update` events for UI changes triggered by tool execution.
+Also emits `dom_update` events for UI changes triggered by tool execution, and `status` events for retry notifications and errors.
 
 ### Persistent Channel (`GET /api/events`)
 
