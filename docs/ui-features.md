@@ -58,6 +58,23 @@ During streaming, the Send button transforms into a Stop button with two-tap con
 
 Implemented in `web/js/psycheros.js`: `requestStopGeneration()`, `stopGeneration()`. CSS in `web/css/components.css`.
 
+## Auto-Scroll
+
+Smart proximity-based scroll latching replaces the naive "always scroll to bottom" approach. Matches standard chat app conventions.
+
+**Behavior:**
+- **Latched by default** — when the user is within 80px of the bottom, new content automatically scrolls into view
+- **Scroll up to disengage** — scrolling away from the bottom unlatches auto-scroll immediately; the user can read history undisturbed during streaming
+- **Scroll-to-bottom pill** — a circular button appears whenever the user is scrolled away from the bottom, not just during streaming
+- **New-content badge** — a pulsing green dot on the pill indicates content has arrived while the user was scrolled up
+- **Click pill to re-latch** — instant scroll during streaming (avoids race with growing content), smooth scroll when idle
+- **Scroll back to bottom naturally** — also re-latches and dismisses the pill
+- **Sending a message always latches** — user intent is unambiguous, view jumps to the new message
+
+**Self-healing DOM:** The `AutoScroll` module detects stale DOM references (from HTMX swaps and `innerHTML` replacements) via `element.isConnected` checks and automatically reinitializes.
+
+Implemented in `web/js/psycheros.js`: `AutoScroll` IIFE module. CSS in `web/css/components.css`: `.scroll-to-bottom-pill`, `.scroll-pill-badge`.
+
 ## Message Editing
 
 Both user and assistant messages can be edited after they're sent.

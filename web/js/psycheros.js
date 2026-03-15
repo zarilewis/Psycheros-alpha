@@ -244,6 +244,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Create selection bar and modal containers
   createUIContainers();
 
+  // Initialize smart auto-scroll
+  AutoScroll.init();
+
   // Focus input on load
   const input = document.getElementById('message-input');
   if (input) {
@@ -253,7 +256,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Scroll to bottom when chat content is swapped via HTMX (sidebar clicks)
   document.body.addEventListener('htmx:afterSwap', (e) => {
     if (e.detail.target?.id === 'chat') {
-      scrollToBottom();
+      AutoScroll.reinit();
+      requestAnimationFrame(() => AutoScroll.jumpToBottom());
 
       // Initialize graph view if present
       if (document.getElementById('graph-container')) {
@@ -334,8 +338,9 @@ async function loadConversationFromUrl(conversationId) {
       chat.innerHTML = doc.body.innerHTML;
     }
 
-    // Scroll to bottom to show most recent messages
-    scrollToBottom();
+    // Re-init scroll system for new DOM — defer scroll until browser has laid out content
+    AutoScroll.reinit();
+    requestAnimationFrame(() => AutoScroll.jumpToBottom());
 
     // Mark as active in sidebar after it loads
     // Use a small delay to wait for the sidebar conversation list to load
@@ -570,7 +575,7 @@ async function sendMessage() {
   // Remove empty state if present
   document.getElementById('empty-state')?.remove();
 
-  // Add user message with timestamp
+  // Add user message with timestamp — sending always scrolls to bottom
   const messages = document.getElementById('messages');
   const userTime = formatChatTimestamp(new Date());
   if (messages) {
@@ -584,6 +589,7 @@ async function sendMessage() {
       </div>
     `);
   }
+  AutoScroll.jumpToBottom();
 
   // Create assistant message container with current timestamp
   const assistantEl = document.createElement('div');
@@ -598,7 +604,7 @@ async function sendMessage() {
     <div class="msg-content"></div>
   `;
   messages?.appendChild(assistantEl);
-  scrollToBottom();
+  AutoScroll.streamStart();
 
   let currentThinking = null;
   let currentContent = null;
@@ -845,6 +851,7 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         state.setThinking(thinkingSection.querySelector('.thinking-content'));
       }
       state.getThinking().textContent += data;
+      AutoScroll.streamTick();
       break;
 
     case 'content': {
@@ -858,6 +865,7 @@ function handleSSEEvent(eventType, data, messageEl, state) {
       // Accumulate raw content for this segment and schedule progressive render
       state.appendSegmentRaw(data);
       scheduleStreamingRender(state.getContent(), state.getSegmentRaw());
+      AutoScroll.streamTick();
       break;
     }
 
@@ -875,6 +883,7 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         toolCard.dataset.toolCallId = toolCall.id;
         pendingToolCalls.set(toolCall.id, toolCard);
         contentContainer.appendChild(toolCard);
+        AutoScroll.streamTick();
       } catch (e) {
         console.error('Failed to parse tool call:', e);
       }
@@ -887,6 +896,7 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         if (toolCard) {
           addToolResult(toolCard, result.content, result.isError);
           pendingToolCalls.delete(result.toolCallId);
+          AutoScroll.streamTick();
         }
       } catch (e) {
         console.error('Failed to parse tool result:', e);
@@ -969,11 +979,10 @@ function handleSSEEvent(eventType, data, messageEl, state) {
       contentContainer.querySelectorAll('.streaming-active').forEach(el => {
         el.classList.remove('streaming-active');
       });
+      AutoScroll.streamEnd();
       break;
     }
   }
-
-  scrollToBottom();
 }
 
 // =============================================================================
@@ -1045,12 +1054,176 @@ function addToolResult(card, content, isError = false) {
   card.appendChild(resultEl);
 }
 
-function scrollToBottom() {
-  const messages = document.getElementById('messages');
-  if (messages) {
-    messages.scrollTop = messages.scrollHeight;
+// =============================================================================
+// Smart Auto-Scroll
+// Proximity-based latching: auto-scrolls only when user is near the bottom.
+// Disengages when user scrolls up; shows a "scroll to bottom" pill.
+// =============================================================================
+
+const AutoScroll = (() => {
+  const NEAR_BOTTOM_THRESHOLD = 80; // px from bottom to consider "latched"
+  let _latched = true;
+  let _pill = null;
+  let _badge = null;
+  let _messagesEl = null;
+  let _streaming = false;
+  let _hasNewContent = false;
+
+  /**
+   * Ensure AutoScroll is connected to live DOM elements.
+   * Handles stale references from innerHTML replacements (loadConversationFromUrl, etc).
+   */
+  function ensureReady() {
+    if (_messagesEl && _messagesEl.isConnected && _pill && _pill.isConnected) return true;
+    // DOM was replaced or never initialized — (re)init
+    cleanup();
+    return setup();
   }
-}
+
+  function cleanup() {
+    if (_pill && _pill.isConnected) _pill.remove();
+    if (_messagesEl) _messagesEl.removeEventListener('scroll', onScroll);
+    _pill = null;
+    _badge = null;
+    _messagesEl = null;
+  }
+
+  function setup() {
+    _messagesEl = document.getElementById('messages');
+    if (!_messagesEl) return false;
+
+    // Create scroll-to-bottom pill with new-content badge
+    _pill = document.createElement('button');
+    _pill.className = 'scroll-to-bottom-pill';
+    _pill.setAttribute('aria-label', 'Scroll to bottom');
+    _pill.innerHTML = `
+      <span class="scroll-pill-badge" aria-hidden="true"></span>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 3v8.5M4 8l4 4.5L12 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>`;
+    _badge = _pill.querySelector('.scroll-pill-badge');
+    _pill.addEventListener('click', () => {
+      // Instant scroll during streaming — smooth scroll races with growing content
+      doScrollToBottom(!_streaming);
+      _latched = true;
+      _hasNewContent = false;
+      hidePill();
+    });
+
+    // Insert pill inside .chat — positioned absolutely above the input area
+    const chat = _messagesEl.closest('.chat') || _messagesEl.parentElement;
+    if (chat) {
+      chat.style.position = 'relative';
+      chat.appendChild(_pill);
+    }
+
+    // Listen for user scroll
+    _messagesEl.addEventListener('scroll', onScroll, { passive: true });
+    return true;
+  }
+
+  function onScroll() {
+    if (!_messagesEl) return;
+    _latched = isNearBottom();
+
+    if (_latched) {
+      _hasNewContent = false;
+      hidePill();
+    } else {
+      // Show pill whenever user is scrolled away from bottom
+      showPill();
+    }
+  }
+
+  function isNearBottom() {
+    if (!_messagesEl) return true;
+    const { scrollTop, scrollHeight, clientHeight } = _messagesEl;
+    return scrollHeight - scrollTop - clientHeight <= NEAR_BOTTOM_THRESHOLD;
+  }
+
+  function doScrollToBottom(smooth) {
+    ensureReady();
+    if (!_messagesEl) return;
+    if (smooth) {
+      _messagesEl.scrollTo({ top: _messagesEl.scrollHeight, behavior: 'smooth' });
+    } else {
+      _messagesEl.scrollTop = _messagesEl.scrollHeight;
+    }
+  }
+
+  function showPill() {
+    if (!_pill) return;
+    _pill.classList.add('visible');
+    if (_badge) _badge.classList.toggle('active', _hasNewContent);
+  }
+
+  function hidePill() {
+    if (!_pill) return;
+    _pill.classList.remove('visible');
+    if (_badge) _badge.classList.remove('active');
+  }
+
+  // ── Public API ──────────────────────────────────────────────────────
+
+  /** Initial setup on DOMContentLoaded. */
+  function init() {
+    setup();
+  }
+
+  /** Re-initialize after DOM replacement (HTMX swaps, innerHTML). */
+  function reinit() {
+    _streaming = false;
+    _latched = true;
+    _hasNewContent = false;
+    cleanup();
+    setup();
+  }
+
+  /**
+   * Force scroll to bottom — for conversation loads and HTMX swaps.
+   * Always re-latches. Self-healing if DOM has been replaced.
+   */
+  function jumpToBottom() {
+    ensureReady();
+    _latched = true;
+    _hasNewContent = false;
+    doScrollToBottom(false);
+    hidePill();
+  }
+
+  /** Streaming begins — latch to bottom. */
+  function streamStart() {
+    ensureReady();
+    _streaming = true;
+    // Don't force _latched here — jumpToBottom() already latched before streaming.
+    // Respect current scroll position.
+  }
+
+  /** Content chunk arrived during streaming — scroll if latched, badge if not. */
+  function streamTick() {
+    if (_latched && _messagesEl) {
+      _messagesEl.scrollTop = _messagesEl.scrollHeight;
+    } else if (_streaming) {
+      _hasNewContent = true;
+      showPill();
+    }
+  }
+
+  /** Streaming ended. */
+  function streamEnd() {
+    _streaming = false;
+    if (_latched) {
+      doScrollToBottom(true);
+      _hasNewContent = false;
+      hidePill();
+    } else {
+      _hasNewContent = true;
+      showPill();
+    }
+  }
+
+  return { init, reinit, jumpToBottom, streamStart, streamTick, streamEnd };
+})();
 
 function escapeHtml(text) {
   if (!text) return '';
