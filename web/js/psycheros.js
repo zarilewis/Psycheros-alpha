@@ -2235,9 +2235,6 @@ let graphViewLoaded = false;
  * Dynamically loads vis-network and graph-view.js if needed.
  */
 async function loadGraphView() {
-  if (graphViewLoaded) return;
-  graphViewLoaded = true;
-
   console.log('[Psycheros] Loading graph view...');
 
   // Load vis-network if not already loaded
@@ -2266,14 +2263,10 @@ async function loadGraphView() {
       script.onerror = reject;
       document.head.appendChild(script);
     });
-  }
-
-  // Initialize the graph
-  if (typeof initGraph === 'function') {
-    console.log('[Psycheros] Initializing graph...');
-    initGraph();
   } else {
-    console.error('[Psycheros] initGraph is not a function:', typeof initGraph, initGraph);
+    // Scripts already loaded — re-initialize for the new DOM
+    console.log('[Psycheros] Re-initializing graph view...');
+    initGraph();
   }
 }
 

@@ -84,7 +84,14 @@ let initialized = false;
 // ─── Initialization ──────────────────────────────────────────────────────────
 
 async function initGraph() {
-  if (initialized) return;
+  if (initialized) {
+    // Already initialized — reset so we can re-init for HTMX navigation
+    if (network) {
+      network.destroy();
+      network = null;
+    }
+    selectedNodes = [];
+  }
   initialized = true;
   await loadGraphData();
   setupEventListeners();
@@ -377,10 +384,9 @@ function setupEventListeners() {
     if (ids.length > 0) network.focus(ids[0], { animation: true });
   });
 
-  // Refresh
+  // Refresh — just reload data, don't re-run full init
   document.getElementById('graph-refresh')?.addEventListener('click', () => {
-    initialized = false;
-    initGraph();
+    loadGraphData();
   });
 
   // Close panel
