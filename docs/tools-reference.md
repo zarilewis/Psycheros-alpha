@@ -33,7 +33,7 @@ The entity can read and write to its knowledge graph. Write tools auto-generate 
 | Tool | Description |
 |------|-------------|
 | `graph_create_node` | Create a node with duplicate prevention and auto-embedding |
-| `graph_create_edge` | Create a relationship between two nodes |
+| `graph_create_edge` | Create a relationship between two nodes (supports IDs or labels) |
 | `graph_update_node` | Update label, description, or confidence (re-embeds) |
 | `graph_update_edge` | Update weight, evidence, or validity |
 | `graph_write_batch` | Batch create nodes and edges (edges can reference existing nodes by label) |

@@ -95,6 +95,12 @@ Full code review covering code quality, error handling, input validation, SQLite
 - Native extensions available for both platforms: `lib/vec0.so` (Linux x86-64) and `lib/vec0.dylib` (macOS aarch64)
 - sqlite-vec loads natively on both macOS and Docker — no fallback needed
 
+### graph_create_edge rejects labels with cryptic JSON error (Medium — UX)
+- `graph_create_edge` only accepted `fromId`/`toId` but entity naturally used `fromLabel`/`toLabel` (consistent with `graph_write_batch`)
+- Undefined IDs passed to entity-core → Zod validation failure → MCP error returned as plain text → Psycheros `JSON.parse()` threw `SyntaxError`
+- Fix: Added `fromLabel`/`toLabel` support with label-to-ID resolution via `getGraphNodes()` (exact case-insensitive match). Clear error messages for missing nodes.
+- Initial fix used `searchGraphNodes()` (semantic search) which failed for short proper nouns — switched to direct node list lookup
+
 ## Confirmed Safe Patterns
 
 - All SQLite queries are parameterized

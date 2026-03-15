@@ -42,7 +42,7 @@ Tools must be explicitly enabled via `PSYCHEROS_TOOLS`. Set to a comma-separated
 | `graph_get_subgraph` | Extract a subgraph centered on a node |
 | `graph_stats` | Get knowledge graph statistics |
 | `graph_create_node` | Create a node (with auto-embedding and duplicate prevention) |
-| `graph_create_edge` | Create a relationship between two nodes |
+| `graph_create_edge` | Create a relationship between two nodes (supports IDs or labels) |
 | `graph_update_node` | Update a node's label, description, or confidence |
 | `graph_update_edge` | Update an edge's weight, evidence, or validity |
 | `graph_write_batch` | Batch create multiple nodes and edges |

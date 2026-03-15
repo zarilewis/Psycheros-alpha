@@ -48,17 +48,25 @@ const graphCreateEdgeDef: Tool["definition"] = {
   function: {
     name: "graph_create_edge",
     description:
-      "Create a relationship between two nodes in my knowledge graph. I use this to connect concepts like 'user loves hiking' or 'meditation helps_with anxiety'. IMPORTANT: Use first-person perspective.",
+      "Create a relationship between two nodes in my knowledge graph. I use this to connect concepts like 'user loves hiking' or 'meditation helps_with anxiety'. I can use either node IDs or node labels — if I use labels, the tool will look up the IDs for me. IMPORTANT: Use first-person perspective.",
     parameters: {
       type: "object",
       properties: {
         fromId: {
           type: "string",
-          description: "Source node ID (use graph_search_nodes to find IDs)",
+          description: "Source node ID (if I know it)",
         },
         toId: {
           type: "string",
-          description: "Target node ID",
+          description: "Target node ID (if I know it)",
+        },
+        fromLabel: {
+          type: "string",
+          description: "Source node label (e.g., 'Tyler') — used to look up the node ID if fromId is not provided",
+        },
+        toLabel: {
+          type: "string",
+          description: "Target node label (e.g., 'Thea') — used to look up the node ID if toId is not provided",
         },
         type: {
           type: "string",
@@ -73,7 +81,7 @@ const graphCreateEdgeDef: Tool["definition"] = {
           description: "Why I believe this relationship exists",
         },
       },
-      required: ["fromId", "toId", "type"],
+      required: ["type"],
     },
   },
 };
@@ -259,8 +267,10 @@ async function executeGraphCreateNode(
 }
 
 interface CreateEdgeArgs {
-  fromId: string;
-  toId: string;
+  fromId?: string;
+  toId?: string;
+  fromLabel?: string;
+  toLabel?: string;
   type: string;
   weight?: number;
   evidence?: string;
@@ -270,7 +280,7 @@ async function executeGraphCreateEdge(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { fromId, toId, type, weight, evidence } = args as unknown as CreateEdgeArgs;
+  const { fromId, toId, fromLabel, toLabel, type, weight, evidence } = args as unknown as CreateEdgeArgs;
 
   if (!ctx.config.mcpClient) {
     return {
@@ -281,9 +291,61 @@ async function executeGraphCreateEdge(
   }
 
   try {
+    // Fetch node list once if we need to resolve any labels
+    const needsLabelLookup = (!fromId && fromLabel) || (!toId && toLabel);
+    const allNodes = needsLabelLookup
+      ? await ctx.config.mcpClient.getGraphNodes({ limit: 500 })
+      : [];
+
+    // Resolve source node: use ID if provided, otherwise look up by label
+    let resolvedFromId = fromId;
+    if (!resolvedFromId && fromLabel) {
+      const match = allNodes.find(
+        (n) => n.label.toLowerCase() === fromLabel.toLowerCase()
+      );
+      if (match) {
+        resolvedFromId = match.id;
+      } else {
+        return {
+          toolCallId: ctx.toolCallId,
+          content: `I couldn't find a node with label "${fromLabel}". I should use graph_search_nodes to find the correct node first, or create it with graph_create_node.`,
+          isError: true,
+        };
+      }
+    }
+
+    // Resolve target node: use ID if provided, otherwise look up by label
+    let resolvedToId = toId;
+    if (!resolvedToId && toLabel) {
+      const match = allNodes.find(
+        (n) => n.label.toLowerCase() === toLabel.toLowerCase()
+      );
+      if (match) {
+        resolvedToId = match.id;
+      } else {
+        return {
+          toolCallId: ctx.toolCallId,
+          content: `I couldn't find a node with label "${toLabel}". I should use graph_search_nodes to find the correct node first, or create it with graph_create_node.`,
+          isError: true,
+        };
+      }
+    }
+
+    // Validate we have both IDs
+    if (!resolvedFromId || !resolvedToId) {
+      const missing = [];
+      if (!resolvedFromId) missing.push("fromId or fromLabel");
+      if (!resolvedToId) missing.push("toId or toLabel");
+      return {
+        toolCallId: ctx.toolCallId,
+        content: `I need to specify the source and target nodes. Missing: ${missing.join(", ")}. I can use either node IDs (fromId/toId) or node labels (fromLabel/toLabel).`,
+        isError: true,
+      };
+    }
+
     const result = await ctx.config.mcpClient.createGraphEdge({
-      fromId,
-      toId,
+      fromId: resolvedFromId,
+      toId: resolvedToId,
       type,
       weight,
       evidence,
