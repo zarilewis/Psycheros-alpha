@@ -104,17 +104,18 @@ if (mcpEnabled) {
     offlineFallback: true,
   });
 
-  // Attempt connection (non-blocking)
-  mcpClient.connect().then((connected) => {
+  // Await connection before server init to avoid race conditions
+  try {
+    const connected = await mcpClient.connect();
     if (connected) {
       console.log("[MCP] Connected to entity-core");
     } else {
       console.log("[MCP] Running in offline mode (will sync when available)");
     }
-  }).catch((error) => {
+  } catch (error) {
     console.error("[MCP] Connection failed:", error);
     console.log("[MCP] Running in offline mode");
-  });
+  }
 }
 
 const server = new Server({

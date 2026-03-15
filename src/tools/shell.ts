@@ -98,7 +98,7 @@ async function executeCommand(
         abortController.signal.addEventListener("abort", () => {
           process.kill("SIGTERM");
           reject(new Error(`Command timed out after ${timeoutMs}ms`));
-        });
+        }, { once: true });
       }),
     ]);
 

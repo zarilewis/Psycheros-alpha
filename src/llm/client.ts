@@ -89,9 +89,14 @@ export class LLMClient {
     // Log the outgoing request for observability
     const toolCount = tools?.length ?? 0;
     const messageCount = messages.length;
+    // Rough token estimate: ~4 chars per token across all message content + tool defs
+    const payloadChars = messages.reduce((acc, m) => acc + (m.content?.length || 0), 0) +
+      (tools ? JSON.stringify(tools).length : 0);
+    const estimatedTokens = Math.ceil(payloadChars / 4);
     console.log(
       `[LLM] Sending request to ${this.config.baseUrl} — model=${this.config.model}, ` +
-      `messages=${messageCount}, tools=${toolCount}, thinking=${this.config.thinkingEnabled}`,
+      `messages=${messageCount}, tools=${toolCount}, thinking=${this.config.thinkingEnabled}, ` +
+      `~${estimatedTokens} tokens (${payloadChars} chars)`,
     );
     const requestStart = Date.now();
 
@@ -520,6 +525,15 @@ export class LLMClient {
 
       // Handle finish reason
       if (choice.finish_reason) {
+        // Log non-standard finish reasons with the full raw chunk for diagnostics
+        const expectedReasons = new Set(["stop", "tool_calls", "length"]);
+        if (!expectedReasons.has(choice.finish_reason)) {
+          console.error(
+            `[LLM] Unexpected finish_reason="${choice.finish_reason}" — raw chunk: ` +
+            JSON.stringify(chunk),
+          );
+        }
+
         // Emit completed tool calls when we hit tool_calls finish reason
         if (choice.finish_reason === "tool_calls") {
           yield* emitAccumulatedToolCalls(toolCallAccumulators);

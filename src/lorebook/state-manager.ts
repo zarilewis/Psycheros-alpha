@@ -81,6 +81,13 @@ export function saveState(db: DBClient, state: LorebookState): void {
 
   rawDb.exec("BEGIN TRANSACTION");
 
+  const insertStmt = rawDb.prepare(
+    `INSERT INTO lorebook_state
+     (id, conversation_id, entry_id, turns_remaining, triggered_at_message,
+      triggered_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+  );
+
   try {
     // Delete existing state for this conversation
     rawDb.exec(
@@ -89,13 +96,6 @@ export function saveState(db: DBClient, state: LorebookState): void {
     );
 
     // Insert new state entries
-    const insertStmt = rawDb.prepare(
-      `INSERT INTO lorebook_state
-       (id, conversation_id, entry_id, turns_remaining, triggered_at_message,
-        triggered_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-    );
-
     for (const [entryId, entryState] of state.activeEntries) {
       const id = crypto.randomUUID();
       insertStmt.run(
@@ -110,11 +110,12 @@ export function saveState(db: DBClient, state: LorebookState): void {
       );
     }
 
-    insertStmt.finalize();
     rawDb.exec("COMMIT");
   } catch (error) {
     rawDb.exec("ROLLBACK");
     throw error;
+  } finally {
+    insertStmt.finalize();
   }
 }
 

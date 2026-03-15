@@ -164,6 +164,11 @@ export class MCPClient {
     } catch (error) {
       console.error("[MCP] Failed to connect:", error);
 
+      // Clean up partially-created transport/client
+      try { if (this.client) await this.client.close(); } catch { /* ignore */ }
+      this.client = null;
+      this.transport = null;
+
       if (this.config.offlineFallback) {
         console.log("[MCP] Falling back to local files mode");
         return false;

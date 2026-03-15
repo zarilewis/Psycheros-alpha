@@ -339,9 +339,13 @@ export class EntityTurn {
     // Persist context snapshot to database for the Context Inspector
     const turnIndexStmt = this.db.getRawDb()
       .prepare("SELECT COUNT(*) as count FROM messages WHERE conversation_id = ? AND role = 'user'");
-    const turnIndexResult = turnIndexStmt.get<{ count: number }>(conversationId);
-    turnIndexStmt.finalize();
-    const turnIndex = turnIndexResult?.count ?? 1;
+    let turnIndex: number;
+    try {
+      const turnIndexResult = turnIndexStmt.get<{ count: number }>(conversationId);
+      turnIndex = turnIndexResult?.count ?? 1;
+    } finally {
+      turnIndexStmt.finalize();
+    }
 
     this.db.addContextSnapshot({
       conversationId,
