@@ -78,8 +78,10 @@ export interface EntityConfig {
 
 /**
  * Default maximum tool iterations.
+ * Set high enough to allow complex multi-tool workflows (identity + memory +
+ * graph + RAG chains) while still catching genuine runaway loops.
  */
-const DEFAULT_MAX_TOOL_ITERATIONS = 10;
+const DEFAULT_MAX_TOOL_ITERATIONS = 25;
 
 /**
  * Extended yield type that includes tool results, UI updates, and metrics.

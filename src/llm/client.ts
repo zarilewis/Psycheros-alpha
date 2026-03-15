@@ -83,7 +83,8 @@ export class LLMClient {
     },
   ): AsyncGenerator<StreamChunk, void, unknown> {
     const request = this.buildRequest(messages, tools, true, options);
-    const streamStallTimeout = this.config.streamStallTimeout ?? 60_000;
+    const firstChunkTimeout = this.config.firstChunkTimeout ?? 180_000;
+    const streamStallTimeout = this.config.streamStallTimeout ?? 120_000;
 
     // Log the outgoing request for observability
     const toolCount = tools?.length ?? 0;
@@ -124,6 +125,8 @@ export class LLMClient {
     // Track consecutive malformed chunks
     let consecutiveMalformed = 0;
     const MAX_CONSECUTIVE_MALFORMED = 5;
+    // Track whether we've received any data yet (first chunk gets a longer timeout)
+    let receivedFirstChunk = false;
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -131,13 +134,21 @@ export class LLMClient {
 
     try {
       while (true) {
-        // Read with stall timeout — if no data arrives for streamStallTimeout ms, abort
-        const { done, value } = await this.readWithTimeout(reader, streamStallTimeout);
+        // First read gets a longer timeout since the model may be thinking before
+        // producing any output. Subsequent reads use the shorter stall timeout.
+        const timeout = receivedFirstChunk ? streamStallTimeout : firstChunkTimeout;
+        const { done, value } = await this.readWithTimeout(reader, timeout);
 
         if (done) {
           // Flush any remaining bytes from the decoder
           buffer += decoder.decode();
           break;
+        }
+
+        if (!receivedFirstChunk) {
+          receivedFirstChunk = true;
+          const firstChunkMs = Date.now() - requestStart;
+          console.log(`[LLM] First stream data arrived in ${firstChunkMs}ms`);
         }
 
         buffer += decoder.decode(value, { stream: true });
@@ -269,8 +280,8 @@ export class LLMClient {
         reader.cancel().catch(() => {});
         reject(
           new LLMError(
-            `LLM stream stalled — no data received for ${Math.round(timeoutMs / 1000)}s. ` +
-            "The upstream API may be overloaded or the connection was dropped",
+            `LLM stream timed out — no data received for ${Math.round(timeoutMs / 1000)}s. ` +
+            "The upstream API may be overloaded or the connection was dropped.",
             "STREAM_STALL_TIMEOUT",
           ),
         );
@@ -543,6 +554,7 @@ export function createDefaultClient(
     apiKey,
     model: options?.model || Deno.env.get("ZAI_MODEL") || "glm-4.7",
     thinkingEnabled: options?.thinkingEnabled ?? true,
+    ...parseTimeoutEnvVars(options),
   };
 
   return new LLMClient(config);
@@ -577,7 +589,38 @@ export function createWorkerClient(
     apiKey,
     model: options?.model || Deno.env.get("ZAI_WORKER_MODEL") || "GLM-4.5-Air",
     thinkingEnabled: options?.thinkingEnabled ?? false, // Worker model doesn't need thinking
+    ...parseTimeoutEnvVars(options),
   };
 
   return new LLMClient(config);
+}
+
+/**
+ * Parse timeout-related env vars, with options taking precedence.
+ */
+function parseTimeoutEnvVars(
+  options?: Partial<LLMConfig>,
+): Pick<LLMConfig, "connectTimeout" | "firstChunkTimeout" | "streamStallTimeout"> {
+  const result: Pick<LLMConfig, "connectTimeout" | "firstChunkTimeout" | "streamStallTimeout"> = {};
+
+  const connectTimeout = options?.connectTimeout ?? parseEnvInt("ZAI_CONNECT_TIMEOUT");
+  if (connectTimeout !== undefined) result.connectTimeout = connectTimeout;
+
+  const firstChunkTimeout = options?.firstChunkTimeout ?? parseEnvInt("ZAI_FIRST_CHUNK_TIMEOUT");
+  if (firstChunkTimeout !== undefined) result.firstChunkTimeout = firstChunkTimeout;
+
+  const streamStallTimeout = options?.streamStallTimeout ?? parseEnvInt("ZAI_STREAM_STALL_TIMEOUT");
+  if (streamStallTimeout !== undefined) result.streamStallTimeout = streamStallTimeout;
+
+  return result;
+}
+
+/**
+ * Parse an environment variable as an integer (milliseconds). Returns undefined if not set or invalid.
+ */
+function parseEnvInt(name: string): number | undefined {
+  const raw = Deno.env.get(name);
+  if (!raw) return undefined;
+  const parsed = parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }

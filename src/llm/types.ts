@@ -38,7 +38,9 @@ export interface LLMConfig {
   maxTokens?: number;
   /** Timeout in ms for the initial API connection (default: 30000) */
   connectTimeout?: number;
-  /** Timeout in ms for silence between stream chunks (default: 60000) */
+  /** Timeout in ms waiting for the first stream chunk after connection (default: 180000) */
+  firstChunkTimeout?: number;
+  /** Timeout in ms for silence between stream chunks after first chunk arrives (default: 120000) */
   streamStallTimeout?: number;
 }
 
