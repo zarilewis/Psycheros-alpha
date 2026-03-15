@@ -2473,3 +2473,15 @@ globalThis.Psycheros = {
   createCustomFile,
   deleteCustomFile,
 };
+
+/**
+ * Toggle the sticky duration input when the sticky checkbox changes.
+ * Used by lorebook entry create/edit forms.
+ */
+globalThis.toggleStickyDuration = function(checkbox) {
+  const durInput = document.getElementById('entry-stickyDuration');
+  if (!durInput) return;
+  durInput.disabled = !checkbox.checked;
+  durInput.style.opacity = checkbox.checked ? '1' : '0.5';
+  durInput.style.pointerEvents = checkbox.checked ? 'auto' : 'none';
+};

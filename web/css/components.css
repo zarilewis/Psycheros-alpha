@@ -11,14 +11,18 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--sp-4);
+  height: var(--header-height);
+  box-sizing: border-box;
   background-color: var(--c-bg-raised);
   border-bottom: 1px solid var(--c-border);
+  overflow: hidden;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  min-width: 0;
 }
 
 .logo {
@@ -27,14 +31,23 @@
   font-weight: var(--font-weight-semibold);
   color: var(--c-accent);
   letter-spacing: 0.05em;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .logo-sub {
+  display: inline-block;
+  max-width: 40vw;
   color: var(--c-fg-muted);
   font-weight: var(--font-weight-normal);
   font-size: var(--font-size-sm);
   margin-left: var(--sp-2);
   font-family: var(--font-sans);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: baseline;
 }
 
 .sidebar-toggle {
@@ -197,6 +210,7 @@
    ========================================================================== */
 .msg {
   max-width: var(--content-max-width);
+  min-width: 0;
 }
 
 .msg--user {
@@ -238,6 +252,8 @@
   padding: var(--sp-4);
   line-height: var(--line-height);
   border-radius: 8px;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 /* User messages - subtle, recede */
@@ -260,9 +276,11 @@
   color: var(--c-fg);
   white-space: normal;
   word-wrap: break-word;
+  overflow-wrap: break-word;
   font-size: var(--font-size-base);
   line-height: var(--line-height);
   letter-spacing: -0.01em;
+  min-width: 0;
 }
 
 /* Markdown styles for assistant text */
@@ -280,7 +298,7 @@
 .assistant-text p { margin: var(--sp-2) 0; }
 .assistant-text p:first-child { margin-top: 0; }
 .assistant-text p:last-child { margin-bottom: 0; }
-.assistant-text table { border-collapse: collapse; width: 100%; margin: var(--sp-3) 0; }
+.assistant-text table { border-collapse: collapse; margin: var(--sp-3) 0; display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .assistant-text th, .assistant-text td { border: 1px solid var(--c-border); padding: var(--sp-2); text-align: left; }
 .assistant-text th { background: var(--c-bg-sunken); }
 .assistant-text img { max-width: 100%; border-radius: var(--radius-sm); }
@@ -1163,322 +1181,7 @@
   flex-shrink: 0;
 }
 
-/* ==========================================================================
-   Settings View
-   ========================================================================== */
-.settings-view {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-
-.settings-header {
-  padding: var(--sp-4);
-  border-bottom: 1px solid var(--c-border);
-}
-
-.settings-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--c-accent);
-  margin: 0 0 var(--sp-1) 0;
-}
-
-.settings-desc {
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-  margin: 0;
-}
-
-/* ==========================================================================
-   Settings Header Row (back button + title layout)
-   ========================================================================== */
-.settings-header-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--sp-3);
-}
-
-.settings-back-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: 6px;
-  color: var(--c-fg-muted);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  text-decoration: none;
-  transition: color var(--transition), background-color var(--transition);
-  flex-shrink: 0;
-  margin-top: 0.125rem;
-}
-
-.settings-back-btn:hover {
-  color: var(--c-accent);
-  background-color: var(--c-bg-hover);
-}
-
-/* ==========================================================================
-   Settings Hub Cards
-   ========================================================================== */
-.settings-hub-grid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  padding: var(--sp-4);
-}
-
-.settings-hub-card {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-4);
-  border-radius: 8px;
-  background: var(--c-bg-sunken);
-  border: 1px solid var(--c-border);
-  text-decoration: none;
-  color: var(--c-fg);
-  transition: border-color var(--transition), background-color var(--transition);
-  cursor: pointer;
-}
-
-.settings-hub-card:hover {
-  border-color: var(--c-accent);
-  background-color: var(--c-bg-hover);
-}
-
-.settings-hub-card:hover .settings-hub-card-title {
-  color: var(--c-accent);
-}
-
-.settings-hub-card:hover .settings-hub-card-arrow {
-  color: var(--c-accent);
-}
-
-.settings-hub-card-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  background: var(--c-bg);
-  color: var(--c-accent);
-  flex-shrink: 0;
-}
-
-.settings-hub-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  flex: 1;
-  min-width: 0;
-}
-
-.settings-hub-card-title {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-  color: var(--c-fg);
-  transition: color var(--transition);
-}
-
-.settings-hub-card-desc {
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-}
-
-.settings-hub-card-arrow {
-  color: var(--c-fg-muted);
-  flex-shrink: 0;
-  opacity: 0.5;
-  transition: color var(--transition), opacity var(--transition);
-}
-
-.settings-hub-card:hover .settings-hub-card-arrow {
-  opacity: 1;
-}
-
-.settings-tabs {
-  display: flex;
-  gap: var(--sp-1);
-  padding: var(--sp-2) var(--sp-4);
-  border-bottom: 1px solid var(--c-border);
-  overflow-x: auto;
-}
-
-.settings-tab {
-  padding: var(--sp-2) var(--sp-4);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--c-fg-muted);
-  background-color: transparent;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all var(--transition);
-  white-space: nowrap;
-}
-
-.settings-tab:hover {
-  color: var(--c-accent);
-  background-color: var(--c-bg-hover);
-}
-
-.settings-tab.active {
-  color: var(--c-accent);
-  background-color: var(--c-accent-subtle);
-  border-color: var(--c-accent);
-}
-
-.settings-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--sp-4);
-}
-
-.settings-loading {
-  text-align: center;
-  padding: var(--sp-4);
-  color: var(--c-fg-muted);
-  font-style: italic;
-}
-
-.settings-empty {
-  text-align: center;
-  padding: var(--sp-6);
-  color: var(--c-fg-muted);
-}
-
-.settings-file-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-
-.settings-file-item {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
-  background-color: var(--c-bg-raised);
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all var(--transition);
-  text-align: left;
-  width: 100%;
-}
-
-.settings-file-item:hover {
-  border-color: var(--c-accent);
-  background-color: var(--c-bg-hover);
-}
-
-.settings-file-icon {
-  font-size: var(--font-size-lg);
-}
-
-.settings-file-name {
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm);
-  color: var(--c-fg);
-  text-transform: capitalize;
-}
-
-/* ==========================================================================
-   Settings Editor
-   ========================================================================== */
-.settings-editor {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  max-width: 800px;
-}
-
-.settings-editor-header {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-3);
-}
-
-.settings-editor-filename {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  color: var(--c-accent);
-  text-transform: capitalize;
-}
-
-.settings-editor-tokens {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  color: var(--c-fg-muted);
-  white-space: nowrap;
-}
-
-.settings-editor-form {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.settings-textarea {
-  flex: 1;
-  min-height: 300px;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.6;
-  padding: var(--sp-4);
-  background-color: var(--c-bg-sunken);
-  border: 1px solid var(--c-border);
-  border-radius: 8px;
-  color: var(--c-fg);
-  resize: vertical;
-  transition: border-color var(--transition), box-shadow var(--transition);
-}
-
-.settings-textarea::placeholder {
-  color: var(--c-fg-muted);
-}
-
-.settings-textarea:focus {
-  border-color: var(--c-accent);
-  outline: none;
-  box-shadow: 0 0 0 3px var(--c-accent-subtle);
-}
-
-.settings-editor-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--sp-2);
-  margin-top: var(--sp-3);
-}
-
-.settings-editor-status {
-  margin-top: var(--sp-2);
-  text-align: right;
-}
-
-.settings-save-success {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  color: var(--c-accent);
-}
-
-.settings-save-error {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  color: var(--c-error);
-}
+/* Settings styles moved to settings.css */
 
 /* ==========================================================================
    Header Right
@@ -1930,278 +1633,7 @@
   text-align: right;
 }
 
-/* ==========================================================================
-   Lorebooks
-   ========================================================================== */
-
-.lorebooks-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-6);
-}
-
-.lorebooks-empty {
-  padding: var(--sp-6);
-  text-align: center;
-  color: var(--c-fg-muted);
-  background-color: var(--c-bg-raised);
-  border-radius: var(--radius-md);
-  border: 1px dashed var(--c-border);
-}
-
-.lorebook-card {
-  background-color: var(--c-bg-raised);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-  padding: var(--sp-4);
-}
-
-.lorebook-card--disabled {
-  opacity: 0.6;
-}
-
-.lorebook-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--sp-2);
-}
-
-.lorebook-card-name {
-  font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--c-fg);
-  margin: 0;
-}
-
-.lorebook-card-status {
-  font-size: var(--font-size-xs);
-  color: var(--c-fg-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.lorebook-card-desc {
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-  margin: 0 0 var(--sp-3) 0;
-}
-
-.lorebook-card-actions {
-  display: flex;
-  gap: var(--sp-2);
-}
-
-.lorebook-create {
-  background-color: var(--c-bg-raised);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-  padding: var(--sp-4);
-}
-
-.lorebook-create h3 {
-  margin: 0 0 var(--sp-3) 0;
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-}
-
-/* Entry cards */
-.lorebook-entries-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-6);
-}
-
-.entry-card {
-  background-color: var(--c-bg-raised);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-  padding: var(--sp-4);
-}
-
-.entry-card--disabled {
-  opacity: 0.6;
-  border-style: dashed;
-}
-
-.entry-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--sp-2);
-}
-
-.entry-card-name {
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-  color: var(--c-fg);
-  margin: 0;
-}
-
-.entry-card-priority {
-  font-size: var(--font-size-xs);
-  color: var(--c-fg-muted);
-  font-family: var(--font-mono);
-}
-
-.entry-card-triggers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-1);
-  margin-bottom: var(--sp-2);
-}
-
-.trigger-tag {
-  display: inline-block;
-  padding: var(--sp-1) var(--sp-2);
-  background-color: var(--c-accent-subtle);
-  color: var(--c-accent);
-  font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
-  border-radius: var(--radius-sm);
-}
-
-.entry-card-content {
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-  margin: 0 0 var(--sp-2) 0;
-  padding: var(--sp-2);
-  background-color: var(--c-bg);
-  border-radius: var(--radius-sm);
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.entry-card-meta {
-  display: flex;
-  gap: var(--sp-3);
-  margin-bottom: var(--sp-3);
-  font-size: var(--font-size-xs);
-  color: var(--c-fg-muted);
-}
-
-.entry-card-actions {
-  display: flex;
-  gap: var(--sp-2);
-}
-
-/* Entry editor form */
-.lorebook-entry-create {
-  background-color: var(--c-bg-raised);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-  padding: var(--sp-4);
-}
-
-.lorebook-entry-create h3 {
-  margin: 0 0 var(--sp-3) 0;
-  font-size: var(--font-size-md);
-  font-weight: var(--font-weight-semibold);
-}
-
-.lorebook-entry-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-}
-
-.form-row {
-  display: flex;
-  gap: var(--sp-3);
-}
-
-.form-row--checkboxes {
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.form-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.form-group--small {
-  flex: 0 0 120px;
-}
-
-.form-group label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--c-fg-muted);
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  padding: var(--sp-2) var(--sp-3);
-  background-color: var(--c-bg);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-sm);
-  color: var(--c-fg);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-sans);
-}
-
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: var(--c-accent);
-  box-shadow: 0 0 0 2px var(--c-accent-subtle);
-}
-
-.form-group textarea {
-  font-family: var(--font-mono);
-  resize: vertical;
-  min-height: 100px;
-}
-
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--font-size-sm);
-  color: var(--c-fg);
-  cursor: pointer;
-}
-
-.checkbox-label input[type="checkbox"] {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--c-accent);
-}
-
-.form-actions {
-  display: flex;
-  gap: var(--sp-2);
-  margin-top: var(--sp-2);
-}
-
-/* Settings breadcrumb */
-.settings-breadcrumb {
-  margin-bottom: var(--sp-3);
-}
-
-.settings-section-header {
-  margin-bottom: var(--sp-4);
-}
-
-.settings-section-header h2 {
-  margin: 0 0 var(--sp-1) 0;
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
-  color: var(--c-fg);
-}
-
-.settings-section-desc {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-}
+/* Lorebook and form styles moved to settings.css */
 
 /* ==========================================================================
    Message Edit
@@ -2274,4 +1706,14 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--sp-2);
+}
+
+/* ==========================================================================
+   Mobile Responsive
+   ========================================================================== */
+@media (max-width: 600px) {
+  .context-viewer {
+    width: 100vw;
+    border-left: none;
+  }
 }

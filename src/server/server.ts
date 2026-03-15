@@ -769,6 +769,12 @@ export class Server {
       return await handleSaveLLMSettings(ctx, request);
     }
 
+    // POST /api/llm-settings/reset - Reset to defaults
+    if (method === "POST" && path === "/api/llm-settings/reset") {
+      const { handleResetLLMSettings } = await import("./routes.ts");
+      return await handleResetLLMSettings(ctx);
+    }
+
     // POST /api/llm-settings/test - Test connection
     if (method === "POST" && path === "/api/llm-settings/test") {
       return await handleTestLLMConnection(ctx, request);

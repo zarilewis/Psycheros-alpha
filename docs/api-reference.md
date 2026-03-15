@@ -121,6 +121,7 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 |--------|------|-------------|
 | `GET` | `/api/llm-settings` | Get current LLM settings |
 | `POST` | `/api/llm-settings` | Save LLM settings |
+| `POST` | `/api/llm-settings/reset` | Reset to environment variable defaults |
 | `POST` | `/api/llm-settings/test` | Test LLM connection |
 
 ### MCP

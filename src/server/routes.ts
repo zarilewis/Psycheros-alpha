@@ -11,7 +11,7 @@
 import type { SSEEvent, TurnMetrics } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, LLMSettings } from "../llm/mod.ts";
-import { maskApiKey } from "../llm/mod.ts";
+import { maskApiKey, getDefaultSettings } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { Retriever, RAGConfig } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
@@ -3425,6 +3425,38 @@ export async function handleSaveLLMSettings(
     console.error("[Routes] handleSaveLLMSettings error:", error);
     return new Response(
       JSON.stringify({ error: "Failed to save settings" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+/**
+ * Handle POST /api/llm-settings/reset - Reset to env-based defaults.
+ * Deletes any saved overrides and reloads from environment variables.
+ */
+export async function handleResetLLMSettings(
+  ctx: RouteContext,
+): Promise<Response> {
+  try {
+    const defaults = getDefaultSettings();
+    await ctx.updateLLMSettings(defaults);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] handleResetLLMSettings error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to reset settings" }),
       {
         status: 500,
         headers: {

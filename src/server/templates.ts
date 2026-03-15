@@ -202,7 +202,7 @@ export function renderAppShell(): string {
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Psycheros</title>
-  <link rel="stylesheet" href="/css/main.css?v=11">
+  <link rel="stylesheet" href="/css/main.css?v=13">
   ${getAccentColorOverride()}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
@@ -319,8 +319,8 @@ export function renderSettingsHub(): string {
           </svg>
         </div>
         <div class="settings-hub-card-body">
-          <span class="settings-hub-card-title">Context Notes</span>
-          <span class="settings-hub-card-desc">Manage lorebooks and context entries</span>
+          <span class="settings-hub-card-title">Context Books</span>
+          <span class="settings-hub-card-desc">Manage context books and keyword-triggered entries</span>
         </div>
         <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 18 15 12 9 6"/>
@@ -922,7 +922,7 @@ export function renderFileList(directory: PromptDirectory, files: string[]): str
               class="settings-file-delete"
               onclick="event.stopPropagation(); Psycheros.deleteCustomFile('${escapeHtml(file)}')"
               title="Delete file"
-            >🗑️</button>`
+            ><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>`
           : "";
         return `<button
           class="settings-file-item"
@@ -930,7 +930,10 @@ export function renderFileList(directory: PromptDirectory, files: string[]): str
           hx-target="#settings-content"
           hx-swap="innerHTML"
         >
-          <span class="settings-file-icon">📄</span>
+          <svg class="settings-file-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
           <span class="settings-file-name">${escapeHtml(displayName)}</span>
           ${deleteButton}
         </button>`;
@@ -946,14 +949,15 @@ export function renderFileList(directory: PromptDirectory, files: string[]): str
 /**
  * Render the active tab indicator as an OOB swap.
  */
-function renderTabActiveState(activeDir: PromptDirectory): string {
-  const tabs = ["self", "user", "relationship", "custom"];
+function renderTabActiveState(activeDir: PromptDirectory | "snapshots"): string {
+  const tabs = ["self", "user", "relationship", "custom", "snapshots"];
   return tabs.map((dir) => {
     const isActive = dir === activeDir;
-    const label = dir === "custom" ? "Custom" : dir.charAt(0).toUpperCase() + dir.slice(1);
+    const label = dir === "custom" ? "Custom" : dir === "snapshots" ? "Snapshots" : dir.charAt(0).toUpperCase() + dir.slice(1);
+    const url = dir === "snapshots" ? "/fragments/settings/snapshots" : `/fragments/settings/core-prompts/${dir}`;
     return `<button
       class="settings-tab${isActive ? " active" : ""}"
-      hx-get="/fragments/settings/core-prompts/${dir}"
+      hx-get="${url}"
       hx-target="#settings-content"
       hx-swap="innerHTML"
       hx-swap-oob="true"
@@ -1070,7 +1074,7 @@ export function renderSnapshotsView(
         hx-target="#settings-content"
         hx-swap="innerHTML"
       >Create Manual Snapshot</button>
-    </div>`;
+    </div>` + renderTabActiveState("snapshots");
   }
 
   let html = `<div class="snapshots-header">
@@ -1112,6 +1116,9 @@ export function renderSnapshotsView(
 
     html += `</div>`;
   }
+
+  // OOB swap to update active tab
+  html += renderTabActiveState("snapshots");
 
   return html;
 }
@@ -1374,7 +1381,7 @@ export function renderLorebookDetailView(book: Lorebook, entries: LorebookEntry[
           Enabled
         </label>
         <label class="checkbox-label">
-          <input type="checkbox" name="sticky" onchange="const durInput = document.getElementById('entry-stickyDuration'); if (this.checked) { durInput.disabled = false; durInput.style.opacity = '1'; durInput.style.pointerEvents = 'auto'; } else { durInput.disabled = true; durInput.style.opacity = '0.5'; durInput.style.pointerEvents = 'none'; }" />
+          <input type="checkbox" name="sticky" onchange="toggleStickyDuration(this)" />
           Sticky
         </label>
       </div>
@@ -1500,7 +1507,7 @@ export function renderEntryEditor(entry: LorebookEntry): string {
         Enabled
       </label>
       <label class="checkbox-label">
-        <input type="checkbox" name="sticky" ${entry.sticky ? 'checked' : ''} onchange="const durInput = document.getElementById('entry-stickyDuration'); if (this.checked) { durInput.disabled = false; durInput.style.opacity = '1'; durInput.style.pointerEvents = 'auto'; } else { durInput.disabled = true; durInput.style.opacity = '0.5'; durInput.style.pointerEvents = 'none'; }" />
+        <input type="checkbox" name="sticky" ${entry.sticky ? 'checked' : ''} onchange="toggleStickyDuration(this)" />
         Sticky
       </label>
     </div>
@@ -1730,455 +1737,7 @@ export function renderGraphView(stats: {
   </div>
 </div>
 
-<style>
-/* ─── Graph View ─────────────────────────────────────────────────────────── */
-/* Namespaced with .gv- to avoid conflicts with app-wide styles              */
-
-.gv {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  background: var(--c-bg);
-  color: var(--c-fg);
-  font-family: var(--font-sans);
-}
-
-/* Header */
-.gv-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--c-border);
-  background: var(--c-bg-raised);
-  gap: var(--sp-3);
-  flex-shrink: 0;
-}
-.gv-header-left {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  min-width: 0;
-}
-.gv-title-block { min-width: 0; }
-.gv-title {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--c-accent);
-  letter-spacing: 0.02em;
-}
-.gv-stats {
-  display: flex;
-  gap: var(--sp-2);
-  font-size: var(--font-size-xs);
-  color: var(--c-fg-muted);
-  font-family: var(--font-mono);
-  margin-top: 2px;
-}
-.gv-stats strong { color: var(--c-fg); font-weight: var(--font-weight-medium); }
-.gv-stats-sep { opacity: 0.3; }
-.gv-header-actions { flex-shrink: 0; }
-
-/* Toolbar */
-.gv-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-4);
-  border-bottom: 1px solid var(--c-border);
-  background: var(--c-bg-raised);
-  flex-shrink: 0;
-}
-.gv-toolbar-controls {
-  display: flex;
-  gap: 2px;
-}
-.gv-search {
-  flex: 1;
-  min-width: 0;
-  padding: var(--sp-1) var(--sp-3);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-sm);
-  background: var(--c-bg-sunken);
-  color: var(--c-fg);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-sans);
-  outline: none;
-  transition: border-color var(--transition);
-}
-.gv-search:focus {
-  border-color: var(--c-accent);
-  box-shadow: 0 0 0 2px var(--c-accent-subtle);
-}
-.gv-search::placeholder { color: var(--c-fg-subtle); }
-.gv-filter {
-  padding: var(--sp-1) var(--sp-2);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-sm);
-  background: var(--c-bg-sunken);
-  color: var(--c-fg);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-sans);
-  cursor: pointer;
-  outline: none;
-  max-width: 120px;
-}
-.gv-filter:focus { border-color: var(--c-accent); }
-
-/* Canvas */
-.gv-canvas {
-  flex: 1;
-  position: relative;
-  background: var(--c-bg);
-  overflow: hidden;
-  min-height: 0;
-}
-.vis-network { outline: none !important; }
-
-/* Loading */
-.gv-loading {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-}
-.gv-spinner {
-  width: 28px; height: 28px;
-  border: 2px solid var(--c-border-strong);
-  border-top-color: var(--c-accent);
-  border-radius: 50%;
-  animation: gv-spin 0.8s linear infinite;
-}
-@keyframes gv-spin { to { transform: rotate(360deg); } }
-
-/* Empty state */
-.gv-empty {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: var(--c-fg-muted);
-  font-size: var(--font-size-sm);
-}
-.gv-empty svg { margin-bottom: var(--sp-3); }
-.gv-empty p { margin: var(--sp-1) 0; }
-.gv-empty-hint { font-size: var(--font-size-xs); color: var(--c-fg-subtle); }
-
-/* ─── Node Detail Panel ──────────────────────────────────────────────────── */
-.gv-panel {
-  position: absolute;
-  top: 0; right: 0;
-  width: 280px;
-  max-width: 85vw;
-  height: 100%;
-  background: var(--c-bg-raised);
-  border-left: 1px solid var(--c-border);
-  box-shadow: -4px 0 16px rgba(0,0,0,0.4);
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  transform: translateX(100%);
-  transition: transform 0.2s ease;
-}
-.gv-panel.gv-panel-open {
-  transform: translateX(0);
-}
-.gv-panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--sp-3) var(--sp-4);
-  border-bottom: 1px solid var(--c-border);
-  flex-shrink: 0;
-}
-.gv-panel-header h3 {
-  margin: 0;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--c-fg-strong);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.gv-panel-body {
-  padding: var(--sp-3) var(--sp-4);
-  overflow-y: auto;
-  flex: 1;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Detail rows inside panel */
-.gv-detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--sp-2) 0;
-  border-bottom: 1px solid var(--c-border);
-  font-size: var(--font-size-sm);
-}
-.gv-detail-label {
-  color: var(--c-fg-muted);
-  font-size: var(--font-size-xs);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  font-family: var(--font-mono);
-}
-.gv-detail-value {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  color: var(--c-fg);
-}
-.gv-detail-section {
-  margin-top: var(--sp-4);
-}
-.gv-detail-desc {
-  margin: var(--sp-1) 0 0;
-  font-size: var(--font-size-sm);
-  color: var(--c-fg);
-  line-height: var(--line-height);
-}
-.gv-conn-list {
-  list-style: none;
-  padding: 0;
-  margin: var(--sp-2) 0 0;
-}
-.gv-conn-list li {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-1) 0;
-  font-size: var(--font-size-sm);
-  border-bottom: 1px solid var(--c-border);
-}
-.gv-conn-list li:last-child { border-bottom: none; }
-.gv-conn-dir { color: var(--c-accent); font-family: var(--font-mono); font-size: var(--font-size-xs); }
-.gv-conn-type { color: var(--c-fg-muted); font-family: var(--font-mono); font-size: var(--font-size-xs); }
-.gv-conn-label { color: var(--c-fg); }
-.gv-node-id {
-  display: block;
-  font-size: var(--font-size-xs);
-  color: var(--c-fg-subtle);
-  font-family: var(--font-mono);
-  word-break: break-all;
-  margin-top: var(--sp-1);
-  padding: var(--sp-1) var(--sp-2);
-  background: var(--c-bg-sunken);
-  border-radius: var(--radius-sm);
-}
-.gv-edit-btn {
-  width: 100%;
-  margin-top: var(--sp-4);
-  justify-content: center;
-}
-
-/* ─── Modal ──────────────────────────────────────────────────────────────── */
-.gv-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 200;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.15s ease;
-  padding: var(--sp-4);
-}
-.gv-modal.gv-modal-open {
-  opacity: 1;
-  pointer-events: auto;
-}
-.gv-modal-box {
-  background: var(--c-bg-raised);
-  border: 1px solid var(--c-border-strong);
-  border-radius: var(--radius-md);
-  padding: var(--sp-6);
-  width: 100%;
-  max-width: 380px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
-  transform: scale(0.95);
-  transition: transform 0.15s ease;
-}
-.gv-modal.gv-modal-open .gv-modal-box {
-  transform: scale(1);
-}
-.gv-modal-box h3 {
-  margin: 0 0 var(--sp-4);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-  color: var(--c-fg-strong);
-}
-
-/* Form fields */
-.gv-field {
-  margin-bottom: var(--sp-4);
-}
-.gv-field label {
-  display: block;
-  font-size: var(--font-size-xs);
-  color: var(--c-fg-muted);
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--sp-1);
-}
-.gv-field input[type="text"],
-.gv-field textarea,
-.gv-field select {
-  width: 100%;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-sm);
-  background: var(--c-bg-sunken);
-  color: var(--c-fg);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-sans);
-  outline: none;
-  transition: border-color var(--transition);
-  box-sizing: border-box;
-}
-.gv-field input:focus,
-.gv-field textarea:focus,
-.gv-field select:focus {
-  border-color: var(--c-accent);
-  box-shadow: 0 0 0 2px var(--c-accent-subtle);
-}
-.gv-field textarea { resize: vertical; min-height: 48px; }
-.gv-range-row {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-.gv-range-row input[type="range"] {
-  flex: 1;
-  accent-color: var(--c-accent);
-  height: 4px;
-}
-.gv-range-val {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-  min-width: 2em;
-  text-align: right;
-}
-.gv-modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--sp-2);
-  margin-top: var(--sp-4);
-}
-
-/* ─── Bottom Action Bar ──────────────────────────────────────────────────── */
-.gv-actions {
-  display: flex;
-  gap: var(--sp-1);
-  padding: var(--sp-2) var(--sp-4);
-  background: var(--c-bg-raised);
-  border-top: 1px solid var(--c-border);
-  flex-shrink: 0;
-}
-.gv-action-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--font-size-sm);
-  flex: 1;
-  justify-content: center;
-  padding: var(--sp-2) var(--sp-3);
-}
-.gv-action-btn:not(:disabled):hover {
-  color: var(--c-accent);
-  border-color: var(--c-accent-muted);
-}
-.gv-action-danger:not(:disabled):hover {
-  color: var(--c-error);
-  border-color: var(--c-error);
-}
-
-/* ─── Back button override ───────────────────────────────────────────────── */
-.gv-header .settings-back-btn {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: var(--sp-1) var(--sp-2);
-  border-radius: var(--radius-sm);
-  color: var(--c-fg-muted);
-  font-size: var(--font-size-sm);
-  text-decoration: none;
-  transition: color var(--transition), background var(--transition);
-  flex-shrink: 0;
-}
-.gv-header .settings-back-btn:hover {
-  color: var(--c-accent);
-  background: var(--c-accent-subtle);
-}
-
-/* ─── Toast ──────────────────────────────────────────────────────────────── */
-#gv-toast-container {
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-  pointer-events: none;
-}
-.gv-toast {
-  background: var(--c-bg-raised);
-  border: 1px solid var(--c-border-strong);
-  color: var(--c-fg);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-sans);
-  padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
-  opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 0.2s ease, transform 0.2s ease;
-  pointer-events: auto;
-  max-width: 340px;
-  text-align: center;
-}
-.gv-toast.gv-toast-visible {
-  opacity: 1;
-  transform: translateY(0);
-}
-
-/* ─── Mobile ─────────────────────────────────────────────────────────────── */
-@media (max-width: 600px) {
-  .gv-header { padding: var(--sp-2) var(--sp-3); }
-  .gv-toolbar {
-    flex-wrap: wrap;
-    padding: var(--sp-2) var(--sp-3);
-    gap: var(--sp-2);
-  }
-  .gv-toolbar-controls { order: 1; }
-  .gv-search { order: 3; flex-basis: 100%; }
-  .gv-filter { order: 2; flex: 1; max-width: none; }
-  .gv-panel {
-    width: 100%;
-    max-width: 100vw;
-    border-left: none;
-    border-top: 1px solid var(--c-border);
-    top: auto;
-    bottom: 0;
-    height: 55vh;
-    transform: translateY(100%);
-    border-radius: var(--radius-md) var(--radius-md) 0 0;
-  }
-  .gv-panel.gv-panel-open { transform: translateY(0); }
-  .gv-actions { padding: var(--sp-2) var(--sp-3); }
-  .gv-action-btn span { display: none; }
-  .gv-action-btn { flex: 0; padding: var(--sp-2); }
-  .gv-stats { display: none; }
-}
-</style>
+<!-- Graph styles in graph.css -->
 `;
 }
 
@@ -2202,10 +1761,10 @@ export function renderAppearanceSettings(): string {
   </div>
   <div class="settings-content" id="settings-content">
 
-    <!-- Color Theme Section -->
+    <!-- Accent Color Section -->
     <section class="theme-section">
-      <h3 class="theme-section-title">Color Theme</h3>
-      <p class="theme-section-desc">Choose a predefined accent color or create your own</p>
+      <h3 class="theme-section-title">Accent Color</h3>
+      <p class="theme-section-desc">Choose a preset or pick a custom color</p>
       <div class="theme-grid" id="theme-grid">
         <button class="theme-swatch" data-theme="phosphor" title="Phosphor Green" style="--swatch-color: #39ff14">
           <span class="swatch-preview"></span>
@@ -2239,18 +1798,21 @@ export function renderAppearanceSettings(): string {
           <span class="swatch-preview"></span>
           <span class="swatch-name">Slate</span>
         </button>
+        <button class="theme-swatch" data-theme="custom" title="Custom Color" style="--swatch-color: #888888">
+          <span class="swatch-preview swatch-preview--custom">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.71 4.63l-1.34-1.34c-.37-.39-1.02-.39-1.41 0L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.04 0-1.41z"/>
+              <path d="M7 14l-4.69 4.69a1 1 0 0 0-.21.33l-1 3a1 1 0 0 0 1.21 1.21l3-1a1 1 0 0 0 .33-.21L10 18"/>
+            </svg>
+          </span>
+          <span class="swatch-name">Custom</span>
+        </button>
       </div>
-    </section>
-
-    <!-- Custom Color Section -->
-    <section class="theme-section">
-      <h3 class="theme-section-title">Custom Accent Color</h3>
-      <p class="theme-section-desc">Enter a hex color or use the color picker</p>
-      <div class="custom-color-input">
+      <div class="custom-color-row" id="custom-color-row" style="display: none;">
         <input type="color" id="custom-color-picker" class="color-picker" value="#39ff14">
         <input type="text" id="custom-color-hex" class="color-hex-input" placeholder="#39ff14" maxlength="7">
-        <button class="btn btn--ghost btn--sm" onclick="Theme.reset()">Reset to Default</button>
       </div>
+      <button class="btn btn--ghost btn--sm" onclick="Theme.reset(); initAppearance();" style="margin-top: var(--sp-3);">Reset to Default</button>
     </section>
 
     <!-- Background Image Section -->
@@ -2298,342 +1860,83 @@ export function renderAppearanceSettings(): string {
       <h3 class="theme-section-title">Glass Effect</h3>
       <p class="theme-section-desc">Enable frosted glass effect on UI panels when background is active</p>
       <label class="toggle-label">
-        <input type="checkbox" id="glass-toggle" onchange="toggleGlass(this.checked)">
+        <input type="checkbox" id="glass-toggle" role="switch" aria-label="Enable Glass Effect" onchange="toggleGlass(this.checked)">
         <span class="toggle-slider"></span>
         <span class="toggle-text">Enable Glass Effect</span>
       </label>
     </section>
 
+    <!-- Status messages -->
+    <div id="appearance-status" class="settings-status"></div>
+
   </div>
 </div>
 
-<style>
-.theme-section {
-  margin-bottom: var(--sp-6);
-  padding: var(--sp-4);
-  background: var(--c-bg-raised);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-md);
-}
-
-.theme-section-title {
-  margin: 0 0 var(--sp-1);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-  color: var(--c-fg);
-}
-
-.theme-section-desc {
-  margin: 0 0 var(--sp-4);
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-}
-
-/* Theme swatch grid */
-.theme-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-  gap: var(--sp-3);
-}
-
-.theme-swatch {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-3);
-  background: var(--c-bg);
-  border: 2px solid var(--c-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.theme-swatch:hover {
-  border-color: var(--swatch-color);
-  box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
-}
-
-.theme-swatch.active {
-  border-color: var(--swatch-color);
-  background: rgba(var(--swatch-color), 0.1);
-  box-shadow: 0 0 12px var(--swatch-color);
-}
-
-.swatch-preview {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: var(--swatch-color);
-  box-shadow: 0 0 8px var(--swatch-color);
-}
-
-.swatch-name {
-  font-size: var(--font-size-xs);
-  color: var(--c-fg-muted);
-  font-family: var(--font-sans);
-}
-
-/* Custom color input */
-.custom-color-input {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.color-picker {
-  width: 48px;
-  height: 48px;
-  padding: 0;
-  border: 2px solid var(--c-border);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  background: transparent;
-}
-
-.color-picker::-webkit-color-swatch-wrapper {
-  padding: 4px;
-}
-
-.color-picker::-webkit-color-swatch {
-  border: none;
-  border-radius: 4px;
-}
-
-.color-hex-input {
-  width: 120px;
-  padding: var(--sp-2) var(--sp-3);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  background: var(--c-bg);
-  border: 1px solid var(--c-border);
-  border-radius: var(--radius-sm);
-  color: var(--c-fg);
-}
-
-.color-hex-input:focus {
-  outline: none;
-  border-color: var(--c-accent);
-  box-shadow: 0 0 0 2px var(--c-accent-subtle);
-}
-
-/* Background controls */
-.bg-controls {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-}
-
-.bg-url-input {
-  display: flex;
-  gap: var(--sp-2);
-}
-
-.bg-url-input .input-field {
-  flex: 1;
-  padding: var(--sp-2) var(--sp-3);
-  font-size: var(--font-size-sm);
-}
-
-.bg-upload-area {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.bg-upload-label {
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-}
-
-.upload-btn {
-  cursor: pointer;
-}
-
-/* Background gallery */
-.bg-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: var(--sp-2);
-  min-height: 0;
-}
-
-.bg-gallery-item {
-  position: relative;
-  aspect-ratio: 16/9;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: border-color var(--transition);
-}
-
-.bg-gallery-item:hover {
-  border-color: var(--c-accent);
-}
-
-.bg-gallery-item.active {
-  border-color: var(--c-accent);
-  box-shadow: 0 0 8px var(--c-accent-glow);
-}
-
-.bg-gallery-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.bg-gallery-item .delete-btn {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.7);
-  border: none;
-  border-radius: 50%;
-  color: #ff4444;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--transition);
-}
-
-.bg-gallery-item:hover .delete-btn {
-  opacity: 1;
-}
-
-/* Sliders */
-.bg-sliders {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-  padding: var(--sp-3);
-  background: var(--c-bg);
-  border-radius: var(--radius-sm);
-}
-
-.slider-group {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.slider-group label {
-  width: 60px;
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-}
-
-.slider-group input[type="range"] {
-  flex: 1;
-  height: 4px;
-  background: var(--c-border);
-  border-radius: 2px;
-  outline: none;
-  -webkit-appearance: none;
-}
-
-.slider-group input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  background: var(--c-accent);
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 0 8px var(--c-accent-glow);
-}
-
-.slider-group span {
-  width: 40px;
-  font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
-  color: var(--c-fg-muted);
-  text-align: right;
-}
-
-/* Toggle */
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  cursor: pointer;
-}
-
-.toggle-label input {
-  display: none;
-}
-
-.toggle-slider {
-  width: 44px;
-  height: 24px;
-  background: var(--c-border);
-  border-radius: 12px;
-  position: relative;
-  transition: background var(--transition);
-}
-
-.toggle-slider::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  background: var(--c-fg-muted);
-  border-radius: 50%;
-  transition: all var(--transition);
-}
-
-.toggle-label input:checked + .toggle-slider {
-  background: var(--c-accent);
-}
-
-.toggle-label input:checked + .toggle-slider::after {
-  transform: translateX(20px);
-  background: #000;
-}
-
-.toggle-text {
-  font-size: var(--font-size-sm);
-  color: var(--c-fg);
-}
-</style>
-
 <script>
-// Initialize appearance settings from saved theme
-(function() {
-  const theme = Theme.get();
+function showAppearanceStatus(type, message) {
+  const el = document.getElementById('appearance-status');
+  if (!el) return;
+  el.className = 'settings-status visible ' + type;
+  el.textContent = message;
+  if (type !== 'error') {
+    setTimeout(() => { el.className = 'settings-status'; }, 3000);
+  }
+}
 
-  // Update swatches
+// Initialize appearance settings from saved theme
+function initAppearance() {
+  const theme = Theme.get();
+  const customRow = document.getElementById('custom-color-row');
+  const colorPicker = document.getElementById('custom-color-picker');
+  const colorHex = document.getElementById('custom-color-hex');
+  const customSwatch = document.querySelector('.theme-swatch[data-theme="custom"]');
+
+  // Determine active state
+  const isCustom = !!theme.customAccent;
+
+  // Update all swatches
   document.querySelectorAll('.theme-swatch').forEach(el => {
-    el.classList.toggle('active', el.dataset.theme === theme.preset);
+    const isPresetMatch = !isCustom && el.dataset.theme === theme.preset;
+    const isCustomMatch = isCustom && el.dataset.theme === 'custom';
+    el.classList.toggle('active', isPresetMatch || isCustomMatch);
+
     el.onclick = () => {
       document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
       el.classList.add('active');
-      Theme.setPreset(el.dataset.theme);
+      if (el.dataset.theme === 'custom') {
+        customRow.style.display = 'flex';
+        // Apply whatever is in the picker
+        const hex = colorPicker.value;
+        Theme.setCustomAccent(hex);
+        customSwatch.style.setProperty('--swatch-color', hex);
+      } else {
+        customRow.style.display = 'none';
+        Theme.setPreset(el.dataset.theme);
+      }
     };
   });
 
-  // Update custom color
-  const colorPicker = document.getElementById('custom-color-picker');
-  const colorHex = document.getElementById('custom-color-hex');
-  if (theme.customAccent) {
+  // Set custom swatch color and show/hide picker
+  if (isCustom) {
+    customRow.style.display = 'flex';
     colorPicker.value = theme.customAccent;
     colorHex.value = theme.customAccent;
+    customSwatch.style.setProperty('--swatch-color', theme.customAccent);
+  } else {
+    customRow.style.display = 'none';
   }
+
+  // Bind color picker events
   colorPicker.oninput = () => {
     colorHex.value = colorPicker.value;
-    document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
     Theme.setCustomAccent(colorPicker.value);
+    customSwatch.style.setProperty('--swatch-color', colorPicker.value);
   };
   colorHex.onchange = () => {
     if (/^#[0-9a-fA-F]{6}$/.test(colorHex.value)) {
       colorPicker.value = colorHex.value;
-      document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
       Theme.setCustomAccent(colorHex.value);
+      customSwatch.style.setProperty('--swatch-color', colorHex.value);
     }
   };
 
@@ -2649,7 +1952,8 @@ export function renderAppearanceSettings(): string {
 
   // Load background gallery
   loadBackgroundGallery();
-})();
+}
+initAppearance();
 
 function updateBgBlur(value) {
   document.getElementById('bg-blur-value').textContent = value + 'px';
@@ -2685,7 +1989,7 @@ async function uploadBackground(file) {
     Theme.setBackground(result.url);
     await loadBackgroundGallery();
   } else {
-    alert('Upload failed: ' + result.error);
+    showAppearanceStatus('error', 'Upload failed: ' + result.error);
   }
 }
 
@@ -2724,7 +2028,7 @@ async function deleteBackground(filename) {
       }
       await loadBackgroundGallery();
     } else {
-      alert('Delete failed: ' + result.error);
+      showAppearanceStatus('error', 'Delete failed: ' + result.error);
     }
   }
 }
@@ -2857,7 +2161,7 @@ export function renderLLMSettings(settings: LLMSettings): string {
       <h3 class="theme-section-title">Behavior</h3>
       <p class="theme-section-desc">Chain-of-thought and reasoning settings</p>
       <label class="toggle-label">
-        <input type="checkbox" id="llm-thinking" ${settings.thinkingEnabled ? "checked" : ""}>
+        <input type="checkbox" id="llm-thinking" role="switch" aria-label="Chain-of-Thought Reasoning" ${settings.thinkingEnabled ? "checked" : ""}>
         <span class="toggle-slider"></span>
         <span class="toggle-text">Chain-of-Thought Reasoning</span>
       </label>
@@ -2866,10 +2170,10 @@ export function renderLLMSettings(settings: LLMSettings): string {
     <!-- Actions -->
     <div class="llm-actions">
       <div class="llm-actions-left">
-        <button class="btn btn--primary" onclick="saveLLMSettings()">Save Settings</button>
+        <button class="btn btn--primary" onclick="saveLLMSettings(event)">Save Settings</button>
         <button class="btn btn--ghost" onclick="testLLMConnection()" id="test-connection-btn">Test Connection</button>
       </div>
-      <button class="btn btn--ghost" onclick="resetLLMDefaults()">Reset to Defaults</button>
+      <button class="btn btn--ghost" onclick="resetLLMDefaults(event)">Reset to Defaults</button>
     </div>
 
     <!-- Status -->
@@ -2877,210 +2181,6 @@ export function renderLLMSettings(settings: LLMSettings): string {
 
   </div>
 </div>
-
-<style>
-/* LLM Settings Form */
-.llm-fields {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-3);
-}
-
-.llm-field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-1);
-}
-
-.llm-field label {
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-  font-weight: var(--font-weight-medium);
-}
-
-.llm-field-row {
-  display: flex;
-  gap: var(--sp-4);
-  flex-wrap: wrap;
-}
-
-.llm-field.inline {
-  flex: 1;
-  min-width: 150px;
-}
-
-.llm-input {
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-}
-
-.llm-input.sm {
-  max-width: 160px;
-}
-
-.llm-api-key-row {
-  display: flex;
-  gap: var(--sp-2);
-  align-items: center;
-}
-
-.llm-api-key-row .llm-input {
-  flex: 1;
-}
-
-.llm-toggle-key {
-  flex-shrink: 0;
-  color: var(--c-fg-muted);
-}
-
-.llm-toggle-key:hover {
-  color: var(--c-accent);
-}
-
-.label-hint {
-  font-weight: var(--font-weight-normal);
-  color: var(--c-fg-subtle);
-  font-size: var(--font-size-xs);
-}
-
-/* Sliders */
-.llm-sliders {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-4);
-}
-
-.slider-group {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-}
-
-.slider-group label {
-  font-size: var(--font-size-sm);
-  color: var(--c-fg-muted);
-  font-weight: var(--font-weight-medium);
-  min-width: 140px;
-}
-
-.slider-group input[type="range"] {
-  flex: 1;
-  height: 4px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: var(--c-border);
-  border-radius: 2px;
-  outline: none;
-}
-
-.slider-group input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--c-accent);
-  cursor: pointer;
-  box-shadow: 0 0 6px var(--c-accent-glow);
-}
-
-.slider-group span {
-  font-size: var(--font-size-sm);
-  font-family: var(--font-mono);
-  color: var(--c-fg-muted);
-  min-width: 40px;
-  text-align: right;
-}
-
-/* Toggle switch */
-.toggle-label {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-3);
-  cursor: pointer;
-}
-
-.toggle-label input {
-  display: none;
-}
-
-.toggle-slider {
-  width: 44px;
-  height: 24px;
-  background: var(--c-border);
-  border-radius: 12px;
-  position: relative;
-  transition: background var(--transition);
-}
-
-.toggle-slider::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 20px;
-  height: 20px;
-  background: var(--c-fg-muted);
-  border-radius: 50%;
-  transition: all var(--transition);
-}
-
-.toggle-label input:checked + .toggle-slider {
-  background: var(--c-accent);
-}
-
-.toggle-label input:checked + .toggle-slider::after {
-  transform: translateX(20px);
-  background: #000;
-}
-
-.toggle-text {
-  font-size: var(--font-size-sm);
-  color: var(--c-fg);
-}
-
-/* Actions */
-.llm-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--sp-3);
-  padding-top: var(--sp-4);
-  border-top: 1px solid var(--c-border);
-  margin-top: var(--sp-4);
-}
-
-.llm-actions-left {
-  display: flex;
-  gap: var(--sp-2);
-}
-
-/* Status */
-.llm-status {
-  margin-top: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  font-family: var(--font-mono);
-}
-
-.llm-status.success {
-  background: rgba(57, 255, 20, 0.08);
-  border: 1px solid rgba(57, 255, 20, 0.2);
-  color: var(--c-accent);
-}
-
-.llm-status.error {
-  background: rgba(255, 68, 68, 0.08);
-  border: 1px solid rgba(255, 68, 68, 0.2);
-  color: var(--c-error);
-}
-
-.llm-status.loading {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--c-border);
-  color: var(--c-fg-muted);
-}
-</style>
 
 <script>
 let apiKeyVisible = false;
@@ -3117,8 +2217,8 @@ function showStatus(type, message) {
   el.textContent = message;
 }
 
-async function saveLLMSettings() {
-  const btn = event.target;
+async function saveLLMSettings(event) {
+  const btn = event.currentTarget;
   btn.disabled = true;
   btn.textContent = 'Saving...';
   showStatus('loading', 'Saving settings...');
@@ -3172,21 +2272,47 @@ async function testLLMConnection() {
   }
 }
 
-async function resetLLMDefaults() {
-  if (!confirm('Reset all LLM settings to defaults? This will reload values from your .env file.')) return;
-  showStatus('loading', 'Resetting...');
+let resetPending = false;
+async function resetLLMDefaults(event) {
+  const btn = event.currentTarget;
+  if (!resetPending) {
+    resetPending = true;
+    btn.textContent = 'Confirm Reset?';
+    btn.classList.add('btn--danger');
+    btn.classList.remove('btn--ghost');
+    setTimeout(() => {
+      if (resetPending) {
+        resetPending = false;
+        btn.textContent = 'Reset to Defaults';
+        btn.classList.remove('btn--danger');
+        btn.classList.add('btn--ghost');
+      }
+    }, 3000);
+    return;
+  }
+  resetPending = false;
+  btn.textContent = 'Resetting...';
+  btn.disabled = true;
+  showStatus('loading', 'Resetting to defaults...');
 
   try {
-    const resp = await fetch('/api/llm-settings');
-    const current = await resp.json();
-
-    // Clear saved settings by saving the current env-based defaults
-    // We just reload the page to pick up fresh values
-    const settings = gatherSettings();
-    // Reset to a known-good set - just reload the page
-    window.location.reload();
+    const resp = await fetch('/api/llm-settings/reset', { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      htmx.ajax('GET', '/fragments/settings/llm', { target: '#chat', swap: 'innerHTML' });
+    } else {
+      showStatus('error', 'Failed to reset: ' + (data.error || 'Unknown error'));
+      btn.disabled = false;
+      btn.textContent = 'Reset to Defaults';
+      btn.classList.remove('btn--danger');
+      btn.classList.add('btn--ghost');
+    }
   } catch (e) {
     showStatus('error', 'Failed to reset: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'Reset to Defaults';
+    btn.classList.remove('btn--danger');
+    btn.classList.add('btn--ghost');
   }
 }
 </script>
