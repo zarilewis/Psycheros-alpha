@@ -26,6 +26,8 @@
 }
 
 .logo {
+  display: flex;
+  align-items: baseline;
   font-family: var(--font-mono);
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
@@ -37,7 +39,6 @@
 }
 
 .logo-sub {
-  display: inline-block;
   max-width: 40vw;
   color: var(--c-fg-muted);
   font-weight: var(--font-weight-normal);
@@ -47,7 +48,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  vertical-align: baseline;
 }
 
 .sidebar-toggle {
