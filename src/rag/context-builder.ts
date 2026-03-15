@@ -151,7 +151,7 @@ export async function buildGraphContext(
       }
     }
 
-    // Include anchor nodes ("me"/"user") if referenced by edges but not yet in results
+    // Include connected nodes referenced by edges but not yet in results
     for (const edge of allEdges) {
       for (const refId of [edge.fromId, edge.toId]) {
         if (!nodesById.has(refId)) {
