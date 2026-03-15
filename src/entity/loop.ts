@@ -24,6 +24,7 @@
  */
 
 import type { LLMClient, StreamChunk, ChatMessage } from "../llm/mod.ts";
+import { LLMError } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
 import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics, LLMContextSnapshot } from "../types.ts";
@@ -463,6 +464,17 @@ export class EntityTurn {
       // If there was a stream error, re-throw it after persisting
       if (streamError) {
         throw streamError;
+      }
+
+      // Detect upstream error finish reasons (e.g. Z.ai returning "network_error")
+      // that completed the stream without throwing but produced no usable content.
+      const expectedFinishReasons = new Set(["stop", "tool_calls", "length"]);
+      if (!expectedFinishReasons.has(finishReason) && !hasContent) {
+        throw new LLMError(
+          `LLM stream completed with unexpected finish_reason="${finishReason}" and no content — ` +
+          "the upstream API may have encountered an internal error",
+          "NETWORK_ERROR",
+        );
       }
 
       // If no tool calls, we're done

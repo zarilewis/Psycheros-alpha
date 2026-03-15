@@ -103,7 +103,7 @@ export interface ChatDelta {
 export interface ChatChoice {
   index: number;
   delta: ChatDelta;
-  finish_reason?: "stop" | "tool_calls" | "length" | null;
+  finish_reason?: "stop" | "tool_calls" | "length" | "network_error" | string | null;
 }
 
 /**
