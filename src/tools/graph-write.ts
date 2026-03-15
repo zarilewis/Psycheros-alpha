@@ -261,9 +261,11 @@ async function executeGraphCreateNode(
 
   try {
     // Check for existing node with same label and type (duplicate prevention)
-    const existing = await ctx.config.mcpClient.searchGraphNodes(label, type, 5, 0.8);
-    const duplicate = existing.find(
-      (n) => n.label.toLowerCase() === label.toLowerCase() && n.type === type
+    // Use list endpoint (direct DB query) — semantic search misses nodes without embeddings
+    // (e.g., canonical "me"/"user" nodes created server-side by ensureCanonicalNodes)
+    const existingByType = await ctx.config.mcpClient.getGraphNodes({ type, limit: 100 });
+    const duplicate = existingByType.find(
+      (n) => n.label.toLowerCase() === label.toLowerCase()
     );
 
     if (duplicate) {
