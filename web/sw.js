@@ -8,7 +8,7 @@
  * - Static assets - Cache-first with background update
  */
 
-const CACHE_NAME = 'psycheros-v4';
+const CACHE_NAME = 'psycheros-v5';
 const STATIC_ASSETS = [
   '/',
   '/css/main.css',

@@ -202,7 +202,7 @@ export function renderAppShell(): string {
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Psycheros</title>
-  <link rel="stylesheet" href="/css/main.css?v=13">
+  <link rel="stylesheet" href="/css/main.css?v=14">
   ${getAccentColorOverride()}
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
