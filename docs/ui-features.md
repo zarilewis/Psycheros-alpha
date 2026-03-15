@@ -23,22 +23,24 @@ Built-in debugging tool for inspecting the full context sent to the LLM. Toggle 
 
 ## Temporal Awareness
 
-Every message includes an XML-tagged timestamp that the entity can see, enabling understanding of when events occurred and time gaps between messages.
+Every message includes an XML-tagged timestamp in the LLM context, enabling the entity to understand when events occurred and time gaps between messages.
 
 **Format**: `<t>YYYY-MM-DD HH:MM</t>`
 
-XML tags are used so the LLM treats timestamps as structural metadata rather than content to reproduce in responses.
+XML tags are used so the LLM treats timestamps as structural metadata. These tags are **stripped from rendered output** — the user never sees them. Instead, timestamps are displayed as proper UI elements in message headers (drawn from database `createdAt` metadata).
 
-**Example:**
+**LLM context example:**
 ```
 [user]: <t>2026-03-03 14:22</t> Hey, what did you think about our conversation yesterday?
 [assistant]: <t>2026-03-03 14:23</t> I enjoyed our discussion about...
 [user]: <t>2026-03-05 15:17</t> Can you summarize what we talked about?
 ```
 
-**Timezone**: Set `TZ` environment variable (e.g., `TZ=America/Los_Angeles`). Defaults to UTC.
+**Display timestamps**: Shown in `.msg-header` as `msg-timestamp` elements. Time-only for today ("3:42 PM"), date + time for older messages ("Mar 14, 3:42 PM"). Server-side via `formatMessageTime()` in `templates.ts`, client-side via `formatChatTimestamp()` in `psycheros.js`.
 
-Implemented in `src/entity/loop.ts` via `formatMessageTimestamp()`.
+**Timezone**: Set `TZ` environment variable (e.g., `TZ=America/Los_Angeles`). Defaults to UTC for backend; display timestamps use TZ for user-facing formatting.
+
+Implemented in `src/entity/loop.ts` via `formatMessageTimestamp()`. XML stripping in `src/server/markdown.ts` and `web/js/psycheros.js`.
 
 ## Stop Generation
 
@@ -74,10 +76,12 @@ Implemented in `web/js/psycheros.js` and `src/server/state-changes.ts`.
 
 ## Markdown Rendering
 
-Both user and assistant messages render markdown formatting.
+Both user and assistant messages render markdown formatting with progressive streaming.
 
-- **Server-side**: `renderMarkdown()` in `src/server/markdown.ts` uses `marked` + `DOMPurify`
-- **Client-side**: Raw text shown during streaming, parsed to markdown on `done` event
+- **Server-side**: `renderMarkdown()` in `src/server/markdown.ts` uses `marked` + `DOMPurify`. Strips LLM XML artifacts (`<t>` timestamp tags, non-HTML XML wrappers) before rendering.
+- **Client-side streaming**: Progressive markdown rendering — content is parsed and rendered live during streaming via debounced `marked.parse()` (40ms). A blinking block cursor (▌) appears inline during generation. Each content segment between tool calls is independently rendered.
+- **Client-side completion**: On `done` event, final render applied, cursor removed, thinking/tool sections collapsed.
+- **XML stripping**: `stripEntityXml()` removes `<t>timestamp</t>` tags (including content), partial tags at chunk boundaries, and non-HTML XML wrappers while preserving standard HTML tags.
 - **Supported**: Headers, lists, code blocks, blockquotes, tables, links, emphasis
 - **Dependencies**: `jsdom` provides DOM environment for DOMPurify sanitization
 

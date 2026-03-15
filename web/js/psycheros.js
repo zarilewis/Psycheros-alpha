@@ -570,23 +570,29 @@ async function sendMessage() {
   // Remove empty state if present
   document.getElementById('empty-state')?.remove();
 
-  // Add user message
+  // Add user message with timestamp
   const messages = document.getElementById('messages');
+  const userTime = formatChatTimestamp(new Date());
   if (messages) {
     messages.insertAdjacentHTML('beforeend', `
       <div class="msg msg--user">
-        <div class="msg-header">You</div>
+        <div class="msg-header">
+          <span class="msg-timestamp">${userTime}</span>
+          <span>You</span>
+        </div>
         <div class="msg-content">${escapeHtml(message)}</div>
       </div>
     `);
   }
 
-  // Create assistant message container
+  // Create assistant message container with current timestamp
   const assistantEl = document.createElement('div');
   assistantEl.className = 'msg msg--assistant';
+  const streamTime = formatChatTimestamp(new Date());
   assistantEl.innerHTML = `
     <div class="msg-header">
-      Assistant
+      <span>Assistant</span>
+      <span class="msg-timestamp">${streamTime}</span>
       <div class="streaming"><span></span><span></span><span></span></div>
     </div>
     <div class="msg-content"></div>
@@ -596,7 +602,7 @@ async function sendMessage() {
 
   let currentThinking = null;
   let currentContent = null;
-  let currentRawContent = ""; // Buffer for raw markdown during streaming
+  let currentSegmentRaw = ""; // Raw markdown buffer for current content segment
 
   // Create abort controller
   currentAbortController = new AbortController();
@@ -652,9 +658,9 @@ async function sendMessage() {
             setThinking: (el) => currentThinking = el,
             getContent: () => currentContent,
             setContent: (el) => currentContent = el,
-            getRawContent: () => currentRawContent,
-            setRawContent: (text) => currentRawContent = text,
-            appendRawContent: (text) => currentRawContent += text
+            getSegmentRaw: () => currentSegmentRaw,
+            setSegmentRaw: (text) => currentSegmentRaw = text,
+            appendSegmentRaw: (text) => currentSegmentRaw += text,
           });
           currentEventType = 'content';
           dataLines = [];
@@ -664,30 +670,46 @@ async function sendMessage() {
   } catch (error) {
     if (error.name === 'AbortError') {
       console.log('Request aborted by user');
+      // Freeze whatever content was streaming with a clean render
+      if (currentContent && currentSegmentRaw) {
+        renderFinalContent(currentContent, currentSegmentRaw);
+      }
       // Show stopped indicator
       const stoppedEl = document.createElement('div');
       stoppedEl.className = 'stopped-indicator';
       stoppedEl.textContent = '[Stopped]';
       assistantEl.querySelector('.msg-content')?.appendChild(stoppedEl);
-      return;
+      // Don't return — fall through to finally for full cleanup
+    } else {
+      console.error('Stream error:', error);
+      showToast('Failed to send message: ' + error.message);
+
+      const errorEl = document.createElement('div');
+      errorEl.style.color = 'var(--c-error)';
+      errorEl.textContent = 'Error: ' + error.message;
+      assistantEl.querySelector('.msg-content')?.appendChild(errorEl);
     }
 
-    console.error('Stream error:', error);
-    showToast('Failed to send message: ' + error.message);
-
-    const errorEl = document.createElement('div');
-    errorEl.style.color = 'var(--c-error)';
-    errorEl.textContent = 'Error: ' + error.message;
-    assistantEl.querySelector('.msg-content')?.appendChild(errorEl);
-
   } finally {
-    // Remove streaming indicator
+    // Kill any pending debounced render
+    if (_renderTimer) {
+      clearTimeout(_renderTimer);
+      _renderTimer = null;
+    }
+
+    // Remove streaming indicator (header dots)
     assistantEl.querySelector('.streaming')?.remove();
+
+    // Clean up all streaming artifacts from content area
+    assistantEl.querySelectorAll('.typing-cursor').forEach(el => el.remove());
+    assistantEl.querySelectorAll('.streaming-active').forEach(el => {
+      el.classList.remove('streaming-active');
+    });
 
     // Clear state
     pendingToolCalls.clear();
     currentAbortController = null;
-    currentRawContent = ""; // Reset markdown buffer
+    currentSegmentRaw = ""; // Reset markdown buffer
 
     // Re-enable input
     if (input) input.disabled = false;
@@ -704,6 +726,100 @@ async function sendMessage() {
     isStreaming = false;
     input?.focus();
   }
+}
+
+// =============================================================================
+// Streaming Content Renderer
+// =============================================================================
+
+/**
+ * Strip XML tags emitted by the LLM that shouldn't be displayed.
+ * Removes <t>timestamp</t> tags entirely (tag + content), and cleans
+ * up any resulting whitespace debris.
+ */
+function stripEntityXml(text) {
+  // Remove <t>...</t> timestamp tags and their content
+  let result = text.replace(/<t>[^<]*<\/t>\s*/g, '');
+  // Remove trailing partial <t> tag (chunk boundary artifact)
+  result = result.replace(/<t>[^<]*$/, '');
+  // Remove other non-HTML XML wrapper tags (keep inner content)
+  // Matches tags like <base_instructions>, <context>, etc. but NOT standard HTML
+  const htmlTags = new Set([
+    'a','b','i','u','p','br','hr','em','ol','ul','li','td','th','tr',
+    'h1','h2','h3','h4','h5','h6','pre','code','del','sub','sup','img',
+    'div','span','strong','table','thead','tbody','tfoot','blockquote',
+    'caption','details','summary','section','article','header','footer',
+  ]);
+  result = result.replace(/<\/?([a-z_][a-z0-9_-]*)\b[^>]*>/gi, (match, tag) => {
+    return htmlTags.has(tag.toLowerCase()) ? match : '';
+  });
+  // Collapse excessive whitespace left by removals
+  result = result.replace(/[ \t]{3,}/g, ' ');
+  result = result.replace(/\n{3,}/g, '\n\n');
+  return result;
+}
+
+/** Debounce timer for progressive markdown rendering */
+let _renderTimer = null;
+
+/**
+ * Render cleaned markdown into a content element (live, during streaming).
+ * Appends a typing cursor to the last block element.
+ */
+function renderStreamingContent(contentEl, rawContent) {
+  const cleaned = stripEntityXml(rawContent);
+  if (!cleaned.trim()) return;
+  try {
+    const html = marked.parse(cleaned);
+    contentEl.innerHTML = DOMPurify.sanitize(html);
+    // Append typing cursor to the last block element
+    const lastBlock = contentEl.lastElementChild || contentEl;
+    if (!lastBlock.querySelector('.typing-cursor')) {
+      const cursor = document.createElement('span');
+      cursor.className = 'typing-cursor';
+      cursor.textContent = '\u258C'; // ▌ block cursor character
+      lastBlock.appendChild(cursor);
+    }
+  } catch (e) {
+    console.error('Streaming markdown parse error:', e);
+    contentEl.textContent = cleaned;
+  }
+}
+
+/**
+ * Schedule a debounced streaming render. Renders immediately on first call,
+ * then debounces subsequent calls to avoid layout thrashing.
+ */
+function scheduleStreamingRender(contentEl, rawContent) {
+  if (_renderTimer) clearTimeout(_renderTimer);
+  _renderTimer = setTimeout(() => {
+    renderStreamingContent(contentEl, rawContent);
+    _renderTimer = null;
+  }, 40);
+}
+
+/**
+ * Final render: clean markdown with no cursor, used when freezing a
+ * content segment (on tool_call) or completing the stream (on done).
+ */
+function renderFinalContent(contentEl, rawContent) {
+  if (_renderTimer) {
+    clearTimeout(_renderTimer);
+    _renderTimer = null;
+  }
+  const cleaned = stripEntityXml(rawContent);
+  if (!cleaned.trim()) {
+    contentEl.remove();
+    return;
+  }
+  try {
+    const html = marked.parse(cleaned);
+    contentEl.innerHTML = DOMPurify.sanitize(html);
+  } catch (e) {
+    console.error('Final markdown parse error:', e);
+    contentEl.textContent = cleaned;
+  }
+  contentEl.classList.remove('streaming-active');
 }
 
 // =============================================================================
@@ -731,26 +847,34 @@ function handleSSEEvent(eventType, data, messageEl, state) {
       state.getThinking().textContent += data;
       break;
 
-    case 'content':
+    case 'content': {
       if (!state.getContent()) {
         const contentEl = document.createElement('div');
-        contentEl.className = 'assistant-text';
+        contentEl.className = 'assistant-text streaming-active';
         contentContainer.appendChild(contentEl);
         state.setContent(contentEl);
+        state.setSegmentRaw('');
       }
-      // Store raw markdown and show it during streaming
-      state.appendRawContent(data);
-      state.getContent().textContent += data;
+      // Accumulate raw content for this segment and schedule progressive render
+      state.appendSegmentRaw(data);
+      scheduleStreamingRender(state.getContent(), state.getSegmentRaw());
       break;
+    }
 
     case 'tool_call':
       try {
+        // Freeze the current content segment with a final render before tool card
+        if (state.getContent() && state.getSegmentRaw()) {
+          renderFinalContent(state.getContent(), state.getSegmentRaw());
+        }
+        state.setContent(null);
+        state.setSegmentRaw('');
+
         const toolCall = JSON.parse(data);
         const toolCard = createToolCard(toolCall);
         toolCard.dataset.toolCallId = toolCall.id;
         pendingToolCalls.set(toolCall.id, toolCard);
         contentContainer.appendChild(toolCard);
-        state.setContent(null);
       } catch (e) {
         console.error('Failed to parse tool call:', e);
       }
@@ -827,24 +951,26 @@ function handleSSEEvent(eventType, data, messageEl, state) {
       }
       break;
 
-    case 'done':
+    case 'done': {
       // Collapse all thinking and tool sections after streaming completes
       contentContainer.querySelectorAll('.thinking.expanded, .tool.expanded').forEach(el => {
         el.classList.remove('expanded');
       });
-      // Render markdown in content element after streaming completes
-      const contentEl = state.getContent();
-      const rawContent = state.getRawContent();
-      if (contentEl && rawContent) {
-        try {
-          const parsedHtml = marked.parse(rawContent);
-          contentEl.innerHTML = DOMPurify.sanitize(parsedHtml);
-        } catch (e) {
-          console.error('Failed to parse markdown:', e);
-          // Fallback: keep raw text
-        }
+
+      // Final render of the last content segment
+      const doneContentEl = state.getContent();
+      const doneSegmentRaw = state.getSegmentRaw();
+      if (doneContentEl && doneSegmentRaw) {
+        renderFinalContent(doneContentEl, doneSegmentRaw);
       }
+
+      // Remove any lingering cursors
+      contentContainer.querySelectorAll('.typing-cursor').forEach(el => el.remove());
+      contentContainer.querySelectorAll('.streaming-active').forEach(el => {
+        el.classList.remove('streaming-active');
+      });
       break;
+    }
   }
 
   scrollToBottom();
@@ -931,6 +1057,22 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+/**
+ * Format a timestamp for display in chat message headers.
+ * Shows time only for today, date + time for older messages.
+ */
+function formatChatTimestamp(date) {
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  if (isToday) {
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+  return date.toLocaleDateString([], {
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  });
 }
 
 function showToast(message) {

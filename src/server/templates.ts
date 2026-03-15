@@ -55,6 +55,36 @@ function hasStringCommand(obj: unknown): obj is { command: string } {
 }
 
 /**
+ * Format a message timestamp for display in the chat UI.
+ * Shows time only for today's messages, date + time for older ones.
+ * Respects the TZ environment variable for display formatting.
+ */
+function formatMessageTime(date: Date): string {
+  const timeZone = Deno.env.get("TZ") || undefined; // undefined = system default
+  const now = new Date();
+  const isToday = date.toLocaleDateString("en-US", { timeZone }) ===
+    now.toLocaleDateString("en-US", { timeZone });
+
+  if (isToday) {
+    return date.toLocaleTimeString("en-US", {
+      timeZone,
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    });
+  }
+
+  return date.toLocaleDateString("en-US", {
+    timeZone,
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+/**
  * Format a date for display.
  */
 function formatDate(date: Date | string): string {
@@ -509,7 +539,7 @@ export function renderMessages(messages: Message[], metricsMap?: MetricsMap): st
  */
 export function renderMessage(msg: Message, metrics?: TurnMetrics): string {
   if (msg.role === "user") {
-    return renderUserMessage(msg.content, msg.id, msg.editedAt);
+    return renderUserMessage(msg.content, msg.id, msg.editedAt, msg.createdAt);
   } else if (msg.role === "assistant") {
     return renderAssistantMessage(msg, metrics);
   }
@@ -526,7 +556,8 @@ export function renderMessage(msg: Message, metrics?: TurnMetrics): string {
 export function renderUserMessage(
   content: string,
   messageId?: string,
-  editedAt?: Date
+  editedAt?: Date,
+  createdAt?: Date,
 ): string {
   const editedIndicator = editedAt
     ? `<span class="msg-edited-indicator">(edited)</span>`
@@ -540,9 +571,12 @@ export function renderUserMessage(
       </button>`
     : "";
   const dataAttr = messageId ? `data-message-id="${escapeHtml(messageId)}"` : "";
+  const timeStr = createdAt ? formatMessageTime(createdAt) : "";
+  const timeEl = timeStr ? `<span class="msg-timestamp">${escapeHtml(timeStr)}</span>` : "";
 
   return `<div class="msg msg--user" ${dataAttr}>
   <div class="msg-header">
+    ${timeEl}
     <span>You</span>
     ${editedIndicator}
     ${editBtn}
@@ -567,9 +601,13 @@ export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics): str
       </button>`
     : "";
 
+  const timeStr = msg.createdAt ? formatMessageTime(msg.createdAt) : "";
+  const timeEl = timeStr ? `<span class="msg-timestamp">${escapeHtml(timeStr)}</span>` : "";
+
   let html = `<div class="msg msg--assistant" data-message-id="${escapeHtml(msg.id)}">
   <div class="msg-header">
     <span>Assistant</span>
+    ${timeEl}
     ${editedIndicator}
     ${metrics ? renderMetricsIndicator(metrics) : ""}
     ${editBtn}
