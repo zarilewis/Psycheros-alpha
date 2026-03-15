@@ -3039,6 +3039,96 @@ export async function handleDeleteGraphEdge(
   });
 }
 
+/**
+ * Handle PUT /api/graph/nodes/:id - Update a graph node
+ */
+export async function handleUpdateGraphNode(
+  ctx: RouteContext,
+  request: Request,
+  nodeId: string
+): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Knowledge Graph requires entity-core connection" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const result = await ctx.mcpClient.updateGraphNode(nodeId, body);
+    return new Response(JSON.stringify(result), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Graph] Failed to update node:", error);
+    return new Response(
+      JSON.stringify({ success: false, error: "Failed to update node" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
+/**
+ * Handle PUT /api/graph/edges/:id - Update a graph edge
+ */
+export async function handleUpdateGraphEdge(
+  ctx: RouteContext,
+  request: Request,
+  edgeId: string
+): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      JSON.stringify({ success: false, error: "Knowledge Graph requires entity-core connection" }),
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const result = await ctx.mcpClient.updateGraphEdge(edgeId, body);
+    return new Response(JSON.stringify(result), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Graph] Failed to update edge:", error);
+    return new Response(
+      JSON.stringify({ success: false, error: "Failed to update edge" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+}
+
 // =============================================================================
 // Appearance Settings Routes
 // =============================================================================

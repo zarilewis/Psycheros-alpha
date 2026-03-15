@@ -389,7 +389,9 @@ async function executeGraphGetSubgraph(
     const edgesFormatted = subgraph.edges && subgraph.edges.length > 0
       ? "\n\nRelationships:\n" + subgraph.edges.map((e) => {
           const relType = e.customType || e.type;
-          return `- **?** → *${relType}* → **?**`;
+          const fromNode = subgraph.nodes.find((n) => n.id === e.fromId);
+          const toNode = subgraph.nodes.find((n) => n.id === e.toId);
+          return `- **${fromNode?.label || e.fromId}** → *${relType}* → **${toNode?.label || e.toId}**`;
         }).join("\n")
       : "";
 

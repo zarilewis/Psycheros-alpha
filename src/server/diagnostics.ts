@@ -68,7 +68,10 @@ export interface DiagnosticsSnapshot {
       totalNodes: number;
       totalEdges: number;
       nodesByType: Record<string, number>;
+      edgesByType: Record<string, number>;
     } | null;
+    vectorSearchAvailable: boolean;
+    writeToolsEnabled: boolean;
   };
 }
 
@@ -203,6 +206,7 @@ export async function collectDiagnostics(ctx: RouteContext): Promise<Diagnostics
 
   // Knowledge graph (only if MCP connected — avoids timeout on disconnected)
   let graphStats: DiagnosticsSnapshot["knowledgeGraph"]["stats"] = null;
+  let graphVecAvailable = false;
   if (mcp.connected && ctx.mcpClient) {
     try {
       const stats = await ctx.mcpClient.getGraphStats();
@@ -211,12 +215,19 @@ export async function collectDiagnostics(ctx: RouteContext): Promise<Diagnostics
           totalNodes: stats.totalNodes,
           totalEdges: stats.totalEdges,
           nodesByType: stats.nodesByType,
+          edgesByType: stats.edgesByType ?? {},
         };
+        graphVecAvailable = stats.vectorSearchAvailable ?? false;
       }
     } catch {
       // Leave as null
     }
   }
+
+  // Check if graph write tools are enabled
+  const writeToolNames = ["graph_create_node", "graph_create_edge", "graph_update_node", "graph_update_edge", "graph_write_batch"];
+  const enabledTools = (Deno.env.get("PSYCHEROS_TOOLS") ?? "").split(",").map(t => t.trim().toLowerCase());
+  const graphWriteToolsEnabled = enabledTools.includes("all") || writeToolNames.every(t => enabledTools.includes(t));
 
   const snapshot: DiagnosticsSnapshot = {
     timestamp: new Date().toISOString(),
@@ -227,7 +238,11 @@ export async function collectDiagnostics(ctx: RouteContext): Promise<Diagnostics
     memory,
     mcp,
     sse,
-    knowledgeGraph: { stats: graphStats },
+    knowledgeGraph: {
+      stats: graphStats,
+      vectorSearchAvailable: graphVecAvailable,
+      writeToolsEnabled: graphWriteToolsEnabled,
+    },
   };
 
   cachedSnapshot = snapshot;

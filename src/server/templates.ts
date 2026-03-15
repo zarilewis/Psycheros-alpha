@@ -1524,70 +1524,88 @@ export function renderGraphView(stats: {
 } | null): string {
   const nodeCount = stats?.totalNodes ?? 0;
   const edgeCount = stats?.totalEdges ?? 0;
-  const vectorStatus = stats?.vectorSearchAvailable ? "Enabled" : "Disabled";
+  const vectorStatus = stats?.vectorSearchAvailable ? "active" : "off";
 
   return `
-<div class="graph-view">
-  <div class="graph-header">
-    ${renderSettingsBackButton()}
-    <h2>Knowledge Graph</h2>
-    <div class="graph-stats">
-      <span class="stat"><strong>${nodeCount}</strong> nodes</span>
-      <span class="stat"><strong>${edgeCount}</strong> edges</span>
-      <span class="stat">Vector search: ${vectorStatus}</span>
+<div class="gv">
+  <!-- Header -->
+  <div class="gv-header">
+    <div class="gv-header-left">
+      ${renderSettingsBackButton()}
+      <div class="gv-title-block">
+        <h2 class="gv-title">Knowledge Graph</h2>
+        <div class="gv-stats">
+          <span><strong>${nodeCount}</strong> nodes</span>
+          <span class="gv-stats-sep">&middot;</span>
+          <span><strong>${edgeCount}</strong> edges</span>
+          <span class="gv-stats-sep">&middot;</span>
+          <span>vec: ${vectorStatus}</span>
+        </div>
+      </div>
+    </div>
+    <div class="gv-header-actions">
+      <button id="graph-refresh" class="btn btn--ghost btn--sm" title="Refresh">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </button>
     </div>
   </div>
 
-  <div class="graph-toolbar">
-    <div class="toolbar-left">
-      <button id="graph-zoom-fit" class="btn btn--ghost" title="Fit to view">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <!-- Toolbar -->
+  <div class="gv-toolbar">
+    <div class="gv-toolbar-controls">
+      <button id="graph-zoom-fit" class="btn btn--ghost btn--sm" title="Fit to view">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
         </svg>
-        Fit
       </button>
-      <button id="graph-zoom-in" class="btn btn--ghost" title="Zoom in">+</button>
-      <button id="graph-zoom-out" class="btn btn--ghost" title="Zoom out">−</button>
+      <button id="graph-zoom-in" class="btn btn--ghost btn--sm" title="Zoom in">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+      <button id="graph-zoom-out" class="btn btn--ghost btn--sm" title="Zoom out">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
     </div>
-    <div class="toolbar-center">
-      <input type="text" id="graph-search" placeholder="Search nodes..." class="search-input" />
-    </div>
-    <div class="toolbar-right">
-      <select id="graph-filter-type" class="filter-select">
-        <option value="">All Types</option>
-      </select>
-      <button id="graph-refresh" class="btn btn--ghost">Refresh</button>
+    <input type="text" id="graph-search" placeholder="Search..." class="gv-search" />
+    <select id="graph-filter-type" class="gv-filter">
+      <option value="">All types</option>
+    </select>
+  </div>
+
+  <!-- Graph Canvas -->
+  <div id="graph-container" class="gv-canvas">
+    <div class="gv-loading">
+      <div class="gv-spinner"></div>
     </div>
   </div>
 
-  <div id="graph-container" class="graph-container">
-    <div class="graph-loading">
-      <div class="spinner"></div>
-      <p>Loading graph data...</p>
+  <!-- Node Detail Panel (slides from right) -->
+  <div id="graph-node-panel" class="gv-panel">
+    <div class="gv-panel-header">
+      <h3 id="panel-node-label">Node</h3>
+      <button id="panel-close" class="btn btn--ghost btn--sm">&times;</button>
     </div>
+    <div class="gv-panel-body" id="panel-content"></div>
   </div>
 
-  <div id="graph-node-panel" class="graph-node-panel hidden">
-    <div class="panel-header">
-      <h3 id="panel-node-label">Node Details</h3>
-      <button id="panel-close" class="btn btn--ghost btn--small">×</button>
-    </div>
-    <div class="panel-content" id="panel-content">
-      <!-- Node details populated by JS -->
-    </div>
-  </div>
-
-  <div id="graph-create-modal" class="modal hidden">
-    <div class="modal-content">
+  <!-- Create Node Modal -->
+  <div id="graph-create-modal" class="gv-modal">
+    <div class="gv-modal-box">
       <h3>Create Node</h3>
       <form id="create-node-form">
-        <div class="form-group">
+        <div class="gv-field">
           <label for="node-type">Type</label>
           <select id="node-type" name="type" required>
             <option value="person">Person</option>
             <option value="emotion">Emotion</option>
             <option value="event">Event</option>
-            <option value="topic">Topic</option>
+            <option value="topic" selected>Topic</option>
             <option value="preference">Preference</option>
             <option value="place">Place</option>
             <option value="goal">Goal</option>
@@ -1595,319 +1613,532 @@ export function renderGraphView(stats: {
             <option value="boundary">Boundary</option>
             <option value="tradition">Tradition</option>
             <option value="insight">Insight</option>
-            <option value="memory_ref">Memory Reference</option>
+            <option value="memory_ref">Memory Ref</option>
           </select>
         </div>
-        <div class="form-group">
+        <div class="gv-field">
           <label for="node-label">Label</label>
-          <input type="text" id="node-label" name="label" required placeholder="Enter a label..." />
+          <input type="text" id="node-label" name="label" required placeholder="e.g. hiking, Tyler, anxiety" />
         </div>
-        <div class="form-group">
+        <div class="gv-field">
           <label for="node-description">Description</label>
-          <textarea id="node-description" name="description" rows="3" placeholder="Optional description..."></textarea>
+          <textarea id="node-description" name="description" rows="2" placeholder="Optional..."></textarea>
         </div>
-        <div class="form-group">
-          <label for="node-perspective">Perspective</label>
-          <select id="node-perspective" name="perspective">
-            <option value="shared">Shared</option>
-            <option value="user">User</option>
-            <option value="entity">Entity</option>
-          </select>
-        </div>
-        <div class="form-group">
+        <div class="gv-field gv-field-range">
           <label for="node-confidence">Confidence</label>
-          <input type="range" id="node-confidence" name="confidence" min="0" max="1" step="0.1" value="0.5" />
-          <span id="confidence-value">0.5</span>
+          <div class="gv-range-row">
+            <input type="range" id="node-confidence" name="confidence" min="0" max="1" step="0.1" value="0.5" />
+            <span id="confidence-value" class="gv-range-val">0.5</span>
+          </div>
         </div>
-        <div class="form-actions">
-          <button type="submit" class="btn btn--primary">Create</button>
+        <div class="gv-modal-actions">
           <button type="button" class="btn btn--ghost" id="cancel-create">Cancel</button>
+          <button type="submit" class="btn btn--primary">Create</button>
         </div>
       </form>
     </div>
   </div>
 
-  <div class="graph-actions">
-    <button id="graph-create-node" class="btn btn--primary">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="12" y1="5" x2="12" y2="19"></line>
-        <line x1="5" y1="12" x2="19" y2="12"></line>
+  <!-- Edit Node Modal -->
+  <div id="graph-edit-modal" class="gv-modal">
+    <div class="gv-modal-box">
+      <h3>Edit Node</h3>
+      <form id="edit-node-form">
+        <input type="hidden" id="edit-node-id" />
+        <div class="gv-field">
+          <label for="edit-node-label">Label</label>
+          <input type="text" id="edit-node-label" required />
+        </div>
+        <div class="gv-field">
+          <label for="edit-node-description">Description</label>
+          <textarea id="edit-node-description" rows="2"></textarea>
+        </div>
+        <div class="gv-field gv-field-range">
+          <label for="edit-node-confidence">Confidence</label>
+          <div class="gv-range-row">
+            <input type="range" id="edit-node-confidence" min="0" max="1" step="0.1" value="0.5" />
+            <span id="edit-confidence-value" class="gv-range-val">0.5</span>
+          </div>
+        </div>
+        <div class="gv-modal-actions">
+          <button type="button" class="btn btn--ghost" id="cancel-edit">Cancel</button>
+          <button type="submit" class="btn btn--primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bottom Action Bar -->
+  <div class="gv-actions">
+    <button id="graph-create-node" class="btn btn--ghost gv-action-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
       </svg>
-      Create Node
+      <span>Add Node</span>
     </button>
-    <button id="graph-create-edge" class="btn btn--secondary" disabled>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="5" y1="12" x2="19" y2="12"></line>
+    <button id="graph-create-edge" class="btn btn--ghost gv-action-btn" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
       </svg>
-      Connect Nodes
+      <span>Connect</span>
     </button>
-    <button id="graph-delete" class="btn btn--danger" disabled>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="3 6 5 6 21 6"></polyline>
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    <button id="graph-delete" class="btn btn--ghost gv-action-btn gv-action-danger" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
       </svg>
-      Delete
+      <span>Delete</span>
     </button>
   </div>
 </div>
 
 <style>
-.graph-view {
+/* ─── Graph View ─────────────────────────────────────────────────────────── */
+/* Namespaced with .gv- to avoid conflicts with app-wide styles              */
+
+.gv {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-secondary);
+  background: var(--c-bg);
+  color: var(--c-fg);
+  font-family: var(--font-sans);
 }
 
-.graph-header {
+/* Header */
+.gv-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-color);
-  gap: 1rem;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-bg-raised);
+  gap: var(--sp-3);
+  flex-shrink: 0;
 }
-
-.graph-header h2 {
+.gv-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  min-width: 0;
+}
+.gv-title-block { min-width: 0; }
+.gv-title {
   margin: 0;
-  font-size: 1.25rem;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--c-accent);
+  letter-spacing: 0.02em;
 }
-
-.graph-stats {
+.gv-stats {
   display: flex;
-  gap: 1rem;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
+  gap: var(--sp-2);
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  font-family: var(--font-mono);
+  margin-top: 2px;
 }
+.gv-stats strong { color: var(--c-fg); font-weight: var(--font-weight-medium); }
+.gv-stats-sep { opacity: 0.3; }
+.gv-header-actions { flex-shrink: 0; }
 
-.stat strong {
-  color: var(--accent-color);
-}
-
-.graph-toolbar {
+/* Toolbar */
+.gv-toolbar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 0.5rem 1rem;
-  background: var(--bg-primary);
-  border-bottom: 1px solid var(--border-color);
-  gap: 1rem;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-bg-raised);
+  flex-shrink: 0;
 }
-
-.toolbar-left, .toolbar-right {
+.gv-toolbar-controls {
   display: flex;
-  gap: 0.5rem;
-  align-items: center;
+  gap: 2px;
 }
-
-.toolbar-center {
+.gv-search {
   flex: 1;
-  max-width: 300px;
+  min-width: 0;
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-bg-sunken);
+  color: var(--c-fg);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color var(--transition);
 }
-
-.search-input {
-  width: 100%;
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+.gv-search:focus {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px var(--c-accent-subtle);
 }
-
-.filter-select {
-  padding: 0.5rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+.gv-search::placeholder { color: var(--c-fg-subtle); }
+.gv-filter {
+  padding: var(--sp-1) var(--sp-2);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-bg-sunken);
+  color: var(--c-fg);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  outline: none;
+  max-width: 120px;
 }
+.gv-filter:focus { border-color: var(--c-accent); }
 
-.graph-container {
+/* Canvas */
+.gv-canvas {
   flex: 1;
   position: relative;
-  background: var(--bg-secondary);
+  background: var(--c-bg);
   overflow: hidden;
+  min-height: 0;
 }
+.vis-network { outline: none !important; }
 
-.graph-loading {
+/* Loading */
+.gv-loading {
   position: absolute;
-  top: 50%;
-  left: 50%;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+}
+.gv-spinner {
+  width: 28px; height: 28px;
+  border: 2px solid var(--c-border-strong);
+  border-top-color: var(--c-accent);
+  border-radius: 50%;
+  animation: gv-spin 0.8s linear infinite;
+}
+@keyframes gv-spin { to { transform: rotate(360deg); } }
+
+/* Empty state */
+.gv-empty {
+  position: absolute;
+  top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--c-fg-muted);
+  font-size: var(--font-size-sm);
 }
+.gv-empty svg { margin-bottom: var(--sp-3); }
+.gv-empty p { margin: var(--sp-1) 0; }
+.gv-empty-hint { font-size: var(--font-size-xs); color: var(--c-fg-subtle); }
 
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--border-color);
-  border-top-color: var(--accent-color);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.graph-node-panel {
+/* ─── Node Detail Panel ──────────────────────────────────────────────────── */
+.gv-panel {
   position: absolute;
-  top: 0;
-  right: 0;
-  width: 300px;
+  top: 0; right: 0;
+  width: 280px;
+  max-width: 85vw;
   height: 100%;
-  background: var(--bg-primary);
-  border-left: 1px solid var(--border-color);
-  box-shadow: -2px 0 8px rgba(0,0,0,0.2);
-  z-index: 100;
+  background: var(--c-bg-raised);
+  border-left: 1px solid var(--c-border);
+  box-shadow: -4px 0 16px rgba(0,0,0,0.4);
+  z-index: 50;
   display: flex;
   flex-direction: column;
-}
-
-.graph-node-panel.hidden {
   transform: translateX(100%);
   transition: transform 0.2s ease;
 }
-
-.panel-header {
+.gv-panel.gv-panel-open {
+  transform: translateX(0);
+}
+.gv-panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid var(--border-color);
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--c-border);
+  flex-shrink: 0;
 }
-
-.panel-header h3 {
+.gv-panel-header h3 {
   margin: 0;
-  font-size: 1rem;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--c-fg-strong);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-
-.panel-content {
-  padding: 1rem;
+.gv-panel-body {
+  padding: var(--sp-3) var(--sp-4);
   overflow-y: auto;
   flex: 1;
+  -webkit-overflow-scrolling: touch;
 }
 
-.graph-actions {
+/* Detail rows inside panel */
+.gv-detail-row {
   display: flex;
-  gap: 0.5rem;
-  padding: 1rem;
-  background: var(--bg-primary);
-  border-top: 1px solid var(--border-color);
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--sp-2) 0;
+  border-bottom: 1px solid var(--c-border);
+  font-size: var(--font-size-sm);
 }
-
-.graph-actions .btn {
+.gv-detail-label {
+  color: var(--c-fg-muted);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: var(--font-mono);
+}
+.gv-detail-value {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--c-fg);
+}
+.gv-detail-section {
+  margin-top: var(--sp-4);
+}
+.gv-detail-desc {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--c-fg);
+  line-height: var(--line-height);
+}
+.gv-conn-list {
+  list-style: none;
+  padding: 0;
+  margin: var(--sp-2) 0 0;
+}
+.gv-conn-list li {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sp-2);
+  padding: var(--sp-1) 0;
+  font-size: var(--font-size-sm);
+  border-bottom: 1px solid var(--c-border);
+}
+.gv-conn-list li:last-child { border-bottom: none; }
+.gv-conn-dir { color: var(--c-accent); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.gv-conn-type { color: var(--c-fg-muted); font-family: var(--font-mono); font-size: var(--font-size-xs); }
+.gv-conn-label { color: var(--c-fg); }
+.gv-node-id {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-subtle);
+  font-family: var(--font-mono);
+  word-break: break-all;
+  margin-top: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--c-bg-sunken);
+  border-radius: var(--radius-sm);
+}
+.gv-edit-btn {
+  width: 100%;
+  margin-top: var(--sp-4);
+  justify-content: center;
 }
 
-.modal {
+/* ─── Modal ──────────────────────────────────────────────────────────────── */
+.gv-modal {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0,0,0,0.5);
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 200;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  padding: var(--sp-4);
+}
+.gv-modal.gv-modal-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.gv-modal-box {
+  background: var(--c-bg-raised);
+  border: 1px solid var(--c-border-strong);
+  border-radius: var(--radius-md);
+  padding: var(--sp-6);
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  transform: scale(0.95);
+  transition: transform 0.15s ease;
+}
+.gv-modal.gv-modal-open .gv-modal-box {
+  transform: scale(1);
+}
+.gv-modal-box h3 {
+  margin: 0 0 var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--c-fg-strong);
 }
 
-.modal.hidden {
-  display: none;
+/* Form fields */
+.gv-field {
+  margin-bottom: var(--sp-4);
 }
-
-.modal-content {
-  background: var(--bg-primary);
-  padding: 1.5rem;
-  border-radius: 8px;
-  max-width: 400px;
-  width: 90%;
-}
-
-.modal-content h3 {
-  margin: 0 0 1rem;
-}
-
-.detail-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.5rem 0;
-  border-bottom: 1px solid var(--border-color);
-}
-
-.detail-label {
-  color: var(--text-secondary);
-}
-
-.detail-section {
-  margin-top: 1rem;
-}
-
-.detail-section h4 {
-  margin: 0 0 0.5rem;
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-}
-
-.connection-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  font-size: 0.875rem;
-}
-
-.connection-list li {
-  padding: 0.25rem 0;
-}
-
-.node-id {
+.gv-field label {
   display: block;
-  font-size: 0.75rem;
-  color: var(--text-secondary);
-  word-break: break-all;
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--sp-1);
 }
-
-.graph-empty, .graph-error {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  color: var(--text-secondary);
+.gv-field input[type="text"],
+.gv-field textarea,
+.gv-field select {
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-bg-sunken);
+  color: var(--c-fg);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  outline: none;
+  transition: border-color var(--transition);
+  box-sizing: border-box;
 }
-
-.graph-error .error-message {
-  color: var(--danger-color);
-  margin: 0.5rem 0;
+.gv-field input:focus,
+.gv-field textarea:focus,
+.gv-field select:focus {
+  border-color: var(--c-accent);
+  box-shadow: 0 0 0 2px var(--c-accent-subtle);
 }
-
-/* vis.js network overrides */
-.vis-network {
-  outline: none !important;
-}
-
-.graph-header .settings-back-btn {
+.gv-field textarea { resize: vertical; min-height: 48px; }
+.gv-range-row {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  border-radius: 6px;
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  text-decoration: none;
-  transition: color 0.15s, background 0.15s;
-  flex-shrink: 0;
+  gap: var(--sp-3);
+}
+.gv-range-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--c-accent);
+  height: 4px;
+}
+.gv-range-val {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--c-fg-muted);
+  min-width: 2em;
+  text-align: right;
+}
+.gv-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
 }
 
-.graph-header .settings-back-btn:hover {
-  color: var(--accent-color);
-  background: rgba(255,255,255,0.05);
+/* ─── Bottom Action Bar ──────────────────────────────────────────────────── */
+.gv-actions {
+  display: flex;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--c-bg-raised);
+  border-top: 1px solid var(--c-border);
+  flex-shrink: 0;
+}
+.gv-action-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--font-size-sm);
+  flex: 1;
+  justify-content: center;
+  padding: var(--sp-2) var(--sp-3);
+}
+.gv-action-btn:not(:disabled):hover {
+  color: var(--c-accent);
+  border-color: var(--c-accent-muted);
+}
+.gv-action-danger:not(:disabled):hover {
+  color: var(--c-error);
+  border-color: var(--c-error);
+}
+
+/* ─── Back button override ───────────────────────────────────────────────── */
+.gv-header .settings-back-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--radius-sm);
+  color: var(--c-fg-muted);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  transition: color var(--transition), background var(--transition);
+  flex-shrink: 0;
+}
+.gv-header .settings-back-btn:hover {
+  color: var(--c-accent);
+  background: var(--c-accent-subtle);
+}
+
+/* ─── Toast ──────────────────────────────────────────────────────────────── */
+#gv-toast-container {
+  position: fixed;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  pointer-events: none;
+}
+.gv-toast {
+  background: var(--c-bg-raised);
+  border: 1px solid var(--c-border-strong);
+  color: var(--c-fg);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-sans);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: auto;
+  max-width: 340px;
+  text-align: center;
+}
+.gv-toast.gv-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .gv-header { padding: var(--sp-2) var(--sp-3); }
+  .gv-toolbar {
+    flex-wrap: wrap;
+    padding: var(--sp-2) var(--sp-3);
+    gap: var(--sp-2);
+  }
+  .gv-toolbar-controls { order: 1; }
+  .gv-search { order: 3; flex-basis: 100%; }
+  .gv-filter { order: 2; flex: 1; max-width: none; }
+  .gv-panel {
+    width: 100%;
+    max-width: 100vw;
+    border-left: none;
+    border-top: 1px solid var(--c-border);
+    top: auto;
+    bottom: 0;
+    height: 55vh;
+    transform: translateY(100%);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+  .gv-panel.gv-panel-open { transform: translateY(0); }
+  .gv-actions { padding: var(--sp-2) var(--sp-3); }
+  .gv-action-btn span { display: none; }
+  .gv-action-btn { flex: 0; padding: var(--sp-2); }
+  .gv-stats { display: none; }
 }
 </style>
 `;

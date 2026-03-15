@@ -98,10 +98,12 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/graph` | Get full knowledge graph |
-| `POST` | `/api/graph/nodes` | Create graph node |
+| `GET` | `/api/graph` | Get full knowledge graph (nodes, edges, stats) |
+| `POST` | `/api/graph/nodes` | Create graph node (auto-generates embedding) |
 | `POST` | `/api/graph/edges` | Create graph edge |
-| `DELETE` | `/api/graph/nodes/:id` | Delete graph node |
+| `PUT` | `/api/graph/nodes/:id` | Update graph node (re-generates embedding) |
+| `PUT` | `/api/graph/edges/:id` | Update graph edge |
+| `DELETE` | `/api/graph/nodes/:id` | Delete graph node (cascades to edges) |
 | `DELETE` | `/api/graph/edges/:id` | Delete graph edge |
 
 ### Backgrounds

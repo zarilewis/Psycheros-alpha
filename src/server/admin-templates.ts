@@ -248,10 +248,26 @@ export function renderAdminDiagnostics(snapshot: DiagnosticsSnapshot): string {
     <h3 class="admin-section-title">Knowledge Graph</h3>
     <div class="admin-stats-grid">
       <div class="admin-stat">
-        <span class="admin-stat-label">Stats</span>
+        <span class="admin-stat-label">Graph Data</span>
         <span class="admin-stat-value">${graphInfo}</span>
       </div>
-    </div>
+      <div class="admin-stat">
+        <span class="admin-stat-label">Graph Vec Search</span>
+        <span class="admin-stat-value">${statusDot(snapshot.knowledgeGraph.vectorSearchAvailable)} ${snapshot.knowledgeGraph.vectorSearchAvailable ? "active" : "off"}</span>
+      </div>
+      <div class="admin-stat">
+        <span class="admin-stat-label">Write Tools</span>
+        <span class="admin-stat-value">${statusDot(snapshot.knowledgeGraph.writeToolsEnabled)} ${snapshot.knowledgeGraph.writeToolsEnabled ? "enabled" : "disabled"}</span>
+      </div>
+    </div>${snapshot.knowledgeGraph.stats ? `
+    <table class="admin-table">
+      <thead><tr><th>Node Type</th><th>Count</th></tr></thead>
+      <tbody>
+        ${Object.entries(snapshot.knowledgeGraph.stats.nodesByType).map(([type, count]) =>
+          `<tr><td>${type}</td><td>${count}</td></tr>`
+        ).join('')}
+      </tbody>
+    </table>` : ''}
   </div>
 
   <div class="admin-footer">

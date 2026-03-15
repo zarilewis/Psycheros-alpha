@@ -27,6 +27,14 @@ import {
   graphGetSubgraphTool,
   graphStatsTool,
 } from "./graph-read.ts";
+// Graph write tools
+import {
+  graphCreateNodeTool,
+  graphCreateEdgeTool,
+  graphUpdateNodeTool,
+  graphUpdateEdgeTool,
+  graphWriteBatchTool,
+} from "./graph-write.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -56,6 +64,12 @@ const AVAILABLE_TOOLS: Record<string, Tool> = {
   graph_traverse: graphTraverseTool,
   graph_get_subgraph: graphGetSubgraphTool,
   graph_stats: graphStatsTool,
+  // Graph write tools (build and maintain the knowledge graph)
+  graph_create_node: graphCreateNodeTool,
+  graph_create_edge: graphCreateEdgeTool,
+  graph_update_node: graphUpdateNodeTool,
+  graph_update_edge: graphUpdateEdgeTool,
+  graph_write_batch: graphWriteBatchTool,
 };
 
 /**

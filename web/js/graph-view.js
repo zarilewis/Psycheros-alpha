@@ -2,237 +2,244 @@
  * Knowledge Graph Visualization
  *
  * Interactive visualization of the knowledge graph using vis-network.
+ * Integrated with the Psycheros design system (tokens.css + components.css).
  */
 
-// Node type colors
-const NODE_COLORS = {
-  person: { background: '#4CAF50', border: '#388E3C' },
-  emotion: { background: '#E91E63', border: '#C2185B' },
-  event: { background: '#2196F3', border: '#1976D2' },
-  memory_ref: { background: '#9C27B0', border: '#7B1FA2' },
-  topic: { background: '#FF9800', border: '#F57C00' },
-  preference: { background: '#00BCD4', border: '#0097A7' },
-  place: { background: '#795548', border: '#5D4037' },
-  goal: { background: '#FFEB3B', border: '#FBC02D' },
-  health: { background: '#F44336', border: '#D32F2F' },
-  boundary: { background: '#607D8B', border: '#455A64' },
-  tradition: { background: '#8BC34A', border: '#689F38' },
-  insight: { background: '#FFC107', border: '#FFA000' },
-  default: { background: '#9E9E9E', border: '#757575' }
-};
+// Node type configuration — uses accent-derived palette
+// Colors are generated at render time from CSS variables
+function getNodeTypeConfig() {
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--c-accent').trim() || '#39ff14';
 
-// Perspective colors for node borders
-const PERSPECTIVE_COLORS = {
-  user: '#2196F3',
-  entity: '#E91E63',
-  shared: '#9E9E9E'
-};
+  return {
+    self:       { hue: 160, label: 'Self' },
+    person:     { hue: 200, label: 'Person' },
+    emotion:    { hue: 340, label: 'Emotion' },
+    event:      { hue: 220, label: 'Event' },
+    memory_ref: { hue: 280, label: 'Memory' },
+    topic:      { hue: 35,  label: 'Topic' },
+    preference: { hue: 180, label: 'Preference' },
+    place:      { hue: 25,  label: 'Place' },
+    goal:       { hue: 55,  label: 'Goal' },
+    health:     { hue: 0,   label: 'Health' },
+    boundary:   { hue: 210, label: 'Boundary' },
+    tradition:  { hue: 90,  label: 'Tradition' },
+    insight:    { hue: 45,  label: 'Insight' },
+    default:    { hue: 0,   label: 'Other' }
+  };
+}
 
-// Edge type colors and styles
-const EDGE_STYLES = {
-  feels_about: { color: '#E91E63', dashes: false },
-  comforted_by: { color: '#4CAF50', dashes: false },
-  stressed_by: { color: '#F44336', dashes: false },
-  close_to: { color: '#2196F3', dashes: false },
-  mentions: { color: '#9C27B0', dashes: true },
-  loves: { color: '#E91E63', dashes: false },
-  dislikes: { color: '#FF9800', dashes: false },
-  helps_with: { color: '#4CAF50', dashes: false },
-  worsens: { color: '#F44336', dashes: false },
-  default: { color: '#9E9E9E', dashes: [5, 5] }
-};
+function hslColor(hue, s, l, a) {
+  if (a !== undefined) return `hsla(${hue}, ${s}%, ${l}%, ${a})`;
+  return `hsl(${hue}, ${s}%, ${l}%)`;
+}
 
-// Global state
+function getNodeColor(type) {
+  const config = getNodeTypeConfig();
+  const info = config[type] || config.default;
+  return {
+    background: hslColor(info.hue, 55, 35),
+    border: hslColor(info.hue, 55, 50),
+    highlight: {
+      background: hslColor(info.hue, 60, 45),
+      border: hslColor(info.hue, 70, 60)
+    },
+    hover: {
+      background: hslColor(info.hue, 55, 40),
+      border: hslColor(info.hue, 60, 55)
+    }
+  };
+}
+
+// Edge styling — muted tones that don't compete with nodes
+function getEdgeColor(type) {
+  const map = {
+    feels_about:  { h: 340, s: 40 },
+    comforted_by: { h: 140, s: 40 },
+    stressed_by:  { h: 0,   s: 50 },
+    close_to:     { h: 210, s: 40 },
+    mentions:     { h: 270, s: 30 },
+    loves:        { h: 340, s: 50 },
+    dislikes:     { h: 25,  s: 40 },
+    helps_with:   { h: 140, s: 40 },
+    worsens:      { h: 0,   s: 50 },
+    includes:     { h: 200, s: 30 },
+    family_of:    { h: 30,  s: 40 },
+    friend_of:    { h: 200, s: 40 },
+    seeks:        { h: 55,  s: 40 },
+    avoids:       { h: 0,   s: 30 },
+    reminds_of:   { h: 270, s: 30 }
+  };
+  const info = map[type] || { h: 0, s: 0 };
+  const color = hslColor(info.h, info.s, 45, 0.7);
+  return { color, highlight: hslColor(info.h, info.s + 10, 55), hover: color };
+}
+
+// ─── State ───────────────────────────────────────────────────────────────────
+
 let network = null;
 let graphData = { nodes: [], edges: [] };
 let selectedNodes = [];
 let initialized = false;
 
-// Initialize - handle both direct load and HTMX fragment load
+// ─── Initialization ──────────────────────────────────────────────────────────
+
 async function initGraph() {
   if (initialized) return;
-  console.log('[Graph] Initializing...');
   initialized = true;
   await loadGraphData();
   setupEventListeners();
-  console.log('[Graph] Initialization complete');
 }
 
-// Check if DOM is already ready (for HTMX fragment loads)
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initGraph);
 } else {
-  // DOM already loaded (HTMX fragment or cached page)
   initGraph();
 }
 
-// Also listen for HTMX load events
 document.body.addEventListener('htmx:afterSwap', (e) => {
   if (e.detail.target?.id === 'chat' && document.getElementById('graph-container')) {
     initGraph();
   }
 });
 
-// Expose initialization function globally for Psycheros.js to call
 globalThis.initGraphView = initGraph;
 
-/**
- * Load graph data from API
- */
+// ─── Data Loading ────────────────────────────────────────────────────────────
+
 async function loadGraphData() {
   const container = document.getElementById('graph-container');
-
-  if (!container) {
-    console.error('Graph container not found');
-    return;
-  }
+  if (!container) return;
 
   try {
-    console.log('[Graph] Fetching data from /api/graph...');
     const response = await fetch('/api/graph');
-    if (!response.ok) {
-      throw new Error('Failed to load graph data');
-    }
+    if (!response.ok) throw new Error('Failed to load graph data');
 
     graphData = await response.json();
-    console.log('[Graph] Data received:', graphData);
 
     if (!graphData.nodes || graphData.nodes.length === 0) {
-      console.log('[Graph] No nodes, showing empty state');
       container.innerHTML = `
-        <div class="graph-empty">
-          <p>The knowledge graph is empty.</p>
-          <p>Create nodes to start building your graph!</p>
+        <div class="gv-empty">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
+            <circle cx="12" cy="12" r="3"/>
+            <circle cx="5" cy="6" r="2"/>
+            <circle cx="19" cy="6" r="2"/>
+            <circle cx="5" cy="18" r="2"/>
+            <circle cx="19" cy="18" r="2"/>
+            <line x1="7" y1="7" x2="10" y2="10"/>
+            <line x1="17" y1="7" x2="14" y2="10"/>
+            <line x1="7" y1="17" x2="10" y2="14"/>
+            <line x1="17" y1="17" x2="14" y2="14"/>
+          </svg>
+          <p>Knowledge graph is empty</p>
+          <p class="gv-empty-hint">Create nodes during conversation or use the + button below</p>
         </div>
       `;
       return;
     }
 
-    console.log('[Graph] Rendering graph with', graphData.nodes.length, 'nodes');
     renderGraph();
     populateTypeFilter();
   } catch (error) {
-    console.error('Failed to load graph:', error);
     container.innerHTML = `
-      <div class="graph-error">
-        <p>Failed to load graph data.</p>
-        <p class="error-message">${error.message}</p>
-        <button onclick="loadGraphData()" class="btn btn--primary">Retry</button>
+      <div class="gv-empty">
+        <p>Failed to load graph data</p>
+        <p class="gv-empty-hint">${error.message}</p>
+        <button onclick="loadGraphData()" class="btn btn--ghost" style="margin-top: var(--sp-3)">Retry</button>
       </div>
     `;
   }
 }
 
-/**
- * Render the graph visualization
- */
+// ─── Graph Rendering ─────────────────────────────────────────────────────────
+
 function renderGraph() {
   const container = document.getElementById('graph-container');
   container.innerHTML = '';
 
-  // Create vis.js dataset
   const nodes = new vis.DataSet(
-    graphData.nodes.map(node => ({
-      id: node.id,
-      label: node.label.length > 20 ? node.label.substring(0, 17) + '...' : node.label,
-      title: `${node.type}: ${node.label}\n${node.description || ''}\nConfidence: ${Math.round(node.confidence * 100)}%`,
-      color: NODE_COLORS[node.type] || NODE_COLORS.default,
-      borderWidth: 3,
-      borderColor: PERSPECTIVE_COLORS[node.perspective] || PERSPECTIVE_COLORS.shared,
-      font: { color: '#ffffff', size: 14 },
-      shadow: true,
-      data: node // Store original data
-    }))
+    graphData.nodes.map(node => {
+      const colors = getNodeColor(node.type);
+      return {
+        id: node.id,
+        label: node.label.length > 20 ? node.label.substring(0, 17) + '...' : node.label,
+        title: `${node.type}: ${node.label}\n${node.description || ''}\nConfidence: ${Math.round(node.confidence * 100)}%`,
+        color: colors,
+        borderWidth: 2,
+        borderWidthSelected: 3,
+        font: { color: '#e8e8e8', size: 13, face: 'IBM Plex Sans, Inter, sans-serif' },
+        shadow: { enabled: true, color: 'rgba(0,0,0,0.5)', size: 8, x: 0, y: 2 },
+        data: node
+      };
+    })
   );
 
   const edges = new vis.DataSet(
     graphData.edges.map(edge => {
-      const style = EDGE_STYLES[edge.type] || EDGE_STYLES.default;
+      const colors = getEdgeColor(edge.type);
       return {
         id: edge.id,
         from: edge.fromId,
         to: edge.toId,
         label: edge.customType || edge.type,
         title: `${edge.type}\nWeight: ${Math.round(edge.weight * 100)}%`,
-        color: { color: style.color, highlight: style.color },
-        dashes: style.dashes,
-        width: 1 + edge.weight * 2,
-        font: { size: 10, align: 'middle' },
-        smooth: { type: 'curvedCW', roundness: 0.2 },
+        color: colors,
+        width: 1 + edge.weight * 1.5,
+        font: { size: 9, color: 'rgba(232,232,232,0.5)', strokeWidth: 0, face: 'IBM Plex Mono, monospace' },
+        smooth: { type: 'curvedCW', roundness: 0.15 },
         data: edge
       };
     })
   );
 
-  // Network options
   const options = {
     physics: {
       enabled: true,
       barnesHut: {
-        gravitationalConstant: -3000,
-        centralGravity: 0.3,
-        springLength: 150,
-        springConstant: 0.05
+        gravitationalConstant: -2500,
+        centralGravity: 0.25,
+        springLength: 160,
+        springConstant: 0.04,
+        damping: 0.12
       },
-      stabilization: {
-        iterations: 200
-      }
+      stabilization: { iterations: 150, fit: true }
     },
     interaction: {
       hover: true,
-      tooltipDelay: 200,
+      tooltipDelay: 300,
       zoomView: true,
       dragView: true,
       multiselect: true,
-      navigationButtons: true,
-      keyboard: {
-        enabled: true
-      }
+      navigationButtons: false,
+      keyboard: false
     },
     nodes: {
       shape: 'dot',
-      size: 20,
-      scaling: {
-        min: 10,
-        max: 30,
-        label: {
-          enabled: true,
-          min: 12,
-          max: 18
-        }
-      }
+      size: 18,
+      scaling: { min: 12, max: 28 }
     },
     edges: {
-      arrows: {
-        to: { enabled: true, scaleFactor: 0.8 }
-      },
-      smooth: {
-        enabled: true,
-        type: 'continuous'
-      }
+      arrows: { to: { enabled: true, scaleFactor: 0.6 } },
+      smooth: { enabled: true, type: 'continuous' }
     }
   };
 
-  // Create network
   network = new vis.Network(container, { nodes, edges }, options);
 
-  // Event handlers
   network.on('click', handleNetworkClick);
   network.on('doubleClick', handleNetworkDoubleClick);
+  // Disable physics once the layout has settled — prevents fight with focus/drag
   network.on('stabilizationIterationsDone', () => {
-    network.fit({ animation: true });
+    network.setOptions({ physics: { enabled: false } });
+    network.fit({ animation: { duration: 400, easingFunction: 'easeInOutQuad' } });
   });
 }
 
-/**
- * Handle network click
- */
+// ─── Interaction Handlers ────────────────────────────────────────────────────
+
 function handleNetworkClick(params) {
-  // Update selection - use network.getSelectedNodes() for accurate multi-select
   selectedNodes = network.getSelectedNodes() || [];
   updateButtonStates();
 
-  // Show node details panel
   if (params.nodes && params.nodes.length === 1) {
     showNodePanel(params.nodes[0]);
   } else {
@@ -240,20 +247,12 @@ function handleNetworkClick(params) {
   }
 }
 
-/**
- * Handle network double click
- */
 function handleNetworkDoubleClick(params) {
   if (params.nodes && params.nodes.length === 1) {
-    const nodeId = params.nodes[0];
-    // Focus on this node and its connections
-    network.focus(nodeId, { animation: true, scale: 1.5 });
+    network.focus(params.nodes[0], { animation: true, scale: 1.5 });
   }
 }
 
-/**
- * Show node details panel
- */
 function showNodePanel(nodeId) {
   const node = graphData.nodes.find(n => n.id === nodeId);
   if (!node) return;
@@ -262,260 +261,279 @@ function showNodePanel(nodeId) {
   const label = document.getElementById('panel-node-label');
   const content = document.getElementById('panel-content');
 
-  // Find connected nodes
   const connectedEdges = graphData.edges.filter(e =>
     e.fromId === nodeId || e.toId === nodeId
   );
+
+  const typeConfig = getNodeTypeConfig();
+  const typeInfo = typeConfig[node.type] || typeConfig.default;
+  const typeColor = hslColor(typeInfo.hue, 55, 50);
 
   const connections = connectedEdges.map(edge => {
     const isFrom = edge.fromId === nodeId;
     const otherNodeId = isFrom ? edge.toId : edge.fromId;
     const otherNode = graphData.nodes.find(n => n.id === otherNodeId);
-    const direction = isFrom ? '→' : '←';
-    return `<li>${direction} <strong>${edge.customType || edge.type}</strong> ${otherNode?.label || otherNodeId}</li>`;
+    const dir = isFrom ? '&rarr;' : '&larr;';
+    return `<li><span class="gv-conn-dir">${dir}</span> <span class="gv-conn-type">${edge.customType || edge.type}</span> <span class="gv-conn-label">${otherNode?.label || '?'}</span></li>`;
   }).join('');
 
   label.textContent = node.label;
   content.innerHTML = `
-    <div class="detail-row">
-      <span class="detail-label">Type:</span>
-      <span class="detail-value">${node.type}</span>
+    <div class="gv-detail-row">
+      <span class="gv-detail-label">Type</span>
+      <span class="gv-detail-value" style="color: ${typeColor}">${node.type}</span>
     </div>
-    <div class="detail-row">
-      <span class="detail-label">Perspective:</span>
-      <span class="detail-value">${node.perspective}</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Confidence:</span>
-      <span class="detail-value">${Math.round(node.confidence * 100)}%</span>
+    <div class="gv-detail-row">
+      <span class="gv-detail-label">Confidence</span>
+      <span class="gv-detail-value">${Math.round(node.confidence * 100)}%</span>
     </div>
     ${node.description ? `
-      <div class="detail-section">
-        <h4>Description</h4>
-        <p>${node.description}</p>
+      <div class="gv-detail-section">
+        <div class="gv-detail-label">Description</div>
+        <p class="gv-detail-desc">${node.description}</p>
       </div>
     ` : ''}
     ${connections ? `
-      <div class="detail-section">
-        <h4>Connections (${connectedEdges.length})</h4>
-        <ul class="connection-list">${connections}</ul>
+      <div class="gv-detail-section">
+        <div class="gv-detail-label">Connections (${connectedEdges.length})</div>
+        <ul class="gv-conn-list">${connections}</ul>
       </div>
     ` : ''}
-    <div class="detail-section">
-      <h4>Node ID</h4>
-      <code class="node-id">${node.id}</code>
+    <div class="gv-detail-section">
+      <div class="gv-detail-label">ID</div>
+      <code class="gv-node-id">${node.id}</code>
     </div>
+    <button class="btn btn--ghost gv-edit-btn" onclick="openEditModal('${node.id}')">Edit Node</button>
   `;
 
-  panel.classList.remove('hidden');
+  panel.classList.add('gv-panel-open');
 }
 
-/**
- * Hide node details panel
- */
 function hideNodePanel() {
-  const panel = document.getElementById('graph-node-panel');
-  panel.classList.add('hidden');
+  document.getElementById('graph-node-panel')?.classList.remove('gv-panel-open');
 }
 
-/**
- * Update button enabled/disabled states
- */
 function updateButtonStates() {
   const createEdgeBtn = document.getElementById('graph-create-edge');
   const deleteBtn = document.getElementById('graph-delete');
-
-  // Enable edge creation when exactly 2 nodes selected
   createEdgeBtn.disabled = selectedNodes.length !== 2;
-
-  // Enable delete when at least 1 node selected
   deleteBtn.disabled = selectedNodes.length === 0;
 }
 
-/**
- * Populate the type filter dropdown
- */
 function populateTypeFilter() {
   const select = document.getElementById('graph-filter-type');
-  const types = [...new Set(graphData.nodes.map(n => n.type))];
-
+  // Clear existing options beyond the default
+  while (select.options.length > 1) select.remove(1);
+  const types = [...new Set(graphData.nodes.map(n => n.type))].sort();
+  const config = getNodeTypeConfig();
   types.forEach(type => {
     const option = document.createElement('option');
     option.value = type;
-    option.textContent = type;
+    option.textContent = (config[type]?.label || type);
     select.appendChild(option);
   });
 }
 
-/**
- * Setup event listeners
- */
+// ─── Event Listeners ─────────────────────────────────────────────────────────
+
 function setupEventListeners() {
   // Zoom controls
-  document.getElementById('graph-zoom-fit').addEventListener('click', () => {
-    network.fit({ animation: true });
+  document.getElementById('graph-zoom-fit')?.addEventListener('click', () => {
+    if (network) network.fit({ animation: true });
   });
-
-  document.getElementById('graph-zoom-in').addEventListener('click', () => {
-    const scale = network.getScale();
-    network.moveTo({ scale: scale * 1.2, animation: true });
+  document.getElementById('graph-zoom-in')?.addEventListener('click', () => {
+    if (network) network.moveTo({ scale: network.getScale() * 1.3, animation: true });
   });
-
-  document.getElementById('graph-zoom-out').addEventListener('click', () => {
-    const scale = network.getScale();
-    network.moveTo({ scale: scale / 1.2, animation: true });
+  document.getElementById('graph-zoom-out')?.addEventListener('click', () => {
+    if (network) network.moveTo({ scale: network.getScale() / 1.3, animation: true });
   });
 
   // Search
-  document.getElementById('graph-search').addEventListener('input', (e) => {
+  document.getElementById('graph-search')?.addEventListener('input', (e) => {
     const query = e.target.value.toLowerCase();
-    if (!query) {
-      // Show all nodes
-      const allNodeIds = graphData.nodes.map(n => n.id);
-      network.selectNodes([]);
+    if (!query || !network) {
+      if (network) network.selectNodes([]);
       return;
     }
-
-    // Find matching nodes
     const matches = graphData.nodes
-      .filter(n =>
-        n.label.toLowerCase().includes(query) ||
-        (n.description && n.description.toLowerCase().includes(query))
-      )
+      .filter(n => n.label.toLowerCase().includes(query) || (n.description && n.description.toLowerCase().includes(query)))
       .map(n => n.id);
-
     if (matches.length > 0) {
       network.selectNodes(matches);
       network.focus(matches[0], { animation: true, scale: 1.2 });
     }
   });
 
-  // Type filter
-  document.getElementById('graph-filter-type').addEventListener('change', (e) => {
+  // Type filter — highlight matching nodes without destroying graph state
+  document.getElementById('graph-filter-type')?.addEventListener('change', (e) => {
+    if (!network) return;
     const type = e.target.value;
     if (!type) {
-      network.setData({
-        nodes: new vis.DataSet(graphData.nodes.map(n => ({ id: n.id }))),
-        edges: new vis.DataSet(graphData.edges.map(e => ({ id: e.id, from: e.fromId, to: e.toId })))
-      });
+      network.selectNodes([]);
       return;
     }
-
-    // Filter nodes by type
-    const filteredNodeIds = graphData.nodes
-      .filter(n => n.type === type)
-      .map(n => n.id);
-
-    // Highlight only these nodes
-    network.selectNodes(filteredNodeIds);
-    if (filteredNodeIds.length > 0) {
-      network.focus(filteredNodeIds[0], { animation: true });
-    }
+    const ids = graphData.nodes.filter(n => n.type === type).map(n => n.id);
+    network.selectNodes(ids);
+    if (ids.length > 0) network.focus(ids[0], { animation: true });
   });
 
-  // Refresh button
-  document.getElementById('graph-refresh').addEventListener('click', loadGraphData);
+  // Refresh
+  document.getElementById('graph-refresh')?.addEventListener('click', () => {
+    initialized = false;
+    initGraph();
+  });
 
   // Close panel
-  document.getElementById('panel-close').addEventListener('click', hideNodePanel);
+  document.getElementById('panel-close')?.addEventListener('click', hideNodePanel);
 
-  // Create node button
-  document.getElementById('graph-create-node').addEventListener('click', () => {
-    document.getElementById('graph-create-modal').classList.remove('hidden');
+  // ─── Create Modal ──────────────────────────────────────────────────────
+  document.getElementById('graph-create-node')?.addEventListener('click', () => {
+    document.getElementById('graph-create-modal')?.classList.add('gv-modal-open');
+  });
+  document.getElementById('cancel-create')?.addEventListener('click', () => {
+    document.getElementById('graph-create-modal')?.classList.remove('gv-modal-open');
+  });
+  // Click backdrop to close
+  document.getElementById('graph-create-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'graph-create-modal') e.target.classList.remove('gv-modal-open');
   });
 
-  // Cancel create
-  document.getElementById('cancel-create').addEventListener('click', () => {
-    document.getElementById('graph-create-modal').classList.add('hidden');
-  });
-
-  // Confidence slider
-  document.getElementById('node-confidence').addEventListener('input', (e) => {
+  document.getElementById('node-confidence')?.addEventListener('input', (e) => {
     document.getElementById('confidence-value').textContent = e.target.value;
   });
 
-  // Create node form
-  document.getElementById('create-node-form').addEventListener('submit', async (e) => {
+  document.getElementById('create-node-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const form = e.target;
     const data = {
       type: form.type.value,
       label: form.label.value,
       description: form.description.value,
-      perspective: form.perspective.value,
       confidence: parseFloat(form.confidence.value)
     };
-
     try {
       const response = await fetch('/api/graph/nodes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
       });
-
       const result = await response.json();
-
       if (result.success) {
-        document.getElementById('graph-create-modal').classList.add('hidden');
+        document.getElementById('graph-create-modal').classList.remove('gv-modal-open');
         form.reset();
-        await loadGraphData();
+        document.getElementById('confidence-value').textContent = '0.5';
+        initialized = false;
+        await initGraph();
       } else {
-        alert('Failed to create node: ' + result.error);
+        showToast('Failed to create node: ' + result.error);
       }
     } catch (error) {
-      alert('Error creating node: ' + error.message);
+      showToast('Error: ' + error.message);
     }
   });
 
-  // Create edge button
-  document.getElementById('graph-create-edge').addEventListener('click', async () => {
+  // ─── Edit Modal ────────────────────────────────────────────────────────
+  document.getElementById('cancel-edit')?.addEventListener('click', () => {
+    document.getElementById('graph-edit-modal')?.classList.remove('gv-modal-open');
+  });
+  document.getElementById('graph-edit-modal')?.addEventListener('click', (e) => {
+    if (e.target.id === 'graph-edit-modal') e.target.classList.remove('gv-modal-open');
+  });
+  document.getElementById('edit-node-confidence')?.addEventListener('input', (e) => {
+    document.getElementById('edit-confidence-value').textContent = e.target.value;
+  });
+
+  document.getElementById('edit-node-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nodeId = document.getElementById('edit-node-id').value;
+    const data = {
+      label: document.getElementById('edit-node-label').value,
+      description: document.getElementById('edit-node-description').value,
+      confidence: parseFloat(document.getElementById('edit-node-confidence').value),
+    };
+    try {
+      const response = await fetch(`/api/graph/nodes/${nodeId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await response.json();
+      if (result.success) {
+        document.getElementById('graph-edit-modal').classList.remove('gv-modal-open');
+        initialized = false;
+        await initGraph();
+      } else {
+        showToast('Failed to update node: ' + result.error);
+      }
+    } catch (error) {
+      showToast('Error: ' + error.message);
+    }
+  });
+
+  // ─── Connect Nodes ─────────────────────────────────────────────────────
+  document.getElementById('graph-create-edge')?.addEventListener('click', async () => {
     if (selectedNodes.length !== 2) return;
-
-    const edgeType = prompt('Enter edge type (e.g., close_to, feels_about, mentions):');
+    const edgeType = prompt('Edge type (e.g. close_to, feels_about, loves, helps_with):');
     if (!edgeType) return;
-
     try {
       const response = await fetch('/api/graph/edges', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fromId: selectedNodes[0],
-          toId: selectedNodes[1],
-          type: edgeType,
-          perspective: 'shared'
-        })
+        body: JSON.stringify({ fromId: selectedNodes[0], toId: selectedNodes[1], type: edgeType })
       });
-
       const result = await response.json();
-
-      if (result.success) {
-        await loadGraphData();
-      } else {
-        alert('Failed to create edge: ' + result.error);
-      }
-    } catch (error) {
-      alert('Error creating edge: ' + error.message);
-    }
+      if (result.success) { initialized = false; await initGraph(); }
+      else showToast('Failed: ' + result.error);
+    } catch (error) { showToast('Error: ' + error.message); }
   });
 
-  // Delete button
-  document.getElementById('graph-delete').addEventListener('click', async () => {
+  // ─── Delete ────────────────────────────────────────────────────────────
+  document.getElementById('graph-delete')?.addEventListener('click', async () => {
     if (selectedNodes.length === 0) return;
-
-    const confirmed = confirm(`Delete ${selectedNodes.length} selected node(s)?`);
-    if (!confirmed) return;
-
+    if (!confirm(`Delete ${selectedNodes.length} selected node(s)?`)) return;
     for (const nodeId of selectedNodes) {
-      try {
-        await fetch(`/api/graph/nodes/${nodeId}`, { method: 'DELETE' });
-      } catch (error) {
-        console.error('Failed to delete node:', nodeId, error);
-      }
+      try { await fetch(`/api/graph/nodes/${nodeId}`, { method: 'DELETE' }); }
+      catch (err) { console.error('Delete failed:', nodeId, err); }
     }
-
-    await loadGraphData();
+    initialized = false;
+    await initGraph();
   });
 }
 
-// Export init function globally so psycheros.js can call it
+// ─── Edit Modal ──────────────────────────────────────────────────────────────
+
+function openEditModal(nodeId) {
+  const node = graphData.nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const modal = document.getElementById('graph-edit-modal');
+  if (!modal) return;
+  document.getElementById('edit-node-id').value = node.id;
+  document.getElementById('edit-node-label').value = node.label;
+  document.getElementById('edit-node-description').value = node.description || '';
+  document.getElementById('edit-node-confidence').value = node.confidence;
+  document.getElementById('edit-confidence-value').textContent = node.confidence;
+  modal.classList.add('gv-modal-open');
+}
+globalThis.openEditModal = openEditModal;
+
+// ─── Toast (replaces alert()) ────────────────────────────────────────────────
+
+function showToast(msg) {
+  let container = document.getElementById('gv-toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'gv-toast-container';
+    document.body.appendChild(container);
+  }
+  const toast = document.createElement('div');
+  toast.className = 'gv-toast';
+  toast.textContent = msg;
+  container.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('gv-toast-visible'));
+  setTimeout(() => {
+    toast.classList.remove('gv-toast-visible');
+    setTimeout(() => toast.remove(), 200);
+  }, 4000);
+}
+
 globalThis.initGraph = initGraph;

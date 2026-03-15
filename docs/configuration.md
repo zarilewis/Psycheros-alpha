@@ -41,6 +41,11 @@ Tools must be explicitly enabled via `PSYCHEROS_TOOLS`. Set to a comma-separated
 | `graph_traverse` | Traverse graph from a starting node |
 | `graph_get_subgraph` | Extract a subgraph centered on a node |
 | `graph_stats` | Get knowledge graph statistics |
+| `graph_create_node` | Create a node (with auto-embedding and duplicate prevention) |
+| `graph_create_edge` | Create a relationship between two nodes |
+| `graph_update_node` | Update a node's label, description, or confidence |
+| `graph_update_edge` | Update an edge's weight, evidence, or validity |
+| `graph_write_batch` | Batch create multiple nodes and edges |
 
 **Example configurations:**
 ```bash
@@ -48,7 +53,7 @@ Tools must be explicitly enabled via `PSYCHEROS_TOOLS`. Set to a comma-separated
 PSYCHEROS_TOOLS=append_to_self,append_to_user,append_to_relationship
 
 # All tools except shell
-PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,append_to_self,append_to_user,append_to_relationship,maintain_identity,list_identity_snapshots,graph_search_nodes,graph_get_node,graph_get_edges,graph_traverse,graph_get_subgraph,graph_stats
+PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,append_to_self,append_to_user,append_to_relationship,maintain_identity,list_identity_snapshots,graph_search_nodes,graph_get_node,graph_get_edges,graph_traverse,graph_get_subgraph,graph_stats,graph_create_node,graph_create_edge,graph_update_node,graph_update_edge,graph_write_batch
 ```
 
 ## RAG Settings

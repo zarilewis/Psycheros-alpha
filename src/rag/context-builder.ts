@@ -151,6 +151,31 @@ export async function buildGraphContext(
       }
     }
 
+    // Include anchor nodes ("me"/"user") if referenced by edges but not yet in results
+    for (const edge of allEdges) {
+      for (const refId of [edge.fromId, edge.toId]) {
+        if (!nodesById.has(refId)) {
+          try {
+            const node = await mcpClient.getGraphNode(refId);
+            if (node) {
+              nodesById.set(node.id, {
+                id: node.id,
+                type: node.type,
+                label: node.label,
+                description: node.description || "",
+                confidence: node.confidence,
+                createdAt: "",
+                updatedAt: "",
+                score: 0,
+              });
+            }
+          } catch {
+            // Skip if lookup fails
+          }
+        }
+      }
+    }
+
     // Format the context
     const nodesArray = Array.from(nodesById.values());
     const context = formatGraphContext(nodesArray, allEdges);

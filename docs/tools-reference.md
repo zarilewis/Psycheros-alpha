@@ -13,6 +13,38 @@ Tools are registered in `src/tools/registry.ts` via `createDefaultRegistry()`. E
 
 See [configuration.md](configuration.md) for the full list of available tools.
 
+## Knowledge Graph Tools
+
+The entity can read and write to its knowledge graph. Write tools auto-generate vector embeddings for semantic search.
+
+### Read Tools (6)
+
+| Tool | Description |
+|------|-------------|
+| `graph_search_nodes` | Semantic search for nodes by query, type, limit |
+| `graph_get_node` | Get a specific node by ID |
+| `graph_get_edges` | Query relationships by source/target/type |
+| `graph_traverse` | Walk the graph from a starting node |
+| `graph_get_subgraph` | Extract full neighborhood around a node |
+| `graph_stats` | Get node/edge counts and vector search status |
+
+### Write Tools (5)
+
+| Tool | Description |
+|------|-------------|
+| `graph_create_node` | Create a node with duplicate prevention and auto-embedding |
+| `graph_create_edge` | Create a relationship between two nodes |
+| `graph_update_node` | Update label, description, or confidence (re-embeds) |
+| `graph_update_edge` | Update weight, evidence, or validity |
+| `graph_write_batch` | Batch create nodes and edges (edges can reference existing nodes by label) |
+
+### Related Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/tools/graph-read.ts` | 6 read-only graph query tools |
+| `src/tools/graph-write.ts` | 5 graph write tools with auto-embedding |
+
 ## Identity Tools
 
 The entity can modify its identity files through two tiers of tools.

@@ -70,6 +70,8 @@ import {
   handleCreateGraphEdge,
   handleDeleteGraphNode,
   handleDeleteGraphEdge,
+  handleUpdateGraphNode,
+  handleUpdateGraphEdge,
   handleAppearanceSettingsFragment,
   handleGetLLMSettings,
   handleSaveLLMSettings,
@@ -709,16 +711,26 @@ export class Server {
       return await handleCreateGraphEdge(ctx, request);
     }
 
-    // DELETE /api/graph/nodes/:id - Delete node
+    // PUT/DELETE /api/graph/nodes/:id - Update or delete node
     const graphNodeMatch = path.match(/^\/api\/graph\/nodes\/([^/]+)$/);
-    if (method === "DELETE" && graphNodeMatch) {
-      return await handleDeleteGraphNode(ctx, graphNodeMatch[1]);
+    if (graphNodeMatch) {
+      if (method === "PUT") {
+        return await handleUpdateGraphNode(ctx, request, graphNodeMatch[1]);
+      }
+      if (method === "DELETE") {
+        return await handleDeleteGraphNode(ctx, graphNodeMatch[1]);
+      }
     }
 
-    // DELETE /api/graph/edges/:id - Delete edge
+    // PUT/DELETE /api/graph/edges/:id - Update or delete edge
     const graphEdgeMatch = path.match(/^\/api\/graph\/edges\/([^/]+)$/);
-    if (method === "DELETE" && graphEdgeMatch) {
-      return await handleDeleteGraphEdge(ctx, graphEdgeMatch[1]);
+    if (graphEdgeMatch) {
+      if (method === "PUT") {
+        return await handleUpdateGraphEdge(ctx, request, graphEdgeMatch[1]);
+      }
+      if (method === "DELETE") {
+        return await handleDeleteGraphEdge(ctx, graphEdgeMatch[1]);
+      }
     }
 
     // ========================================

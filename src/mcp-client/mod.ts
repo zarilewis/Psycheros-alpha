@@ -1002,14 +1002,12 @@ export class MCPClient {
    */
   async getGraphNodes(options?: {
     type?: string;
-    perspective?: string;
     limit?: number;
   }): Promise<Array<{
     id: string;
     type: string;
     label: string;
     description: string;
-    perspective: string;
     confidence: number;
     createdAt: string;
     updatedAt: string;
@@ -1024,7 +1022,6 @@ export class MCPClient {
         name: "graph_node_list",
         arguments: {
           type: options?.type,
-          perspective: options?.perspective,
           limit: options?.limit ?? 500,
         },
       });
@@ -1054,7 +1051,6 @@ export class MCPClient {
     toId: string;
     type: string;
     customType?: string;
-    perspective: string;
     weight: number;
   }>> {
     if (!this.client) {
@@ -1092,26 +1088,38 @@ export class MCPClient {
     type: string;
     label: string;
     description?: string;
-    perspective?: string;
     properties?: Record<string, unknown>;
     confidence?: number;
     sourceMemoryId?: string;
+    embedding?: number[];
   }): Promise<{ success: boolean; nodeId?: string; error?: string }> {
     if (!this.client) {
       return { success: false, error: "MCP not connected" };
     }
 
     try {
+      // Auto-generate embedding if not provided
+      let embedding = input.embedding;
+      if (!embedding) {
+        try {
+          const { getEmbedder } = await import("../rag/embedder.ts");
+          const embedder = getEmbedder();
+          embedding = await embedder.embed(`${input.label} ${input.description || ""}`);
+        } catch (e) {
+          console.warn("[MCP] Failed to generate embedding for graph node:", e);
+        }
+      }
+
       const result = await this.client.callTool({
         name: "graph_node_create",
         arguments: {
           type: input.type,
           label: input.label,
           description: input.description,
-          perspective: input.perspective ?? "shared",
           properties: input.properties ?? {},
           confidence: input.confidence ?? 0.5,
           sourceMemoryId: input.sourceMemoryId,
+          embedding,
           instanceId: this.config.instanceId,
         },
       });
@@ -1140,7 +1148,6 @@ export class MCPClient {
     toId: string;
     type: string;
     customType?: string;
-    perspective?: string;
     weight?: number;
     evidence?: string;
   }): Promise<{ success: boolean; edgeId?: string; error?: string }> {
@@ -1156,7 +1163,6 @@ export class MCPClient {
           toId: input.toId,
           type: input.type,
           customType: input.customType,
-          perspective: input.perspective ?? "shared",
           weight: input.weight ?? 0.5,
           evidence: input.evidence,
           instanceId: this.config.instanceId,
@@ -1250,7 +1256,6 @@ export class MCPClient {
     type: string;
     label: string;
     description: string;
-    perspective: string;
     confidence: number;
   } | null> {
     if (!this.client) {
@@ -1301,10 +1306,21 @@ export class MCPClient {
     }
 
     try {
+      // Generate query embedding for semantic search
+      let queryEmbedding: number[] | undefined;
+      try {
+        const { getEmbedder } = await import("../rag/embedder.ts");
+        const embedder = getEmbedder();
+        queryEmbedding = await embedder.embed(query);
+      } catch (e) {
+        console.warn("[MCP] Failed to generate query embedding, falling back to text search:", e);
+      }
+
       const result = await this.client.callTool({
         name: "graph_node_search",
         arguments: {
           query,
+          queryEmbedding,
           type,
           limit: limit ?? 10,
           minScore: minScore ?? 0.3,
@@ -1317,12 +1333,11 @@ export class MCPClient {
       }
 
       const response = JSON.parse(textContent);
-      return (response.results ?? []).map((r: { node: { id: string; type: string; label: string; description: string; perspective: string; confidence: number; createdAt: string; updatedAt: string }; score: number }) => ({
+      return (response.results ?? []).map((r: { node: { id: string; type: string; label: string; description: string; confidence: number; createdAt: string; updatedAt: string }; score: number }) => ({
         id: r.node.id,
         type: r.node.type,
         label: r.node.label,
         description: r.node.description,
-        perspective: r.node.perspective,
         confidence: r.node.confidence,
         createdAt: r.node.createdAt,
         updatedAt: r.node.updatedAt,
@@ -1448,6 +1463,188 @@ export class MCPClient {
     } catch (error) {
       console.error("[MCP] Get graph subgraph failed:", error);
       return { node: undefined, nodes: [], edges: [] };
+    }
+  }
+
+  /**
+   * Update a graph node via MCP.
+   */
+  async updateGraphNode(id: string, input: {
+    label?: string;
+    description?: string;
+    properties?: Record<string, unknown>;
+    confidence?: number;
+    lastConfirmedAt?: string;
+    embedding?: number[];
+  }): Promise<{ success: boolean; error?: string }> {
+    if (!this.client) {
+      return { success: false, error: "MCP not connected" };
+    }
+
+    try {
+      // Re-generate embedding if label or description changed
+      let embedding = input.embedding;
+      if (!embedding && (input.label || input.description)) {
+        try {
+          const { getEmbedder } = await import("../rag/embedder.ts");
+          const embedder = getEmbedder();
+          const text = `${input.label || ""} ${input.description || ""}`.trim();
+          if (text) {
+            embedding = await embedder.embed(text);
+          }
+        } catch (e) {
+          console.warn("[MCP] Failed to generate embedding for node update:", e);
+        }
+      }
+
+      const result = await this.client.callTool({
+        name: "graph_node_update",
+        arguments: {
+          id,
+          label: input.label,
+          description: input.description,
+          properties: input.properties,
+          confidence: input.confidence,
+          lastConfirmedAt: input.lastConfirmedAt,
+          embedding,
+          instanceId: this.config.instanceId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return {
+          success: response.success,
+          error: response.success ? undefined : response.message,
+        };
+      }
+      return { success: false, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] Update graph node failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Update a graph edge via MCP.
+   */
+  async updateGraphEdge(id: string, input: {
+    type?: string;
+    customType?: string;
+    properties?: Record<string, unknown>;
+    weight?: number;
+    evidence?: string;
+    validUntil?: string;
+    lastConfirmedAt?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    if (!this.client) {
+      return { success: false, error: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "graph_edge_update",
+        arguments: {
+          id,
+          ...input,
+          instanceId: this.config.instanceId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return {
+          success: response.success,
+          error: response.success ? undefined : response.message,
+        };
+      }
+      return { success: false, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] Update graph edge failed:", error);
+      return { success: false, error: String(error) };
+    }
+  }
+
+  /**
+   * Create multiple nodes and edges in a single transaction via MCP.
+   * Auto-generates embeddings for each node.
+   */
+  async writeGraphTransaction(input: {
+    nodes?: Array<{
+      type: string;
+      label: string;
+      description?: string;
+      properties?: Record<string, unknown>;
+      confidence?: number;
+      sourceMemoryId?: string;
+      firstLearnedAt?: string;
+    }>;
+    edges?: Array<{
+      fromLabel: string;
+      toLabel: string;
+      type: string;
+      customType?: string;
+      properties?: Record<string, unknown>;
+      weight?: number;
+      evidence?: string;
+      occurredAt?: string;
+      validUntil?: string;
+    }>;
+  }): Promise<{ success: boolean; nodesCreated: number; edgesCreated: number; error?: string }> {
+    if (!this.client) {
+      return { success: false, nodesCreated: 0, edgesCreated: 0, error: "MCP not connected" };
+    }
+
+    try {
+      // Generate embeddings for all nodes
+      const nodesWithEmbeddings = [];
+      if (input.nodes) {
+        let embedder: { embed: (text: string) => Promise<number[]> } | null = null;
+        try {
+          const { getEmbedder } = await import("../rag/embedder.ts");
+          embedder = getEmbedder();
+        } catch (e) {
+          console.warn("[MCP] Failed to load embedder for batch:", e);
+        }
+
+        for (const node of input.nodes) {
+          let embedding: number[] | undefined;
+          if (embedder) {
+            try {
+              embedding = await embedder.embed(`${node.label} ${node.description || ""}`);
+            } catch (e) {
+              console.warn(`[MCP] Failed to embed node "${node.label}":`, e);
+            }
+          }
+          nodesWithEmbeddings.push({ ...node, embedding });
+        }
+      }
+
+      const result = await this.client.callTool({
+        name: "graph_write_transaction",
+        arguments: {
+          nodes: nodesWithEmbeddings.length > 0 ? nodesWithEmbeddings : undefined,
+          edges: input.edges,
+          instanceId: this.config.instanceId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return {
+          success: response.success,
+          nodesCreated: response.nodesCreated ?? 0,
+          edgesCreated: response.edgesCreated ?? 0,
+          error: response.success ? undefined : response.message,
+        };
+      }
+      return { success: false, nodesCreated: 0, edgesCreated: 0, error: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] Write graph transaction failed:", error);
+      return { success: false, nodesCreated: 0, edgesCreated: 0, error: String(error) };
     }
   }
 }
