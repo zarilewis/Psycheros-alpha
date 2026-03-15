@@ -854,6 +854,12 @@
   to { opacity: 1; transform: translate(-50%, 0); }
 }
 
+.toast-warning {
+  background-color: var(--c-warning);
+  color: #000000;
+  box-shadow: 0 0 12px rgba(255, 170, 0, 0.4);
+}
+
 /* ==========================================================================
    Status Messages
    ========================================================================== */
@@ -864,6 +870,16 @@
   font-size: var(--font-size-sm);
   color: var(--c-fg-muted);
   font-style: italic;
+}
+
+.status-retry {
+  color: var(--c-warning);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* ==========================================================================

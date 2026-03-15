@@ -836,7 +836,10 @@ function handleSSEEvent(eventType, data, messageEl, state) {
   const contentContainer = messageEl.querySelector('.msg-content');
 
   switch (eventType) {
-    case 'thinking':
+    case 'thinking': {
+      // Clear retry indicator — upstream recovered
+      const retryThink = contentContainer.querySelector('.status-retry');
+      if (retryThink) retryThink.remove();
       if (!state.getThinking()) {
         const thinkingSection = document.createElement('div');
         thinkingSection.className = 'thinking expanded';
@@ -853,8 +856,12 @@ function handleSSEEvent(eventType, data, messageEl, state) {
       state.getThinking().textContent += data;
       AutoScroll.streamTick();
       break;
+    }
 
     case 'content': {
+      // Clear retry indicator — upstream recovered
+      const retryContent = contentContainer.querySelector('.status-retry');
+      if (retryContent) retryContent.remove();
       if (!state.getContent()) {
         const contentEl = document.createElement('div');
         contentEl.className = 'assistant-text streaming-active';
@@ -918,7 +925,20 @@ function handleSSEEvent(eventType, data, messageEl, state) {
     case 'status': {
       try {
         const status = JSON.parse(data);
-        if (status.error) {
+        if (status.retry) {
+          // Transient retry indicator — remove any previous one first
+          const prev = contentContainer.querySelector('.status-retry');
+          if (prev) prev.remove();
+          const retryEl = document.createElement('div');
+          retryEl.className = 'status status-retry';
+          retryEl.textContent = status.message;
+          contentContainer.appendChild(retryEl);
+          showToast(status.message, 'warning');
+          AutoScroll.streamTick();
+        } else if (status.error) {
+          // Remove retry indicator if present — we've moved past it
+          const retryEl = contentContainer.querySelector('.status-retry');
+          if (retryEl) retryEl.remove();
           const errorEl = document.createElement('div');
           errorEl.className = 'status error';
           errorEl.style.color = 'var(--c-error)';
@@ -1248,12 +1268,12 @@ function formatChatTimestamp(date) {
   });
 }
 
-function showToast(message) {
+function showToast(message, variant) {
   const existing = document.querySelector('.toast');
   if (existing) existing.remove();
 
   const toast = document.createElement('div');
-  toast.className = 'toast';
+  toast.className = variant === 'warning' ? 'toast toast-warning' : 'toast';
   toast.textContent = message;
   document.body.appendChild(toast);
 

@@ -91,6 +91,7 @@ export type EntityYield =
   | StreamChunk
   | { type: "tool_result"; result: ToolResult }
   | { type: "dom_update"; update: UIUpdate }
+  | { type: "status"; status: { message?: string; error?: string; retry?: { attempt: number; maxAttempts: number } } }
   | { type: "metrics"; metrics: TurnMetrics }
   | { type: "context"; context: LLMContextSnapshot };
 
@@ -375,53 +376,91 @@ export class EntityTurn {
     while (iteration < this.maxToolIterations) {
       iteration++;
 
-      // Create metrics collector for this iteration
-      const metricsCollector = createCollector(conversationId);
+      // Retry configuration for transient upstream errors (e.g. Z.ai "network_error").
+      // Z.ai's failure already takes ~30s, so we use a short fixed delay between retries
+      // rather than exponential backoff — the API already "waited" for us.
+      const MAX_LLM_ATTEMPTS = 3;
+      const RETRY_DELAY_MS = 3000;
 
-      // Accumulate the assistant's response
       let assistantContent = "";
       let assistantReasoning = "";
       const toolCalls: ToolCall[] = [];
       let streamError: Error | null = null;
       let finishReason = "stop";
+      let metricsCollector = createCollector(conversationId);
 
-      // Stream LLM response with error handling
-      try {
-        for await (const chunk of this.llm.chatStream(messages, toolDefinitions, {
-          metricsCollector,
-        })) {
-          // Yield all chunks to the caller
-          yield chunk;
+      for (let attempt = 1; attempt <= MAX_LLM_ATTEMPTS; attempt++) {
+        // Reset accumulators for each attempt
+        assistantContent = "";
+        assistantReasoning = "";
+        toolCalls.length = 0;
+        streamError = null;
+        finishReason = "stop";
+        metricsCollector = createCollector(conversationId);
 
-          // Accumulate content based on chunk type
-          switch (chunk.type) {
-            case "thinking":
-              assistantReasoning += chunk.content;
-              break;
-            case "content":
-              assistantContent += chunk.content;
-              break;
-            case "tool_call":
-              toolCalls.push(chunk.toolCall);
-              break;
-            case "done":
-              // Stream finished for this iteration - capture finish reason
-              finishReason = chunk.finishReason;
-              setFinishReason(metricsCollector, chunk.finishReason);
-              break;
+        // Stream LLM response with error handling
+        try {
+          for await (const chunk of this.llm.chatStream(messages, toolDefinitions, {
+            metricsCollector,
+          })) {
+            // Yield all chunks to the caller
+            yield chunk;
+
+            // Accumulate content based on chunk type
+            switch (chunk.type) {
+              case "thinking":
+                assistantReasoning += chunk.content;
+                break;
+              case "content":
+                assistantContent += chunk.content;
+                break;
+              case "tool_call":
+                toolCalls.push(chunk.toolCall);
+                break;
+              case "done":
+                // Stream finished for this iteration - capture finish reason
+                finishReason = chunk.finishReason;
+                setFinishReason(metricsCollector, chunk.finishReason);
+                break;
+            }
           }
+        } catch (error) {
+          // Capture the error but continue to persist what we have
+          streamError = error instanceof Error ? error : new Error(String(error));
+          const errorCode = (error as { code?: string })?.code || "UNKNOWN";
+          const statusCode = (error as { statusCode?: number })?.statusCode;
+          console.error(
+            `[EntityTurn] LLM stream error — code=${errorCode}` +
+            (statusCode ? `, http=${statusCode}` : "") +
+            `: ${streamError.message}`,
+          );
+          finishReason = "error";
         }
-      } catch (error) {
-        // Capture the error but continue to persist what we have
-        streamError = error instanceof Error ? error : new Error(String(error));
-        const errorCode = (error as { code?: string })?.code || "UNKNOWN";
-        const statusCode = (error as { statusCode?: number })?.statusCode;
-        console.error(
-          `[EntityTurn] LLM stream error — code=${errorCode}` +
-          (statusCode ? `, http=${statusCode}` : "") +
-          `: ${streamError.message}`,
-        );
-        finishReason = "error";
+
+        const hasContentThisAttempt = assistantContent || toolCalls.length > 0 || assistantReasoning;
+
+        // Check if this is a retryable failure: unexpected finish_reason with no content
+        const expectedFinishReasons = new Set(["stop", "tool_calls", "length"]);
+        const isRetryableFinish = !expectedFinishReasons.has(finishReason) && !hasContentThisAttempt && !streamError;
+
+        if (isRetryableFinish && attempt < MAX_LLM_ATTEMPTS) {
+          console.warn(
+            `[EntityTurn] Retryable failure — finish_reason="${finishReason}", ` +
+            `attempt ${attempt}/${MAX_LLM_ATTEMPTS}, retrying in ${RETRY_DELAY_MS}ms`,
+          );
+          yield {
+            type: "status",
+            status: {
+              message: `Upstream connection lost — retrying (${attempt}/${MAX_LLM_ATTEMPTS})`,
+              retry: { attempt, maxAttempts: MAX_LLM_ATTEMPTS },
+            },
+          };
+          await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+          continue;
+        }
+
+        // Either succeeded or non-retryable — break out of retry loop
+        break;
       }
 
       // Generate message ID upfront so we can link metrics to it
@@ -470,13 +509,11 @@ export class EntityTurn {
         throw streamError;
       }
 
-      // Detect upstream error finish reasons (e.g. Z.ai returning "network_error")
-      // that completed the stream without throwing but produced no usable content.
-      const expectedFinishReasons = new Set(["stop", "tool_calls", "length"]);
-      if (!expectedFinishReasons.has(finishReason) && !hasContent) {
+      // Detect upstream error finish reasons after all retry attempts exhausted
+      if (!new Set(["stop", "tool_calls", "length"]).has(finishReason) && !hasContent) {
         throw new LLMError(
-          `LLM stream completed with unexpected finish_reason="${finishReason}" and no content — ` +
-          "the upstream API may have encountered an internal error",
+          `LLM stream failed with finish_reason="${finishReason}" after ${MAX_LLM_ATTEMPTS} attempts — ` +
+          "the upstream API may be experiencing an outage",
           "NETWORK_ERROR",
         );
       }

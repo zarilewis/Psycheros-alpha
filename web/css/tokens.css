@@ -36,6 +36,7 @@
 
   /* Semantic colors */
   --c-error: #ff4444;
+  --c-warning: #ffaa00;
   --c-success: var(--c-accent);
 
   /* Borders */
