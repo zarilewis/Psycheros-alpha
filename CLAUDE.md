@@ -69,8 +69,8 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 - `GET /api/events` — persistent channel (background dom_update events)
 
 **User data protection**:
-- `identity/`, `memories/`, `.snapshots/` are gitignored (protected from overwrites)
-- Fresh installs get defaults from `templates/identity/` via `src/init/mod.ts`
+- `identity/`, `memories/`, `.snapshots/` are **runtime-only directories** — gitignored, never committed
+- To change identity defaults, edit `templates/identity/` (committed). `src/init/mod.ts` seeds `identity/` from templates on first run if empty. **Never `git add` files from `identity/`** — they contain user-specific entity data.
 - Entity-core is canonical source; local `identity/` is a cache when MCP is enabled
 
 ## Documentation Index
