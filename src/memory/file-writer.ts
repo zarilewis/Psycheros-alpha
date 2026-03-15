@@ -8,18 +8,26 @@ import type { DBClient } from "../db/mod.ts";
 import type { MemoryFile, Granularity } from "./types.ts";
 
 /**
+ * Callback invoked after a memory file is successfully written and recorded in the DB.
+ * Used to sync the memory to external systems (e.g., entity-core via MCP).
+ */
+export type OnMemoryCreated = (memory: MemoryFile) => void;
+
+/**
  * Write a memory file to disk and update the database.
  * Note: "significant" memories skip database tracking (they don't consolidate).
  *
  * @param memory - The memory file to write
  * @param db - Database client for recording the summary
  * @param projectRoot - Root directory of the project
+ * @param onCreated - Optional callback fired after successful write (e.g., MCP sync)
  * @returns True if successful, false on error
  */
 export async function writeMemoryFile(
   memory: MemoryFile,
   db: DBClient,
-  projectRoot: string
+  projectRoot: string,
+  onCreated?: OnMemoryCreated,
 ): Promise<boolean> {
   const fullPath = `${projectRoot}/memories/${memory.path}`;
 
@@ -51,6 +59,17 @@ export async function writeMemoryFile(
     }
 
     console.log(`[Memory] Wrote ${memory.granularity} memory: ${memory.path}`);
+
+    // Notify external systems (e.g., MCP sync to entity-core)
+    if (onCreated) {
+      try {
+        onCreated(memory);
+      } catch (error) {
+        // Non-fatal — the local file and DB record are the source of truth
+        console.error(`[Memory] Post-write callback failed:`, error instanceof Error ? error.message : String(error));
+      }
+    }
+
     return true;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -207,64 +226,3 @@ export async function archiveDailyMemory(
   }
 }
 
-/**
- * Write a significant memory file to disk.
- * Significant memories are NOT recorded in the database (they don't consolidate).
- *
- * @param title - The title for the memory
- * @param content - The content of the memory
- * @param conversationId - The ID of the conversation where this memory was created
- * @param projectRoot - Root directory of the project
- * @returns The relative file path if successful, null on error
- */
-export async function writeSignificantMemory(
-  title: string,
-  content: string,
-  conversationId: string,
-  projectRoot: string
-): Promise<string | null> {
-  const now = new Date();
-  const dateStr = now.toISOString().split("T")[0];
-  const timestamp = now.toISOString();
-
-  // Create slug from title
-  const slug = title
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .substring(0, 50);
-
-  const fileName = `${dateStr}_${slug}.md`;
-  const relativePath = `significant/${fileName}`;
-  const fullPath = `${projectRoot}/memories/${relativePath}`;
-
-  try {
-    // Ensure directory exists
-    await Deno.mkdir(`${projectRoot}/memories/significant`, { recursive: true });
-
-    // Format the memory file
-    const formattedContent = `# ${title}
-
-${content}
-
-<!--
-Date: ${dateStr}
-Conversation: ${conversationId}
-Created: ${timestamp}
--->
-`;
-
-    // Write the file
-    await Deno.writeTextFile(fullPath, formattedContent);
-
-    console.log(`[Memory] Wrote significant memory: ${relativePath}`);
-    return relativePath;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[Memory] Failed to write significant memory:`, errorMessage);
-    return null;
-  }
-}

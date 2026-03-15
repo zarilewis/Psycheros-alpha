@@ -48,6 +48,8 @@ RUN cd /app/entity-core && timeout 5s deno run -A --unstable-cron src/mod.ts || 
 RUN cd /app/Psycheros && timeout 10s deno run -A --unstable-cron src/main.ts || true
 
 # Create volume-mounted directories (will be overlaid by volume mounts)
+# Note: /app/Psycheros/memories is NOT listed here — the entrypoint symlinks
+# it to /app/entity-core/data/memories so both systems share one physical copy.
 RUN mkdir -p \
     /app/Psycheros/.snapshots \
     /app/Psycheros/.psycheros \

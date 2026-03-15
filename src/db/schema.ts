@@ -467,6 +467,30 @@ function runMigrations(db: Database): void {
     `);
     console.log("[DB] Created context_snapshots table");
   }
+
+  // Migration: Add cron_job_runs table if missing
+  const hasCronJobRuns = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'cron_job_runs'")
+    .get();
+
+  if (!hasCronJobRuns) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS cron_job_runs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        job_id TEXT NOT NULL,
+        started_at TEXT NOT NULL,
+        completed_at TEXT NOT NULL,
+        duration_ms INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('success', 'error')),
+        result TEXT,
+        error TEXT
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_cron_job_runs_job
+        ON cron_job_runs(job_id, completed_at DESC);
+    `);
+    console.log("[DB] Created cron_job_runs table");
+  }
 }
 
 /**

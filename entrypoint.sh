@@ -25,9 +25,21 @@ for subdir in self user relationship custom; do
   fi
 done
 
-# Ensure memory subdirs exist
-for memdir in daily weekly monthly yearly significant archive/daily; do
+# Ensure memory subdirs exist in entity-core (canonical location)
+for memdir in daily weekly monthly yearly significant archive/daily archive/weekly archive/monthly; do
   mkdir -p "$DATA/memories/$memdir"
 done
+
+# Symlink Psycheros memories → entity-core memories (single source of truth).
+# Psycheros cron writes here; entity-core MCP also writes here.
+# Both systems share one physical copy, persisted by the entity-core-data volume.
+if [ -d "/app/Psycheros/memories" ] && [ ! -L "/app/Psycheros/memories" ]; then
+  # Remove the directory if it exists (from Docker build) so we can symlink
+  rm -rf "/app/Psycheros/memories"
+fi
+if [ ! -L "/app/Psycheros/memories" ]; then
+  ln -s "$DATA/memories" "/app/Psycheros/memories"
+  echo "[Entrypoint] Linked Psycheros/memories → entity-core/data/memories"
+fi
 
 exec /usr/bin/dumb-init -- "$@"

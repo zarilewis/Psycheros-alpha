@@ -14,8 +14,8 @@ import type {
   SummarizerConfig,
   MessageWithContext,
 } from "./types.ts";
-import { getDateFormatInfo } from "./types.ts";
-import { writeMemoryFile, formatMemoryContent, extractChatIds } from "./file-writer.ts";
+import { getDateFormatInfo, getISOWeekMonday } from "./types.ts";
+import { writeMemoryFile, formatMemoryContent, extractChatIds, type OnMemoryCreated } from "./file-writer.ts";
 
 /**
  * Default summarizer configuration.
@@ -267,7 +267,8 @@ export async function summarizeDay(
   date: Date,
   db: DBClient,
   projectRoot: string,
-  config?: Partial<SummarizerConfig>
+  config?: Partial<SummarizerConfig>,
+  onCreated?: OnMemoryCreated,
 ): Promise<MemoryFile | null> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
 
@@ -334,8 +335,8 @@ export async function summarizeDay(
       date: dateInfo.dateStr,
     };
 
-    // Write the file
-    const success = await writeMemoryFile(memoryFile, db, projectRoot);
+    // Write the file and notify external systems
+    const success = await writeMemoryFile(memoryFile, db, projectRoot, onCreated);
 
     if (!success) {
       return null;
@@ -345,21 +346,6 @@ export async function summarizeDay(
   } finally {
     // Worker client doesn't need explicit cleanup
   }
-}
-
-/**
- * Summarize the previous day (convenience function).
- */
-export async function summarizePreviousDay(
-  db: DBClient,
-  projectRoot: string,
-  config?: Partial<SummarizerConfig>
-): Promise<MemoryFile | null> {
-  const yesterday = new Date();
-  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-  yesterday.setUTCHours(0, 0, 0, 0);
-
-  return await summarizeDay(yesterday, db, projectRoot, config);
 }
 
 /**
@@ -375,7 +361,8 @@ export async function consolidateWeek(
   weekDate: Date,
   db: DBClient,
   projectRoot: string,
-  config?: Partial<SummarizerConfig>
+  config?: Partial<SummarizerConfig>,
+  onCreated?: OnMemoryCreated,
 ): Promise<MemoryFile | null> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
 
@@ -467,7 +454,7 @@ export async function consolidateWeek(
     date: dateInfo.dateStr,
   };
 
-  const success = await writeMemoryFile(memoryFile, db, projectRoot);
+  const success = await writeMemoryFile(memoryFile, db, projectRoot, onCreated);
 
   if (success) {
     // Archive the daily files
@@ -512,7 +499,8 @@ export async function consolidateMonth(
   monthDate: Date,
   db: DBClient,
   projectRoot: string,
-  config?: Partial<SummarizerConfig>
+  config?: Partial<SummarizerConfig>,
+  onCreated?: OnMemoryCreated,
 ): Promise<MemoryFile | null> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
 
@@ -537,11 +525,7 @@ export async function consolidateMonth(
       // Parse week file date - get the Monday of that ISO week
       const weekStr = match[1];
       const [year, week] = weekStr.split("-W").map(Number);
-      const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
-      const dayOfWeek = simple.getUTCDay();
-      const weekStart = new Date(simple);
-      weekStart.setUTCDate(simple.getUTCDate() - dayOfWeek + 1);
-      weekStart.setUTCHours(0, 0, 0, 0);
+      const weekStart = getISOWeekMonday(year, week);
 
       if (weekStart >= monthStart && weekStart <= monthEnd) {
         monthFiles.push(file);
@@ -612,7 +596,7 @@ export async function consolidateMonth(
     date: dateInfo.dateStr,
   };
 
-  const success = await writeMemoryFile(memoryFile, db, projectRoot);
+  const success = await writeMemoryFile(memoryFile, db, projectRoot, onCreated);
 
   if (success) {
     // Archive the weekly files
@@ -637,7 +621,8 @@ export async function consolidateYear(
   yearDate: Date,
   db: DBClient,
   projectRoot: string,
-  config?: Partial<SummarizerConfig>
+  config?: Partial<SummarizerConfig>,
+  onCreated?: OnMemoryCreated,
 ): Promise<MemoryFile | null> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
 
@@ -725,7 +710,7 @@ export async function consolidateYear(
     date: dateInfo.dateStr,
   };
 
-  const success = await writeMemoryFile(memoryFile, db, projectRoot);
+  const success = await writeMemoryFile(memoryFile, db, projectRoot, onCreated);
 
   if (success) {
     // Archive the monthly files

@@ -39,14 +39,14 @@ import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
 
 /**
  * Format a timestamp for message content.
- * Uses the TZ environment variable for timezone, defaults to UTC.
+ * Uses PSYCHEROS_DISPLAY_TZ for user-facing timezone, falls back to TZ, defaults to UTC.
  * Format: <t>YYYY-MM-DD HH:MM</t>
  *
  * XML tags are used so the LLM treats timestamps as structural
  * metadata rather than content to reproduce.
  */
 export function formatMessageTimestamp(date: Date): string {
-  const timeZone = Deno.env.get("TZ") || "UTC";
+  const timeZone = Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ") || "UTC";
   const year = date.toLocaleDateString("en-US", { timeZone, year: "numeric" });
   const month = date.toLocaleDateString("en-US", { timeZone, month: "2-digit" });
   const day = date.toLocaleDateString("en-US", { timeZone, day: "2-digit" });

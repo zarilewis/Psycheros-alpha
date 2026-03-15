@@ -6,8 +6,9 @@
 
 import type { DBClient } from "../db/mod.ts";
 import type { MemoryFile, Granularity } from "./types.ts";
+import { getISOWeek, getISOWeekMonday } from "./types.ts";
 import { consolidateWeek, consolidateMonth, consolidateYear } from "./summarizer.ts";
-import { listMemoryFiles } from "./file-writer.ts";
+import { listMemoryFiles, type OnMemoryCreated } from "./file-writer.ts";
 
 /**
  * Consolidation result.
@@ -86,10 +87,7 @@ async function hasUnconsolidatedFiles(
       if (match) {
         fileDateStr = match[1];
         const [year, week] = match[1].split("-W").map(Number);
-        const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7));
-        const dayOfWeek = simple.getUTCDay();
-        fileDate = new Date(simple);
-        fileDate.setUTCDate(simple.getUTCDate() - dayOfWeek + 1);
+        fileDate = getISOWeekMonday(year, week);
       }
     } else if (sourceGranularity === "monthly") {
       // Match both monthly/YYYY-MM.md and archive/monthly/YYYY-MM.md
@@ -130,10 +128,8 @@ function getTargetDateInfo(
 
   switch (granularity) {
     case "weekly": {
-      const jan1 = new Date(Date.UTC(year, 0, 1));
-      const daysDiff = Math.floor((sourceDate.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000));
-      const weekNum = String(Math.ceil((daysDiff + jan1.getUTCDay() + 1) / 7)).padStart(2, "0");
-      const dateStr = `${year}-W${weekNum}`;
+      const iso = getISOWeek(sourceDate);
+      const dateStr = `${iso.year}-W${String(iso.week).padStart(2, "0")}`;
       return { filePath: `weekly/${dateStr}.md`, dateStr };
     }
     case "monthly": {
@@ -184,7 +180,8 @@ export async function needsConsolidation(
 export async function runConsolidation(
   granularity: "weekly" | "monthly" | "yearly",
   db: DBClient,
-  projectRoot: string
+  projectRoot: string,
+  onCreated?: OnMemoryCreated,
 ): Promise<ConsolidationResult> {
   // Get a date in the previous period to consolidate
   const now = new Date();
@@ -193,7 +190,7 @@ export async function runConsolidation(
   switch (granularity) {
     case "weekly":
       try {
-        const memoryFile = await consolidateWeek(targetDate, db, projectRoot);
+        const memoryFile = await consolidateWeek(targetDate, db, projectRoot, undefined, onCreated);
         return {
           success: !!memoryFile,
           memoryFile: memoryFile ?? undefined,
@@ -207,7 +204,7 @@ export async function runConsolidation(
 
     case "monthly":
       try {
-        const memoryFile = await consolidateMonth(targetDate, db, projectRoot);
+        const memoryFile = await consolidateMonth(targetDate, db, projectRoot, undefined, onCreated);
         return {
           success: !!memoryFile,
           memoryFile: memoryFile ?? undefined,
@@ -221,7 +218,7 @@ export async function runConsolidation(
 
     case "yearly":
       try {
-        const memoryFile = await consolidateYear(targetDate, db, projectRoot);
+        const memoryFile = await consolidateYear(targetDate, db, projectRoot, undefined, onCreated);
         return {
           success: !!memoryFile,
           memoryFile: memoryFile ?? undefined,
@@ -233,35 +230,4 @@ export async function runConsolidation(
         };
       }
   }
-}
-
-/**
- * Run all needed consolidations.
- *
- * @param db - Database client
- * @param projectRoot - Root directory of the project
- * @returns Array of consolidation results
- */
-export async function runAllConsolidations(
-  db: DBClient,
-  projectRoot: string
-): Promise<ConsolidationResult[]> {
-  const results: ConsolidationResult[] = [];
-
-  // Check and run weekly consolidation
-  if (await needsConsolidation("weekly", db, projectRoot)) {
-    results.push(await runConsolidation("weekly", db, projectRoot));
-  }
-
-  // Check and run monthly consolidation
-  if (await needsConsolidation("monthly", db, projectRoot)) {
-    results.push(await runConsolidation("monthly", db, projectRoot));
-  }
-
-  // Check and run yearly consolidation
-  if (await needsConsolidation("yearly", db, projectRoot)) {
-    results.push(await runConsolidation("yearly", db, projectRoot));
-  }
-
-  return results;
 }

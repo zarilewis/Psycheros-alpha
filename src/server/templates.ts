@@ -208,6 +208,7 @@ export function renderAppShell(): string {
   <link rel="manifest" href="/manifest.json" crossorigin="use-credentials">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.svg">
   <script src="/lib/htmx.min.js"></script>
+  <script src="/lib/idiomorph-ext.min.js"></script>
   <script src="/lib/htmx-sse.js"></script>
   <script src="/lib/marked.min.js"></script>
   <script src="/lib/dompurify.min.js"></script>

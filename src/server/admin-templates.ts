@@ -9,6 +9,7 @@
 
 import type { LogEntry } from "./logger.ts";
 import type { DiagnosticsSnapshot } from "./diagnostics.ts";
+import type { ScheduledJob } from "./cron-tracker.ts";
 import { escapeHtml } from "./templates.ts";
 
 /**
@@ -47,6 +48,17 @@ export function renderAdminHub(): string {
         Diagnostics
       </button>
       <button class="admin-nav-tab"
+        hx-get="/fragments/admin/jobs"
+        hx-target="#admin-content"
+        hx-swap="innerHTML"
+        onclick="document.querySelectorAll('.admin-nav-tab').forEach(t => t.classList.remove('active')); this.classList.add('active')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <polyline points="12 6 12 12 16 14"/>
+        </svg>
+        Scheduled Jobs
+      </button>
+      <button class="admin-nav-tab"
         hx-get="/fragments/admin/logs"
         hx-target="#admin-content"
         hx-swap="innerHTML"
@@ -60,10 +72,8 @@ export function renderAdminHub(): string {
         Logs
       </button>
     </div>
-    <div id="admin-content"
-      hx-get="/fragments/admin/diagnostics"
-      hx-trigger="load"
-      hx-swap="innerHTML">
+    <div id="admin-content">
+      <div hx-get="/fragments/admin/diagnostics" hx-trigger="load" hx-swap="outerHTML"></div>
     </div>
   </div>
 </div>`;
@@ -343,6 +353,119 @@ export function renderAdminLogs(entries: LogEntry[], components: string[]): stri
     ${renderLogEntries(entries)}
   </div>
 </div>`;
+}
+
+/**
+ * Render the scheduled jobs dashboard.
+ */
+export function renderAdminJobs(jobs: ScheduledJob[]): string {
+  if (jobs.length === 0) {
+    return `<div class="admin-jobs">
+      <div class="admin-empty">No scheduled jobs registered. Memory system may be disabled.</div>
+    </div>`;
+  }
+
+  return `<div class="admin-jobs">
+  <div class="admin-section">
+    <h3 class="admin-section-title">Scheduled Jobs</h3>
+    <div class="admin-table-wrap">
+      <table class="admin-table admin-jobs-table">
+        <thead>
+          <tr>
+            <th>Job</th>
+            <th>Schedule</th>
+            <th>Status</th>
+            <th>Last Run</th>
+            <th>Duration</th>
+            <th>OK / Err</th>
+            <th>Last Result</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="admin-jobs-rows" hx-ext="morph">
+          ${renderAdminJobRows(jobs)}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="admin-footer">
+    <span class="admin-footer-ts">Execution history persisted across restarts</span>
+    <button class="admin-refresh-btn"
+      hx-get="/api/admin/jobs/rows"
+      hx-target="#admin-jobs-rows"
+      hx-swap="morph:innerHTML">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="23 4 23 10 17 10"/>
+        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+</div>`;
+}
+
+/**
+ * Render just the scheduled jobs table rows (for HTMX partial swap).
+ */
+export function renderAdminJobRows(jobs: ScheduledJob[]): string {
+  if (jobs.length === 0) {
+    return `<tr><td colspan="8" class="admin-empty">No scheduled jobs registered.</td></tr>`;
+  }
+
+  return jobs.map((job) => {
+    const statusClass = job.status === "success" ? "admin-status-ok"
+      : job.status === "error" ? "admin-status-error"
+      : job.status === "running" ? "admin-status-running"
+      : "admin-status-idle";
+
+    const statusLabel = job.status === "success" ? "OK"
+      : job.status === "error" ? "Error"
+      : job.status === "running" ? "Running"
+      : "Idle";
+
+    const lastRun = job.lastCompletedAt
+      ? `<time class="admin-local-time" datetime="${job.lastCompletedAt}">${job.lastCompletedAt}</time>`
+      : "Never";
+
+    const duration = job.lastDurationMs !== null
+      ? job.lastDurationMs < 1000 ? `${job.lastDurationMs}ms`
+        : `${(job.lastDurationMs / 1000).toFixed(1)}s`
+      : "—";
+
+    const resultText = job.lastError
+      ? `<span class="admin-job-error">${escapeHtml(job.lastError)}</span>`
+      : job.lastResult
+        ? escapeHtml(job.lastResult)
+        : "—";
+
+    const triggerBtn = job.manualTrigger
+      ? `<button class="admin-job-trigger-btn"
+          hx-post="/api/admin/jobs/${escapeHtml(job.id)}/trigger"
+          hx-target="#admin-jobs-rows"
+          hx-swap="morph:innerHTML"
+          ${job.status === "running" ? "disabled" : ""}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+          Run Now
+        </button>`
+      : "";
+
+    return `<tr class="admin-job-row">
+      <td>
+        <div class="admin-job-name">${escapeHtml(job.name)}</div>
+        <div class="admin-job-desc">${escapeHtml(job.description)}</div>
+      </td>
+      <td><code>${escapeHtml(job.schedule)}</code></td>
+      <td><span class="admin-status-dot ${statusClass}"></span> ${statusLabel}</td>
+      <td>${lastRun}</td>
+      <td>${duration}</td>
+      <td><span class="admin-job-count-ok">${job.successCount}</span> / <span class="admin-job-count-err">${job.errorCount}</span></td>
+      <td>${resultText}</td>
+      <td>${triggerBtn}</td>
+    </tr>`;
+  }).join("");
 }
 
 /**

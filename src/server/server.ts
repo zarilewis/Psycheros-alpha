@@ -11,7 +11,8 @@ import { DBClient } from "../db/mod.ts";
 import { createDefaultClient, type LLMClient, type LLMSettings, loadSettings, saveSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
-import { catchUpSummarization, needsConsolidation, runConsolidation } from "../memory/mod.ts";
+import { catchUpSummarization, repairOrphanedSummaries, needsConsolidation, runConsolidation } from "../memory/mod.ts";
+import { initTracker, registerJob, registerTrigger, tracked } from "./cron-tracker.ts";
 import { createFullSnapshot, cleanupOldSnapshots } from "../snapshot/mod.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
@@ -87,9 +88,13 @@ import {
   handleAdminFragment,
   handleAdminLogsFragment,
   handleAdminDiagnosticsFragment,
+  handleAdminJobsFragment,
   handleAdminLogsAPI,
   handleAdminLogEntriesAPI,
   handleAdminDiagnosticsAPI,
+  handleAdminJobsAPI,
+  handleAdminJobRowsFragment,
+  handleAdminJobTriggerAPI,
 } from "./admin-routes.ts";
 import { setServerStartTime } from "./diagnostics.ts";
 
@@ -290,95 +295,101 @@ export class Server {
       }
     }
 
+    // Initialize cron tracker with DB for persistent execution history
+    initTracker(this.db);
+
     // Set up memory summarization cron job and catch-up on startup
     if (this.config.memoryEnabled !== false) {
-      // Catch up on any missed summarizations from when server was down
-      catchUpSummarization(this.db, this.config.projectRoot).catch((error) => {
-        console.error("[Memory] Startup catch-up failed:", error instanceof Error ? error.message : String(error));
-      });
+      // MCP sync callback — pushes generated memories to entity-core
+      const syncMemoryToMCP = this.mcpClient
+        ? (memory: import("../memory/mod.ts").MemoryFile) => {
+            const granularity = memory.granularity as "daily" | "weekly" | "monthly" | "yearly";
+            this.mcpClient!.createMemory(granularity, memory.date, memory.content, memory.chatIds).catch((error) => {
+              console.error("[Memory] MCP sync failed:", error instanceof Error ? error.message : String(error));
+            });
+          }
+        : undefined;
+
+      // Repair orphaned DB records then catch up on missed summarizations.
+      // Repair must complete first so cleared records become eligible for regeneration.
+      (async () => {
+        try {
+          await repairOrphanedSummaries(this.db, this.config.projectRoot);
+        } catch (error) {
+          console.error("[Memory] Integrity check failed:", error instanceof Error ? error.message : String(error));
+        }
+        try {
+          await catchUpSummarization(this.db, this.config.projectRoot, syncMemoryToMCP);
+        } catch (error) {
+          console.error("[Memory] Startup catch-up failed:", error instanceof Error ? error.message : String(error));
+        }
+      })();
 
       // Set up daily cron job at configured hour (default 4 AM)
       const memoryHour = parseInt(Deno.env.get("PSYCHEROS_MEMORY_HOUR") || "4");
       const cronPattern = `0 ${memoryHour} * * *`;
 
-      Deno.cron("memory-daily-summarization", cronPattern, async () => {
-        console.log("[Memory] Running daily summarization cron");
-        try {
-          const count = await catchUpSummarization(this.db, this.config.projectRoot);
-          if (count > 0) {
-            console.log(`[Memory] Daily cron: summarized ${count} day(s)`);
-          }
-        } catch (error) {
-          console.error("[Memory] Daily cron failed:", error instanceof Error ? error.message : String(error));
-        }
-      });
+      // Shared handler for daily summarization (used by both cron and manual trigger)
+      const dailySummarizationHandler = async (): Promise<string> => {
+        const count = await catchUpSummarization(this.db, this.config.projectRoot, syncMemoryToMCP);
+        return count > 0 ? `Summarized ${count} day(s)` : "No unsummarized dates found";
+      };
+
+      registerJob("memory-daily", "Daily Memory Summarization", cronPattern, "Summarize conversations into daily memory files");
+      Deno.cron("memory-daily-summarization", cronPattern, tracked("memory-daily", dailySummarizationHandler));
 
       // Weekly consolidation - runs Sunday at 5 AM (7 = Sunday in Deno cron)
-      Deno.cron("memory-weekly-consolidation", "0 5 * * 7", async () => {
-        console.log("[Memory] Running weekly consolidation cron");
-        try {
-          if (await needsConsolidation("weekly", this.db, this.config.projectRoot)) {
-            const result = await runConsolidation("weekly", this.db, this.config.projectRoot);
-            if (result.success) {
-              console.log("[Memory] Weekly consolidation complete");
-            } else if (result.error) {
-              console.error("[Memory] Weekly consolidation failed:", result.error);
-            }
-          }
-        } catch (error) {
-          console.error("[Memory] Weekly consolidation cron failed:", error instanceof Error ? error.message : String(error));
+      const weeklyHandler = async (): Promise<string> => {
+        if (await needsConsolidation("weekly", this.db, this.config.projectRoot)) {
+          const result = await runConsolidation("weekly", this.db, this.config.projectRoot, syncMemoryToMCP);
+          if (result.success) return "Weekly consolidation complete";
+          if (result.error) throw new Error(result.error);
         }
-      });
+        return "No consolidation needed";
+      };
+
+      registerJob("memory-weekly", "Weekly Memory Consolidation", "0 5 * * 7", "Consolidate daily memories into weekly summaries");
+      Deno.cron("memory-weekly-consolidation", "0 5 * * 7", tracked("memory-weekly", weeklyHandler));
 
       // Monthly consolidation - runs 1st of month at 5 AM
-      Deno.cron("memory-monthly-consolidation", "0 5 1 * *", async () => {
-        console.log("[Memory] Running monthly consolidation cron");
-        try {
-          if (await needsConsolidation("monthly", this.db, this.config.projectRoot)) {
-            const result = await runConsolidation("monthly", this.db, this.config.projectRoot);
-            if (result.success) {
-              console.log("[Memory] Monthly consolidation complete");
-            } else if (result.error) {
-              console.error("[Memory] Monthly consolidation failed:", result.error);
-            }
-          }
-        } catch (error) {
-          console.error("[Memory] Monthly consolidation cron failed:", error instanceof Error ? error.message : String(error));
+      const monthlyHandler = async (): Promise<string> => {
+        if (await needsConsolidation("monthly", this.db, this.config.projectRoot)) {
+          const result = await runConsolidation("monthly", this.db, this.config.projectRoot, syncMemoryToMCP);
+          if (result.success) return "Monthly consolidation complete";
+          if (result.error) throw new Error(result.error);
         }
-      });
+        return "No consolidation needed";
+      };
+
+      registerJob("memory-monthly", "Monthly Memory Consolidation", "0 5 1 * *", "Consolidate weekly memories into monthly summaries");
+      Deno.cron("memory-monthly-consolidation", "0 5 1 * *", tracked("memory-monthly", monthlyHandler));
 
       // Yearly consolidation - runs Jan 1st at 5 AM
-      Deno.cron("memory-yearly-consolidation", "0 5 1 1 *", async () => {
-        console.log("[Memory] Running yearly consolidation cron");
-        try {
-          if (await needsConsolidation("yearly", this.db, this.config.projectRoot)) {
-            const result = await runConsolidation("yearly", this.db, this.config.projectRoot);
-            if (result.success) {
-              console.log("[Memory] Yearly consolidation complete");
-            } else if (result.error) {
-              console.error("[Memory] Yearly consolidation failed:", result.error);
-            }
-          }
-        } catch (error) {
-          console.error("[Memory] Yearly consolidation cron failed:", error instanceof Error ? error.message : String(error));
+      const yearlyHandler = async (): Promise<string> => {
+        if (await needsConsolidation("yearly", this.db, this.config.projectRoot)) {
+          const result = await runConsolidation("yearly", this.db, this.config.projectRoot, syncMemoryToMCP);
+          if (result.success) return "Yearly consolidation complete";
+          if (result.error) throw new Error(result.error);
         }
-      });
+        return "No consolidation needed";
+      };
+
+      registerJob("memory-yearly", "Yearly Memory Consolidation", "0 5 1 1 *", "Consolidate monthly memories into yearly summaries");
+      Deno.cron("memory-yearly-consolidation", "0 5 1 1 *", tracked("memory-yearly", yearlyHandler));
 
       // Daily identity snapshot - runs at configured hour (default 3 AM)
       const snapshotHour = parseInt(Deno.env.get("PSYCHEROS_SNAPSHOT_HOUR") || "3");
       const snapshotRetention = parseInt(Deno.env.get("PSYCHEROS_SNAPSHOT_RETENTION_DAYS") || "30");
 
-      Deno.cron("identity-daily-snapshot", `0 ${snapshotHour} * * *`, async () => {
-        console.log("[Snapshot] Running daily identity snapshot");
-        try {
-          const snapshots = await createFullSnapshot(this.config.projectRoot, "scheduled", "psycheros");
-          console.log(`[Snapshot] Created ${snapshots.length} snapshots`);
-          const cleanup = await cleanupOldSnapshots(this.config.projectRoot, snapshotRetention);
-          console.log(`[Snapshot] Cleanup: deleted ${cleanup.deleted}, kept ${cleanup.kept}`);
-        } catch (error) {
-          console.error("[Snapshot] Daily snapshot cron failed:", error instanceof Error ? error.message : String(error));
-        }
-      });
+      const snapshotHandler = async (): Promise<string> => {
+        const snapshots = await createFullSnapshot(this.config.projectRoot, "scheduled", "psycheros");
+        const cleanup = await cleanupOldSnapshots(this.config.projectRoot, snapshotRetention);
+        return `Created ${snapshots.length} snapshots, cleaned up ${cleanup.deleted} (kept ${cleanup.kept})`;
+      };
+
+      registerJob("identity-snapshot", "Daily Identity Snapshot", `0 ${snapshotHour} * * *`, "Snapshot identity files and clean up old snapshots", true);
+      registerTrigger("identity-snapshot", snapshotHandler);
+      Deno.cron("identity-daily-snapshot", `0 ${snapshotHour} * * *`, tracked("identity-snapshot", snapshotHandler));
     }
 
     // Start keepalive timer for persistent SSE connections
@@ -799,6 +810,22 @@ export class Server {
       return await handleAdminDiagnosticsAPI(ctx);
     }
 
+    // GET /api/admin/jobs - JSON scheduled jobs status
+    if (method === "GET" && path === "/api/admin/jobs") {
+      return handleAdminJobsAPI(ctx);
+    }
+
+    // GET /api/admin/jobs/rows - HTML partial of job table rows
+    if (method === "GET" && path === "/api/admin/jobs/rows") {
+      return handleAdminJobRowsFragment(ctx);
+    }
+
+    // POST /api/admin/jobs/:id/trigger - Manually trigger a scheduled job
+    if (method === "POST" && path.startsWith("/api/admin/jobs/") && path.endsWith("/trigger")) {
+      const jobId = path.slice("/api/admin/jobs/".length, -"/trigger".length);
+      return await handleAdminJobTriggerAPI(ctx, jobId);
+    }
+
     // 404 for unknown API routes
     return new Response(
       JSON.stringify({ error: "API endpoint not found" }),
@@ -946,6 +973,11 @@ export class Server {
     // GET /fragments/admin/diagnostics - Diagnostics dashboard
     if (path === "/fragments/admin/diagnostics") {
       return await handleAdminDiagnosticsFragment(ctx);
+    }
+
+    // GET /fragments/admin/jobs - Scheduled jobs dashboard
+    if (path === "/fragments/admin/jobs") {
+      return handleAdminJobsFragment(ctx);
     }
 
     // GET /backgrounds/:filename - Serve background image files

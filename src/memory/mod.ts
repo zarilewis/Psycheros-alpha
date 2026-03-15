@@ -59,12 +59,11 @@ export type {
   DateFormatInfo,
 } from "./types.ts";
 
-export { getDateFormatInfo } from "./types.ts";
+export { getDateFormatInfo, getISOWeek, getISOWeekMonday } from "./types.ts";
 
 // Summarization
 export {
   summarizeDay,
-  summarizePreviousDay,
   consolidateWeek,
   consolidateMonth,
   consolidateYear,
@@ -78,18 +77,19 @@ export {
   readMemoryFile,
   listMemoryFiles,
   archiveDailyMemory,
+  type OnMemoryCreated,
 } from "./file-writer.ts";
 
-// Trigger and catch-up
+// Trigger, catch-up, and integrity
 export {
   catchUpSummarization,
+  repairOrphanedSummaries,
   type MemoryTriggerConfig,
 } from "./trigger.ts";
 
-// Consolidation (Phase 2)
+// Consolidation
 export {
   needsConsolidation,
   runConsolidation,
-  runAllConsolidations,
   type ConsolidationResult,
 } from "./consolidator.ts";

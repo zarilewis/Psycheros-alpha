@@ -787,7 +787,9 @@ export class DBClient {
     const stmt = this.db.prepare(
       `SELECT DISTINCT DATE(m.created_at) as date
        FROM messages m
-       LEFT JOIN summarized_chats sc ON sc.message_date = DATE(m.created_at)
+       LEFT JOIN summarized_chats sc
+         ON sc.chat_id = m.conversation_id
+         AND sc.message_date = DATE(m.created_at)
        WHERE sc.message_date IS NULL
        ORDER BY date ASC`
     );
@@ -921,6 +923,58 @@ export class DBClient {
     const row = stmt.get<{ date: string }>(granularity);
     stmt.finalize();
     return row?.date ?? null;
+  }
+
+  /**
+   * Find memory summary records where the file no longer exists on disk.
+   * Used by the startup integrity check to detect lost files.
+   *
+   * @param projectRoot - Root directory of the project
+   * @returns Array of orphaned records
+   */
+  findOrphanedSummaries(
+    projectRoot: string
+  ): Array<{ id: string; date: string; granularity: string; filePath: string }> {
+    const stmt = this.db.prepare(
+      `SELECT id, date, granularity, file_path FROM memory_summaries ORDER BY date ASC`
+    );
+    const rows = stmt.all<{ id: string; date: string; granularity: string; file_path: string }>();
+    stmt.finalize();
+
+    const orphaned: Array<{ id: string; date: string; granularity: string; filePath: string }> = [];
+    for (const row of rows) {
+      const fullPath = `${projectRoot}/${row.file_path}`;
+      try {
+        Deno.statSync(fullPath);
+      } catch {
+        orphaned.push({
+          id: row.id,
+          date: row.date,
+          granularity: row.granularity,
+          filePath: row.file_path,
+        });
+      }
+    }
+
+    return orphaned;
+  }
+
+  /**
+   * Delete a memory summary record and its associated summarized_chats entries.
+   * Used by the integrity check to clear orphaned records for regeneration.
+   *
+   * @param summaryId - The summary record ID to delete
+   */
+  deleteMemorySummary(summaryId: string): void {
+    // Delete associated summarized_chats first (FK constraint)
+    this.db.exec(
+      `DELETE FROM summarized_chats WHERE summary_id = ?`,
+      [summaryId]
+    );
+    this.db.exec(
+      `DELETE FROM memory_summaries WHERE id = ?`,
+      [summaryId]
+    );
   }
 
   // ===========================================================================
@@ -1097,5 +1151,127 @@ export class DBClient {
    */
   getRawDb(): Database {
     return this.db;
+  }
+
+  // ===========================================================================
+  // Cron Job Run Operations
+  // ===========================================================================
+
+  /**
+   * Record a cron job execution.
+   */
+  addJobRun(
+    jobId: string,
+    startedAt: string,
+    completedAt: string,
+    durationMs: number,
+    status: "success" | "error",
+    result: string | null,
+    error: string | null,
+  ): void {
+    this.db.exec(
+      `INSERT INTO cron_job_runs (job_id, started_at, completed_at, duration_ms, status, result, error)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [jobId, startedAt, completedAt, durationMs, status, result, error]
+    );
+
+    // Keep only last 100 runs per job to prevent unbounded growth
+    this.db.exec(
+      `DELETE FROM cron_job_runs WHERE job_id = ? AND id NOT IN (
+         SELECT id FROM cron_job_runs WHERE job_id = ? ORDER BY completed_at DESC LIMIT 100
+       )`,
+      [jobId, jobId]
+    );
+  }
+
+  /**
+   * Get the most recent run for each job ID.
+   * Used to hydrate the cron tracker on startup.
+   */
+  getLatestJobRuns(): Array<{
+    jobId: string;
+    startedAt: string;
+    completedAt: string;
+    durationMs: number;
+    status: "success" | "error";
+    result: string | null;
+    error: string | null;
+    successCount: number;
+    errorCount: number;
+  }> {
+    const stmt = this.db.prepare(
+      `SELECT
+         job_id,
+         started_at,
+         completed_at,
+         duration_ms,
+         status,
+         result,
+         error,
+         (SELECT COUNT(*) FROM cron_job_runs r2 WHERE r2.job_id = r1.job_id AND r2.status = 'success') as success_count,
+         (SELECT COUNT(*) FROM cron_job_runs r2 WHERE r2.job_id = r1.job_id AND r2.status = 'error') as error_count
+       FROM cron_job_runs r1
+       WHERE r1.id = (SELECT MAX(id) FROM cron_job_runs r3 WHERE r3.job_id = r1.job_id)
+       ORDER BY r1.job_id`
+    );
+    const rows = stmt.all<{
+      job_id: string;
+      started_at: string;
+      completed_at: string;
+      duration_ms: number;
+      status: string;
+      result: string | null;
+      error: string | null;
+      success_count: number;
+      error_count: number;
+    }>();
+    stmt.finalize();
+
+    return rows.map((row) => ({
+      jobId: row.job_id,
+      startedAt: row.started_at,
+      completedAt: row.completed_at,
+      durationMs: row.duration_ms,
+      status: row.status as "success" | "error",
+      result: row.result,
+      error: row.error,
+      successCount: row.success_count,
+      errorCount: row.error_count,
+    }));
+  }
+
+  /**
+   * Get recent runs for a specific job.
+   */
+  getJobRunHistory(jobId: string, limit = 20): Array<{
+    startedAt: string;
+    completedAt: string;
+    durationMs: number;
+    status: "success" | "error";
+    result: string | null;
+    error: string | null;
+  }> {
+    const stmt = this.db.prepare(
+      `SELECT started_at, completed_at, duration_ms, status, result, error
+       FROM cron_job_runs WHERE job_id = ? ORDER BY completed_at DESC LIMIT ?`
+    );
+    const rows = stmt.all<{
+      started_at: string;
+      completed_at: string;
+      duration_ms: number;
+      status: string;
+      result: string | null;
+      error: string | null;
+    }>(jobId, limit);
+    stmt.finalize();
+
+    return rows.map((row) => ({
+      startedAt: row.started_at,
+      completedAt: row.completed_at,
+      durationMs: row.duration_ms,
+      status: row.status as "success" | "error",
+      result: row.result,
+      error: row.error,
+    }));
   }
 }

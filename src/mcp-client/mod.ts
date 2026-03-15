@@ -716,15 +716,27 @@ export class MCPClient {
         },
       });
 
+      // Check for MCP-level error
+      const r = result as Record<string, unknown>;
+      if (r.isError) {
+        const errorText = extractTextContent(result) || "Unknown MCP error";
+        throw new Error(errorText);
+      }
+
       const textContent = extractTextContent(result);
       if (textContent) {
-        const response = JSON.parse(textContent);
-        return response.success;
+        try {
+          const response = JSON.parse(textContent);
+          return response.success;
+        } catch {
+          // Response wasn't JSON — treat as error
+          throw new Error(textContent);
+        }
       }
 
       return false;
     } catch (error) {
-      console.error("[MCP] Create memory failed:", error);
+      console.error("[MCP] Create memory failed:", error instanceof Error ? error.message : String(error));
 
       // Queue for later sync
       this.queueMemoryChange({

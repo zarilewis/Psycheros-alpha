@@ -96,17 +96,47 @@ export interface DateFormatInfo {
 }
 
 /**
+ * Get the ISO 8601 week number and year for a UTC date.
+ * ISO weeks start on Monday. Week 1 contains the year's first Thursday.
+ * The ISO year may differ from the calendar year near year boundaries.
+ */
+export function getISOWeek(date: Date): { year: number; week: number } {
+  // Copy to avoid mutation, set to nearest Thursday (ISO week definition)
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  // Set to nearest Thursday: current date + 4 - current day number (Mon=1, Sun=7)
+  const dayNum = d.getUTCDay() || 7; // Convert Sunday from 0 to 7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  // ISO year is the year of the Thursday
+  const isoYear = d.getUTCFullYear();
+  // Week 1 = the week with the year's first Thursday
+  const jan1 = new Date(Date.UTC(isoYear, 0, 1));
+  const week = Math.ceil(((d.getTime() - jan1.getTime()) / 86400000 + 1) / 7);
+  return { year: isoYear, week };
+}
+
+/**
+ * Get the Monday of a given ISO week.
+ */
+export function getISOWeekMonday(year: number, week: number): Date {
+  // Jan 4 is always in ISO week 1
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const dayNum = jan4.getUTCDay() || 7;
+  // Monday of week 1
+  const week1Monday = new Date(jan4);
+  week1Monday.setUTCDate(jan4.getUTCDate() - dayNum + 1);
+  // Add (week - 1) * 7 days
+  const result = new Date(week1Monday);
+  result.setUTCDate(week1Monday.getUTCDate() + (week - 1) * 7);
+  return result;
+}
+
+/**
  * Get date format info for a given date and granularity.
  */
 export function getDateFormatInfo(date: Date, granularity: Granularity): DateFormatInfo {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   const day = String(date.getUTCDate()).padStart(2, "0");
-
-  // Get ISO week number (using UTC to avoid timezone drift)
-  const jan1 = new Date(Date.UTC(year, 0, 1));
-  const daysDiff = Math.floor((date.getTime() - jan1.getTime()) / (24 * 60 * 60 * 1000));
-  const weekNum = String(Math.ceil((daysDiff + jan1.getUTCDay() + 1) / 7)).padStart(2, "0");
 
   switch (granularity) {
     case "daily": {
@@ -118,7 +148,8 @@ export function getDateFormatInfo(date: Date, granularity: Granularity): DateFor
       };
     }
     case "weekly": {
-      const weekStr = `${year}-W${weekNum}`;
+      const iso = getISOWeek(date);
+      const weekStr = `${iso.year}-W${String(iso.week).padStart(2, "0")}`;
       return {
         dateStr: weekStr,
         filePath: `weekly/${weekStr}.md`,

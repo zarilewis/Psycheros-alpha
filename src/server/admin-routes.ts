@@ -10,7 +10,8 @@
 import type { RouteContext } from "./routes.ts";
 import { queryLogs, getLogComponents, getLogLevelCounts, type LogLevel } from "./logger.ts";
 import { collectDiagnostics } from "./diagnostics.ts";
-import { renderAdminHub, renderAdminLogs, renderLogEntries, renderAdminDiagnostics } from "./admin-templates.ts";
+import { getAllJobs, triggerJob } from "./cron-tracker.ts";
+import { renderAdminHub, renderAdminLogs, renderLogEntries, renderAdminDiagnostics, renderAdminJobs, renderAdminJobRows } from "./admin-templates.ts";
 
 const HTML_HEADERS = { "Content-Type": "text/html; charset=utf-8" };
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -92,4 +93,39 @@ export function handleAdminLogEntriesAPI(_ctx: RouteContext, url: URL): Response
 export async function handleAdminDiagnosticsAPI(ctx: RouteContext): Promise<Response> {
   const snapshot = await collectDiagnostics(ctx);
   return new Response(JSON.stringify(snapshot), { headers: JSON_HEADERS });
+}
+
+/**
+ * GET /fragments/admin/jobs — Scheduled jobs dashboard fragment.
+ */
+export function handleAdminJobsFragment(_ctx: RouteContext): Response {
+  const jobs = getAllJobs();
+  return new Response(renderAdminJobs(jobs), { headers: HTML_HEADERS });
+}
+
+/**
+ * GET /api/admin/jobs/rows — HTML partial of job table rows only.
+ * Used by HTMX to refresh just the table body without a full panel re-render.
+ */
+export function handleAdminJobRowsFragment(_ctx: RouteContext): Response {
+  const jobs = getAllJobs();
+  return new Response(renderAdminJobRows(jobs), { headers: HTML_HEADERS });
+}
+
+/**
+ * GET /api/admin/jobs — JSON scheduled jobs status.
+ */
+export function handleAdminJobsAPI(_ctx: RouteContext): Response {
+  const jobs = getAllJobs();
+  return new Response(JSON.stringify({ jobs }), { headers: JSON_HEADERS });
+}
+
+/**
+ * POST /api/admin/jobs/:id/trigger — Manually trigger a scheduled job.
+ * Returns updated job rows HTML for HTMX to swap into the tbody.
+ */
+export async function handleAdminJobTriggerAPI(_ctx: RouteContext, jobId: string): Promise<Response> {
+  await triggerJob(jobId);
+  const jobs = getAllJobs();
+  return new Response(renderAdminJobRows(jobs), { headers: HTML_HEADERS });
 }

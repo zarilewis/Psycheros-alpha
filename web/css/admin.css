@@ -74,7 +74,11 @@
    Panel Entrance
    ========================================================================== */
 
-#admin-content {
+/* Fade-in on panel-level containers only (not on #admin-content itself,
+   which would re-animate on every cell update or HTMX swap) */
+.admin-diagnostics,
+.admin-logs,
+.admin-jobs {
   animation: adminFadeIn 0.15s ease both;
 }
 
@@ -443,4 +447,94 @@
     flex: 1;
     min-width: 0;
   }
+
+  .admin-jobs-table {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+/* ── Scheduled Jobs ────────────────────────────────────────── */
+
+.admin-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-jobs-table td,
+.admin-jobs-table th {
+  white-space: nowrap;
+}
+
+.admin-jobs-table td:first-child {
+  white-space: normal;
+  min-width: 180px;
+}
+
+.admin-jobs-table td:nth-child(7) {
+  white-space: normal;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-job-name {
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+.admin-job-desc {
+  font-size: 0.8em;
+  color: var(--c-text-muted);
+  margin-top: 2px;
+}
+
+.admin-job-error {
+  color: var(--c-error);
+  font-size: 0.85em;
+}
+
+.admin-job-count-ok {
+  color: var(--c-accent);
+}
+
+.admin-job-count-err {
+  color: var(--c-error);
+}
+
+.admin-status-running {
+  background: #f59e0b;
+  animation: adminStatusPulse 1s ease-in-out infinite;
+}
+
+.admin-status-idle {
+  background: var(--c-text-muted);
+  opacity: 0.4;
+}
+
+.admin-job-trigger-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--c-bg-raised);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  color: var(--c-text);
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.admin-job-trigger-btn:hover:not(:disabled) {
+  background: var(--c-accent-subtle);
+  border-color: var(--c-accent);
+  color: var(--c-accent);
+}
+
+.admin-job-trigger-btn:disabled,
+.admin-job-trigger-btn.htmx-request {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
