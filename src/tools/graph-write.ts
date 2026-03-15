@@ -152,6 +152,44 @@ const graphUpdateEdgeDef: Tool["definition"] = {
   },
 };
 
+const graphDeleteNodeDef: Tool["definition"] = {
+  type: "function",
+  function: {
+    name: "graph_delete_node",
+    description:
+      "Remove a node from my knowledge graph. I use this to clean up test data, remove outdated concepts, or fix mistakes. This is a soft delete — the node is marked as deleted but can be recovered if needed. Any edges connected to this node will also be removed.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The node ID to delete",
+        },
+      },
+      required: ["id"],
+    },
+  },
+};
+
+const graphDeleteEdgeDef: Tool["definition"] = {
+  type: "function",
+  function: {
+    name: "graph_delete_edge",
+    description:
+      "Remove a relationship from my knowledge graph. I use this to clean up incorrect or outdated connections between concepts.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description: "The edge ID to delete",
+        },
+      },
+      required: ["id"],
+    },
+  },
+};
+
 const graphWriteBatchDef: Tool["definition"] = {
   type: "function",
   function: {
@@ -477,6 +515,102 @@ async function executeGraphUpdateEdge(
   }
 }
 
+interface DeleteNodeArgs {
+  id: string;
+}
+
+async function executeGraphDeleteNode(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolResult> {
+  const { id } = args as unknown as DeleteNodeArgs;
+
+  if (!ctx.config.mcpClient) {
+    return {
+      toolCallId: ctx.toolCallId,
+      content: "I cannot delete a graph node - MCP connection to entity-core is not available.",
+      isError: true,
+    };
+  }
+
+  try {
+    // Look up the node first so we can show its label in the confirmation
+    const node = await ctx.config.mcpClient.getGraphNode(id);
+    if (!node) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: `I could not find a node with ID "${id}" in my knowledge graph.`,
+        isError: false,
+      };
+    }
+
+    const result = await ctx.config.mcpClient.deleteGraphNode(id);
+
+    if (!result.success) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: `Failed to delete node: ${result.error}`,
+        isError: true,
+      };
+    }
+
+    return {
+      toolCallId: ctx.toolCallId,
+      content: `I removed "${node.label}" (${node.type}) from my knowledge graph.`,
+      isError: false,
+    };
+  } catch (error) {
+    return {
+      toolCallId: ctx.toolCallId,
+      content: `Failed to delete graph node: ${error instanceof Error ? error.message : String(error)}`,
+      isError: true,
+    };
+  }
+}
+
+interface DeleteEdgeArgs {
+  id: string;
+}
+
+async function executeGraphDeleteEdge(
+  args: Record<string, unknown>,
+  ctx: ToolContext
+): Promise<ToolResult> {
+  const { id } = args as unknown as DeleteEdgeArgs;
+
+  if (!ctx.config.mcpClient) {
+    return {
+      toolCallId: ctx.toolCallId,
+      content: "I cannot delete a graph edge - MCP connection to entity-core is not available.",
+      isError: true,
+    };
+  }
+
+  try {
+    const result = await ctx.config.mcpClient.deleteGraphEdge(id);
+
+    if (!result.success) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: `Failed to delete edge: ${result.error}`,
+        isError: true,
+      };
+    }
+
+    return {
+      toolCallId: ctx.toolCallId,
+      content: `I removed edge ${id} from my knowledge graph.`,
+      isError: false,
+    };
+  } catch (error) {
+    return {
+      toolCallId: ctx.toolCallId,
+      content: `Failed to delete graph edge: ${error instanceof Error ? error.message : String(error)}`,
+      isError: true,
+    };
+  }
+}
+
 interface WriteBatchArgs {
   nodes?: Array<{
     type: string;
@@ -556,6 +690,16 @@ export const graphUpdateEdgeTool: Tool = {
   execute: executeGraphUpdateEdge,
 };
 
+export const graphDeleteNodeTool: Tool = {
+  definition: graphDeleteNodeDef,
+  execute: executeGraphDeleteNode,
+};
+
+export const graphDeleteEdgeTool: Tool = {
+  definition: graphDeleteEdgeDef,
+  execute: executeGraphDeleteEdge,
+};
+
 export const graphWriteBatchTool: Tool = {
   definition: graphWriteBatchDef,
   execute: executeGraphWriteBatch,
@@ -567,5 +711,7 @@ export const graphWriteTools: Tool[] = [
   graphCreateEdgeTool,
   graphUpdateNodeTool,
   graphUpdateEdgeTool,
+  graphDeleteNodeTool,
+  graphDeleteEdgeTool,
   graphWriteBatchTool,
 ];

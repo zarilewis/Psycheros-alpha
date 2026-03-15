@@ -33,6 +33,8 @@ import {
   graphCreateEdgeTool,
   graphUpdateNodeTool,
   graphUpdateEdgeTool,
+  graphDeleteNodeTool,
+  graphDeleteEdgeTool,
   graphWriteBatchTool,
 } from "./graph-write.ts";
 
@@ -69,6 +71,8 @@ const AVAILABLE_TOOLS: Record<string, Tool> = {
   graph_create_edge: graphCreateEdgeTool,
   graph_update_node: graphUpdateNodeTool,
   graph_update_edge: graphUpdateEdgeTool,
+  graph_delete_node: graphDeleteNodeTool,
+  graph_delete_edge: graphDeleteEdgeTool,
   graph_write_batch: graphWriteBatchTool,
 };
 

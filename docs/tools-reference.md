@@ -28,7 +28,7 @@ The entity can read and write to its knowledge graph. Write tools auto-generate 
 | `graph_get_subgraph` | Extract full neighborhood around a node |
 | `graph_stats` | Get node/edge counts and vector search status |
 
-### Write Tools (5)
+### Write Tools (7)
 
 | Tool | Description |
 |------|-------------|
@@ -36,6 +36,8 @@ The entity can read and write to its knowledge graph. Write tools auto-generate 
 | `graph_create_edge` | Create a relationship between two nodes (supports IDs or labels) |
 | `graph_update_node` | Update label, description, or confidence (re-embeds) |
 | `graph_update_edge` | Update weight, evidence, or validity |
+| `graph_delete_node` | Soft-delete a node and its connected edges |
+| `graph_delete_edge` | Remove a relationship |
 | `graph_write_batch` | Batch create nodes and edges (edges can reference existing nodes by label) |
 
 ### Related Source Files
@@ -43,7 +45,7 @@ The entity can read and write to its knowledge graph. Write tools auto-generate 
 | File | Purpose |
 |------|---------|
 | `src/tools/graph-read.ts` | 6 read-only graph query tools |
-| `src/tools/graph-write.ts` | 5 graph write tools with auto-embedding |
+| `src/tools/graph-write.ts` | 7 graph write tools with auto-embedding |
 
 ## Identity Tools
 
