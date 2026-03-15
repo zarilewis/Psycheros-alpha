@@ -2,13 +2,12 @@
  * Psycheros Service Worker
  *
  * Caching strategy:
- * - /api/*       - Network-first (dynamic JSON data)
- * - /fragments/* - Network-first (dynamic HTML partials, user-specific)
- * - /c/*         - Network-first (page routes, returns app shell)
- * - Static assets - Cache-first with background update
+ * - All routes use network-first — always serve fresh content, cache for offline fallback
+ * - /api/*, /fragments/*, /c/* — dynamic routes (no caching on success)
+ * - Static assets (CSS, JS, libs) — cached on successful fetch for offline use
  */
 
-const CACHE_NAME = 'psycheros-v5';
+const CACHE_NAME = 'psycheros-offline';
 const STATIC_ASSETS = [
   '/',
   '/css/main.css',
@@ -61,8 +60,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for static assets
-  event.respondWith(cacheFirst(event.request));
+  // Network-first for static assets (always get fresh content, cache for offline)
+  event.respondWith(networkFirstStatic(event.request));
 });
 
 /**
@@ -90,18 +89,9 @@ async function networkFirst(request) {
 }
 
 /**
- * Cache-first strategy: return cached, update in background.
+ * Network-first strategy for static assets: try network, cache result, fall back to cache.
  */
-async function cacheFirst(request) {
-  const cached = await caches.match(request);
-
-  if (cached) {
-    // Return cached immediately, but update cache in background
-    updateCache(request);
-    return cached;
-  }
-
-  // Not cached, fetch and cache
+async function networkFirstStatic(request) {
   try {
     const response = await fetch(request);
     if (response.ok && request.method === 'GET') {
@@ -110,21 +100,11 @@ async function cacheFirst(request) {
     }
     return response;
   } catch {
-    return new Response('Not Found', { status: 404 });
-  }
-}
-
-/**
- * Update cache in background (stale-while-revalidate).
- */
-async function updateCache(request) {
-  try {
-    const response = await fetch(request);
-    if (response.ok) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, response);
+    // Network failed, try cache
+    const cached = await caches.match(request);
+    if (cached) {
+      return cached;
     }
-  } catch {
-    // Network error, keep using cached version
+    return new Response('Not Found', { status: 404 });
   }
 }

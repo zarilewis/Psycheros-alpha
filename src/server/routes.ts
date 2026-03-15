@@ -1060,7 +1060,7 @@ export async function handleStaticFile(
     return new Response(content, {
       headers: {
         "Content-Type": mimeType,
-        "Cache-Control": "public, max-age=3600",
+        "Cache-Control": "no-cache",
       },
     });
   } catch (error) {
