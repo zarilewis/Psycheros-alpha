@@ -362,9 +362,14 @@ export class LLMClient {
    * @throws LLMError on network failures or timeout
    */
   private async makeRequest(request: ChatRequest): Promise<Response> {
-    const connectTimeout = this.config.connectTimeout ?? 30_000;
+    const connectTimeout = this.config.connectTimeout ?? 180_000;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), connectTimeout);
+    const timer = setTimeout(() => {
+      console.error(
+        `[LLM] Connection timeout — no HTTP response from API after ${Math.round(connectTimeout / 1000)}s. Aborting request.`,
+      );
+      controller.abort();
+    }, connectTimeout);
 
     try {
       const response = await fetch(this.config.baseUrl, {

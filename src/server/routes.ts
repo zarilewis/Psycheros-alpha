@@ -891,7 +891,7 @@ export async function handleChat(
         let userMessage: string;
         switch (errorCode) {
           case "CONNECT_TIMEOUT":
-            userMessage = "The AI service did not respond in time. It may be temporarily unavailable — please try again.";
+            userMessage = "The AI service is unreachable or failed to respond. It may be temporarily unavailable — please try again.";
             break;
           case "STREAM_STALL_TIMEOUT":
             userMessage = "The AI response stalled mid-stream. The service may be overloaded — please try again.";
