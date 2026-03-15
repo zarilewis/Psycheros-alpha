@@ -310,7 +310,10 @@ function showNodePanel(nodeId) {
       <div class="gv-detail-label">ID</div>
       <code class="gv-node-id">${node.id}</code>
     </div>
-    <button class="btn btn--ghost gv-edit-btn" onclick="openEditModal('${node.id}')">Edit Node</button>
+    <div class="gv-panel-actions">
+      <button class="btn btn--ghost gv-edit-btn" onclick="openEditModal('${node.id}')">Edit Node</button>
+      <button class="btn btn--ghost gv-edit-btn gv-action-danger" onclick="deleteNodeFromPanel('${node.id}')">Delete Node</button>
+    </div>
   `;
 
   panel.classList.add('gv-panel-open');
@@ -521,6 +524,21 @@ function openEditModal(nodeId) {
   modal.classList.add('gv-modal-open');
 }
 globalThis.openEditModal = openEditModal;
+
+async function deleteNodeFromPanel(nodeId) {
+  const node = graphData.nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  if (!confirm(`Delete node "${node.label}"?`)) return;
+  try {
+    await fetch(`/api/graph/nodes/${nodeId}`, { method: 'DELETE' });
+    hideNodePanel();
+    initialized = false;
+    await initGraph();
+  } catch (err) {
+    showToast('Delete failed: ' + err.message);
+  }
+}
+globalThis.deleteNodeFromPanel = deleteNodeFromPanel;
 
 // ─── Toast (replaces alert()) ────────────────────────────────────────────────
 
