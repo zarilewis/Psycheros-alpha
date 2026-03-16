@@ -1135,7 +1135,8 @@ export function renderSnapshotsView(
 export function renderSnapshotPreview(
   category: string,
   filename: string,
-  content: string
+  content: string,
+  snapshotId: string
 ): string {
   const displayName = filename.replace(/\.md$/, "").replace(/_/g, " ");
   const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
@@ -1167,7 +1168,7 @@ export function renderSnapshotPreview(
   <div class="snapshot-preview-actions">
     <button
       class="btn btn--danger"
-      hx-post="/api/snapshots/${encodeURIComponent(`${category}/${filename.replace(/\.md$/, "")}`)}/restore"
+      hx-post="/api/snapshots/${encodeURIComponent(snapshotId)}/restore"
       hx-target="#settings-content"
       hx-swap="innerHTML"
       hx-confirm="Are you sure you want to restore this snapshot? This will replace the current ${escapeHtml(categoryLabel)} / ${escapeHtml(displayName)} file."

@@ -382,9 +382,20 @@ export class Server {
       const snapshotRetention = parseInt(Deno.env.get("PSYCHEROS_SNAPSHOT_RETENTION_DAYS") || "30");
 
       const snapshotHandler = async (): Promise<string> => {
+        // Use MCP when available so snapshots go to entity-core's data directory
+        // (the canonical location the UI reads from). Fall back to local filesystem
+        // only when MCP is not connected.
+        if (this.mcpClient) {
+          const result = await this.mcpClient.createSnapshot();
+          if (result.success) {
+            const count = result.snapshots?.length ?? 0;
+            return `Created ${count} snapshots via MCP (cleanup handled by entity-core)`;
+          }
+          console.warn("[Snapshot] MCP snapshot failed, falling back to local:", result.error);
+        }
         const snapshots = await createFullSnapshot(this.config.projectRoot, "scheduled", "psycheros");
         const cleanup = await cleanupOldSnapshots(this.config.projectRoot, snapshotRetention);
-        return `Created ${snapshots.length} snapshots, cleaned up ${cleanup.deleted} (kept ${cleanup.kept})`;
+        return `Created ${snapshots.length} snapshots (local fallback), cleaned up ${cleanup.deleted} (kept ${cleanup.kept})`;
       };
 
       registerJob("identity-snapshot", "Daily Identity Snapshot", `0 ${snapshotHour} * * *`, "Snapshot identity files and clean up old snapshots", true);

@@ -1950,10 +1950,12 @@ export async function handleRestoreSnapshot(
     );
   }
 
-  return new Response(JSON.stringify(result), {
+  // Fetch updated list and return HTML
+  const listResult = await ctx.mcpClient.listSnapshots();
+  const html = renderSnapshotsView(listResult.snapshots || []);
+  return new Response(html, {
     headers: {
-      "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "*",
+      "Content-Type": "text/html; charset=utf-8",
     },
   });
 }
@@ -2098,7 +2100,8 @@ export async function handleSnapshotPreviewFragment(
   const html = renderSnapshotPreview(
     category as SnapshotCategoryType,
     filename,
-    result.content
+    result.content,
+    decodedId
   );
 
   return new Response(html, {
