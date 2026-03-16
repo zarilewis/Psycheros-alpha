@@ -1884,7 +1884,8 @@ export async function handleGetSnapshot(
     );
   }
 
-  const result = await ctx.mcpClient.getSnapshotContent(snapshotId);
+  const decodedId = decodeURIComponent(snapshotId);
+  const result = await ctx.mcpClient.getSnapshotContent(decodedId);
 
   if (!result.success) {
     return new Response(
@@ -1918,36 +1919,53 @@ export async function handleRestoreSnapshot(
   ctx: RouteContext,
   snapshotId: string
 ): Promise<Response> {
+  // Decode URL-encoded snapshot ID (e.g., custom%2Fmy_facets -> custom/my_facets)
+  const decodedId = decodeURIComponent(snapshotId);
+
   // Snapshots are centralized in entity-core - require MCP connection
   if (!ctx.mcpClient) {
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: "Snapshots require entity-core connection. Please enable MCP.",
-      }),
+      `<div class="snapshot-error">Snapshots require entity-core connection. Please enable MCP.</div>`,
       {
         status: 503,
         headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
+          "Content-Type": "text/html; charset=utf-8",
         },
       }
     );
   }
 
-  const result = await ctx.mcpClient.restoreSnapshot(snapshotId);
+  const result = await ctx.mcpClient.restoreSnapshot(decodedId);
 
   if (!result.success) {
-    return new Response(
-      JSON.stringify({ success: false, error: result.error }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+    const errorHtml = `<div class="snapshot-error">Restore failed: ${escapeHtml(result.error || "Unknown error")}</div>`;
+    return new Response(errorHtml, {
+      status: 500,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  }
+
+  // Sync restored file to local disk so Core Prompts UI shows updated content.
+  // pull() (called inside restoreSnapshot) updates the in-memory cache, but the
+  // Core Prompts UI reads identity files from disk at projectRoot/identity/.
+  const idMatch = decodedId.match(/^(.+)\/(.+)_\d{4}-\d{2}-\d{2}T[\d-]+Z$/);
+  if (idMatch) {
+    const [, cat, filenamePart] = idMatch;
+    const fname = `${filenamePart}.md`;
+    const identity = await ctx.mcpClient.loadIdentity();
+    const files = identity?.[cat as "self" | "user" | "relationship" | "custom"];
+    const restored = files?.find((f: { filename: string }) => f.filename === fname);
+    if (restored) {
+      try {
+        const localPath = `${ctx.projectRoot}/identity/${cat}/${fname}`;
+        await Deno.mkdir(`${ctx.projectRoot}/identity/${cat}`, { recursive: true });
+        await Deno.writeTextFile(localPath, restored.content);
+      } catch (error) {
+        console.error("[Snapshot] Failed to sync restored file to local disk:", error);
       }
-    );
+    }
   }
 
   // Fetch updated list and return HTML
