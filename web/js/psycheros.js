@@ -2145,6 +2145,7 @@ function renderContextSection(title, text, expanded) {
  */
 function renderSystemTab(snap) {
   let html = '';
+  html += renderContextSection('Base Instructions', snap.baseInstructionsContent || snap.baseInstructions, true);
   html += renderContextSection('Self Identity', snap.selfContent, true);
   html += renderContextSection('User Context', snap.userContent, true);
   html += renderContextSection('Relationship', snap.relationshipContent, true);
@@ -2267,6 +2268,7 @@ function renderMetricsTab(snap) {
   }
 
   const sections = [
+    { name: 'Base Instructions', text: snap.baseInstructionsContent || snap.baseInstructions },
     { name: 'Self Identity', text: snap.selfContent },
     { name: 'User Context', text: snap.userContent },
     { name: 'Relationship', text: snap.relationshipContent },

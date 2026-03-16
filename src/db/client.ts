@@ -69,6 +69,7 @@ interface ContextSnapshotRow {
   timestamp: string;
   user_message: string;
   system_message: string;
+  base_instructions_content: string | null;
   self_content: string | null;
   user_content: string | null;
   relationship_content: string | null;
@@ -1001,10 +1002,11 @@ export class DBClient {
       this.db.exec(
         `INSERT INTO context_snapshots
          (id, conversation_id, turn_index, iteration, timestamp, user_message,
-          system_message, self_content, user_content, relationship_content,
-          memories_content, chat_history_content, lorebook_content, graph_content,
+          system_message, base_instructions_content, self_content, user_content,
+          relationship_content, memories_content, chat_history_content,
+          lorebook_content, graph_content,
           messages_json, tool_definitions_json, metrics_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           snapshot.conversationId,
@@ -1013,6 +1015,7 @@ export class DBClient {
           snapshot.timestamp,
           snapshot.userMessage,
           snapshot.systemMessage,
+          snapshot.baseInstructionsContent ?? null,
           snapshot.selfContent ?? null,
           snapshot.userContent ?? null,
           snapshot.relationshipContent ?? null,
@@ -1063,8 +1066,9 @@ export class DBClient {
   getContextSnapshots(conversationId: string): ContextSnapshotRecord[] {
     const stmt = this.db.prepare(
       `SELECT id, conversation_id, turn_index, iteration, timestamp, user_message,
-              system_message, self_content, user_content, relationship_content,
-              memories_content, chat_history_content, lorebook_content, graph_content,
+              system_message, base_instructions_content, self_content, user_content,
+              relationship_content, memories_content, chat_history_content,
+              lorebook_content, graph_content,
               messages_json, tool_definitions_json, metrics_json, created_at
        FROM context_snapshots
        WHERE conversation_id = ?
@@ -1086,8 +1090,9 @@ export class DBClient {
   getLatestContextSnapshot(conversationId: string): ContextSnapshotRecord | null {
     const stmt = this.db.prepare(
       `SELECT id, conversation_id, turn_index, iteration, timestamp, user_message,
-              system_message, self_content, user_content, relationship_content,
-              memories_content, chat_history_content, lorebook_content, graph_content,
+              system_message, base_instructions_content, self_content, user_content,
+              relationship_content, memories_content, chat_history_content,
+              lorebook_content, graph_content,
               messages_json, tool_definitions_json, metrics_json, created_at
        FROM context_snapshots
        WHERE conversation_id = ?
@@ -1113,6 +1118,7 @@ export class DBClient {
       timestamp: row.timestamp,
       userMessage: row.user_message,
       systemMessage: row.system_message,
+      baseInstructionsContent: row.base_instructions_content ?? undefined,
       selfContent: row.self_content ?? undefined,
       userContent: row.user_content ?? undefined,
       relationshipContent: row.relationship_content ?? undefined,

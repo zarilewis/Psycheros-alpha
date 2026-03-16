@@ -216,7 +216,11 @@ export async function loadBaseInstructions(
       const identity = await mcpClient.loadIdentity();
       const baseFile = identity?.self?.find((f) => f.filename === BASE_INSTRUCTIONS_FILE);
       if (baseFile?.content) {
-        return applyTimestamp(baseFile.content);
+        const applied = applyTimestamp(baseFile.content);
+        // Guard against whitespace-only content from MCP — fall through to local file
+        if (applied.trim()) {
+          return applied;
+        }
       }
     } catch {
       // Fall through to local file

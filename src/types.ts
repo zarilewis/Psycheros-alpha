@@ -162,6 +162,8 @@ export interface LLMContextSnapshot {
   userMessage: string;
   /** The system message with all identity files and RAG context */
   systemMessage: string;
+  /** Base instructions loaded from identity/self/base_instructions.md */
+  baseInstructions: string;
   /** Self content loaded from self/ directory */
   selfContent: string;
   /** User content loaded from user/ directory */
@@ -202,6 +204,7 @@ export interface ContextSnapshotRecord {
   timestamp: string;
   userMessage: string;
   systemMessage: string;
+  baseInstructionsContent?: string;
   selfContent?: string;
   userContent?: string;
   relationshipContent?: string;

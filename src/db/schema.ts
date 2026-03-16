@@ -210,6 +210,7 @@ export const SCHEMA = `
     timestamp TEXT NOT NULL,
     user_message TEXT NOT NULL,
     system_message TEXT NOT NULL,
+    base_instructions_content TEXT,
     self_content TEXT,
     user_content TEXT,
     relationship_content TEXT,
@@ -448,6 +449,7 @@ function runMigrations(db: Database): void {
         timestamp TEXT NOT NULL,
         user_message TEXT NOT NULL,
         system_message TEXT NOT NULL,
+        base_instructions_content TEXT,
         self_content TEXT,
         user_content TEXT,
         relationship_content TEXT,
@@ -490,6 +492,20 @@ function runMigrations(db: Database): void {
         ON cron_job_runs(job_id, completed_at DESC);
     `);
     console.log("[DB] Created cron_job_runs table");
+  }
+
+  // Migration: Add base_instructions_content column to context_snapshots if missing
+  const hasBaseInstructionsCol = db
+    .prepare(
+      "SELECT 1 FROM pragma_table_info('context_snapshots') WHERE name = 'base_instructions_content'"
+    )
+    .get();
+
+  if (!hasBaseInstructionsCol) {
+    db.exec(
+      `ALTER TABLE context_snapshots ADD COLUMN base_instructions_content TEXT`
+    );
+    console.log("[DB] Added base_instructions_content column to context_snapshots");
   }
 }
 
