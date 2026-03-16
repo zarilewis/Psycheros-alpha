@@ -586,9 +586,11 @@ export class EntityTurn {
 
       // Add assistant message with tool calls to the messages array
       const assistantTimestamp = formatMessageTimestamp(new Date());
+      // Strip any <t>...</t> tags the LLM echoed to prevent accumulation
+      const cleanAssistantContent = (assistantContent || "").replace(/<t>[^<]*<\/t>\s*/g, "");
       const assistantMsg: ChatMessage = {
         role: "assistant",
-        content: `${assistantTimestamp} ${assistantContent || ""}`,
+        content: `${assistantTimestamp} ${cleanAssistantContent}`,
         tool_calls: toolCalls,
       };
       messages.push(assistantMsg);
@@ -655,9 +657,12 @@ export class EntityTurn {
       const timestamp = formatMessageTimestamp(msg.createdAt);
       // Prepend edited marker if message was edited
       const editedPrefix = msg.editedAt ? "<edited/> " : "";
+      // Strip any <t>...</t> tags the LLM may have echoed in its output
+      // to prevent timestamp accumulation across turns
+      const cleanContent = msg.content.replace(/<t>[^<]*<\/t>\s*/g, "");
       const chatMsg: ChatMessage = {
         role: msg.role,
-        content: `${timestamp} ${editedPrefix}${msg.content}`,
+        content: `${timestamp} ${editedPrefix}${cleanContent}`,
       };
 
       // Add tool call ID if present (for tool role messages)

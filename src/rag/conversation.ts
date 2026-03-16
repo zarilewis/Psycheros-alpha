@@ -560,7 +560,9 @@ export function formatChatHistoryForContext(
 
   for (const msg of messages) {
     const timestamp = formatMessageTimestamp(msg.createdAt);
-    const line = `[${msg.role}]: ${timestamp} ${msg.content}`;
+    // Strip any LLM-echoed <t>...</t> tags before adding the canonical one
+    const cleanContent = msg.content.replace(/<t>[^<]*<\/t>\s*/g, "");
+    const line = `[${msg.role}]: ${timestamp} ${cleanContent}`;
     const lineTokens = estimateTokens(line);
 
     if (totalTokens + lineTokens > maxTokens) {
