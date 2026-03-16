@@ -87,6 +87,8 @@ export interface MCPClientConfig {
   offlineFallback?: boolean;
   /** Full path to deno executable (default: auto-detect) */
   denoPath?: string;
+  /** Local project root — identity files synced here after pull (e.g. projectRoot) */
+  localBasePath?: string;
 }
 
 /**
@@ -238,6 +240,10 @@ export class MCPClient {
           this.cache.lastSync = new Date().toISOString();
 
           console.log("[MCP] Pulled identity from entity-core");
+
+          // Sync to local disk so Core Prompts UI stays current
+          await this.syncIdentityToLocal();
+
           return this.cache.identity;
         }
       }
@@ -251,6 +257,41 @@ export class MCPClient {
       }
 
       throw error;
+    }
+  }
+
+  /**
+   * Sync cached identity files to local disk so the Core Prompts UI
+   * (which reads from projectRoot/identity/) reflects MCP-canonical data.
+   * Non-fatal — logs errors but never throws.
+   */
+  private async syncIdentityToLocal(): Promise<void> {
+    if (!this.config.localBasePath || !this.cache.identity) return;
+
+    const categories = ["self", "user", "relationship", "custom"] as const;
+    let synced = 0;
+
+    for (const category of categories) {
+      const files = this.cache.identity[category];
+      if (!files || files.length === 0) continue;
+
+      const dir = `${this.config.localBasePath}/identity/${category}`;
+      try {
+        await Deno.mkdir(dir, { recursive: true });
+      } catch { /* already exists */ }
+
+      for (const file of files) {
+        try {
+          await Deno.writeTextFile(`${dir}/${file.filename}`, file.content);
+          synced++;
+        } catch (error) {
+          console.error(`[MCP] Failed to sync ${category}/${file.filename} to local:`, error);
+        }
+      }
+    }
+
+    if (synced > 0) {
+      console.log(`[MCP] Synced ${synced} identity file(s) to local disk`);
     }
   }
 

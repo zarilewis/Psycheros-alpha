@@ -102,6 +102,7 @@ if (mcpEnabled) {
     syncOnStartup: true,
     syncInterval: 5 * 60 * 1000, // 5 minutes
     offlineFallback: true,
+    localBasePath: config.projectRoot,
   });
 
   // Await connection before server init to avoid race conditions
