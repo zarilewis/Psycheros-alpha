@@ -13,7 +13,7 @@ import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import { catchUpSummarization, repairOrphanedSummaries, needsConsolidation, runConsolidation } from "../memory/mod.ts";
 import { initTracker, registerJob, registerTrigger, tracked } from "./cron-tracker.ts";
-import { createFullSnapshot, cleanupOldSnapshots } from "../snapshot/mod.ts";
+
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import { LorebookManager } from "../lorebook/mod.ts";
@@ -379,23 +379,19 @@ export class Server {
 
       // Daily identity snapshot - runs at configured hour (default 3 AM)
       const snapshotHour = parseInt(Deno.env.get("PSYCHEROS_SNAPSHOT_HOUR") || "3");
-      const snapshotRetention = parseInt(Deno.env.get("PSYCHEROS_SNAPSHOT_RETENTION_DAYS") || "30");
-
       const snapshotHandler = async (): Promise<string> => {
-        // Use MCP when available so snapshots go to entity-core's data directory
-        // (the canonical location the UI reads from). Fall back to local filesystem
-        // only when MCP is not connected.
-        if (this.mcpClient) {
-          const result = await this.mcpClient.createSnapshot();
-          if (result.success) {
-            const count = result.snapshots?.length ?? 0;
-            return `Created ${count} snapshots via MCP (cleanup handled by entity-core)`;
-          }
-          console.warn("[Snapshot] MCP snapshot failed, falling back to local:", result.error);
+        // Snapshots must go through MCP so they land in entity-core's data directory
+        // (the canonical location the UI reads from). If MCP is unavailable, skip —
+        // creating local-only snapshots would be invisible to the UI.
+        if (!this.mcpClient) {
+          return "Skipped: MCP not connected (snapshots require entity-core)";
         }
-        const snapshots = await createFullSnapshot(this.config.projectRoot, "scheduled", "psycheros");
-        const cleanup = await cleanupOldSnapshots(this.config.projectRoot, snapshotRetention);
-        return `Created ${snapshots.length} snapshots (local fallback), cleaned up ${cleanup.deleted} (kept ${cleanup.kept})`;
+        const result = await this.mcpClient.createSnapshot();
+        if (result.success) {
+          const count = result.snapshots?.length ?? 0;
+          return `Created ${count} snapshots via MCP (cleanup handled by entity-core)`;
+        }
+        return `Failed: ${result.error || "Unknown error"}`;
       };
 
       registerJob("identity-snapshot", "Daily Identity Snapshot", `0 ${snapshotHour} * * *`, "Snapshot identity files and clean up old snapshots", true);

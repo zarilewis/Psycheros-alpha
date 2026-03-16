@@ -158,6 +158,14 @@ export async function listSnapshots(
         // Parse snapshot metadata from filename
         const meta = parseSnapshotFilename(cat, entry.name);
         if (meta) {
+          // Read file header to extract actual reason and source
+          try {
+            const header = await readSnapshotHeader(join(catDir, entry.name));
+            if (header.reason) meta.reason = header.reason;
+            if (header.source) meta.source = header.source;
+          } catch {
+            // Keep defaults from parseSnapshotFilename
+          }
           snapshots.push(meta);
         }
       }
@@ -195,9 +203,48 @@ function parseSnapshotFilename(category: SnapshotCategory, filename: string): Sn
     filename: `${originalFilename}.md`,
     timestamp,
     date,
-    reason: "pre-replace" as SnapshotReason, // Default, actual reason stored in file
-    source: "psycheros" as SnapshotSource, // Default, actual source stored in file
+    reason: "manual" as SnapshotReason,
+    source: "psycheros" as SnapshotSource,
   };
+}
+
+/**
+ * Read the header of a snapshot file to extract reason and source.
+ * Only reads the first 512 bytes to avoid loading full file content.
+ */
+async function readSnapshotHeader(
+  filePath: string
+): Promise<{ reason?: SnapshotReason; source?: SnapshotSource }> {
+  const file = await Deno.open(filePath, { read: true });
+  const buf = new Uint8Array(512);
+  const bytesRead = await file.read(buf);
+  file.close();
+  if (!bytesRead) return {};
+
+  const header = new TextDecoder().decode(buf.subarray(0, bytesRead));
+  const lines = header.split("\n").slice(0, 5);
+
+  let reason: SnapshotReason | undefined;
+  let source: SnapshotSource | undefined;
+
+  for (const line of lines) {
+    const reasonMatch = line.match(/^# Reason:\s*(.+)$/);
+    if (reasonMatch) {
+      const val = reasonMatch[1].trim();
+      if (val === "scheduled" || val === "manual" || val === "pre-replace") {
+        reason = val;
+      }
+    }
+    const sourceMatch = line.match(/^# Source:\s*(.+)$/);
+    if (sourceMatch) {
+      const val = sourceMatch[1].trim();
+      if (val === "psycheros" || val === "entity-core") {
+        source = val;
+      }
+    }
+  }
+
+  return { reason, source };
 }
 
 /**
