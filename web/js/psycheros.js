@@ -477,8 +477,13 @@ function autoResize(textarea) {
   textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
 }
 
+function isMobileDevice() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && window.innerWidth < 768);
+}
+
 function handleKeyDown(event) {
-  if (event.key === 'Enter' && !event.shiftKey) {
+  if (event.key === 'Enter' && !event.shiftKey && !isMobileDevice()) {
     event.preventDefault();
     sendMessage();
   }
