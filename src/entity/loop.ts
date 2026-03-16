@@ -268,7 +268,7 @@ export class EntityTurn {
       }
     }
 
-    const baseInstructions = await loadBaseInstructions(this.config.projectRoot);
+    const baseInstructions = await loadBaseInstructions(this.config.projectRoot, this.config.mcpClient);
     const systemMessage = buildSystemMessage(baseInstructions, selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent, graphContent);
 
     // Get conversation history from DB

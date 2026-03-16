@@ -190,22 +190,45 @@ export async function loadCustomFiles(projectRoot: string): Promise<string> {
 }
 
 /**
- * Load the base instructions from identity/self/base_instructions.md.
+ * Apply timestamp substitution to base instructions content.
+ */
+function applyTimestamp(content: string): string {
+  const timestamp = new Date().toISOString();
+  return content.replace(/\{\{timestamp\}\}/g, timestamp).trim();
+}
+
+/**
+ * Load the base instructions from MCP (canonical) or local identity/self/base_instructions.md.
  * Replaces {{timestamp}} with the current ISO timestamp.
- * Returns a fallback default if the file doesn't exist.
+ * Returns a fallback default if the file doesn't exist anywhere.
  *
  * @param projectRoot - The root directory of the project
+ * @param mcpClient - Optional MCP client for loading from entity-core
  * @returns The base instructions string (with XML tags intact)
  */
-export async function loadBaseInstructions(projectRoot: string): Promise<string> {
+export async function loadBaseInstructions(
+  projectRoot: string,
+  mcpClient?: MCPClient,
+): Promise<string> {
+  // Prefer MCP (canonical source) when available
+  if (mcpClient) {
+    try {
+      const identity = await mcpClient.loadIdentity();
+      const baseFile = identity?.self?.find((f) => f.filename === BASE_INSTRUCTIONS_FILE);
+      if (baseFile?.content) {
+        return applyTimestamp(baseFile.content);
+      }
+    } catch {
+      // Fall through to local file
+    }
+  }
+
+  // Fall back to local file
   const filePath = join(projectRoot, SELF_DIR, BASE_INSTRUCTIONS_FILE);
 
   try {
-    let content = await Deno.readTextFile(filePath);
-    // Replace timestamp placeholder
-    const timestamp = new Date().toISOString();
-    content = content.replace(/\{\{timestamp\}\}/g, timestamp);
-    return content.trim();
+    const content = await Deno.readTextFile(filePath);
+    return applyTimestamp(content);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
       // Fallback default if file doesn't exist
@@ -259,7 +282,9 @@ export async function loadSelfContent(
   if (mcpClient) {
     const identity = await mcpClient.loadIdentity();
     if (identity?.self) {
-      return identityFilesToString(identity.self, SELF_FILE_ORDER);
+      // Filter out base_instructions.md — loaded separately via loadBaseInstructions()
+      const filtered = identity.self.filter((f) => f.filename !== BASE_INSTRUCTIONS_FILE);
+      return identityFilesToString(filtered, SELF_FILE_ORDER);
     }
   }
   return await loadSelfMd(projectRoot);
@@ -355,8 +380,11 @@ export function buildSystemMessage(
   lorebookContent?: string,
   graphContent?: string,
 ): string {
-  // Build sections for self, user, relationship, and custom content
-  const sections: string[] = [baseInstructions];
+  // Build sections — base instructions always first
+  const sections: string[] = [];
+  if (baseInstructions.trim()) {
+    sections.push(baseInstructions);
+  }
 
   if (selfContent.trim()) {
     sections.push(`---
