@@ -584,13 +584,14 @@ async function sendMessage() {
   const messages = document.getElementById('messages');
   const userTime = formatChatTimestamp(new Date());
   if (messages) {
+    const userHtml = DOMPurify.sanitize(marked.parse(message));
     messages.insertAdjacentHTML('beforeend', `
       <div class="msg msg--user">
         <div class="msg-header">
           <span class="msg-timestamp">${userTime}</span>
           <span>You</span>
         </div>
-        <div class="msg-content">${escapeHtml(message)}</div>
+        <div class="msg-content user-text">${userHtml}</div>
       </div>
     `);
   }
