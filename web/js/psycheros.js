@@ -303,6 +303,10 @@ function closeSidebarAfterNav() {
 async function loadConversationFromUrl(conversationId) {
   currentConversationId = conversationId;
 
+  // Clear context inspector state for the new conversation
+  contextSnapshots = [];
+  selectedSnapshotIdx = -1;
+
   try {
     // Fetch the chat fragment from the dedicated fragment endpoint
     const response = await fetch(`/fragments/chat/${conversationId}`);
@@ -386,6 +390,13 @@ async function newConversation() {
     // Reload conversation list
     htmx.trigger('#conv-list', 'load');
 
+    // Clear context inspector state — new conversation has no snapshots yet
+    contextSnapshots = [];
+    selectedSnapshotIdx = -1;
+    if (contextInspectorOpen) {
+      renderContextInspector();
+    }
+
     // Clear chat and show empty state with input area
     const chat = document.getElementById('chat');
     if (chat) {
@@ -462,6 +473,16 @@ function selectConversation(id) {
     sendBtn.classList.remove('stop-btn');
     sendBtn.classList.add('send-btn');
     sendBtn.disabled = false;
+  }
+
+  // Clear context inspector state — snapshots belong to the previous conversation
+  // and must not leak into the new one
+  contextSnapshots = [];
+  selectedSnapshotIdx = -1;
+  if (contextInspectorOpen) {
+    loadContextSnapshots();
+  } else {
+    renderContextInspector();
   }
 
   // Close sidebar after selecting conversation
@@ -1752,6 +1773,13 @@ async function confirmDelete() {
       currentConversationId = null;
       history.pushState({}, '', '/');
 
+      // Clear context inspector state — the conversation no longer exists
+      contextSnapshots = [];
+      selectedSnapshotIdx = -1;
+      if (contextInspectorOpen) {
+        renderContextInspector();
+      }
+
       // Reset header title
       const headerTitle = document.getElementById('header-title');
       if (headerTitle) {
@@ -1934,7 +1962,11 @@ function hideContextViewer() {
  * Fetch context snapshots from the REST API.
  */
 async function loadContextSnapshots() {
-  if (!currentConversationId) {
+  // Capture the target conversation ID at fetch time to guard against race conditions:
+  // the user may switch conversations between when the fetch starts and completes.
+  const targetConversationId = currentConversationId;
+
+  if (!targetConversationId) {
     contextSnapshots = [];
     selectedSnapshotIdx = -1;
     renderContextInspector();
@@ -1942,7 +1974,7 @@ async function loadContextSnapshots() {
   }
 
   try {
-    const res = await fetch(`/api/conversations/${currentConversationId}/context`);
+    const res = await fetch(`/api/conversations/${targetConversationId}/context`);
     if (res.status === 204 || !res.ok) {
       contextSnapshots = [];
       selectedSnapshotIdx = -1;
@@ -1955,6 +1987,10 @@ async function loadContextSnapshots() {
     contextSnapshots = [];
     selectedSnapshotIdx = -1;
   }
+
+  // Discard results if the user has switched conversations during the fetch
+  if (currentConversationId !== targetConversationId) return;
+
   renderContextInspector();
 }
 
