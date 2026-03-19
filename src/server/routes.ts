@@ -17,6 +17,7 @@ import type { Retriever, RAGConfig } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
+import type { VaultManager } from "../vault/mod.ts";
 import { EntityTurn, type EntityYield, generateAndSetTitle } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
 import {
@@ -71,6 +72,8 @@ export interface RouteContext {
   mcpClient?: MCPClient;
   /** Optional lorebook manager for world info */
   lorebookManager?: LorebookManager;
+  /** Optional vault manager for document storage */
+  vaultManager?: VaultManager;
   /** Get current LLM settings */
   getLLMSettings: () => LLMSettings;
   /** Update LLM settings and hot-reload */
@@ -854,6 +857,7 @@ export async function handleChat(
             chatRAG: ctx.chatRAG,
             mcpClient: ctx.mcpClient,
             lorebookManager: ctx.lorebookManager,
+            vaultManager: ctx.vaultManager,
           }
         );
 
@@ -3594,4 +3598,362 @@ export function handleLLMSettingsFragment(ctx: RouteContext): Response {
       "Content-Type": "text/html; charset=utf-8",
     },
   });
+}
+
+// =============================================================================
+// Vault API Routes
+// =============================================================================
+
+/** JSON response helper */
+function vaultJson(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
+}
+
+/** HTML fragment response helper */
+function vaultHtml(content: string): Response {
+  return new Response(content, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /api/vault - List vault documents.
+ */
+export function handleListVault(ctx: RouteContext): Response {
+  if (!ctx.vaultManager) return vaultJson({ error: "Vault not available" }, 503);
+
+  const docs = ctx.vaultManager.listDocuments();
+  return vaultJson({ documents: docs });
+}
+
+/**
+ * Handle POST /api/vault - Upload a vault document.
+ */
+export async function handleUploadVault(
+  ctx: RouteContext,
+  request: Request
+): Promise<Response> {
+  if (!ctx.vaultManager) return vaultJson({ error: "Vault not available" }, 503);
+
+  const isHtmx = request.headers.get("HX-Request") === "true";
+
+  try {
+    const formData = await request.formData();
+    const file = formData.get("document");
+
+    if (!file || !(file instanceof File)) {
+      return isHtmx
+        ? vaultHtml(renderVaultView(ctx, "No file provided", "error"))
+        : vaultJson({ error: "No file provided" }, 400);
+    }
+
+    const _title = formData.get("title") as string || file.name;
+    const scope = (formData.get("scope") as "global" | "chat") || "global";
+    const conversationId = formData.get("conversation_id") as string | undefined;
+
+    // Use _title for context (e.g., future logging) - suppress unused warning
+    void _title;
+
+    const doc = await ctx.vaultManager.createFromUpload(file, {
+      scope,
+      conversationId,
+    });
+
+    if (isHtmx) {
+      return vaultHtml(renderVaultView(ctx));
+    }
+
+    return vaultJson({ success: true, document: doc }, 201);
+  } catch (error) {
+    console.error("[Routes] handleUploadVault error:", error);
+    const msg = error instanceof Error ? error.message : "Upload failed";
+    return isHtmx
+      ? vaultHtml(renderVaultView(ctx, msg, "error"))
+      : vaultJson({ error: msg }, 500);
+  }
+}
+
+/**
+ * Handle GET /api/vault/:id - Get vault document metadata.
+ */
+export function handleGetVault(ctx: RouteContext, id: string): Response {
+  if (!ctx.vaultManager) return vaultJson({ error: "Vault not available" }, 503);
+
+  const doc = ctx.vaultManager.getDocument(id);
+  if (!doc) return vaultJson({ error: "Document not found" }, 404);
+  return vaultJson(doc);
+}
+
+/**
+ * Handle PUT /api/vault/:id - Update vault document metadata.
+ */
+export async function handleUpdateVault(
+  ctx: RouteContext,
+  id: string,
+  request: Request
+): Promise<Response> {
+  if (!ctx.vaultManager) return vaultJson({ error: "Vault not available" }, 503);
+
+  try {
+    const body = await request.json() as Record<string, unknown>;
+    const updates: { title?: string; content?: string } = {};
+
+    if (body.title) updates.title = String(body.title);
+    if (body.content !== undefined) updates.content = String(body.content);
+
+    const doc = await ctx.vaultManager.updateDocument(id, updates);
+    if (!doc) return vaultJson({ error: "Document not found" }, 404);
+    return vaultJson(doc);
+  } catch (error) {
+    console.error("[Routes] handleUpdateVault error:", error);
+    return vaultJson({ error: "Update failed" }, 500);
+  }
+}
+
+/**
+ * Handle DELETE /api/vault/:id - Delete a vault document.
+ */
+export function handleDeleteVault(ctx: RouteContext, id: string): Response {
+  if (!ctx.vaultManager) return vaultJson({ error: "Vault not available" }, 503);
+
+  const success = ctx.vaultManager.deleteDocument(id);
+  if (!success) return vaultJson({ error: "Document not found" }, 404);
+  return vaultJson({ success: true });
+}
+
+/**
+ * Handle POST /api/vault/search - Search vault documents.
+ */
+export async function handleSearchVault(
+  ctx: RouteContext,
+  request: Request
+): Promise<Response> {
+  if (!ctx.vaultManager) return vaultJson({ error: "Vault not available" }, 503);
+
+  try {
+    const body = await request.json() as { query: string; conversation_id?: string; max_results?: number };
+
+    if (!body.query) {
+      return vaultJson({ error: "Query is required" }, 400);
+    }
+
+    const results = await ctx.vaultManager.search(body.query, {
+      conversationId: body.conversation_id,
+      maxChunks: body.max_results ?? 5,
+    });
+
+    return vaultJson({ results });
+  } catch (error) {
+    console.error("[Routes] handleSearchVault error:", error);
+    return vaultJson({ error: "Search failed" }, 500);
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/vault - Vault management view.
+ */
+export function handleVaultFragment(ctx: RouteContext): Response {
+  return vaultHtml(renderVaultView(ctx));
+}
+
+/**
+ * Handle GET /fragments/settings/vault/:id - Vault document detail view.
+ */
+export function handleVaultDetailFragment(
+  ctx: RouteContext,
+  id: string
+): Response {
+  return vaultHtml(renderVaultDetailView(ctx, id));
+}
+
+// =============================================================================
+// Vault View Templates (inline to avoid large template.ts changes)
+// =============================================================================
+
+function renderVaultView(
+  ctx: RouteContext,
+  statusMsg?: string,
+  statusType?: "success" | "error"
+): string {
+  const docs = ctx.vaultManager?.listDocuments() ?? [];
+
+  const statusHtml = statusMsg
+    ? `<div class="settings-status visible ${statusType}">${escapeHtml(statusMsg)}</div>`
+    : "";
+
+  const docCards = docs.length === 0
+    ? `<div class="vault-empty">No documents in the Data Vault. Upload a file or the entity can create documents using vault_write.</div>`
+    : docs.map((d) => {
+      const scopeBadge = d.scope === "global"
+        ? `<span class="vault-scope-badge vault-scope-badge--global">Global</span>`
+        : `<span class="vault-scope-badge vault-scope-badge--chat">Chat</span>`;
+      const sourceLabel = d.source === "entity" ? "entity" : "upload";
+      const sizeKB = (d.fileSize / 1024).toFixed(1);
+      const date = new Date(d.updatedAt).toLocaleDateString();
+
+      return `<div class="vault-card" hx-target="#chat" hx-swap="innerHTML">
+        <div class="vault-card-header">
+          <span class="vault-card-title">${escapeHtml(d.title)}</span>
+          <div class="vault-card-meta">
+            ${scopeBadge}
+            <span class="vault-type-badge">${d.fileType.toUpperCase()}</span>
+            <span class="vault-source-badge">${sourceLabel}</span>
+          </div>
+        </div>
+        <div class="vault-card-body">
+          <span>${d.chunkCount} chunks</span>
+          <span>${sizeKB} KB</span>
+          <span>${date}</span>
+        </div>
+        <div class="vault-card-actions">
+          <a class="btn btn--sm" hx-get="/fragments/settings/vault/${d.id}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Edit
+          </a>
+          <button class="btn btn--sm btn--danger"
+            hx-delete="/api/vault/${d.id}"
+            hx-confirm="Delete this document?"
+            hx-target="#chat"
+            hx-swap="innerHTML"
+            hx-on::after-request="if(event.detail.successful) htmx.ajax('GET','/fragments/settings/vault',{target:'#chat',swap:'innerHTML'})"
+            onclick="event.stopPropagation()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Delete
+          </button>
+        </div>
+      </div>`;
+    }).join("\n");
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      <a class="settings-back-btn"
+        hx-get="/fragments/settings"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        <span>Settings</span>
+      </a>
+      <div>
+        <h1 class="settings-title">Data Vault</h1>
+        <p class="settings-desc">Store and search documents for context-aware responses</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+    ${statusHtml}
+    <div class="vault-upload">
+      <form hx-post="/api/vault" hx-encoding="multipart/form-data" hx-target="#chat" hx-swap="innerHTML">
+        <div class="form-row">
+          <div class="form-group" style="flex:2">
+            <label>Document</label>
+            <input type="file" name="document" accept=".md,.txt,.pdf,.docx,.xlsx" required />
+          </div>
+          <div class="form-group">
+            <label>Title (optional)</label>
+            <input type="text" name="title" placeholder="Auto-detected from filename" />
+          </div>
+          <div class="form-group form-group--small">
+            <label>Scope</label>
+            <select name="scope">
+              <option value="global">Global</option>
+              <option value="chat">Per-Chat</option>
+            </select>
+          </div>
+          <div class="form-group" style="flex:0;align-items:flex-end">
+            <button type="submit" class="btn btn--primary">Upload</button>
+          </div>
+        </div>
+      </form>
+    </div>
+    <div class="vault-list">
+      ${docCards}
+    </div>
+  </div>
+</div>`;
+}
+
+function renderVaultDetailView(ctx: RouteContext, id: string): string {
+  const doc = ctx.vaultManager?.getDocument(id);
+
+  if (!doc) {
+    return `<div class="settings-view">
+      <div class="settings-header">
+        <div class="settings-header-row">
+          <a class="settings-back-btn"
+            hx-get="/fragments/settings/vault"
+            hx-target="#chat"
+            hx-swap="innerHTML">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            <span>Vault</span>
+          </a>
+        </div>
+      </div>
+      <div class="settings-content">
+        <div class="settings-empty">Document not found.</div>
+      </div>
+    </div>`;
+  }
+
+  const isEditable = doc.source === "entity";
+  let contentText = "";
+  if (isEditable) {
+    try {
+      contentText = Deno.readTextFileSync(doc.filePath);
+    } catch {
+      // File may not exist
+    }
+  }
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      <a class="settings-back-btn"
+        hx-get="/fragments/settings/vault"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        <span>Vault</span>
+      </a>
+      <div>
+        <h1 class="settings-title">${escapeHtml(doc.title)}</h1>
+        <p class="settings-desc">
+          ${doc.fileType.toUpperCase()} | ${doc.scope} | ${doc.chunkCount} chunks | ${(doc.fileSize / 1024).toFixed(1)} KB | ${doc.source}
+        </p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content">
+    <div class="settings-editor">
+      <div class="settings-editor-header">
+        <span class="settings-editor-filename">${escapeHtml(doc.filename)}</span>
+      </div>
+      <form hx-put="/api/vault/${doc.id}" hx-target="#settings-content" hx-swap="innerHTML">
+        <div class="form-group" style="margin-bottom:var(--sp-3)">
+          <label>Title</label>
+          <input type="text" name="title" value="${escapeHtml(doc.title)}" />
+        </div>
+        ${isEditable
+          ? `<div class="form-group">
+              <label>Content</label>
+              <textarea name="content" class="settings-textarea" rows="20">${escapeHtml(contentText)}</textarea>
+            </div>
+            <div class="settings-editor-actions">
+              <button type="submit" class="btn btn--primary">Save Changes</button>
+            </div>`
+          : `<div class="settings-empty">Uploaded documents cannot be edited inline. Re-upload to update.</div>`
+        }
+      </form>
+    </div>
+  </div>
+</div>`;
 }

@@ -40,6 +40,23 @@ The entity can read and write to its knowledge graph. Write tools auto-generate 
 | `graph_delete_edge` | Remove a relationship |
 | `graph_write_batch` | Batch create nodes and edges (edges can reference existing nodes by label) |
 
+## Data Vault Tools
+
+The entity can create, list, and search documents stored in the Data Vault for persistent reference.
+
+| Tool | Description |
+|------|-------------|
+| `vault_write` | Create or update a vault document with title, content, and scope (global/chat) |
+| `vault_list` | List vault documents, optionally filtered by scope |
+| `vault_search` | Search vault for relevant content by query |
+
+### Related Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/tools/vault-tools.ts` | 3 vault document management tools |
+| `src/vault/manager.ts` | VaultManager — CRUD, chunking, embedding, search |
+
 ### Related Source Files
 
 | File | Purpose |

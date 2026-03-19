@@ -77,6 +77,7 @@ interface ContextSnapshotRow {
   chat_history_content: string | null;
   lorebook_content: string | null;
   graph_content: string | null;
+  vault_content: string | null;
   messages_json: string;
   tool_definitions_json: string;
   metrics_json: string;
@@ -1004,9 +1005,9 @@ export class DBClient {
          (id, conversation_id, turn_index, iteration, timestamp, user_message,
           system_message, base_instructions_content, self_content, user_content,
           relationship_content, memories_content, chat_history_content,
-          lorebook_content, graph_content,
+          lorebook_content, graph_content, vault_content,
           messages_json, tool_definitions_json, metrics_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           snapshot.conversationId,
@@ -1023,6 +1024,7 @@ export class DBClient {
           snapshot.chatHistoryContent ?? null,
           snapshot.lorebookContent ?? null,
           snapshot.graphContent ?? null,
+          snapshot.vaultContent ?? null,
           snapshot.messagesJson,
           snapshot.toolDefinitionsJson,
           snapshot.metricsJson,
@@ -1068,7 +1070,7 @@ export class DBClient {
       `SELECT id, conversation_id, turn_index, iteration, timestamp, user_message,
               system_message, base_instructions_content, self_content, user_content,
               relationship_content, memories_content, chat_history_content,
-              lorebook_content, graph_content,
+              lorebook_content, graph_content, vault_content,
               messages_json, tool_definitions_json, metrics_json, created_at
        FROM context_snapshots
        WHERE conversation_id = ?
@@ -1092,7 +1094,7 @@ export class DBClient {
       `SELECT id, conversation_id, turn_index, iteration, timestamp, user_message,
               system_message, base_instructions_content, self_content, user_content,
               relationship_content, memories_content, chat_history_content,
-              lorebook_content, graph_content,
+              lorebook_content, graph_content, vault_content,
               messages_json, tool_definitions_json, metrics_json, created_at
        FROM context_snapshots
        WHERE conversation_id = ?
@@ -1126,6 +1128,7 @@ export class DBClient {
       chatHistoryContent: row.chat_history_content ?? undefined,
       lorebookContent: row.lorebook_content ?? undefined,
       graphContent: row.graph_content ?? undefined,
+      vaultContent: row.vault_content ?? undefined,
       messagesJson: row.messages_json,
       toolDefinitionsJson: row.tool_definitions_json,
       metricsJson: row.metrics_json,

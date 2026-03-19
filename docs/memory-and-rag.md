@@ -50,7 +50,7 @@ Memories are tagged with `sourceInstance` to track which embodiment created them
 
 ## RAG Systems
 
-Three RAG systems provide contextual information before each LLM call.
+Three RAG systems provide contextual information before each LLM call, plus the Data Vault for user/entity-uploaded documents.
 
 ### Memory RAG
 
@@ -94,6 +94,35 @@ Knowledge graph context when MCP is enabled. The entity can both read from and w
 
 Requires `PSYCHEROS_MCP_ENABLED=true`.
 
+### Vault RAG (Data Vault)
+
+Eager RAG over user-uploaded and entity-created reference documents. Documents are chunked, embedded, and proactively searched every turn — always available, no keyword triggers needed.
+
+**Document storage:**
+- Users upload via Settings → Data Vault UI or `POST /api/vault` (supports .md, .txt, .pdf, .docx, .xlsx)
+- Entity creates/updates via `vault_write` tool (saved as markdown)
+- Files stored at `data/vault/documents/{global|chat-{convId}}/`
+- Content extracted, chunked (512 tokens), embedded (all-MiniLM-L6-v2, 384 dims)
+
+**Scope:**
+- **Global** — available in every conversation
+- **Per-chat** — only searched in the matching conversation
+
+**Retrieval:**
+1. Every turn, the user message is embedded and compared against all vault chunks
+2. Always includes global documents; per-chat documents only when conversation matches
+3. Top results (default 5 chunks, 1500 token budget, min 0.3 similarity) formatted and injected
+4. Falls back to in-memory cosine similarity when sqlite-vec is unavailable
+
+**Context injection order:** base instructions → identity → lorebook → **vault** → memories → chat history → graph
+
+**Entity tools:**
+| Tool | Description |
+|------|-------------|
+| `vault_write` | Create or update a vault document (global or per-chat scope) |
+| `vault_list` | List vault documents (filterable by scope) |
+| `vault_search` | Search vault for relevant content |
+
 ### Vector Search Backend
 
 - **Primary**: sqlite-vec extension for efficient vector similarity search
@@ -119,3 +148,9 @@ Requires `PSYCHEROS_MCP_ENABLED=true`.
 | `src/rag/conversation.ts` | ChatRAG for chat history |
 | `src/rag/context-builder.ts` | Formats retrieved memories for context |
 | `src/db/vector.ts` | sqlite-vec helpers, serialization, search |
+| `src/vault/mod.ts` | Data Vault barrel exports |
+| `src/vault/manager.ts` | VaultManager — CRUD, chunking, embedding, vector search |
+| `src/vault/processor.ts` | Text extraction from .md/.txt/.pdf/.docx/.xlsx |
+| `src/vault/retriever.ts` | Vault context formatting for system message |
+| `src/vault/types.ts` | Vault type definitions |
+| `src/tools/vault-tools.ts` | vault_write, vault_list, vault_search tools |

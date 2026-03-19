@@ -371,6 +371,7 @@ export async function loadCustomContent(
  * @param chatHistoryContent - Optional chat history content from Chat RAG
  * @param lorebookContent - Optional lorebook-triggered content
  * @param graphContent - Optional knowledge graph context
+ * @param vaultContent - Optional vault document content from Data Vault RAG
  * @returns The formatted system message
  */
 export function buildSystemMessage(
@@ -383,6 +384,7 @@ export function buildSystemMessage(
   chatHistoryContent?: string,
   lorebookContent?: string,
   graphContent?: string,
+  vaultContent?: string,
 ): string {
   // Build sections — base instructions always first
   const sections: string[] = [];
@@ -425,6 +427,11 @@ ${customContent}`);
   // Add lorebook-triggered content if present
   if (lorebookContent && lorebookContent.trim()) {
     sections.push(lorebookContent);
+  }
+
+  // Add vault document content if present
+  if (vaultContent && vaultContent.trim()) {
+    sections.push(vaultContent);
   }
 
   // Add RAG-retrieved memories if present

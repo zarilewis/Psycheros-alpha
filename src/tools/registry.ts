@@ -37,6 +37,12 @@ import {
   graphDeleteEdgeTool,
   graphWriteBatchTool,
 } from "./graph-write.ts";
+// Vault tools
+import {
+  vaultWriteTool,
+  vaultListTool,
+  vaultSearchTool,
+} from "./vault-tools.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -74,6 +80,10 @@ const AVAILABLE_TOOLS: Record<string, Tool> = {
   graph_delete_node: graphDeleteNodeTool,
   graph_delete_edge: graphDeleteEdgeTool,
   graph_write_batch: graphWriteBatchTool,
+  // Vault tools (entity document management)
+  vault_write: vaultWriteTool,
+  vault_list: vaultListTool,
+  vault_search: vaultSearchTool,
 };
 
 /**

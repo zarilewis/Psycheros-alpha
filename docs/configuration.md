@@ -48,6 +48,9 @@ Tools must be explicitly enabled via `PSYCHEROS_TOOLS`. Set to a comma-separated
 | `graph_delete_node` | Soft-delete a node and its connected edges |
 | `graph_delete_edge` | Remove a relationship from the graph |
 | `graph_write_batch` | Batch create multiple nodes and edges |
+| `vault_write` | Create or update a vault document (global or per-chat scope) |
+| `vault_list` | List vault documents (filterable by scope) |
+| `vault_search` | Search vault for relevant content |
 
 **Example configurations:**
 ```bash
@@ -55,7 +58,7 @@ Tools must be explicitly enabled via `PSYCHEROS_TOOLS`. Set to a comma-separated
 PSYCHEROS_TOOLS=append_to_self,append_to_user,append_to_relationship
 
 # All tools except shell
-PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,append_to_self,append_to_user,append_to_relationship,maintain_identity,list_identity_snapshots,graph_search_nodes,graph_get_node,graph_get_edges,graph_traverse,graph_get_subgraph,graph_stats,graph_create_node,graph_create_edge,graph_update_node,graph_update_edge,graph_delete_node,graph_delete_edge,graph_write_batch
+PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,append_to_self,append_to_user,append_to_relationship,maintain_identity,list_identity_snapshots,graph_search_nodes,graph_get_node,graph_get_edges,graph_traverse,graph_get_subgraph,graph_stats,graph_create_node,graph_create_edge,graph_update_node,graph_update_edge,graph_delete_node,graph_delete_edge,graph_write_batch,vault_write,vault_list,vault_search
 ```
 
 ## RAG Settings

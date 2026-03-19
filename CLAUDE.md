@@ -1,6 +1,6 @@
 # Psycheros — Agent System Card
 
-Persistent AI entity harness daemon built on Deno 2.x. Web chat UI with streaming LLM, tool execution, hierarchical memory, RAG, knowledge graph, lorebook, and identity management. Runs on port 3000.
+Persistent AI entity harness daemon built on Deno 2.x. Web chat UI with streaming LLM, tool execution, hierarchical memory, RAG, knowledge graph, lorebook, data vault, and identity management. Runs on port 3000.
 
 Psycheros is an **embodiment** — an interface through which the AI entity exists and interacts. The entity's canonical identity lives in [entity-core](https://github.com/zarilewis/entity-core) (MCP server). Psycheros syncs with it when `PSYCHEROS_MCP_ENABLED=true`.
 
@@ -47,6 +47,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/rag/mod.ts` | RAG retrieval system |
 | `src/mcp-client/mod.ts` | MCP client for entity-core connection |
 | `src/lorebook/mod.ts` | Lorebook/world info system |
+| `src/vault/mod.ts` | Data Vault — document storage and eager RAG |
 | `src/db/schema.ts` | Database schema, migrations, vector table sync |
 | `src/init/mod.ts` | Initialization — copies templates to empty identity directories |
 
@@ -69,7 +70,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 - `GET /api/events` — persistent channel (background dom_update events)
 
 **User data protection**:
-- `identity/`, `memories/`, `.snapshots/` are **runtime-only directories** — gitignored, never committed
+- `identity/`, `memories/`, `.snapshots/`, `data/vault/` are **runtime-only directories** — gitignored, never committed
 - To change identity defaults, edit `templates/identity/` (committed). `src/init/mod.ts` seeds `identity/` from templates on first run if empty. **Never `git add` files from `identity/`** — they contain user-specific entity data.
 - Entity-core is canonical source; local `identity/` is a cache when MCP is enabled
 
@@ -80,9 +81,9 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | [docs/entity-philosophy.md](docs/entity-philosophy.md) | First-person convention rationale, ownership, embodiment concept |
 | [docs/configuration.md](docs/configuration.md) | All env vars, available tools, RAG/MCP settings, migration commands |
 | [docs/tools-reference.md](docs/tools-reference.md) | Tool system, identity tiers, MCP fallback, core prompt file structure |
-| [docs/memory-and-rag.md](docs/memory-and-rag.md) | Memory hierarchy, consolidation, 3 RAG systems, vector search |
+| [docs/memory-and-rag.md](docs/memory-and-rag.md) | Memory hierarchy, consolidation, 4 RAG systems (memory, chat, lorebook, vault), vector search |
 | [docs/ui-features.md](docs/ui-features.md) | Context viewer, stop generation, message editing, appearance, graph viz |
-| [docs/api-reference.md](docs/api-reference.md) | Full API endpoints (49 routes), dual SSE architecture |
+| [docs/api-reference.md](docs/api-reference.md) | Full API endpoints (58 routes), dual SSE architecture |
 | [docs/code-review-findings.md](docs/code-review-findings.md) | Code review bugs fixed, architectural decisions |
 | [docs/security-audit.md](docs/security-audit.md) | Security audit findings, threat model, accepted risks |
 | [docs/deployment/docker-strategy.md](docs/deployment/docker-strategy.md) | Dockerfile design, volumes, env vars, Deno caching |

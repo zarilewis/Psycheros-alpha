@@ -32,6 +32,7 @@ import type { Retriever } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
+import type { VaultManager } from "../vault/mod.ts";
 import { loadBaseInstructions, loadSelfContent, loadUserContent, loadRelationshipContent, loadCustomContent, buildSystemMessage } from "./context.ts";
 import { buildRAGContext, formatChatHistoryForContext, buildGraphContext } from "../rag/mod.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
@@ -75,6 +76,8 @@ export interface EntityConfig {
   mcpClient?: MCPClient;
   /** Optional lorebook manager for world info/triggered content */
   lorebookManager?: LorebookManager;
+  /** Optional vault manager for document storage and eager RAG */
+  vaultManager?: VaultManager;
 }
 
 /**
@@ -269,7 +272,35 @@ export class EntityTurn {
     }
 
     const baseInstructions = await loadBaseInstructions(this.config.projectRoot, this.config.mcpClient);
-    const systemMessage = buildSystemMessage(baseInstructions, selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent, graphContent);
+
+    // Search vault for relevant documents if manager is available
+    let vaultContent: string | undefined;
+    if (this.config.vaultManager) {
+      console.log("[Vault] Searching for:", userMessage.substring(0, 50));
+      try {
+        const vaultResults = await this.config.vaultManager.search(userMessage, {
+          conversationId, maxChunks: 5, minScore: 0.3
+        });
+        if (vaultResults.length > 0) {
+          const { formatVaultContext } = await import("../vault/retriever.ts");
+          vaultContent = formatVaultContext(vaultResults);
+          console.log(
+            "[Vault] Found",
+            vaultResults.length,
+            "chunks (",
+            vaultContent!.length,
+            "chars)"
+          );
+        }
+      } catch (error) {
+        console.error(
+          "EntityTurn: Vault search failed:",
+          error instanceof Error ? error.message : String(error)
+        );
+      }
+    }
+
+    const systemMessage = buildSystemMessage(baseInstructions, selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent, graphContent, vaultContent);
 
     // Get conversation history from DB
     const history = this.db.getMessages(conversationId);
@@ -323,6 +354,7 @@ export class EntityTurn {
       chatHistoryContent,
       lorebookContent,
       graphContent,
+      vaultContent,
       messages: messages.slice(1).map((msg) => ({
         role: msg.role,
         content: msg.content,
@@ -364,6 +396,7 @@ export class EntityTurn {
       chatHistoryContent,
       lorebookContent,
       graphContent,
+      vaultContent,
       messagesJson: JSON.stringify(contextSnapshot.messages),
       toolDefinitionsJson: JSON.stringify(toolDefinitions),
       metricsJson: JSON.stringify(contextSnapshot.metrics),

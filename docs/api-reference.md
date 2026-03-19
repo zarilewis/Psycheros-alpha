@@ -115,6 +115,17 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 | `DELETE` | `/api/backgrounds/:filename` | Delete background image |
 | `GET` | `/backgrounds/:filename` | Serve background image file |
 
+### Data Vault
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/vault` | List vault documents |
+| `POST` | `/api/vault` | Upload vault document (multipart: document, title, scope) |
+| `GET` | `/api/vault/:id` | Get vault document metadata |
+| `PUT` | `/api/vault/:id` | Update vault document title/content |
+| `DELETE` | `/api/vault/:id` | Delete vault document |
+| `POST` | `/api/vault/search` | Search vault by query |
+
 ### LLM Settings
 
 | Method | Path | Description |
@@ -137,6 +148,8 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 | `GET` | `/fragments/admin` | Admin hub with tab navigation |
 | `GET` | `/fragments/admin/diagnostics` | Diagnostics dashboard HTML fragment |
 | `GET` | `/fragments/admin/logs` | Log viewer HTML fragment |
+| `GET` | `/fragments/settings/vault` | Data Vault management fragment |
+| `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
 | `GET` | `/api/admin/diagnostics` | JSON diagnostics snapshot (all subsystems) |
 | `GET` | `/api/admin/logs` | JSON log entries with filtering (`?level=`, `?component=`, `?limit=`, `?since=`) |
 | `GET` | `/api/admin/logs/entries` | HTML partial of log entries (same query params as above) |

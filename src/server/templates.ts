@@ -374,6 +374,25 @@ export function renderSettingsHub(): string {
         </svg>
       </a>
       <a class="settings-hub-card"
+        hx-get="/fragments/settings/vault"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Data Vault</span>
+          <span class="settings-hub-card-desc">Store and search documents for context-aware responses</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
         hx-get="/fragments/settings/llm"
         hx-target="#chat"
         hx-swap="innerHTML">

@@ -14,7 +14,7 @@ Built-in debugging tool for inspecting the full context sent to the LLM. Toggle 
 
 **Tabs:**
 - **System**: Identity sections (self, user, relationship) as collapsible sections with size badges, plus the full assembled system message
-- **RAG**: All four retrieval sources — memories, chat history, lorebook entries, knowledge graph
+- **RAG**: All five retrieval sources — memories, chat history, lorebook entries, data vault, knowledge graph
 - **Messages**: Conversation history sent to the LLM with role badges and collapsible content
 - **Tools**: Available tool definitions with parameters
 - **Metrics**: Per-section size breakdown, token counts, and context window utilization bar
@@ -186,3 +186,25 @@ Uses vis-network library. Client-side JS in `web/js/graph-view.js`, dynamically 
 - `POST /api/graph/edges` — create edge
 - `DELETE /api/graph/nodes/:id` — delete node
 - `DELETE /api/graph/edges/:id` — delete edge
+
+## Data Vault
+
+Document storage and search system accessible via Settings → Data Vault in the sidebar. Documents are chunked, embedded, and proactively searched every turn for context injection.
+
+**Features:**
+- Upload documents (.md, .txt, .pdf, .docx, .xlsx up to 10MB)
+- Set scope: global (all conversations) or per-chat (single conversation)
+- Document cards showing title, file type, scope, chunk count, size, source (upload/entity), date
+- Edit entity-created documents inline (uploaded docs require re-upload)
+- Delete documents with confirmation
+- Entity can also create/edit vault documents via `vault_write` tool
+
+**API Endpoints:**
+- `GET /api/vault` — list documents
+- `POST /api/vault` — upload document
+- `GET /api/vault/:id` — get document metadata
+- `PUT /api/vault/:id` — update document
+- `DELETE /api/vault/:id` — delete document
+- `POST /api/vault/search` — search vault
+
+**Source files:** `src/vault/manager.ts`, `src/vault/processor.ts`, `src/tools/vault-tools.ts`, `src/server/routes.ts`

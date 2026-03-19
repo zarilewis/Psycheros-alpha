@@ -17,7 +17,10 @@
     "@modelcontextprotocol/sdk": "npm:@modelcontextprotocol/sdk@^1",
     "marked": "npm:marked@^15",
     "dompurify": "npm:dompurify@^3",
-    "jsdom": "npm:jsdom@^26"
+    "jsdom": "npm:jsdom@^26",
+    "pdf-parse": "npm:pdf-parse@^1.1.1",
+    "mammoth": "npm:mammoth@^1.8.0",
+    "xlsx": "npm:xlsx@^0.18.5"
   },
   "lint": {
     "exclude": ["web/lib/"]

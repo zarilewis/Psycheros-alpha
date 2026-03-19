@@ -17,6 +17,7 @@ import { initTracker, registerJob, registerTrigger, tracked } from "./cron-track
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import { LorebookManager } from "../lorebook/mod.ts";
+import { VaultManager } from "../vault/mod.ts";
 import { join } from "@std/path";
 import { MAX_REQUEST_BODY_SIZE, MAX_UPLOAD_BODY_SIZE } from "../constants.ts";
 import {
@@ -81,6 +82,14 @@ import {
   handleListBackgrounds,
   handleUploadBackground,
   handleDeleteBackground,
+  handleListVault,
+  handleUploadVault,
+  handleGetVault,
+  handleUpdateVault,
+  handleDeleteVault,
+  handleSearchVault,
+  handleVaultFragment,
+  handleVaultDetailFragment,
   type RouteContext,
 } from "./routes.ts";
 import { getBroadcaster } from "./broadcaster.ts";
@@ -154,6 +163,7 @@ export class Server {
   private keepaliveInterval: number | null = null;
   private mcpClient: MCPClient | null = null;
   private lorebookManager: LorebookManager;
+  private vaultManager: VaultManager;
   private llmSettings: LLMSettings;
 
   /**
@@ -208,6 +218,9 @@ export class Server {
 
     // Initialize lorebook manager
     this.lorebookManager = new LorebookManager(this.db);
+
+    // Initialize vault manager
+    this.vaultManager = new VaultManager(this.db, config.projectRoot);
 
     // Create abort controller for graceful shutdown
     this.abortController = new AbortController();
@@ -452,6 +465,7 @@ export class Server {
       memoryEnabled: this.config.memoryEnabled ?? true,
       mcpClient: this.mcpClient ?? undefined,
       lorebookManager: this.lorebookManager,
+      vaultManager: this.vaultManager,
       getLLMSettings: () => this.llmSettings,
       updateLLMSettings: (settings) => this.updateLLMSettings(settings),
     };
@@ -833,6 +847,41 @@ export class Server {
       return await handleAdminJobTriggerAPI(ctx, jobId);
     }
 
+    // ========================================
+    // Vault API Routes
+    // ========================================
+
+    // GET /api/vault - List vault documents
+    // POST /api/vault - Upload vault document
+    if (path === "/api/vault") {
+      if (method === "GET") {
+        return handleListVault(ctx);
+      }
+      if (method === "POST") {
+        return await handleUploadVault(ctx, request);
+      }
+    }
+
+    // POST /api/vault/search - Search vault
+    if (method === "POST" && path === "/api/vault/search") {
+      return await handleSearchVault(ctx, request);
+    }
+
+    // Vault document CRUD
+    const vaultMatch = path.match(/^\/api\/vault\/([^/]+)$/);
+    if (vaultMatch) {
+      const vaultId = vaultMatch[1];
+      if (method === "GET") {
+        return handleGetVault(ctx, vaultId);
+      }
+      if (method === "PUT") {
+        return await handleUpdateVault(ctx, vaultId, request);
+      }
+      if (method === "DELETE") {
+        return handleDeleteVault(ctx, vaultId);
+      }
+    }
+
     // 404 for unknown API routes
     return new Response(
       JSON.stringify({ error: "API endpoint not found" }),
@@ -952,6 +1001,21 @@ export class Server {
     // GET /fragments/settings/appearance - Appearance settings fragment
     if (path === "/fragments/settings/appearance") {
       return handleAppearanceSettingsFragment(ctx);
+    }
+
+    // ========================================
+    // Vault Fragment Routes
+    // ========================================
+
+    // GET /fragments/settings/vault - Vault management fragment
+    if (path === "/fragments/settings/vault") {
+      return handleVaultFragment(ctx);
+    }
+
+    // GET /fragments/settings/vault/:id - Vault document detail fragment
+    const vaultDetailMatch = path.match(/^\/fragments\/settings\/vault\/([^/]+)$/);
+    if (vaultDetailMatch) {
+      return handleVaultDetailFragment(ctx, vaultDetailMatch[1]);
     }
 
     // ========================================

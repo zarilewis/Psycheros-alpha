@@ -507,6 +507,66 @@ function runMigrations(db: Database): void {
     );
     console.log("[DB] Added base_instructions_content column to context_snapshots");
   }
+
+  // Migration: Add vault tables if missing
+  const hasVaultTables = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'vault_documents'")
+    .get();
+
+  if (!hasVaultTables) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS vault_documents (
+        id TEXT PRIMARY KEY,
+        title TEXT NOT NULL,
+        filename TEXT NOT NULL,
+        file_type TEXT NOT NULL,
+        scope TEXT NOT NULL DEFAULT 'global' CHECK(scope IN ('global','chat')),
+        conversation_id TEXT REFERENCES conversations(id) ON DELETE CASCADE,
+        file_path TEXT NOT NULL,
+        file_size INTEGER NOT NULL,
+        content_hash TEXT NOT NULL,
+        chunk_count INTEGER NOT NULL DEFAULT 0,
+        source TEXT NOT NULL DEFAULT 'upload' CHECK(source IN ('upload','entity')),
+        enabled INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_vault_documents_scope
+        ON vault_documents(scope);
+
+      CREATE INDEX IF NOT EXISTS idx_vault_documents_conversation
+        ON vault_documents(conversation_id);
+
+      CREATE TABLE IF NOT EXISTS vault_chunks (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL REFERENCES vault_documents(id) ON DELETE CASCADE,
+        content TEXT NOT NULL,
+        token_count INTEGER NOT NULL,
+        metadata TEXT,
+        embedding BLOB,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_vault_chunks_document
+        ON vault_chunks(document_id);
+
+      ALTER TABLE context_snapshots ADD COLUMN vault_content TEXT;
+    `);
+    console.log("[DB] Created vault tables");
+  }
+
+  // Migration: Add vault_content column to context_snapshots if missing
+  const hasVaultContentCol = db
+    .prepare(
+      "SELECT 1 FROM pragma_table_info('context_snapshots') WHERE name = 'vault_content'"
+    )
+    .get();
+
+  if (!hasVaultContentCol) {
+    db.exec("ALTER TABLE context_snapshots ADD COLUMN vault_content TEXT");
+    console.log("[DB] Added vault_content column to context_snapshots");
+  }
 }
 
 /**
@@ -550,6 +610,20 @@ function initializeVectorTables(db: Database): void {
         )
       `);
       console.log("[DB] Created vec_messages virtual table");
+    }
+
+    // Create vec_vault_chunks virtual table for vault RAG
+    const hasVaultVecTable = db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'vec_vault_chunks'")
+      .get();
+
+    if (!hasVaultVecTable) {
+      db.exec(`
+        CREATE VIRTUAL TABLE IF NOT EXISTS vec_vault_chunks USING vec0(
+          embedding FLOAT[${EMBEDDING_DIMENSION}] distance=cosine
+        )
+      `);
+      console.log("[DB] Created vec_vault_chunks virtual table");
     }
 
     // Verify and repair vector table sync
@@ -635,5 +709,39 @@ function verifyVectorTableSync(db: Database): void {
       }
     }
     console.log(`[DB] Rebuilt vec_messages: ${rebuilt}/${rows.length} rows restored`);
+  }
+
+  // Check vault_chunks vs vec_vault_chunks
+  const vaultChunksCount = db
+    .prepare("SELECT COUNT(*) as count FROM vault_chunks")
+    .get<{ count: number }>()?.count ?? 0;
+
+  const vecVaultCount = db
+    .prepare("SELECT COUNT(*) as count FROM vec_vault_chunks")
+    .get<{ count: number }>()?.count ?? 0;
+
+  if (vaultChunksCount !== vecVaultCount) {
+    console.warn(
+      `[DB] Vector table mismatch: vault_chunks=${vaultChunksCount}, vec_vault_chunks=${vecVaultCount}. Rebuilding vec_vault_chunks.`
+    );
+    db.exec("DELETE FROM vec_vault_chunks");
+
+    const vaultRows = db
+      .prepare("SELECT rowid, embedding FROM vault_chunks WHERE embedding IS NOT NULL")
+      .all<{ rowid: number; embedding: Uint8Array }>();
+
+    let vaultRebuilt = 0;
+    for (const row of vaultRows) {
+      try {
+        db.exec(
+          "INSERT INTO vec_vault_chunks(rowid, embedding) VALUES (?, ?)",
+          [row.rowid, row.embedding]
+        );
+        vaultRebuilt++;
+      } catch {
+        // Skip rows that fail
+      }
+    }
+    console.log(`[DB] Rebuilt vec_vault_chunks: ${vaultRebuilt}/${vaultRows.length} rows restored`);
   }
 }

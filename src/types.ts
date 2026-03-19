@@ -178,6 +178,8 @@ export interface LLMContextSnapshot {
   lorebookContent?: string;
   /** Knowledge graph context */
   graphContent?: string;
+  /** Vault document content from Data Vault RAG */
+  vaultContent?: string;
   /** The messages array sent to the LLM (excluding system) */
   messages: Array<{
     role: string;
@@ -212,6 +214,7 @@ export interface ContextSnapshotRecord {
   chatHistoryContent?: string;
   lorebookContent?: string;
   graphContent?: string;
+  vaultContent?: string;
   messagesJson: string;
   toolDefinitionsJson: string;
   metricsJson: string;

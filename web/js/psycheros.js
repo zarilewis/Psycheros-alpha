@@ -2198,9 +2198,10 @@ function renderRagTab(snap) {
   html += renderContextSection('Retrieved Memories', snap.memoriesContent, true);
   html += renderContextSection('Chat History', snap.chatHistoryContent, true);
   html += renderContextSection('Lorebook Entries', snap.lorebookContent, true);
+  html += renderContextSection('Data Vault', snap.vaultContent, true);
   html += renderContextSection('Knowledge Graph', snap.graphContent, true);
 
-  const hasAny = snap.memoriesContent || snap.chatHistoryContent || snap.lorebookContent || snap.graphContent;
+  const hasAny = snap.memoriesContent || snap.chatHistoryContent || snap.lorebookContent || snap.graphContent || snap.vaultContent;
   if (!hasAny) {
     html = '<div class="context-empty">No RAG context retrieved for this turn</div>';
   }
@@ -2312,6 +2313,7 @@ function renderMetricsTab(snap) {
     { name: 'Memories (RAG)', text: snap.memoriesContent },
     { name: 'Chat History (RAG)', text: snap.chatHistoryContent },
     { name: 'Lorebook', text: snap.lorebookContent },
+    { name: 'Data Vault', text: snap.vaultContent },
     { name: 'Knowledge Graph', text: snap.graphContent },
   ];
 

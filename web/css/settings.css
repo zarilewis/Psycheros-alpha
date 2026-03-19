@@ -1270,6 +1270,115 @@
 }
 
 /* ==========================================================================
+   Data Vault
+   ========================================================================== */
+.vault-upload {
+  margin-bottom: var(--sp-4);
+}
+
+.vault-upload form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.vault-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.vault-empty {
+  text-align: center;
+  padding: var(--sp-8);
+  color: var(--c-fg-muted);
+  background-color: var(--c-bg-raised);
+  border: 1px dashed var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.vault-card {
+  background-color: var(--c-bg-raised);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+  padding: var(--sp-4);
+  transition: border-color var(--transition), background-color var(--transition);
+}
+
+.vault-card:hover {
+  border-color: var(--c-accent);
+  background-color: var(--c-bg-hover);
+}
+
+.vault-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--sp-2);
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.vault-card-title {
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--c-fg);
+}
+
+.vault-card-meta {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+.vault-scope-badge {
+  display: inline-block;
+  padding: 0.125rem var(--sp-2);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.vault-scope-badge--global {
+  background-color: var(--c-accent-subtle);
+  color: var(--c-accent);
+}
+
+.vault-scope-badge--chat {
+  background-color: rgba(255, 165, 0, 0.1);
+  color: #ffa500;
+}
+
+.vault-type-badge {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  color: var(--c-fg-muted);
+}
+
+.vault-source-badge {
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  color: var(--c-fg-subtle);
+}
+
+.vault-card-body {
+  display: flex;
+  gap: var(--sp-3);
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  font-family: var(--font-mono);
+  margin-bottom: var(--sp-3);
+}
+
+.vault-card-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+/* ==========================================================================
    Mobile Responsive
    ========================================================================== */
 @media (max-width: 600px) {
@@ -1402,5 +1511,14 @@
   /* Snapshot preview */
   .snapshot-preview {
     max-width: none;
+  }
+
+  /* Vault cards */
+  .vault-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .vault-card-body {
+    flex-wrap: wrap;
   }
 }
