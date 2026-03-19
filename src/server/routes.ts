@@ -3689,6 +3689,7 @@ export function handleGetVault(ctx: RouteContext, id: string): Response {
 
 /**
  * Handle PUT /api/vault/:id - Update vault document metadata.
+ * Accepts both JSON (API) and form-encoded (HTMX) payloads.
  */
 export async function handleUpdateVault(
   ctx: RouteContext,
@@ -3697,19 +3698,45 @@ export async function handleUpdateVault(
 ): Promise<Response> {
   if (!ctx.vaultManager) return vaultJson({ error: "Vault not available" }, 503);
 
+  const isHtmx = request.headers.get("HX-Request") === "true";
+
   try {
-    const body = await request.json() as Record<string, unknown>;
     const updates: { title?: string; content?: string } = {};
 
-    if (body.title) updates.title = String(body.title);
-    if (body.content !== undefined) updates.content = String(body.content);
+    if (isHtmx) {
+      const formData = await request.formData();
+      const title = formData.get("title") as string;
+      const content = formData.get("content") as string;
+      if (title) updates.title = title;
+      if (content !== null) updates.content = content;
+    } else {
+      const body = await request.json() as Record<string, unknown>;
+      if (body.title) updates.title = String(body.title);
+      if (body.content !== undefined) updates.content = String(body.content);
+    }
 
     const doc = await ctx.vaultManager.updateDocument(id, updates);
-    if (!doc) return vaultJson({ error: "Document not found" }, 404);
-    return vaultJson(doc);
+    if (!doc) {
+      return isHtmx
+        ? new Response(renderSaveError("Document not found"), {
+            headers: { "Content-Type": "text/html; charset=utf-8" },
+          })
+        : vaultJson({ error: "Document not found" }, 404);
+    }
+
+    return isHtmx
+      ? new Response(renderSaveSuccess(), {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        })
+      : vaultJson(doc);
   } catch (error) {
     console.error("[Routes] handleUpdateVault error:", error);
-    return vaultJson({ error: "Update failed" }, 500);
+    const msg = error instanceof Error ? error.message : "Update failed";
+    return isHtmx
+      ? new Response(renderSaveError(msg), {
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        })
+      : vaultJson({ error: msg }, 500);
   }
 }
 
@@ -3762,11 +3789,11 @@ export function handleVaultFragment(ctx: RouteContext): Response {
 /**
  * Handle GET /fragments/settings/vault/:id - Vault document detail view.
  */
-export function handleVaultDetailFragment(
+export async function handleVaultDetailFragment(
   ctx: RouteContext,
   id: string
-): Response {
-  return vaultHtml(renderVaultDetailView(ctx, id));
+): Promise<Response> {
+  return vaultHtml(await renderVaultDetailView(ctx, id));
 }
 
 // =============================================================================
@@ -3878,7 +3905,7 @@ function renderVaultView(
 </div>`;
 }
 
-function renderVaultDetailView(ctx: RouteContext, id: string): string {
+async function renderVaultDetailView(ctx: RouteContext, id: string): Promise<string> {
   const doc = ctx.vaultManager?.getDocument(id);
 
   if (!doc) {
@@ -3904,12 +3931,16 @@ function renderVaultDetailView(ctx: RouteContext, id: string): string {
 
   const isEditable = doc.source === "entity";
   let contentText = "";
-  if (isEditable) {
-    try {
+  try {
+    if (isEditable || doc.fileType === "md" || doc.fileType === "txt") {
       contentText = Deno.readTextFileSync(doc.filePath);
-    } catch {
-      // File may not exist
+    } else {
+      // For binary formats, extract text via processor
+      const { extractText } = await import("../vault/processor.ts");
+      contentText = await extractText(doc.filePath, doc.fileType);
     }
+  } catch {
+    // File may not exist or extraction failed
   }
 
   return `<div class="settings-view">
@@ -3937,21 +3968,19 @@ function renderVaultDetailView(ctx: RouteContext, id: string): string {
       <div class="settings-editor-header">
         <span class="settings-editor-filename">${escapeHtml(doc.filename)}</span>
       </div>
-      <form hx-put="/api/vault/${doc.id}" hx-target="#settings-content" hx-swap="innerHTML">
+      <form hx-put="/api/vault/${doc.id}" hx-target="#vault-editor-status" hx-swap="innerHTML">
         <div class="form-group" style="margin-bottom:var(--sp-3)">
           <label>Title</label>
           <input type="text" name="title" value="${escapeHtml(doc.title)}" />
         </div>
-        ${isEditable
-          ? `<div class="form-group">
-              <label>Content</label>
-              <textarea name="content" class="settings-textarea" rows="20">${escapeHtml(contentText)}</textarea>
-            </div>
-            <div class="settings-editor-actions">
-              <button type="submit" class="btn btn--primary">Save Changes</button>
-            </div>`
-          : `<div class="settings-empty">Uploaded documents cannot be edited inline. Re-upload to update.</div>`
-        }
+        <div class="form-group">
+          <label>Content</label>
+          <textarea name="content" class="settings-textarea" rows="20">${escapeHtml(contentText)}</textarea>
+        </div>
+        <div class="settings-editor-actions">
+          <button type="submit" class="btn btn--primary">Save Changes</button>
+        </div>
+        <div id="vault-editor-status" class="settings-editor-status"></div>
       </form>
     </div>
   </div>

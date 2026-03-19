@@ -1015,7 +1015,7 @@ export class Server {
     // GET /fragments/settings/vault/:id - Vault document detail fragment
     const vaultDetailMatch = path.match(/^\/fragments\/settings\/vault\/([^/]+)$/);
     if (vaultDetailMatch) {
-      return handleVaultDetailFragment(ctx, vaultDetailMatch[1]);
+      return await handleVaultDetailFragment(ctx, vaultDetailMatch[1]);
     }
 
     // ========================================
