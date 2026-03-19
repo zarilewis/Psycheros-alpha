@@ -38,7 +38,7 @@ XML tags are used so the LLM treats timestamps as structural metadata. These tag
 
 **Display timestamps**: Shown in `.msg-header` as `msg-timestamp` elements. Time-only for today ("3:42 PM"), date + time for older messages ("Mar 14, 3:42 PM"). Server-side via `formatMessageTime()` in `templates.ts`, client-side via `formatChatTimestamp()` in `psycheros.js`.
 
-**Timezone**: Set `TZ` environment variable (e.g., `TZ=America/Los_Angeles`). Defaults to UTC for backend; display timestamps use TZ for user-facing formatting.
+**Timezone**: Configurable via General Settings UI. The selected timezone propagates to all three timestamp formatters (server-side message headers, client-side streaming, entity temporal XML). Empty selection falls back to the `TZ` environment variable, then UTC for entity context and the browser's local timezone for display.
 
 Implemented in `src/entity/loop.ts` via `formatMessageTimestamp()`. XML stripping in `src/server/markdown.ts` and `web/js/psycheros.js`.
 
@@ -104,20 +104,26 @@ Both user and assistant messages render markdown formatting with progressive str
 
 ## General Settings
 
-Customizable display names for the chat interface. Access via Settings → General Settings (first card in the settings hub).
+Customizable display names and timezone for the chat interface. Access via Settings → General Settings (first card in the settings hub).
 
 ### Display Names
 
 - **Entity Name** — replaces "Assistant" in message headers across the chat UI
 - **Your Name** — replaces "You" in message headers across the chat UI
 
+### Timezone
+
+- **Display Timezone** — dropdown of ~40 common IANA timezones grouped by region, with "(System Default)" option
+- Affects all message timestamps: server-rendered, client-streamed, and entity temporal XML
+- Empty selection uses the system/browser default
+
 Settings are loaded on page init from the server and cached in `globalThis.PsycherosSettings` for instant access during streaming. Saving updates the in-memory cache immediately so new messages reflect the change without a page reload.
 
-**Persistence:** Settings stored in `.psycheros/general-settings.json` on the server. Defaults: `{ "entityName": "Assistant", "userName": "You" }`.
+**Persistence:** Settings stored in `.psycheros/general-settings.json` on the server. Defaults: `{ "entityName": "Assistant", "userName": "You", "timezone": "" }`.
 
 **API Endpoints:**
 - `GET /api/general-settings` — get current settings
-- `POST /api/general-settings` — save settings (`{ "entityName": "...", "userName": "..." }`)
+- `POST /api/general-settings` — save settings (`{ "entityName": "...", "userName": "...", "timezone": "..." }`)
 - `GET /fragments/settings/general` — render settings form fragment
 
 ## Appearance Settings

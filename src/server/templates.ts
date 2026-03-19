@@ -60,7 +60,7 @@ function hasStringCommand(obj: unknown): obj is { command: string } {
  * Respects the TZ environment variable for display formatting.
  */
 function formatMessageTime(date: Date): string {
-  const timeZone = Deno.env.get("TZ") || undefined; // undefined = system default
+  const timeZone = Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ") || undefined; // undefined = system default
   const now = new Date();
   const isToday = date.toLocaleDateString("en-US", { timeZone }) ===
     now.toLocaleDateString("en-US", { timeZone });
@@ -461,6 +461,7 @@ export function renderSettingsHub(): string {
 export interface GeneralSettings {
   entityName: string;
   userName: string;
+  timezone: string;
 }
 
 export function renderGeneralSettings(settings: GeneralSettings): string {
@@ -491,6 +492,58 @@ export function renderGeneralSettings(settings: GeneralSettings): string {
       </div>
     </section>
 
+    <section class="theme-section">
+      <h3 class="theme-section-title">Timezone</h3>
+      <p class="theme-section-desc">Set the timezone used for message timestamps</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="general-timezone">Display Timezone</label>
+          <select id="general-timezone" class="input-field llm-input">
+            <option value=""${settings.timezone === '' ? ' selected' : ''}>(System Default)</option>
+            <optgroup label="UTC">
+              <option value="UTC">UTC</option>
+            </optgroup>
+            <optgroup label="Americas">
+              <option value="America/New_York">Eastern (America/New_York)</option>
+              <option value="America/Chicago">Central (America/Chicago)</option>
+              <option value="America/Denver">Mountain (America/Denver)</option>
+              <option value="America/Los_Angeles">Pacific (America/Los_Angeles)</option>
+              <option value="America/Anchorage">Alaska (America/Anchorage)</option>
+              <option value="America/Sao_Paulo">Sao Paulo (America/Sao_Paulo)</option>
+              <option value="America/Argentina/Buenos_Aires">Buenos Aires (America/Argentina/Buenos_Aires)</option>
+            </optgroup>
+            <optgroup label="Europe">
+              <option value="Europe/London">London (Europe/London)</option>
+              <option value="Europe/Paris">Paris (Europe/Paris)</option>
+              <option value="Europe/Berlin">Berlin (Europe/Berlin)</option>
+              <option value="Europe/Madrid">Madrid (Europe/Madrid)</option>
+              <option value="Europe/Rome">Rome (Europe/Rome)</option>
+              <option value="Europe/Amsterdam">Amsterdam (Europe/Amsterdam)</option>
+              <option value="Europe/Moscow">Moscow (Europe/Moscow)</option>
+              <option value="Europe/Istanbul">Istanbul (Europe/Istanbul)</option>
+              <option value="Europe/Athens">Athens (Europe/Athens)</option>
+            </optgroup>
+            <optgroup label="Asia">
+              <option value="Asia/Tokyo">Tokyo (Asia/Tokyo)</option>
+              <option value="Asia/Shanghai">Shanghai (Asia/Shanghai)</option>
+              <option value="Asia/Hong_Kong">Hong Kong (Asia/Hong_Kong)</option>
+              <option value="Asia/Singapore">Singapore (Asia/Singapore)</option>
+              <option value="Asia/Kolkata">Kolkata (Asia/Kolkata)</option>
+              <option value="Asia/Dubai">Dubai (Asia/Dubai)</option>
+              <option value="Asia/Seoul">Seoul (Asia/Seoul)</option>
+              <option value="Asia/Bangkok">Bangkok (Asia/Bangkok)</option>
+            </optgroup>
+            <optgroup label="Pacific">
+              <option value="Australia/Sydney">Sydney (Australia/Sydney)</option>
+              <option value="Australia/Melbourne">Melbourne (Australia/Melbourne)</option>
+              <option value="Pacific/Auckland">Auckland (Pacific/Auckland)</option>
+              <option value="Pacific/Honolulu">Honolulu (Pacific/Honolulu)</option>
+            </optgroup>
+          </select>
+        </div>
+      </div>
+    </section>
+
     <div style="margin-top: 16px;">
       <button class="btn btn--primary" onclick="saveGeneralSettings()">Save Changes</button>
     </div>
@@ -502,15 +555,24 @@ export function renderGeneralSettings(settings: GeneralSettings): string {
 </div>
 
 <script>
+// Set timezone select value from saved settings
+(function() {
+  const sel = document.getElementById('general-timezone');
+  if (sel && window.PsycherosSettings && window.PsycherosSettings.timezone) {
+    sel.value = window.PsycherosSettings.timezone;
+  }
+})();
+
 async function saveGeneralSettings() {
   const entityName = document.getElementById('general-entity-name').value.trim();
   const userName = document.getElementById('general-user-name').value.trim();
+  const timezone = document.getElementById('general-timezone').value;
 
   try {
     const res = await fetch('/api/general-settings', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ entityName, userName }),
+      body: JSON.stringify({ entityName, userName, timezone }),
     });
     const data = await res.json();
     const el = document.getElementById('general-settings-status');
@@ -523,6 +585,7 @@ async function saveGeneralSettings() {
       if (window.PsycherosSettings) {
         window.PsycherosSettings.entityName = entityName || 'Assistant';
         window.PsycherosSettings.userName = userName || 'You';
+        window.PsycherosSettings.timezone = timezone;
       }
     } else {
       el.className = 'settings-status visible error';

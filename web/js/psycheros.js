@@ -14,7 +14,7 @@ let currentAbortController = null;
 let persistentSSE = null;
 
 // General settings (display names)
-globalThis.PsycherosSettings = { entityName: 'Assistant', userName: 'You' };
+globalThis.PsycherosSettings = { entityName: 'Assistant', userName: 'You', timezone: '' };
 
 // Selection mode state
 let selectionMode = false;
@@ -187,6 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data) {
         window.PsycherosSettings.entityName = data.entityName || 'Assistant';
         window.PsycherosSettings.userName = data.userName || 'You';
+        window.PsycherosSettings.timezone = data.timezone || '';
       }
     })
     .catch(() => {});
@@ -1298,14 +1299,19 @@ function escapeHtml(text) {
  * Shows time only for today, date + time for older messages.
  */
 function formatChatTimestamp(date) {
+  const tz = window.PsycherosSettings?.timezone || undefined;
+  const tzOpts = tz ? { timeZone: tz } : {};
   const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
+  const isToday = tz
+    ? date.toLocaleDateString('en-US', { ...tzOpts }) === now.toLocaleDateString('en-US', { ...tzOpts })
+    : date.toDateString() === now.toDateString();
   if (isToday) {
-    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true, ...tzOpts });
   }
   return date.toLocaleDateString([], {
     month: 'short', day: 'numeric',
     hour: 'numeric', minute: '2-digit', hour12: true,
+    ...tzOpts,
   });
 }
 

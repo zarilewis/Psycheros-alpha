@@ -3617,9 +3617,10 @@ async function loadGeneralSettings(projectRoot: string): Promise<GeneralSettings
     return {
       entityName: saved.entityName || "Assistant",
       userName: saved.userName || "You",
+      timezone: saved.timezone ?? "",
     };
   } catch {
-    return { entityName: "Assistant", userName: "You" };
+    return { entityName: "Assistant", userName: "You", timezone: "" };
   }
 }
 
@@ -3650,6 +3651,7 @@ export async function handleSaveGeneralSettings(
     const updated: GeneralSettings = {
       entityName: body.entityName || current.entityName,
       userName: body.userName || current.userName,
+      timezone: body.timezone !== undefined ? body.timezone : current.timezone,
     };
 
     const settingsDir = `${ctx.projectRoot}/.psycheros`;
@@ -3658,6 +3660,13 @@ export async function handleSaveGeneralSettings(
       `${settingsDir}/general-settings.json`,
       JSON.stringify(updated, null, 2) + "\n",
     );
+
+    // Propagate timezone to env var so server-side formatters pick it up
+    if (updated.timezone) {
+      Deno.env.set("PSYCHEROS_DISPLAY_TZ", updated.timezone);
+    } else {
+      Deno.env.delete("PSYCHEROS_DISPLAY_TZ");
+    }
 
     return new Response(JSON.stringify({ success: true }), {
       headers: {

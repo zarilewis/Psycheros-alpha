@@ -235,6 +235,17 @@ export class Server {
   async init(): Promise<void> {
     this.llmSettings = await loadSettings(this.config.projectRoot);
     this.reloadLLMClient();
+
+    // Load general settings to set PSYCHEROS_DISPLAY_TZ for server-side timestamp formatting
+    try {
+      const settingsText = await Deno.readTextFile(`${this.config.projectRoot}/.psycheros/general-settings.json`);
+      const settings = JSON.parse(settingsText) as { timezone?: string };
+      if (settings.timezone) {
+        Deno.env.set("PSYCHEROS_DISPLAY_TZ", settings.timezone);
+      }
+    } catch {
+      // No settings file yet — use system default
+    }
   }
 
   /**
