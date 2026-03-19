@@ -2186,6 +2186,7 @@ function renderSystemTab(snap) {
   html += renderContextSection('Self Identity', snap.selfContent, true);
   html += renderContextSection('User Context', snap.userContent, true);
   html += renderContextSection('Relationship', snap.relationshipContent, true);
+  html += renderContextSection('Custom', snap.customContent, true);
   html += renderContextSection('Full System Message', snap.systemMessage, false);
   return html;
 }

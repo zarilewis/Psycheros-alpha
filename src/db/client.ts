@@ -73,6 +73,7 @@ interface ContextSnapshotRow {
   self_content: string | null;
   user_content: string | null;
   relationship_content: string | null;
+  custom_content: string | null;
   memories_content: string | null;
   chat_history_content: string | null;
   lorebook_content: string | null;
@@ -1004,10 +1005,10 @@ export class DBClient {
         `INSERT INTO context_snapshots
          (id, conversation_id, turn_index, iteration, timestamp, user_message,
           system_message, base_instructions_content, self_content, user_content,
-          relationship_content, memories_content, chat_history_content,
+          relationship_content, custom_content, memories_content, chat_history_content,
           lorebook_content, graph_content, vault_content,
           messages_json, tool_definitions_json, metrics_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           snapshot.conversationId,
@@ -1020,6 +1021,7 @@ export class DBClient {
           snapshot.selfContent ?? null,
           snapshot.userContent ?? null,
           snapshot.relationshipContent ?? null,
+          snapshot.customContent ?? null,
           snapshot.memoriesContent ?? null,
           snapshot.chatHistoryContent ?? null,
           snapshot.lorebookContent ?? null,
@@ -1069,7 +1071,7 @@ export class DBClient {
     const stmt = this.db.prepare(
       `SELECT id, conversation_id, turn_index, iteration, timestamp, user_message,
               system_message, base_instructions_content, self_content, user_content,
-              relationship_content, memories_content, chat_history_content,
+              relationship_content, custom_content, memories_content, chat_history_content,
               lorebook_content, graph_content, vault_content,
               messages_json, tool_definitions_json, metrics_json, created_at
        FROM context_snapshots
@@ -1093,7 +1095,7 @@ export class DBClient {
     const stmt = this.db.prepare(
       `SELECT id, conversation_id, turn_index, iteration, timestamp, user_message,
               system_message, base_instructions_content, self_content, user_content,
-              relationship_content, memories_content, chat_history_content,
+              relationship_content, custom_content, memories_content, chat_history_content,
               lorebook_content, graph_content, vault_content,
               messages_json, tool_definitions_json, metrics_json, created_at
        FROM context_snapshots
@@ -1124,6 +1126,7 @@ export class DBClient {
       selfContent: row.self_content ?? undefined,
       userContent: row.user_content ?? undefined,
       relationshipContent: row.relationship_content ?? undefined,
+      customContent: row.custom_content ?? undefined,
       memoriesContent: row.memories_content ?? undefined,
       chatHistoryContent: row.chat_history_content ?? undefined,
       lorebookContent: row.lorebook_content ?? undefined,

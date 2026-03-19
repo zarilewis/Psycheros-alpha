@@ -170,6 +170,8 @@ export interface LLMContextSnapshot {
   userContent: string;
   /** Relationship content loaded from relationship/ directory */
   relationshipContent: string;
+  /** Custom content loaded from custom/ directory */
+  customContent?: string;
   /** RAG-retrieved memories content */
   memoriesContent?: string;
   /** ChatRAG-retrieved chat history context */
@@ -210,6 +212,7 @@ export interface ContextSnapshotRecord {
   selfContent?: string;
   userContent?: string;
   relationshipContent?: string;
+  customContent?: string;
   memoriesContent?: string;
   chatHistoryContent?: string;
   lorebookContent?: string;

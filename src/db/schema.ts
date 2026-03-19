@@ -214,6 +214,7 @@ export const SCHEMA = `
     self_content TEXT,
     user_content TEXT,
     relationship_content TEXT,
+    custom_content TEXT,
     memories_content TEXT,
     chat_history_content TEXT,
     lorebook_content TEXT,
@@ -453,6 +454,7 @@ function runMigrations(db: Database): void {
         self_content TEXT,
         user_content TEXT,
         relationship_content TEXT,
+        custom_content TEXT,
         memories_content TEXT,
         chat_history_content TEXT,
         lorebook_content TEXT,
@@ -566,6 +568,18 @@ function runMigrations(db: Database): void {
   if (!hasVaultContentCol) {
     db.exec("ALTER TABLE context_snapshots ADD COLUMN vault_content TEXT");
     console.log("[DB] Added vault_content column to context_snapshots");
+  }
+
+  // Migration: Add custom_content column to context_snapshots if missing
+  const hasCustomContentCol = db
+    .prepare(
+      "SELECT 1 FROM pragma_table_info('context_snapshots') WHERE name = 'custom_content'"
+    )
+    .get();
+
+  if (!hasCustomContentCol) {
+    db.exec("ALTER TABLE context_snapshots ADD COLUMN custom_content TEXT");
+    console.log("[DB] Added custom_content column to context_snapshots");
   }
 }
 
