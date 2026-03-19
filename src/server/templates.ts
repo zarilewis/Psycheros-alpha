@@ -292,6 +292,31 @@ export function renderSettingsHub(): string {
   <div class="settings-content" id="settings-content">
     <div class="settings-hub-grid">
       <a class="settings-hub-card"
+        hx-get="/fragments/settings/general"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="4" y1="21" x2="4" y2="14"/>
+            <line x1="4" y1="10" x2="4" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="12"/>
+            <line x1="12" y1="8" x2="12" y2="3"/>
+            <line x1="20" y1="21" x2="20" y2="16"/>
+            <line x1="20" y1="12" x2="20" y2="3"/>
+            <line x1="1" y1="14" x2="7" y2="14"/>
+            <line x1="9" y1="8" x2="15" y2="8"/>
+            <line x1="17" y1="16" x2="23" y2="16"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">General Settings</span>
+          <span class="settings-hub-card-desc">Display names and basic chat configuration</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
         hx-get="/fragments/settings/core-prompts"
         hx-target="#chat"
         hx-swap="innerHTML">
@@ -432,6 +457,87 @@ export function renderSettingsHub(): string {
   </div>
 </div>`;
 }
+
+export interface GeneralSettings {
+  entityName: string;
+  userName: string;
+}
+
+export function renderGeneralSettings(settings: GeneralSettings): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">General Settings</h1>
+        <p class="settings-desc">Display names and basic chat configuration</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <section class="theme-section">
+      <h3 class="theme-section-title">Display Names</h3>
+      <p class="theme-section-desc">Customize how names appear in the chat interface</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="general-entity-name">Entity Name</label>
+          <input type="text" id="general-entity-name" class="input-field llm-input" value="${escapeHtml(settings.entityName)}" placeholder="Assistant">
+        </div>
+        <div class="llm-field">
+          <label for="general-user-name">Your Name</label>
+          <input type="text" id="general-user-name" class="input-field llm-input" value="${escapeHtml(settings.userName)}" placeholder="You">
+        </div>
+      </div>
+    </section>
+
+    <div style="margin-top: 16px;">
+      <button class="btn btn--primary" onclick="saveGeneralSettings()">Save Changes</button>
+    </div>
+
+    <!-- Status messages -->
+    <div id="general-settings-status" class="settings-status"></div>
+
+  </div>
+</div>
+
+<script>
+async function saveGeneralSettings() {
+  const entityName = document.getElementById('general-entity-name').value.trim();
+  const userName = document.getElementById('general-user-name').value.trim();
+
+  try {
+    const res = await fetch('/api/general-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entityName, userName }),
+    });
+    const data = await res.json();
+    const el = document.getElementById('general-settings-status');
+    if (!el) return;
+    if (data.success) {
+      el.className = 'settings-status visible success';
+      el.textContent = 'Settings saved successfully';
+      setTimeout(() => { el.className = 'settings-status'; }, 3000);
+      // Update in-memory settings for subsequent streaming messages
+      if (window.PsycherosSettings) {
+        window.PsycherosSettings.entityName = entityName || 'Assistant';
+        window.PsycherosSettings.userName = userName || 'You';
+      }
+    } else {
+      el.className = 'settings-status visible error';
+      el.textContent = data.error || 'Failed to save settings';
+    }
+  } catch {
+    const el = document.getElementById('general-settings-status');
+    if (!el) return;
+    el.className = 'settings-status visible error';
+    el.textContent = 'Failed to save settings';
+  }
+}
+</script>`;
+}
+
 /**
  * Render the sidebar with conversation list.
  */
@@ -537,9 +643,9 @@ export type MetricsMap = Map<string, TurnMetrics>;
  * @param messages - Messages to render
  * @param metricsMap - Optional map of message ID to metrics
  */
-export function renderChatView(messages: Message[], metricsMap?: MetricsMap): string {
+export function renderChatView(messages: Message[], metricsMap?: MetricsMap, displayNames?: { entityName: string; userName: string }): string {
   return `<div class="messages" id="messages">
-  ${messages.length === 0 ? "" : renderMessages(messages, metricsMap)}
+  ${messages.length === 0 ? "" : renderMessages(messages, metricsMap, displayNames)}
 </div>
 ${renderInputArea()}`;
 }
@@ -547,21 +653,21 @@ ${renderInputArea()}`;
 /**
  * Render all messages.
  */
-export function renderMessages(messages: Message[], metricsMap?: MetricsMap): string {
+export function renderMessages(messages: Message[], metricsMap?: MetricsMap, displayNames?: { entityName: string; userName: string }): string {
   return messages
     .filter((m) => m.role === "user" || m.role === "assistant")
-    .map((m) => renderMessage(m, metricsMap?.get(m.id)))
+    .map((m) => renderMessage(m, metricsMap?.get(m.id), displayNames))
     .join("");
 }
 
 /**
  * Render a single message based on role.
  */
-export function renderMessage(msg: Message, metrics?: TurnMetrics): string {
+export function renderMessage(msg: Message, metrics?: TurnMetrics, displayNames?: { entityName: string; userName: string }): string {
   if (msg.role === "user") {
-    return renderUserMessage(msg.content, msg.id, msg.editedAt, msg.createdAt);
+    return renderUserMessage(msg.content, msg.id, msg.editedAt, msg.createdAt, displayNames?.userName);
   } else if (msg.role === "assistant") {
-    return renderAssistantMessage(msg, metrics);
+    return renderAssistantMessage(msg, metrics, displayNames?.entityName);
   }
   return "";
 }
@@ -578,6 +684,7 @@ export function renderUserMessage(
   messageId?: string,
   editedAt?: Date,
   createdAt?: Date,
+  userName?: string,
 ): string {
   const editedIndicator = editedAt
     ? `<span class="msg-edited-indicator">(edited)</span>`
@@ -593,11 +700,12 @@ export function renderUserMessage(
   const dataAttr = messageId ? `data-message-id="${escapeHtml(messageId)}"` : "";
   const timeStr = createdAt ? formatMessageTime(createdAt) : "";
   const timeEl = timeStr ? `<span class="msg-timestamp">${escapeHtml(timeStr)}</span>` : "";
+  const displayName = escapeHtml(userName || "You");
 
   return `<div class="msg msg--user" ${dataAttr}>
   <div class="msg-header">
     ${timeEl}
-    <span>You</span>
+    <span>${displayName}</span>
     ${editedIndicator}
     ${editBtn}
   </div>
@@ -608,7 +716,7 @@ export function renderUserMessage(
 /**
  * Render an assistant message with optional thinking, tool calls, and metrics.
  */
-export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics): string {
+export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics, entityName?: string): string {
   const editedIndicator = msg.editedAt
     ? `<span class="msg-edited-indicator">(edited)</span>`
     : "";
@@ -623,10 +731,11 @@ export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics): str
 
   const timeStr = msg.createdAt ? formatMessageTime(msg.createdAt) : "";
   const timeEl = timeStr ? `<span class="msg-timestamp">${escapeHtml(timeStr)}</span>` : "";
+  const displayName = escapeHtml(entityName || "Assistant");
 
   let html = `<div class="msg msg--assistant" data-message-id="${escapeHtml(msg.id)}">
   <div class="msg-header">
-    <span>Assistant</span>
+    <span>${displayName}</span>
     ${timeEl}
     ${editedIndicator}
     ${metrics ? renderMetricsIndicator(metrics) : ""}

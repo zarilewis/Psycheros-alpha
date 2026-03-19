@@ -126,6 +126,15 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 | `DELETE` | `/api/vault/:id` | Delete vault document |
 | `POST` | `/api/vault/search` | Search vault by query |
 
+### General Settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/general-settings` | Get general settings (entity name, user name) |
+| `POST` | `/api/general-settings` | Save general settings |
+
+Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName": "Assistant", "userName": "You" }`.
+
 ### LLM Settings
 
 | Method | Path | Description |

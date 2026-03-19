@@ -13,6 +13,9 @@ const pendingToolCalls = new Map();
 let currentAbortController = null;
 let persistentSSE = null;
 
+// General settings (display names)
+globalThis.PsycherosSettings = { entityName: 'Assistant', userName: 'You' };
+
 // Selection mode state
 let selectionMode = false;
 const selectedConversations = new Set();
@@ -176,6 +179,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize persistent SSE connection for background updates
   initPersistentSSE();
+
+  // Load general settings (display names)
+  fetch('/api/general-settings')
+    .then(r => r.json())
+    .then(data => {
+      if (data) {
+        window.PsycherosSettings.entityName = data.entityName || 'Assistant';
+        window.PsycherosSettings.userName = data.userName || 'You';
+      }
+    })
+    .catch(() => {});
 
   // Event delegation for token counting in the file editor textarea
   document.addEventListener('input', (e) => {
@@ -610,7 +624,7 @@ async function sendMessage() {
       <div class="msg msg--user">
         <div class="msg-header">
           <span class="msg-timestamp">${userTime}</span>
-          <span>You</span>
+          <span>${globalThis.PsycherosSettings.userName || 'You'}</span>
         </div>
         <div class="msg-content user-text">${userHtml}</div>
       </div>
@@ -624,7 +638,7 @@ async function sendMessage() {
   const streamTime = formatChatTimestamp(new Date());
   assistantEl.innerHTML = `
     <div class="msg-header">
-      <span>Assistant</span>
+      <span>${globalThis.PsycherosSettings.entityName || 'Assistant'}</span>
       <span class="msg-timestamp">${streamTime}</span>
       <div class="streaming"><span></span><span></span><span></span></div>
     </div>

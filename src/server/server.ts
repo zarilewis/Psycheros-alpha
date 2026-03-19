@@ -79,6 +79,9 @@ import {
   handleSaveLLMSettings,
   handleTestLLMConnection,
   handleLLMSettingsFragment,
+  handleGetGeneralSettings,
+  handleSaveGeneralSettings,
+  handleGeneralSettingsFragment,
   handleListBackgrounds,
   handleUploadBackground,
   handleDeleteBackground,
@@ -791,6 +794,24 @@ export class Server {
     // LLM Settings API Routes
     // ========================================
 
+    // ========================================
+    // General Settings API Routes
+    // ========================================
+
+    // GET /api/general-settings - Get current general settings
+    if (method === "GET" && path === "/api/general-settings") {
+      return await handleGetGeneralSettings(ctx);
+    }
+
+    // POST /api/general-settings - Save general settings
+    if (method === "POST" && path === "/api/general-settings") {
+      return await handleSaveGeneralSettings(ctx, request);
+    }
+
+    // ========================================
+    // LLM Settings API Routes
+    // ========================================
+
     // GET /api/llm-settings - Get current settings
     if (method === "GET" && path === "/api/llm-settings") {
       return handleGetLLMSettings(ctx);
@@ -937,6 +958,11 @@ export class Server {
     // GET /fragments/settings - Settings hub page fragment
     if (path === "/fragments/settings") {
       return handleSettingsHubFragment(ctx);
+    }
+
+    // GET /fragments/settings/general - General settings fragment
+    if (path === "/fragments/settings/general") {
+      return await handleGeneralSettingsFragment(ctx);
     }
 
     // GET /fragments/settings/core-prompts - Settings page fragment

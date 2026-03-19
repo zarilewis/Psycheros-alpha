@@ -102,6 +102,24 @@ Both user and assistant messages render markdown formatting with progressive str
 - **Supported**: Headers, lists, code blocks, blockquotes, tables, links, emphasis
 - **Dependencies**: `jsdom` provides DOM environment for DOMPurify sanitization
 
+## General Settings
+
+Customizable display names for the chat interface. Access via Settings → General Settings (first card in the settings hub).
+
+### Display Names
+
+- **Entity Name** — replaces "Assistant" in message headers across the chat UI
+- **Your Name** — replaces "You" in message headers across the chat UI
+
+Settings are loaded on page init from the server and cached in `globalThis.PsycherosSettings` for instant access during streaming. Saving updates the in-memory cache immediately so new messages reflect the change without a page reload.
+
+**Persistence:** Settings stored in `.psycheros/general-settings.json` on the server. Defaults: `{ "entityName": "Assistant", "userName": "You" }`.
+
+**API Endpoints:**
+- `GET /api/general-settings` — get current settings
+- `POST /api/general-settings` — save settings (`{ "entityName": "...", "userName": "..." }`)
+- `GET /fragments/settings/general` — render settings form fragment
+
 ## Appearance Settings
 
 Customizable UI theming accessible via Settings → Appearance in the sidebar.

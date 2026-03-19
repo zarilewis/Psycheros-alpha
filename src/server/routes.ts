@@ -39,6 +39,8 @@ import {
   renderAppearanceSettings,
   renderLLMSettings,
   renderSettingsHub,
+  renderGeneralSettings,
+  type GeneralSettings,
   escapeHtml,
   type MetricsMap,
 } from "./templates.ts";
@@ -323,10 +325,10 @@ export function handleConversationView(
  * @param conversationId - The conversation ID
  * @returns HTTP Response with chat HTML fragment
  */
-export function handleChatFragment(
+export async function handleChatFragment(
   ctx: RouteContext,
   conversationId: string
-): Response {
+): Promise<Response> {
   // Check if conversation exists
   const conversation = ctx.db.getConversation(conversationId);
   if (!conversation) {
@@ -349,7 +351,8 @@ export function handleChatFragment(
     }
   }
 
-  const chatHtml = renderChatView(messages, metricsMap);
+  const displayNames = await loadGeneralSettings(ctx.projectRoot);
+  const chatHtml = renderChatView(messages, metricsMap, displayNames);
 
   // Generate OOB swaps for header title using unified helper
   const uiUpdates = generateUIUpdates(["header-title"], ctx.db, conversationId);
@@ -560,7 +563,8 @@ export async function handleUpdateMessage(
 
   // Render updated message HTML for HTMX swap
   const { renderMessage } = await import("./templates.ts");
-  const html = renderMessage(updatedMsg, metrics);
+  const displayNames = await loadGeneralSettings(ctx.projectRoot);
+  const html = renderMessage(updatedMsg, metrics, displayNames);
 
   return new Response(html, {
     headers: {
@@ -3593,6 +3597,95 @@ export async function handleTestLLMConnection(
  */
 export function handleLLMSettingsFragment(ctx: RouteContext): Response {
   const html = renderLLMSettings(ctx.getLLMSettings());
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+// =============================================================================
+// General Settings API Routes
+// =============================================================================
+
+const GENERAL_SETTINGS_PATH = ".psycheros/general-settings.json";
+
+async function loadGeneralSettings(projectRoot: string): Promise<GeneralSettings> {
+  try {
+    const text = await Deno.readTextFile(`${projectRoot}/${GENERAL_SETTINGS_PATH}`);
+    const saved = JSON.parse(text) as Partial<GeneralSettings>;
+    return {
+      entityName: saved.entityName || "Assistant",
+      userName: saved.userName || "You",
+    };
+  } catch {
+    return { entityName: "Assistant", userName: "You" };
+  }
+}
+
+/**
+ * Handle GET /api/general-settings - Return current general settings as JSON.
+ */
+export async function handleGetGeneralSettings(ctx: RouteContext): Promise<Response> {
+  const settings = await loadGeneralSettings(ctx.projectRoot);
+  return new Response(JSON.stringify(settings), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/general-settings - Save general settings.
+ */
+export async function handleSaveGeneralSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<GeneralSettings>;
+    const current = await loadGeneralSettings(ctx.projectRoot);
+
+    const updated: GeneralSettings = {
+      entityName: body.entityName || current.entityName,
+      userName: body.userName || current.userName,
+    };
+
+    const settingsDir = `${ctx.projectRoot}/.psycheros`;
+    await Deno.mkdir(settingsDir, { recursive: true });
+    await Deno.writeTextFile(
+      `${settingsDir}/general-settings.json`,
+      JSON.stringify(updated, null, 2) + "\n",
+    );
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] handleSaveGeneralSettings error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save settings" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/general - Render the General Settings page.
+ */
+export async function handleGeneralSettingsFragment(ctx: RouteContext): Promise<Response> {
+  const settings = await loadGeneralSettings(ctx.projectRoot);
+  const html = renderGeneralSettings(settings);
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
