@@ -85,10 +85,10 @@ const mcpEnabled = Deno.env.get("PSYCHEROS_MCP_ENABLED") === "true";
 
 if (mcpEnabled) {
   const mcpCommand = Deno.env.get("PSYCHEROS_MCP_COMMAND") || "/home/zari/.deno/bin/deno";
-  const mcpArgsStr = Deno.env.get("PSYCHEROS_MCP_ARGS") || `run -A ${Deno.env.get("HOME")}/projects/entity-core/src/mod.ts`;
+  const mcpArgsStr = Deno.env.get("PSYCHEROS_MCP_ARGS") || `run -A ${Deno.env.get("HOME")}/Projects/entity-core/src/mod.ts`;
   const mcpArgs = mcpArgsStr.split(" ");
   const mcpInstance = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
-  const entityCoreDataDir = Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${Deno.env.get("HOME")}/projects/entity-core/data`;
+  const entityCoreDataDir = Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${Deno.env.get("HOME")}/Projects/entity-core/data`;
 
   console.log(`MCP enabled: connecting to entity-core as ${mcpInstance}`);
 
@@ -98,6 +98,7 @@ if (mcpEnabled) {
     instanceId: mcpInstance,
     env: {
       ENTITY_CORE_DATA_DIR: entityCoreDataDir,
+      ZAI_API_KEY: Deno.env.get("ZAI_API_KEY"),
     },
     syncOnStartup: true,
     syncInterval: 5 * 60 * 1000, // 5 minutes
