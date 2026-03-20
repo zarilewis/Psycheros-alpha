@@ -18,4 +18,5 @@ I can track my relationship with the user in the identity/relationship/ director
 I can store additional context in custom files in the identity/custom/ directory.
 
 Current timestamp: {{timestamp}}
+Current chat thread: {{chatId}}
 </base_instructions>

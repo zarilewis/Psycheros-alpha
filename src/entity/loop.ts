@@ -271,7 +271,7 @@ export class EntityTurn {
       }
     }
 
-    const baseInstructions = await loadBaseInstructions(this.config.projectRoot, this.config.mcpClient);
+    const baseInstructions = await loadBaseInstructions(this.config.projectRoot, this.config.mcpClient, conversationId);
 
     // Search vault for relevant documents if manager is available
     let vaultContent: string | undefined;

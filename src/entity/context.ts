@@ -190,25 +190,30 @@ export async function loadCustomFiles(projectRoot: string): Promise<string> {
 }
 
 /**
- * Apply timestamp substitution to base instructions content.
+ * Apply template variable substitutions to base instructions content.
  */
-function applyTimestamp(content: string): string {
+function applyTemplateVariables(content: string, chatId?: string): string {
   const timestamp = new Date().toISOString();
-  return content.replace(/\{\{timestamp\}\}/g, timestamp).trim();
+  return content
+    .replace(/\{\{timestamp\}\}/g, timestamp)
+    .replace(/\{\{chatId\}\}/g, chatId ?? "unknown")
+    .trim();
 }
 
 /**
  * Load the base instructions from MCP (canonical) or local identity/self/base_instructions.md.
- * Replaces {{timestamp}} with the current ISO timestamp.
+ * Replaces {{timestamp}} with the current ISO timestamp and {{chatId}} with the conversation ID.
  * Returns a fallback default if the file doesn't exist anywhere.
  *
  * @param projectRoot - The root directory of the project
  * @param mcpClient - Optional MCP client for loading from entity-core
+ * @param chatId - Optional current conversation ID for {{chatId}} substitution
  * @returns The base instructions string (with XML tags intact)
  */
 export async function loadBaseInstructions(
   projectRoot: string,
   mcpClient?: MCPClient,
+  chatId?: string,
 ): Promise<string> {
   // Prefer MCP (canonical source) when available
   if (mcpClient) {
@@ -216,7 +221,7 @@ export async function loadBaseInstructions(
       const identity = await mcpClient.loadIdentity();
       const baseFile = identity?.self?.find((f) => f.filename === BASE_INSTRUCTIONS_FILE);
       if (baseFile?.content) {
-        const applied = applyTimestamp(baseFile.content);
+        const applied = applyTemplateVariables(baseFile.content, chatId);
         // Guard against whitespace-only content from MCP — fall through to local file
         if (applied.trim()) {
           return applied;
@@ -232,17 +237,19 @@ export async function loadBaseInstructions(
 
   try {
     const content = await Deno.readTextFile(filePath);
-    return applyTimestamp(content);
+    return applyTemplateVariables(content, chatId);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
       // Fallback default if file doesn't exist
       const timestamp = new Date().toISOString();
+      const id = chatId ?? "unknown";
       return `<base_instructions>
 I am Psycheros, a persistent AI companion and assistant.
 
 I have access to tools that let me interact with the system. I use them when the user asks me to perform actions.
 
 Current timestamp: ${timestamp}
+Current chat thread: ${id}
 </base_instructions>`;
     }
     throw error;
