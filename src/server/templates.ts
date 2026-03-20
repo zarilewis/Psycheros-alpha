@@ -500,45 +500,41 @@ export function renderGeneralSettings(settings: GeneralSettings): string {
           <label for="general-timezone">Display Timezone</label>
           <select id="general-timezone" class="input-field llm-input">
             <option value=""${settings.timezone === '' ? ' selected' : ''}>(System Default)</option>
-            <optgroup label="UTC">
-              <option value="UTC">UTC</option>
-            </optgroup>
-            <optgroup label="Americas">
-              <option value="America/New_York">Eastern (America/New_York)</option>
-              <option value="America/Chicago">Central (America/Chicago)</option>
-              <option value="America/Denver">Mountain (America/Denver)</option>
-              <option value="America/Los_Angeles">Pacific (America/Los_Angeles)</option>
-              <option value="America/Anchorage">Alaska (America/Anchorage)</option>
-              <option value="America/Sao_Paulo">Sao Paulo (America/Sao_Paulo)</option>
-              <option value="America/Argentina/Buenos_Aires">Buenos Aires (America/Argentina/Buenos_Aires)</option>
-            </optgroup>
-            <optgroup label="Europe">
-              <option value="Europe/London">London (Europe/London)</option>
-              <option value="Europe/Paris">Paris (Europe/Paris)</option>
-              <option value="Europe/Berlin">Berlin (Europe/Berlin)</option>
-              <option value="Europe/Madrid">Madrid (Europe/Madrid)</option>
-              <option value="Europe/Rome">Rome (Europe/Rome)</option>
-              <option value="Europe/Amsterdam">Amsterdam (Europe/Amsterdam)</option>
-              <option value="Europe/Moscow">Moscow (Europe/Moscow)</option>
-              <option value="Europe/Istanbul">Istanbul (Europe/Istanbul)</option>
-              <option value="Europe/Athens">Athens (Europe/Athens)</option>
-            </optgroup>
-            <optgroup label="Asia">
-              <option value="Asia/Tokyo">Tokyo (Asia/Tokyo)</option>
-              <option value="Asia/Shanghai">Shanghai (Asia/Shanghai)</option>
-              <option value="Asia/Hong_Kong">Hong Kong (Asia/Hong_Kong)</option>
-              <option value="Asia/Singapore">Singapore (Asia/Singapore)</option>
-              <option value="Asia/Kolkata">Kolkata (Asia/Kolkata)</option>
-              <option value="Asia/Dubai">Dubai (Asia/Dubai)</option>
-              <option value="Asia/Seoul">Seoul (Asia/Seoul)</option>
-              <option value="Asia/Bangkok">Bangkok (Asia/Bangkok)</option>
-            </optgroup>
-            <optgroup label="Pacific">
-              <option value="Australia/Sydney">Sydney (Australia/Sydney)</option>
-              <option value="Australia/Melbourne">Melbourne (Australia/Melbourne)</option>
-              <option value="Pacific/Auckland">Auckland (Pacific/Auckland)</option>
-              <option value="Pacific/Honolulu">Honolulu (Pacific/Honolulu)</option>
-            </optgroup>
+            <option value="UTC"${settings.timezone === 'UTC' ? ' selected' : ''}>UTC+0 UTC</option>
+            <option value="Etc/GMT+12"${settings.timezone === 'Etc/GMT+12' ? ' selected' : ''}>UTC-12 Etc/GMT+12</option>
+            <option value="Pacific/Honolulu"${settings.timezone === 'Pacific/Honolulu' ? ' selected' : ''}>UTC-10 Pacific/Honolulu (HST)</option>
+            <option value="America/Anchorage"${settings.timezone === 'America/Anchorage' ? ' selected' : ''}>UTC-9 America/Anchorage (AKST)</option>
+            <option value="America/Los_Angeles"${settings.timezone === 'America/Los_Angeles' ? ' selected' : ''}>UTC-8 America/Los_Angeles (PST)</option>
+            <option value="America/Denver"${settings.timezone === 'America/Denver' ? ' selected' : ''}>UTC-7 America/Denver (MST)</option>
+            <option value="America/Chicago"${settings.timezone === 'America/Chicago' ? ' selected' : ''}>UTC-6 America/Chicago (CST)</option>
+            <option value="America/New_York"${settings.timezone === 'America/New_York' ? ' selected' : ''}>UTC-5 America/New_York (EST)</option>
+            <option value="America/Sao_Paulo"${settings.timezone === 'America/Sao_Paulo' ? ' selected' : ''}>UTC-3 America/Sao_Paulo (BRT)</option>
+            <option value="America/Argentina/Buenos_Aires"${settings.timezone === 'America/Argentina/Buenos_Aires' ? ' selected' : ''}>UTC-3 America/Argentina/Buenos_Aires (ART)</option>
+            <option value="Atlantic/South_Georgia"${settings.timezone === 'Atlantic/South_Georgia' ? ' selected' : ''}>UTC-2 Atlantic/South_Georgia</option>
+            <option value="Atlantic/Azores"${settings.timezone === 'Atlantic/Azores' ? ' selected' : ''}>UTC-1 Atlantic/Azores</option>
+            <option value="Europe/London"${settings.timezone === 'Europe/London' ? ' selected' : ''}>UTC+0 Europe/London (GMT)</option>
+            <option value="Europe/Paris"${settings.timezone === 'Europe/Paris' ? ' selected' : ''}>UTC+1 Europe/Paris (CET)</option>
+            <option value="Europe/Berlin"${settings.timezone === 'Europe/Berlin' ? ' selected' : ''}>UTC+1 Europe/Berlin (CET)</option>
+            <option value="Europe/Madrid"${settings.timezone === 'Europe/Madrid' ? ' selected' : ''}>UTC+1 Europe/Madrid (CET)</option>
+            <option value="Europe/Rome"${settings.timezone === 'Europe/Rome' ? ' selected' : ''}>UTC+1 Europe/Rome (CET)</option>
+            <option value="Europe/Amsterdam"${settings.timezone === 'Europe/Amsterdam' ? ' selected' : ''}>UTC+1 Europe/Amsterdam (CET)</option>
+            <option value="Africa/Lagos"${settings.timezone === 'Africa/Lagos' ? ' selected' : ''}>UTC+1 Africa/Lagos (WAT)</option>
+            <option value="Europe/Athens"${settings.timezone === 'Europe/Athens' ? ' selected' : ''}>UTC+2 Europe/Athens (EET)</option>
+            <option value="Europe/Istanbul"${settings.timezone === 'Europe/Istanbul' ? ' selected' : ''}>UTC+3 Europe/Istanbul (TRT)</option>
+            <option value="Europe/Moscow"${settings.timezone === 'Europe/Moscow' ? ' selected' : ''}>UTC+3 Europe/Moscow (MSK)</option>
+            <option value="Africa/Nairobi"${settings.timezone === 'Africa/Nairobi' ? ' selected' : ''}>UTC+3 Africa/Nairobi (EAT)</option>
+            <option value="Asia/Dubai"${settings.timezone === 'Asia/Dubai' ? ' selected' : ''}>UTC+4 Asia/Dubai (GST)</option>
+            <option value="Asia/Kolkata"${settings.timezone === 'Asia/Kolkata' ? ' selected' : ''}>UTC+5:30 Asia/Kolkata (IST)</option>
+            <option value="Asia/Dhaka"${settings.timezone === 'Asia/Dhaka' ? ' selected' : ''}>UTC+6 Asia/Dhaka (BST)</option>
+            <option value="Asia/Bangkok"${settings.timezone === 'Asia/Bangkok' ? ' selected' : ''}>UTC+7 Asia/Bangkok (ICT)</option>
+            <option value="Asia/Shanghai"${settings.timezone === 'Asia/Shanghai' ? ' selected' : ''}>UTC+8 Asia/Shanghai (CST)</option>
+            <option value="Asia/Hong_Kong"${settings.timezone === 'Asia/Hong_Kong' ? ' selected' : ''}>UTC+8 Asia/Hong_Kong (HKT)</option>
+            <option value="Asia/Singapore"${settings.timezone === 'Asia/Singapore' ? ' selected' : ''}>UTC+8 Asia/Singapore (SGT)</option>
+            <option value="Asia/Tokyo"${settings.timezone === 'Asia/Tokyo' ? ' selected' : ''}>UTC+9 Asia/Tokyo (JST)</option>
+            <option value="Asia/Seoul"${settings.timezone === 'Asia/Seoul' ? ' selected' : ''}>UTC+9 Asia/Seoul (KST)</option>
+            <option value="Australia/Sydney"${settings.timezone === 'Australia/Sydney' ? ' selected' : ''}>UTC+11 Australia/Sydney (AEDT)</option>
+            <option value="Australia/Melbourne"${settings.timezone === 'Australia/Melbourne' ? ' selected' : ''}>UTC+11 Australia/Melbourne (AEDT)</option>
+            <option value="Pacific/Auckland"${settings.timezone === 'Pacific/Auckland' ? ' selected' : ''}>UTC+13 Pacific/Auckland (NZDT)</option>
           </select>
         </div>
       </div>
