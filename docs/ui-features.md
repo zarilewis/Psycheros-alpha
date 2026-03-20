@@ -147,9 +147,11 @@ Frosted glass (glassmorphism) effect on UI panels when background is active. Use
 
 ### Persistence
 
-Theme preferences stored in localStorage via `web/js/theme.js`. CSS variables in `web/css/tokens.css`.
+Theme preferences persist server-side in `.psycheros/appearance-settings.json`. On page load, the server is queried first and its values take precedence; localStorage acts as a synchronous cache for instant rendering and an offline fallback. On theme changes, settings are saved to both localStorage (immediate) and the server (async fire-and-forget). CSS variables in `web/css/tokens.css`.
 
 **API Endpoints:**
+- `GET /api/appearance-settings` — get current appearance settings
+- `POST /api/appearance-settings` — save appearance settings
 - `GET /api/backgrounds` — list uploaded backgrounds
 - `POST /api/backgrounds` — upload new background
 - `DELETE /api/backgrounds/:filename` — delete background

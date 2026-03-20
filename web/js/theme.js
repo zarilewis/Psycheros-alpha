@@ -162,22 +162,31 @@ function applyTheme(theme) {
 }
 
 /**
- * Save theme to localStorage.
+ * Save theme to localStorage and persist to server.
  * @param {object} theme - Theme configuration
  */
 function saveTheme(theme) {
   try {
     localStorage.setItem(THEME_KEY, JSON.stringify(theme));
   } catch (e) {
-    console.warn('Failed to save theme:', e);
+    console.warn('Failed to save theme to localStorage:', e);
   }
+
+  // Persist to server (fire-and-forget)
+  fetch('/api/appearance-settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(theme),
+  }).catch((e) => {
+    console.warn('Failed to save theme to server:', e);
+  });
 }
 
 /**
- * Load theme from localStorage.
+ * Load theme from localStorage (synchronous fallback).
  * @returns {object} Theme configuration
  */
-function loadTheme() {
+function loadThemeLocal() {
   try {
     const saved = localStorage.getItem(THEME_KEY);
     if (saved) {
@@ -186,17 +195,37 @@ function loadTheme() {
       return { ...DEFAULT_THEME, ...parsed };
     }
   } catch (e) {
-    console.warn('Failed to load theme:', e);
+    console.warn('Failed to load theme from localStorage:', e);
   }
   return { ...DEFAULT_THEME };
 }
 
 /**
  * Initialize theme on page load.
+ * Fetches from server first, falls back to localStorage for instant apply.
  */
-function initTheme() {
-  currentTheme = loadTheme();
+async function initTheme() {
+  // Apply from localStorage immediately for instant rendering
+  currentTheme = loadThemeLocal();
   applyTheme(currentTheme);
+
+  // Then try to fetch server-side settings
+  try {
+    const response = await fetch('/api/appearance-settings');
+    if (response.ok) {
+      const serverSettings = await response.json();
+      const merged = { ...DEFAULT_THEME, ...serverSettings };
+      // Only update if server has different data
+      if (JSON.stringify(merged) !== JSON.stringify(currentTheme)) {
+        currentTheme = merged;
+        saveTheme(currentTheme); // Sync localStorage cache with server
+        applyTheme(currentTheme);
+      }
+    }
+  } catch (e) {
+    // Server unavailable — localStorage values are already applied
+    console.warn('Failed to load theme from server, using localStorage:', e);
+  }
 }
 
 /**

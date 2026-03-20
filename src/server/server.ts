@@ -82,6 +82,8 @@ import {
   handleGetGeneralSettings,
   handleSaveGeneralSettings,
   handleGeneralSettingsFragment,
+  handleGetAppearanceSettings,
+  handleSaveAppearanceSettings,
   handleListBackgrounds,
   handleUploadBackground,
   handleDeleteBackground,
@@ -817,6 +819,20 @@ export class Server {
     // POST /api/general-settings - Save general settings
     if (method === "POST" && path === "/api/general-settings") {
       return await handleSaveGeneralSettings(ctx, request);
+    }
+
+    // ========================================
+    // Appearance Settings API Routes
+    // ========================================
+
+    // GET /api/appearance-settings - Get current appearance settings
+    if (method === "GET" && path === "/api/appearance-settings") {
+      return await handleGetAppearanceSettings(ctx);
+    }
+
+    // POST /api/appearance-settings - Save appearance settings
+    if (method === "POST" && path === "/api/appearance-settings") {
+      return await handleSaveAppearanceSettings(ctx, request);
     }
 
     // ========================================

@@ -115,6 +115,15 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 | `DELETE` | `/api/backgrounds/:filename` | Delete background image |
 | `GET` | `/backgrounds/:filename` | Serve background image file |
 
+### Appearance Settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/appearance-settings` | Get current appearance settings |
+| `POST` | `/api/appearance-settings` | Save appearance settings |
+
+Settings stored in `.psycheros/appearance-settings.json`. Shape: `{ "preset": string|null, "customAccent": string|null, "bgImage": string|null, "bgBlur": number, "bgOverlayOpacity": number, "glassEnabled": boolean }`. Defaults to phosphor preset with no background.
+
 ### Data Vault
 
 | Method | Path | Description |

@@ -3703,6 +3703,101 @@ export async function handleGeneralSettingsFragment(ctx: RouteContext): Promise<
 }
 
 // =============================================================================
+// Appearance Settings API Routes
+// =============================================================================
+
+const APPEARANCE_SETTINGS_PATH = ".psycheros/appearance-settings.json";
+
+interface AppearanceSettings {
+  preset: string | null;
+  customAccent: string | null;
+  bgImage: string | null;
+  bgBlur: number;
+  bgOverlayOpacity: number;
+  glassEnabled: boolean;
+}
+
+const DEFAULT_APPEARANCE_SETTINGS: AppearanceSettings = {
+  preset: "phosphor",
+  customAccent: null,
+  bgImage: null,
+  bgBlur: 0,
+  bgOverlayOpacity: 0,
+  glassEnabled: false,
+};
+
+async function loadAppearanceSettings(projectRoot: string): Promise<AppearanceSettings> {
+  try {
+    const text = await Deno.readTextFile(`${projectRoot}/${APPEARANCE_SETTINGS_PATH}`);
+    const saved = JSON.parse(text) as Partial<AppearanceSettings>;
+    return { ...DEFAULT_APPEARANCE_SETTINGS, ...saved };
+  } catch {
+    return { ...DEFAULT_APPEARANCE_SETTINGS };
+  }
+}
+
+/**
+ * Handle GET /api/appearance-settings - Return current appearance settings as JSON.
+ */
+export async function handleGetAppearanceSettings(ctx: RouteContext): Promise<Response> {
+  const settings = await loadAppearanceSettings(ctx.projectRoot);
+  return new Response(JSON.stringify(settings), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/appearance-settings - Save appearance settings.
+ */
+export async function handleSaveAppearanceSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<AppearanceSettings>;
+    const current = await loadAppearanceSettings(ctx.projectRoot);
+
+    const updated: AppearanceSettings = {
+      preset: body.preset !== undefined ? body.preset : current.preset,
+      customAccent: body.customAccent !== undefined ? body.customAccent : current.customAccent,
+      bgImage: body.bgImage !== undefined ? body.bgImage : current.bgImage,
+      bgBlur: body.bgBlur !== undefined ? body.bgBlur : current.bgBlur,
+      bgOverlayOpacity: body.bgOverlayOpacity !== undefined ? body.bgOverlayOpacity : current.bgOverlayOpacity,
+      glassEnabled: body.glassEnabled !== undefined ? body.glassEnabled : current.glassEnabled,
+    };
+
+    const settingsDir = `${ctx.projectRoot}/.psycheros`;
+    await Deno.mkdir(settingsDir, { recursive: true });
+    await Deno.writeTextFile(
+      `${settingsDir}/appearance-settings.json`,
+      JSON.stringify(updated, null, 2) + "\n",
+    );
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] handleSaveAppearanceSettings error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save appearance settings" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+// =============================================================================
 // Vault API Routes
 // =============================================================================
 
