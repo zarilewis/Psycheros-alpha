@@ -58,8 +58,8 @@ export async function generateAndSetTitle(
     }
 
     // Truncate if too long
-    if (generatedTitle.length > 50) {
-      generatedTitle = generatedTitle.substring(0, 47) + "...";
+    if (generatedTitle.length > 30) {
+      generatedTitle = generatedTitle.substring(0, 27) + "...";
     }
 
     const result = updateConversationTitle(db, conversationId, generatedTitle);
