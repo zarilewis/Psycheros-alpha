@@ -11,7 +11,8 @@
 import type { SSEEvent, TurnMetrics } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, LLMSettings } from "../llm/mod.ts";
-import { maskApiKey, getDefaultSettings } from "../llm/mod.ts";
+import type { WebSearchSettings } from "../llm/mod.ts";
+import { maskApiKey, getDefaultSettings, getDefaultWebSearchSettings, maskWebSearchSettings } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { Retriever, RAGConfig } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
@@ -40,6 +41,7 @@ import {
   renderLLMSettings,
   renderSettingsHub,
   renderGeneralSettings,
+  renderWebSearchSettings,
   type GeneralSettings,
   escapeHtml,
   type MetricsMap,
@@ -80,6 +82,10 @@ export interface RouteContext {
   getLLMSettings: () => LLMSettings;
   /** Update LLM settings and hot-reload */
   updateLLMSettings: (settings: LLMSettings) => Promise<void>;
+  /** Get current web search settings */
+  getWebSearchSettings: () => WebSearchSettings;
+  /** Update web search settings and hot-reload tool registry */
+  updateWebSearchSettings: (settings: WebSearchSettings) => Promise<void>;
 }
 
 /**
@@ -862,6 +868,7 @@ export async function handleChat(
             mcpClient: ctx.mcpClient,
             lorebookManager: ctx.lorebookManager,
             vaultManager: ctx.vaultManager,
+            webSearchSettings: ctx.getWebSearchSettings(),
           }
         );
 
@@ -3597,6 +3604,111 @@ export async function handleTestLLMConnection(
  */
 export function handleLLMSettingsFragment(ctx: RouteContext): Response {
   const html = renderLLMSettings(ctx.getLLMSettings());
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+// =============================================================================
+// Web Search Settings API Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/web-search-settings - Return current web search settings (API keys masked).
+ */
+export function handleGetWebSearchSettings(ctx: RouteContext): Response {
+  const settings = maskWebSearchSettings(ctx.getWebSearchSettings());
+  return new Response(JSON.stringify(settings), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/web-search-settings - Save and apply web search settings.
+ * If an API key field contains the masked value, it keeps the existing key.
+ */
+export async function handleSaveWebSearchSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<WebSearchSettings>;
+    const current = ctx.getWebSearchSettings();
+
+    const updated: WebSearchSettings = {
+      provider: body.provider === "none" ? "disabled" : (body.provider ?? current.provider),
+      tavilyApiKey: (body.tavilyApiKey && !body.tavilyApiKey.includes("••••"))
+        ? body.tavilyApiKey
+        : current.tavilyApiKey,
+      braveApiKey: (body.braveApiKey && !body.braveApiKey.includes("••••"))
+        ? body.braveApiKey
+        : current.braveApiKey,
+    };
+
+    await ctx.updateWebSearchSettings(updated);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] handleSaveWebSearchSettings error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save settings" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+/**
+ * Handle POST /api/web-search-settings/reset - Reset to env-based defaults.
+ */
+export async function handleResetWebSearchSettings(
+  ctx: RouteContext,
+): Promise<Response> {
+  try {
+    const defaults = getDefaultWebSearchSettings();
+    await ctx.updateWebSearchSettings(defaults);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] handleResetWebSearchSettings error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to reset settings" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/web-search - Web search settings UI fragment.
+ */
+export function handleWebSearchSettingsFragment(ctx: RouteContext): Response {
+  const html = renderWebSearchSettings(maskWebSearchSettings(ctx.getWebSearchSettings()));
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

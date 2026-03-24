@@ -43,6 +43,8 @@ import {
   vaultListTool,
   vaultSearchTool,
 } from "./vault-tools.ts";
+// Web search tool
+import { webSearchTool } from "./web-search.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -84,6 +86,8 @@ const AVAILABLE_TOOLS: Record<string, Tool> = {
   vault_write: vaultWriteTool,
   vault_list: vaultListTool,
   vault_search: vaultSearchTool,
+  // Web search tool (Tavily / Brave)
+  web_search: webSearchTool,
 };
 
 /**

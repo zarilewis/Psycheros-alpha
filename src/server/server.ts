@@ -8,7 +8,7 @@
  */
 
 import { DBClient } from "../db/mod.ts";
-import { createDefaultClient, type LLMClient, type LLMSettings, loadSettings, saveSettings } from "../llm/mod.ts";
+import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSettings, loadSettings, saveSettings, loadWebSearchSettings, saveWebSearchSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import { catchUpSummarization, repairOrphanedSummaries, needsConsolidation, runConsolidation } from "../memory/mod.ts";
@@ -95,6 +95,9 @@ import {
   handleSearchVault,
   handleVaultFragment,
   handleVaultDetailFragment,
+  handleGetWebSearchSettings,
+  handleSaveWebSearchSettings,
+  handleWebSearchSettingsFragment,
   type RouteContext,
 } from "./routes.ts";
 import { getBroadcaster } from "./broadcaster.ts";
@@ -170,6 +173,7 @@ export class Server {
   private lorebookManager: LorebookManager;
   private vaultManager: VaultManager;
   private llmSettings: LLMSettings;
+  private webSearchSettings: WebSearchSettings;
 
   /**
    * Create a new Server instance.
@@ -198,6 +202,13 @@ export class Server {
       maxTokens: 4096,
       contextLength: 128000,
       thinkingEnabled: true,
+    };
+
+    // Initialize web search settings (will be reloaded from settings in init())
+    this.webSearchSettings = {
+      provider: "disabled",
+      tavilyApiKey: "",
+      braveApiKey: "",
     };
 
     // Initialize tool registry with only allowed tools
@@ -236,7 +247,9 @@ export class Server {
    */
   async init(): Promise<void> {
     this.llmSettings = await loadSettings(this.config.projectRoot);
+    this.webSearchSettings = await loadWebSearchSettings(this.config.projectRoot);
     this.reloadLLMClient();
+    this.reloadToolRegistry();
 
     // Load general settings to set PSYCHEROS_DISPLAY_TZ for server-side timestamp formatting
     try {
@@ -267,6 +280,22 @@ export class Server {
   }
 
   /**
+   * Get the current web search settings.
+   */
+  getWebSearchSettings(): WebSearchSettings {
+    return this.webSearchSettings;
+  }
+
+  /**
+   * Update web search settings, persist to disk, and reload tool registry.
+   */
+  async updateWebSearchSettings(settings: WebSearchSettings): Promise<void> {
+    this.webSearchSettings = settings;
+    await saveWebSearchSettings(this.config.projectRoot, settings);
+    this.reloadToolRegistry();
+  }
+
+  /**
    * Re-create the LLM client from current settings.
    */
   private reloadLLMClient(): void {
@@ -282,6 +311,21 @@ export class Server {
       presencePenalty: this.llmSettings.presencePenalty,
       maxTokens: this.llmSettings.maxTokens,
     });
+  }
+
+  /**
+   * Re-create the tool registry from current allowed tools.
+   * Adds web_search to the allowed list when a custom provider is configured.
+   */
+  private reloadToolRegistry(): void {
+    const allowed = [...(this.config.allowedTools ?? [])];
+    // Auto-enable web_search tool when using Tavily or Brave provider
+    if (this.webSearchSettings.provider === "tavily" || this.webSearchSettings.provider === "brave") {
+      if (!allowed.includes("web_search")) {
+        allowed.push("web_search");
+      }
+    }
+    this.tools = createDefaultRegistry(allowed);
   }
 
   /**
@@ -484,6 +528,8 @@ export class Server {
       vaultManager: this.vaultManager,
       getLLMSettings: () => this.llmSettings,
       updateLLMSettings: (settings) => this.updateLLMSettings(settings),
+      getWebSearchSettings: () => this.webSearchSettings,
+      updateWebSearchSettings: (settings) => this.updateWebSearchSettings(settings),
     };
   }
 
@@ -861,6 +907,26 @@ export class Server {
     }
 
     // ========================================
+    // Web Search Settings API Routes
+    // ========================================
+
+    // GET /api/web-search-settings - Get current web search settings
+    if (method === "GET" && path === "/api/web-search-settings") {
+      return handleGetWebSearchSettings(ctx);
+    }
+
+    // POST /api/web-search-settings - Save web search settings
+    if (method === "POST" && path === "/api/web-search-settings") {
+      return await handleSaveWebSearchSettings(ctx, request);
+    }
+
+    // POST /api/web-search-settings/reset - Reset to defaults
+    if (method === "POST" && path === "/api/web-search-settings/reset") {
+      const { handleResetWebSearchSettings } = await import("./routes.ts");
+      return await handleResetWebSearchSettings(ctx);
+    }
+
+    // ========================================
     // Admin API Routes
     // ========================================
 
@@ -1078,6 +1144,11 @@ export class Server {
     // GET /fragments/settings/llm - LLM settings UI fragment
     if (path === "/fragments/settings/llm") {
       return handleLLMSettingsFragment(ctx);
+    }
+
+    // GET /fragments/settings/web-search - Web search settings UI fragment
+    if (path === "/fragments/settings/web-search") {
+      return handleWebSearchSettingsFragment(ctx);
     }
 
     // ========================================

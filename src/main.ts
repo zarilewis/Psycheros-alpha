@@ -11,6 +11,8 @@ initLogCapture();
 import { Server } from "./server/mod.ts";
 import { createMCPClient, type MCPClient } from "./mcp-client/mod.ts";
 import { initialize } from "./init/mod.ts";
+import { getDefaultWebSearchSettings } from "./llm/web-search-settings.ts";
+import { join } from "@std/path";
 
 const VERSION = "0.1.0";
 
@@ -77,18 +79,21 @@ console.log(
   `Tools enabled: ${allowedTools.length > 0 ? allowedTools.join(", ") : "(none)"}`
 );
 console.log(`RAG enabled: ${ragEnabled}`);
+const webSearchDefaults = getDefaultWebSearchSettings();
+console.log(`Web search: ${webSearchDefaults.provider}`);
 console.log(`Press Ctrl+C to stop\n`);
 
 // Initialize MCP client if enabled
 let mcpClient: MCPClient | undefined;
-const mcpEnabled = Deno.env.get("PSYCHEROS_MCP_ENABLED") === "true";
+const mcpEnabled = Deno.env.get("PSYCHEROS_MCP_ENABLED") !== "false";
 
 if (mcpEnabled) {
   const mcpCommand = Deno.env.get("PSYCHEROS_MCP_COMMAND") || "/home/zari/.deno/bin/deno";
-  const mcpArgsStr = Deno.env.get("PSYCHEROS_MCP_ARGS") || `run -A ${Deno.env.get("HOME")}/Projects/entity-core/src/mod.ts`;
+  const entityCoreRoot = Deno.env.get("PSYCHEROS_ENTITY_CORE_PATH") || join(config.projectRoot, "..", "entity-core");
+  const mcpArgsStr = Deno.env.get("PSYCHEROS_MCP_ARGS") || `run -A ${entityCoreRoot}/src/mod.ts`;
   const mcpArgs = mcpArgsStr.split(" ");
   const mcpInstance = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
-  const entityCoreDataDir = Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${Deno.env.get("HOME")}/Projects/entity-core/data`;
+  const entityCoreDataDir = Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${entityCoreRoot}/data`;
 
   console.log(`MCP enabled: connecting to entity-core as ${mcpInstance}`);
 
@@ -98,7 +103,7 @@ if (mcpEnabled) {
     instanceId: mcpInstance,
     env: {
       ENTITY_CORE_DATA_DIR: entityCoreDataDir,
-      ZAI_API_KEY: Deno.env.get("ZAI_API_KEY"),
+      ZAI_API_KEY: Deno.env.get("ZAI_API_KEY") || "",
     },
     syncOnStartup: true,
     syncInterval: 5 * 60 * 1000, // 5 minutes

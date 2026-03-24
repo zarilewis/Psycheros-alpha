@@ -42,6 +42,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/server/state-changes.ts` | Unified state mutations |
 | `src/server/broadcaster.ts` | Persistent SSE for background updates |
 | `src/tools/registry.ts` | Tool registration |
+| `src/tools/web-search.ts` | Web search tool (Tavily / Brave) |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
 | `src/memory/mod.ts` | Hierarchical memory system |
 | `src/rag/mod.ts` | RAG retrieval system |

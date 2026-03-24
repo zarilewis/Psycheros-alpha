@@ -10,6 +10,7 @@
 import type { Conversation, Message, ToolCall, ToolResult, TurnMetrics } from "../types.ts";
 import type { Lorebook, LorebookEntry } from "../lorebook/mod.ts";
 import type { LLMSettings } from "../llm/mod.ts";
+import type { WebSearchSettings } from "../llm/mod.ts";
 import { maskApiKey } from "../llm/mod.ts";
 import { renderMarkdown } from "./markdown.ts";
 
@@ -412,6 +413,25 @@ export function renderSettingsHub(): string {
         <div class="settings-hub-card-body">
           <span class="settings-hub-card-title">Data Vault</span>
           <span class="settings-hub-card-desc">Store and search documents for context-aware responses</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/web-search"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="2" y1="12" x2="22" y2="12"/>
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Web Search</span>
+          <span class="settings-hub-card-desc">Enable web search for current information and news</span>
         </div>
         <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 18 15 12 9 6"/>
@@ -2498,6 +2518,210 @@ async function resetLLMDefaults(event) {
     }
   } catch (e) {
     showStatus('error', 'Failed to reset: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'Reset to Defaults';
+    btn.classList.remove('btn--danger');
+    btn.classList.add('btn--ghost');
+  }
+}
+</script>
+`;
+}
+
+// =============================================================================
+// Web Search Settings Template
+// =============================================================================
+
+export function renderWebSearchSettings(settings: WebSearchSettings): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Web Search</h1>
+        <p class="settings-desc">Enable web search for current information and news access</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <!-- Provider Selection -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Provider</h3>
+      <p class="theme-section-desc">Choose which web search service to use</p>
+      <div class="llm-fields">
+        <label class="radio-label">
+          <input type="radio" name="ws-provider" value="none" ${settings.provider === "disabled" ? "checked" : ""}>
+          <span class="radio-text">None</span>
+          <span class="label-hint">No web search capability</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="ws-provider" value="tavily" ${settings.provider === "tavily" ? "checked" : ""}>
+          <span class="radio-text">Tavily</span>
+          <span class="label-hint">AI-optimized search API (requires API key)</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="ws-provider" value="brave" ${settings.provider === "brave" ? "checked" : ""}>
+          <span class="radio-text">Brave Search</span>
+          <span class="label-hint">General web search API (requires API key)</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Tavily API Key -->
+    <section class="theme-section" id="ws-tavily-section" style="${settings.provider === "tavily" ? "" : "display:none;"}">
+      <h3 class="theme-section-title">Tavily API Key</h3>
+      <p class="theme-section-desc">Get an API key from <a href="https://tavily.com" target="_blank" rel="noopener" style="color:var(--accent)">tavily.com</a></p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="ws-tavily-key">API Key</label>
+          <input type="password" id="ws-tavily-key" class="input-field llm-input" value="${escapeHtml(settings.tavilyApiKey || "")}" placeholder="tvly-...">
+        </div>
+      </div>
+    </section>
+
+    <!-- Brave API Key -->
+    <section class="theme-section" id="ws-brave-section" style="${settings.provider === "brave" ? "" : "display:none;"}">
+      <h3 class="theme-section-title">Brave Search API Key</h3>
+      <p class="theme-section-desc">Get an API key from <a href="https://brave.com/search/api/" target="_blank" rel="noopener" style="color:var(--accent)">brave.com/search/api</a></p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="ws-brave-key">API Key</label>
+          <input type="password" id="ws-brave-key" class="input-field llm-input" value="${escapeHtml(settings.braveApiKey || "")}" placeholder="BSA-...">
+        </div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <div class="llm-actions">
+      <div class="llm-actions-left">
+        <button class="btn btn--primary" onclick="saveWebSearchSettings(event)">Save Settings</button>
+      </div>
+      <button class="btn btn--ghost" onclick="resetWebSearchDefaults(event)">Reset to Defaults</button>
+    </div>
+
+    <!-- Status -->
+    <div id="ws-status" class="llm-status" style="display:none;"></div>
+
+  </div>
+</div>
+
+<style>
+  .radio-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    cursor: pointer;
+  }
+  .radio-label input[type="radio"] {
+    accent-color: var(--accent);
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+  }
+  .radio-text {
+    font-weight: 500;
+    min-width: 100px;
+  }
+  .label-hint {
+    color: var(--text-dim);
+    font-size: 0.85rem;
+  }
+</style>
+
+<script>
+document.querySelectorAll('input[name="ws-provider"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    const tavily = document.getElementById('ws-tavily-section');
+    const brave = document.getElementById('ws-brave-section');
+    if (!tavily || !brave) return;
+    tavily.style.display = radio.value === 'tavily' ? '' : 'none';
+    brave.style.display = radio.value === 'brave' ? '' : 'none';
+  });
+});
+
+function showWsStatus(type, message) {
+  const el = document.getElementById('ws-status');
+  if (!el) return;
+  el.style.display = 'block';
+  el.className = 'llm-status ' + type;
+  el.textContent = message;
+}
+
+function getSelectedProvider() {
+  const checked = document.querySelector('input[name="ws-provider"]:checked');
+  return checked ? checked.value : 'disabled';
+}
+
+async function saveWebSearchSettings(event) {
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  showWsStatus('loading', 'Saving settings...');
+
+  try {
+    const settings = {
+      provider: getSelectedProvider(),
+      tavilyApiKey: document.getElementById('ws-tavily-key')?.value.trim() || '',
+      braveApiKey: document.getElementById('ws-brave-key')?.value.trim() || '',
+    };
+    const resp = await fetch('/api/web-search-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showWsStatus('success', 'Settings saved successfully.');
+    } else {
+      showWsStatus('error', 'Failed to save: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    showWsStatus('error', 'Failed to save: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Settings';
+  }
+}
+
+let wsResetPending = false;
+async function resetWebSearchDefaults(event) {
+  const btn = event.currentTarget;
+  if (!wsResetPending) {
+    wsResetPending = true;
+    btn.textContent = 'Confirm Reset?';
+    btn.classList.add('btn--danger');
+    btn.classList.remove('btn--ghost');
+    setTimeout(() => {
+      if (wsResetPending) {
+        wsResetPending = false;
+        btn.textContent = 'Reset to Defaults';
+        btn.classList.remove('btn--danger');
+        btn.classList.add('btn--ghost');
+      }
+    }, 3000);
+    return;
+  }
+  wsResetPending = false;
+  btn.textContent = 'Resetting...';
+  btn.disabled = true;
+  showWsStatus('loading', 'Resetting to defaults...');
+
+  try {
+    const resp = await fetch('/api/web-search-settings/reset', { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      htmx.ajax('GET', '/fragments/settings/web-search', { target: '#chat', swap: 'innerHTML' });
+    } else {
+      showWsStatus('error', 'Failed to reset: ' + (data.error || 'Unknown error'));
+      btn.disabled = false;
+      btn.textContent = 'Reset to Defaults';
+      btn.classList.remove('btn--danger');
+      btn.classList.add('btn--ghost');
+    }
+  } catch (e) {
+    showWsStatus('error', 'Failed to reset: ' + e.message);
     btn.disabled = false;
     btn.textContent = 'Reset to Defaults';
     btn.classList.remove('btn--danger');

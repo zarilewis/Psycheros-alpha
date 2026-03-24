@@ -17,3 +17,7 @@ export { createDefaultClient, createWorkerClient, LLMClient } from "./client.ts"
 // Re-export settings
 export type { LLMSettings } from "./settings.ts";
 export { loadSettings, saveSettings, getDefaultSettings, maskApiKey } from "./settings.ts";
+
+// Re-export web search settings
+export type { WebSearchSettings } from "./web-search-settings.ts";
+export { loadWebSearchSettings, saveWebSearchSettings, getDefaultWebSearchSettings, maskWebSearchSettings } from "./web-search-settings.ts";

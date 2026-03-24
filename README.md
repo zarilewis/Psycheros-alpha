@@ -63,6 +63,8 @@ src/
 ├── llm/              # OpenAI-compatible LLM client
 │   ├── mod.ts
 │   ├── client.ts     # Streaming client, tool calls, thinking content
+│   ├── settings.ts   # LLM settings persistence
+│   ├── web-search-settings.ts  # Web search settings persistence
 │   └── types.ts
 ├── db/               # SQLite persistence
 │   ├── mod.ts
@@ -73,6 +75,7 @@ src/
 │   ├── mod.ts
 │   ├── registry.ts   # Tool registration
 │   ├── shell.ts
+│   ├── web-search.ts # Web search (Tavily / Brave)
 │   ├── identity-helpers.ts  # XML parsing, MCP fallback
 │   ├── identity-casual.ts   # Tier 1: append-only
 │   └── identity-maintain.ts # Tier 2: maintenance

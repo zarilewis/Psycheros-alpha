@@ -153,6 +153,14 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `POST` | `/api/llm-settings/reset` | Reset to environment variable defaults |
 | `POST` | `/api/llm-settings/test` | Test LLM connection |
 
+### Web Search Settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/web-search-settings` | Get current web search settings (API keys masked) |
+| `POST` | `/api/web-search-settings` | Save web search settings |
+| `POST` | `/api/web-search-settings/reset` | Reset to environment variable defaults |
+
 ### MCP
 
 | Method | Path | Description |

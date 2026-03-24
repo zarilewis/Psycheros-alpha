@@ -17,6 +17,9 @@ All Psycheros configuration is via environment variables. Copy `.env.example` to
 | `PSYCHEROS_MEMORY_HOUR` | No | `4` | Hour to run daily summarization (0-23) |
 | `PSYCHEROS_SNAPSHOT_HOUR` | No | `3` | Hour to run daily identity snapshots (0-23) |
 | `PSYCHEROS_SNAPSHOT_RETENTION_DAYS` | No | `30` | Days to retain snapshots before cleanup |
+| `PSYCHEROS_WEB_SEARCH` | No | `disabled` | Web search provider: `disabled`, `tavily`, or `brave` |
+| `TAVILY_API_KEY` | No | — | API key for Tavily search (when `PSYCHEROS_WEB_SEARCH=tavily`) |
+| `BRAVE_SEARCH_API_KEY` | No | — | API key for Brave search (when `PSYCHEROS_WEB_SEARCH=brave`) |
 | `TZ` | No | `UTC` | Timezone for message timestamps (e.g., `America/Los_Angeles`) |
 
 ## Available Tools
@@ -51,6 +54,7 @@ Tools must be explicitly enabled via `PSYCHEROS_TOOLS`. Set to a comma-separated
 | `vault_write` | Create or update a vault document (global or per-chat scope) |
 | `vault_list` | List vault documents (filterable by scope) |
 | `vault_search` | Search vault for relevant content |
+| `web_search` | Search the web via Tavily or Brave (auto-enabled when web search provider is set) |
 
 **Example configurations:**
 ```bash
@@ -74,7 +78,7 @@ PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,appe
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PSYCHEROS_MCP_ENABLED` | `false` | Enable connection to entity-core |
+| `PSYCHEROS_MCP_ENABLED` | `true` | Enable connection to entity-core (set to `false` to disable) |
 | `PSYCHEROS_MCP_COMMAND` | `deno` | Command to spawn entity-core |
 | `PSYCHEROS_MCP_ARGS` | `run -A --unstable-cron <path>/entity-core/src/mod.ts` | Arguments for entity-core |
 | `PSYCHEROS_MCP_INSTANCE` | `psycheros-harness` | Instance ID for this embodiment |

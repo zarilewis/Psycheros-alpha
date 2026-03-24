@@ -40,6 +40,27 @@ The entity can read and write to its knowledge graph. Write tools auto-generate 
 | `graph_delete_edge` | Remove a relationship |
 | `graph_write_batch` | Batch create nodes and edges (edges can reference existing nodes by label) |
 
+## Web Search Tool
+
+The entity can search the web for current information using either Tavily or Brave Search. The provider and API key are configured via the Settings UI or environment variables — the tool is auto-enabled when a provider is selected.
+
+| Setting | Env Var | Description |
+|---------|---------|-------------|
+| Provider | `PSYCHEROS_WEB_SEARCH` | `disabled` (default), `tavily`, or `brave` |
+| Tavily key | `TAVILY_API_KEY` | Required when using Tavily |
+| Brave key | `BRAVE_SEARCH_API_KEY` | Required when using Brave Search |
+
+The tool accepts a `query` (required) and `max_results` (optional, default 5, max 10). Results are returned as a formatted list with titles, URLs, and snippets.
+
+Settings are persisted to `.psycheros/web-search-settings.json` (gitignored).
+
+### Related Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/tools/web-search.ts` | `web_search` tool with Tavily and Brave providers |
+| `src/llm/web-search-settings.ts` | Settings type, load/save, API key masking |
+
 ## Data Vault Tools
 
 The entity can create, list, and search documents stored in the Data Vault for persistent reference.
