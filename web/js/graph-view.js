@@ -53,21 +53,42 @@ function getNodeColor(type) {
 // Edge styling — muted tones that don't compete with nodes
 function getEdgeColor(type) {
   const map = {
-    feels_about:  { h: 340, s: 40 },
-    comforted_by: { h: 140, s: 40 },
-    stressed_by:  { h: 0,   s: 50 },
-    close_to:     { h: 210, s: 40 },
-    mentions:     { h: 270, s: 30 },
-    loves:        { h: 340, s: 50 },
-    dislikes:     { h: 25,  s: 40 },
-    helps_with:   { h: 140, s: 40 },
-    worsens:      { h: 0,   s: 50 },
-    includes:     { h: 200, s: 30 },
-    family_of:    { h: 30,  s: 40 },
-    friend_of:    { h: 200, s: 40 },
-    seeks:        { h: 55,  s: 40 },
-    avoids:       { h: 0,   s: 30 },
-    reminds_of:   { h: 270, s: 30 }
+    // Attitudes
+    loves:          { h: 340, s: 50 },
+    dislikes:       { h: 25,  s: 40 },
+    respects:       { h: 200, s: 40 },
+    proud_of:       { h: 45,  s: 50 },
+    worried_about:  { h: 0,   s: 50 },
+    nostalgic_for:  { h: 30,  s: 40 },
+    intrigued_by:   { h: 270, s: 40 },
+    frustrated_with:{ h: 15,  s: 50 },
+    // Social
+    family_of:      { h: 30,  s: 40 },
+    friend_of:      { h: 200, s: 40 },
+    works_with:     { h: 210, s: 35 },
+    close_to:       { h: 210, s: 40 },
+    estranged_from: { h: 0,   s: 40 },
+    // Life/Factual
+    works_at:       { h: 210, s: 30 },
+    lives_in:       { h: 140, s: 35 },
+    studies:        { h: 270, s: 30 },
+    // Beliefs/Values
+    values:         { h: 45,  s: 45 },
+    believes_in:    { h: 200, s: 45 },
+    // Knowledge/Interest
+    skilled_at:     { h: 270, s: 40 },
+    interested_in:  { h: 55,  s: 40 },
+    // Temporal/Causal
+    caused:         { h: 0,   s: 35 },
+    led_to:         { h: 25,  s: 30 },
+    part_of:        { h: 200, s: 30 },
+    // Association
+    reminds_of:     { h: 270, s: 30 },
+    associated_with:{ h: 0,   s: 0  },
+    similar_to:     { h: 210, s: 25 },
+    // Memory
+    mentions:       { h: 270, s: 30 },
+    mentioned_in:   { h: 270, s: 25 },
   };
   const info = map[type] || { h: 0, s: 0 };
   const color = hslColor(info.h, info.s, 45, 0.7);

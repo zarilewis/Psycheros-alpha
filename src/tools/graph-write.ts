@@ -70,7 +70,7 @@ const graphCreateEdgeDef: Tool["definition"] = {
         },
         type: {
           type: "string",
-          description: "Relationship type: feels_about, close_to, mentions, helps_with, worsens, loves, dislikes, avoids, seeks, family_of, friend_of, reminds_of, or any custom type",
+          description: "Relationship type — any natural language string (e.g., loves, works_at, values, respects, proud_of, family_of, close_to, interested_in, caused, reminds_of, mentioned_in)",
         },
         weight: {
           type: "number",

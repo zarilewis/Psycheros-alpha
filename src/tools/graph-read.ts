@@ -78,7 +78,7 @@ const graphGetEdgesDef: Tool["definition"] = {
         },
         type: {
           type: "string",
-          description: "Optional filter by relationship type (feels_about, close_to, mentions, helps_with, worsens, etc.)",
+          description: "Optional filter by relationship type (loves, works_at, values, close_to, mentions, etc. — any natural language string)",
         },
       },
       required: [],
@@ -283,7 +283,7 @@ async function executeGraphGetEdges(
 
     const formatted = edges.map((e) => {
       const weight = Math.round(e.weight * 100);
-      const relType = e.customType || e.type;
+      const relType = e.type;
       return `- ${e.fromId} --[${relType}]--> ${e.toId} [${weight}%]`;
     }).join("\n");
 
@@ -388,7 +388,7 @@ async function executeGraphGetSubgraph(
 
     const edgesFormatted = subgraph.edges && subgraph.edges.length > 0
       ? "\n\nRelationships:\n" + subgraph.edges.map((e) => {
-          const relType = e.customType || e.type;
+          const relType = e.type;
           const fromNode = subgraph.nodes.find((n) => n.id === e.fromId);
           const toNode = subgraph.nodes.find((n) => n.id === e.toId);
           return `- **${fromNode?.label || e.fromId}** → *${relType}* → **${toNode?.label || e.toId}**`;
