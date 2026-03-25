@@ -103,7 +103,17 @@ if (mcpEnabled) {
     instanceId: mcpInstance,
     env: {
       ENTITY_CORE_DATA_DIR: entityCoreDataDir,
+      // Entity-core LLM settings — fall back to Psycheros ZAI_* vars,
+      // but prefer entity-core specific vars if set
+      ENTITY_CORE_LLM_API_KEY: Deno.env.get("ENTITY_CORE_LLM_API_KEY") || Deno.env.get("ZAI_API_KEY") || "",
+      ENTITY_CORE_LLM_BASE_URL: Deno.env.get("ENTITY_CORE_LLM_BASE_URL") || Deno.env.get("ZAI_BASE_URL") || "",
+      ENTITY_CORE_LLM_MODEL: Deno.env.get("ENTITY_CORE_LLM_MODEL") || Deno.env.get("ZAI_MODEL") || "",
+      ENTITY_CORE_LLM_TEMPERATURE: Deno.env.get("ENTITY_CORE_LLM_TEMPERATURE") || "",
+      ENTITY_CORE_LLM_MAX_TOKENS: Deno.env.get("ENTITY_CORE_LLM_MAX_TOKENS") || "",
+      // Also pass ZAI_* directly for any code paths that read those
       ZAI_API_KEY: Deno.env.get("ZAI_API_KEY") || "",
+      ZAI_BASE_URL: Deno.env.get("ZAI_BASE_URL") || "",
+      ZAI_MODEL: Deno.env.get("ZAI_MODEL") || "",
     },
     syncOnStartup: true,
     syncInterval: 5 * 60 * 1000, // 5 minutes

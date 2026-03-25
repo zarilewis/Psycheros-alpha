@@ -82,9 +82,16 @@ PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,appe
 | `PSYCHEROS_MCP_COMMAND` | `deno` | Command to spawn entity-core |
 | `PSYCHEROS_MCP_ARGS` | `run -A --unstable-cron <path>/entity-core/src/mod.ts` | Arguments for entity-core |
 | `PSYCHEROS_MCP_INSTANCE` | `psycheros-harness` | Instance ID for this embodiment |
+| `ENTITY_CORE_LLM_API_KEY` | — | Override API key for entity-core's LLM (memory-to-graph extraction). Falls back to `ZAI_API_KEY` |
+| `ENTITY_CORE_LLM_BASE_URL` | — | Override LLM endpoint for entity-core. Falls back to `ZAI_BASE_URL` |
+| `ENTITY_CORE_LLM_MODEL` | — | Override model for entity-core extraction. Falls back to `ZAI_MODEL` |
+
+Psycheros automatically forwards its `ZAI_API_KEY`, `ZAI_BASE_URL`, and `ZAI_MODEL` to entity-core so that knowledge graph extraction works out of the box. Set the `ENTITY_CORE_LLM_*` variants if entity-core needs different LLM settings than Psycheros (e.g., a cheaper model for extraction).
 
 When MCP is enabled, Psycheros:
 - Spawns entity-core as a subprocess on startup
+- Automatically forwards LLM env vars (`ZAI_API_KEY`, `ZAI_BASE_URL`, `ZAI_MODEL`) so entity-core's memory-to-graph extraction works
+- Entity-core-specific `ENTITY_CORE_LLM_*` vars take priority if set
 - Pulls identity files (self, user, relationship, custom) from entity-core
 - Queues changes and syncs back periodically (every 5 minutes)
 - Falls back to local files if MCP is unavailable
