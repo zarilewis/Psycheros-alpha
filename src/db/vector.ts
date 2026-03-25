@@ -43,7 +43,7 @@ export function isVectorModuleAvailable(): boolean {
  *
  * @returns Promise that resolves to true if extension loaded successfully
  */
-export async function ensureVectorModule(): Promise<boolean> {
+export function ensureVectorModule(): boolean {
   // Extension loading is now done in loadVectorExtension
   // This function exists for backwards compatibility
   return extensionLoaded;

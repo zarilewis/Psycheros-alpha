@@ -23,7 +23,7 @@
     "xlsx": "npm:xlsx@^0.18.5"
   },
   "lint": {
-    "exclude": ["web/lib/"]
+    "exclude": ["web/lib/", "web/js/"]
   },
   "compilerOptions": {
     "strict": true,

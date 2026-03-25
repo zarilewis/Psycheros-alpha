@@ -108,7 +108,7 @@ async function main() {
     } else {
       console.log("sqlite-vec not available. Using in-memory fallback for search.");
     }
-  } catch (error) {
+  } catch {
     console.log("sqlite-vec not available. Using in-memory fallback for search.");
     console.log("(Embeddings will still be stored and searchable via in-memory calculation)");
   }

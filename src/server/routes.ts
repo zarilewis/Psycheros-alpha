@@ -3641,7 +3641,7 @@ export async function handleSaveWebSearchSettings(
     const current = ctx.getWebSearchSettings();
 
     const updated: WebSearchSettings = {
-      provider: body.provider === "none" ? "disabled" : (body.provider ?? current.provider),
+      provider: body.provider === "disabled" ? "disabled" : (body.provider ?? current.provider),
       tavilyApiKey: (body.tavilyApiKey && !body.tavilyApiKey.includes("••••"))
         ? body.tavilyApiKey
         : current.tavilyApiKey,
