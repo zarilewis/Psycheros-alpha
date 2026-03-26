@@ -867,6 +867,7 @@ function renderFinalContent(contentEl, rawContent) {
     console.error('Final markdown parse error:', e);
     contentEl.textContent = cleaned;
   }
+  contentEl.dataset.rawContent = cleaned;
   contentEl.classList.remove('streaming-active');
 }
 
@@ -2546,18 +2547,27 @@ function startMessageEdit(messageId) {
   const msgElement = document.querySelector(`[data-message-id="${messageId}"]`);
   if (!msgElement) return;
 
-  // Get the content element
-  const contentEl = msgElement.querySelector('.msg-content');
-  if (!contentEl) return;
+  // Get original content — use raw markdown from data attribute when available
+  let originalContent = '';
+  let targetEl;
 
-  // Get original content (text only, without markdown)
-  const originalContent = contentEl.textContent || '';
+  // For assistant messages, target .assistant-text to exclude thinking/tool sections
+  const assistantText = msgElement.querySelector('.assistant-text');
+  if (assistantText) {
+    targetEl = assistantText;
+    originalContent = assistantText.dataset.rawContent || assistantText.textContent || '';
+  } else {
+    // For user messages, target .msg-content
+    targetEl = msgElement.querySelector('.msg-content');
+    if (!targetEl) return;
+    originalContent = targetEl.dataset.rawContent || targetEl.textContent || '';
+  }
 
   // Store original content for cancel
   msgElement.dataset.originalContent = originalContent;
 
   // Hide the content
-  contentEl.style.display = 'none';
+  targetEl.style.display = 'none';
 
   // Hide edit button
   const editBtn = msgElement.querySelector('.msg-edit-btn');
@@ -2594,7 +2604,7 @@ function startMessageEdit(messageId) {
   editContainer.appendChild(actions);
 
   // Insert after content
-  contentEl.after(editContainer);
+  targetEl.after(editContainer);
 
   // Focus textarea
   textarea.focus();
@@ -2612,9 +2622,14 @@ function cancelMessageEdit(messageId) {
   const editContainer = msgElement.querySelector('.msg-edit-container');
   if (editContainer) editContainer.remove();
 
-  // Show content
-  const contentEl = msgElement.querySelector('.msg-content');
-  if (contentEl) contentEl.style.display = '';
+  // Show content (could be .assistant-text for assistant or .msg-content for user)
+  const assistantText = msgElement.querySelector('.assistant-text');
+  if (assistantText) {
+    assistantText.style.display = '';
+  } else {
+    const contentEl = msgElement.querySelector('.msg-content');
+    if (contentEl) contentEl.style.display = '';
+  }
 
   // Show edit button
   const editBtn = msgElement.querySelector('.msg-edit-btn');

@@ -788,7 +788,7 @@ export function renderUserMessage(
     ${editedIndicator}
     ${editBtn}
   </div>
-  <div class="msg-content user-text">${renderMarkdown(content)}</div>
+  <div class="msg-content user-text" data-raw-content="${escapeHtml(content)}">${renderMarkdown(content)}</div>
 </div>`;
 }
 
@@ -836,7 +836,7 @@ export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics, enti
 
   // Main content - render markdown for assistant messages
   if (msg.content) {
-    html += `<div class="assistant-text">${renderMarkdown(msg.content)}</div>`;
+    html += `<div class="assistant-text" data-raw-content="${escapeHtml(msg.content)}">${renderMarkdown(msg.content)}</div>`;
   }
 
   html += `</div></div>`;
