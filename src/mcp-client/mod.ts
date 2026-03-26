@@ -798,6 +798,108 @@ export class MCPClient {
   }
 
   /**
+   * Read a single memory entry via MCP.
+   * Falls back to local file if MCP is not connected.
+   */
+  async readMemory(
+    granularity: Granularity,
+    date: string,
+  ): Promise<MemoryEntry | null> {
+    if (this.client) {
+      try {
+        const result = await this.client.callTool({
+          name: "memory_read",
+          arguments: {
+            granularity,
+            date,
+          },
+        });
+
+        const r = result as Record<string, unknown>;
+        if (r.isError) {
+          const errorText = extractTextContent(result) || "Unknown MCP error";
+          console.error("[MCP] memory_read error:", errorText);
+          return null;
+        }
+
+        const textContent = extractTextContent(result);
+        if (textContent) {
+          const response = JSON.parse(textContent);
+          if (response.success && response.memory) {
+            return response.memory;
+          }
+        }
+        return null;
+      } catch (error) {
+        console.error("[MCP] memory_read failed:", error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Update (overwrite) a memory entry via MCP.
+   * If MCP is not connected, queues for later sync.
+   */
+  async updateMemory(
+    granularity: Granularity,
+    date: string,
+    content: string,
+  ): Promise<boolean> {
+    if (this.client) {
+      try {
+        const result = await this.client.callTool({
+          name: "memory_update",
+          arguments: {
+            granularity,
+            date,
+            content,
+            editedBy: this.config.instanceId,
+          },
+        });
+
+        const r = result as Record<string, unknown>;
+        if (r.isError) {
+          const errorText = extractTextContent(result) || "Unknown MCP error";
+          throw new Error(errorText);
+        }
+
+        const textContent = extractTextContent(result);
+        if (textContent) {
+          try {
+            const response = JSON.parse(textContent);
+            return response.success;
+          } catch {
+            throw new Error(textContent);
+          }
+        }
+
+        return false;
+      } catch (error) {
+        console.error("[MCP] memory_update failed:", error instanceof Error ? error.message : String(error));
+        // Queue for later sync
+      }
+    }
+
+    // Not connected or failed — queue as a memory change for later
+    this.queueMemoryChange({
+      id: `${granularity}-${date}`,
+      granularity,
+      date,
+      content,
+      chatIds: [],
+      sourceInstance: this.config.instanceId,
+      participatingInstances: [this.config.instanceId],
+      version: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    return true;
+  }
+
+  /**
    * Search memories via MCP.
    */
   async searchMemories(

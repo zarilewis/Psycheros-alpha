@@ -117,6 +117,39 @@ export class MemoryIndexer implements Indexer {
   }
 
   /**
+   * Reindex a single memory file.
+   * Efficient — only processes the one changed file.
+   */
+  async reindexFile(relativePath: string): Promise<void> {
+    const filePath = join(this.memoriesDir, relativePath);
+
+    console.log(`[RAG] Reindexing: ${relativePath}`);
+
+    // Remove old chunks for this file
+    this.removeFile(relativePath);
+
+    // Read and chunk file
+    const content = await Deno.readTextFile(filePath);
+    const chunker = getChunker();
+    const embedder = getEmbedder();
+    await embedder.initialize();
+
+    const chunks = chunker.chunk(content, relativePath);
+
+    // Generate embeddings and store chunks
+    for (const chunk of chunks) {
+      const embedding = await embedder.embed(chunk.content);
+      this.storeChunk(chunk, embedding);
+    }
+
+    // Mark file as indexed
+    const contentHash = await hashContent(content);
+    this.markFileIndexed(relativePath, contentHash, chunks.length);
+
+    console.log(`[RAG] Reindexed ${relativePath}: ${chunks.length} chunks`);
+  }
+
+  /**
    * Check if a file needs to be reindexed.
    */
   async needsReindex(filePath: string): Promise<boolean> {

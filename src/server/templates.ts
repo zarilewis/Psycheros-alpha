@@ -375,6 +375,25 @@ export function renderSettingsHub(): string {
         </svg>
       </a>
       <a class="settings-hub-card"
+        hx-get="/fragments/settings/memories"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/>
+            <line x1="9" y1="21" x2="15" y2="21"/>
+            <path d="M9 9h.01M15 9h.01M9.5 13a3.5 3.5 0 0 0 5 0"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Memories</span>
+          <span class="settings-hub-card-desc">Review and edit the entity's recorded memories</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
         hx-get="/fragments/settings/appearance"
         hx-target="#chat"
         hx-swap="innerHTML">
@@ -1417,6 +1436,223 @@ function formatTime(timestamp: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+// =============================================================================
+// Memories Templates
+// =============================================================================
+
+/**
+ * Valid memory granularities.
+ */
+const VALID_MEMORY_GRANULARITIES = ["daily", "weekly", "monthly", "yearly", "significant"] as const;
+type MemoryGranularity = typeof VALID_MEMORY_GRANULARITIES[number];
+
+/**
+ * Render the memories view with tabs.
+ */
+export function renderMemoriesView(activeGranularity: MemoryGranularity = "daily"): string {
+  const tabs = [
+    { id: "daily", label: "Daily" },
+    { id: "weekly", label: "Weekly" },
+    { id: "monthly", label: "Monthly" },
+    { id: "yearly", label: "Yearly" },
+    { id: "significant", label: "Significant" },
+  ];
+
+  const tabsHtml = tabs.map((tab) => {
+    const isActive = tab.id === activeGranularity;
+    return `<button
+      class="settings-tab${isActive ? " active" : ""}"
+      hx-get="/fragments/settings/memories/${tab.id}"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      id="memtab-${tab.id}"
+    >${tab.label}</button>`;
+  }).join("");
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Memories</h1>
+        <p class="settings-desc">Review and edit the entity's recorded memories.</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-tabs">
+    ${tabsHtml}
+  </div>
+  <div class="settings-content" id="settings-content"
+    hx-get="/fragments/settings/memories/${activeGranularity}"
+    hx-trigger="load"
+    hx-swap="innerHTML">
+    <div class="settings-loading">Loading...</div>
+  </div>
+</div>`;
+}
+
+/**
+ * Render the active tab indicator for memories as an OOB swap.
+ */
+function renderMemoryTabActiveState(activeGranularity: MemoryGranularity): string {
+  const tabs = VALID_MEMORY_GRANULARITIES;
+  return tabs.map((g) => {
+    const isActive = g === activeGranularity;
+    const label = g.charAt(0).toUpperCase() + g.slice(1);
+    return `<button
+      class="settings-tab${isActive ? " active" : ""}"
+      hx-get="/fragments/settings/memories/${g}"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-swap-oob="true"
+      id="memtab-${g}"
+    >${label}</button>`;
+  }).join("");
+}
+
+/**
+ * Render the memory file list for a granularity.
+ */
+export function renderMemoryList(
+  granularity: MemoryGranularity,
+  files: string[],
+): string {
+  const isSignificant = granularity === "significant";
+
+  // Significant directory has a create form
+  let createFormHtml = "";
+  if (isSignificant) {
+    createFormHtml = `
+      <div class="settings-create-file">
+        <input
+          type="date"
+          class="settings-create-file-input"
+          id="significant-date-input"
+        />
+        <button
+          class="btn btn--primary btn--sm"
+          onclick="Psycheros.createSignificantMemory()"
+        >
+          Create
+        </button>
+      </div>`;
+  }
+
+  // Sort files newest first
+  const sortedFiles = [...files].reverse();
+
+  const fileListHtml = sortedFiles.length === 0
+    ? `<div class="settings-empty">${isSignificant ? "No significant memories yet. Create one above!" : "No memories in this category"}</div>`
+    : `<div class="settings-file-list">
+      ${sortedFiles.map((file) => {
+        // Extract date from filename (e.g., "daily/2026-03-25.md" -> "2026-03-25")
+        const parts = file.split("/");
+        const filename = parts[parts.length - 1];
+        const displayName = filename.replace(/\.md$/, "");
+
+        return `<button
+          class="settings-file-item"
+          hx-get="/fragments/settings/memories/${granularity}/${encodeURIComponent(displayName)}"
+          hx-target="#settings-content"
+          hx-swap="innerHTML"
+        >
+          <svg class="settings-file-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+          </svg>
+          <span class="settings-file-name">${escapeHtml(displayName)}</span>
+        </button>`;
+      }).join("")}
+    </div>`;
+
+  // OOB swap to update active tab
+  const oobSwap = renderMemoryTabActiveState(granularity);
+
+  return createFormHtml + fileListHtml + oobSwap;
+}
+
+/**
+ * Render the memory editor with textarea.
+ */
+export function renderMemoryEditor(
+  granularity: MemoryGranularity,
+  date: string,
+  content: string,
+  metadata?: {
+    sourceInstance?: string;
+    createdAt?: string;
+    updatedAt?: string;
+    version?: number;
+    editedBy?: string;
+  },
+): string {
+  const safeContent = escapeHtml(content);
+
+  let metaHtml = "";
+  if (metadata) {
+    const parts: string[] = [];
+    if (metadata.sourceInstance && metadata.sourceInstance !== "unknown") {
+      parts.push(`Source: ${escapeHtml(metadata.sourceInstance)}`);
+    }
+    if (metadata.createdAt) {
+      parts.push(`Created: ${escapeHtml(new Date(metadata.createdAt).toLocaleString())}`);
+    }
+    if (metadata.updatedAt) {
+      parts.push(`Updated: ${escapeHtml(new Date(metadata.updatedAt).toLocaleString())}`);
+    }
+    if (metadata.version && metadata.version > 1) {
+      parts.push(`Version: ${metadata.version}`);
+    }
+    if (metadata.editedBy) {
+      parts.push(`Edited by: ${escapeHtml(metadata.editedBy)}`);
+    }
+    if (parts.length > 0) {
+      metaHtml = `<div class="settings-editor-meta">${parts.join(" &middot; ")}</div>`;
+    }
+  }
+
+  return `<div class="settings-editor">
+  <div class="settings-editor-header">
+    <button
+      class="btn btn--ghost btn--sm"
+      hx-get="/fragments/settings/memories/${granularity}"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+    >
+      &larr; Back
+    </button>
+    <span class="settings-editor-filename">${escapeHtml(date)}</span>
+    <span class="settings-editor-tokens" id="settings-editor-tokens">...</span>
+  </div>
+  ${metaHtml}
+  <form
+    class="settings-editor-form"
+    hx-post="/api/memories/${granularity}/${encodeURIComponent(date)}"
+    hx-target="#settings-editor-status"
+    hx-swap="innerHTML"
+  >
+    <textarea
+      class="settings-textarea"
+      name="content"
+      data-tokenize
+      placeholder="Memory content..."
+      rows="20"
+    >${safeContent}</textarea>
+    <div class="settings-editor-actions">
+      <button
+        type="button"
+        class="btn btn--ghost"
+        hx-get="/fragments/settings/memories/${granularity}"
+        hx-target="#settings-content"
+        hx-swap="innerHTML"
+      >Cancel</button>
+      <button type="submit" class="btn btn--primary">Save</button>
+    </div>
+    <div id="settings-editor-status" class="settings-editor-status"></div>
+  </form>
+</div>`;
 }
 
 // =============================================================================

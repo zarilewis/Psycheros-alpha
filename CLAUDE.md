@@ -84,7 +84,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | [docs/tools-reference.md](docs/tools-reference.md) | Tool system, identity tiers, MCP fallback, core prompt file structure |
 | [docs/memory-and-rag.md](docs/memory-and-rag.md) | Memory hierarchy, consolidation, 4 RAG systems (memory, chat, lorebook, vault), vector search |
 | [docs/ui-features.md](docs/ui-features.md) | Context viewer, stop generation, message editing, appearance, graph viz |
-| [docs/api-reference.md](docs/api-reference.md) | Full API endpoints (61 routes), dual SSE architecture |
+| [docs/api-reference.md](docs/api-reference.md) | Full API endpoints (67 routes), dual SSE architecture |
 | [docs/code-review-findings.md](docs/code-review-findings.md) | Code review bugs fixed, architectural decisions |
 | [docs/security-audit.md](docs/security-audit.md) | Security audit findings, threat model, accepted risks |
 | [docs/deployment/docker-strategy.md](docs/deployment/docker-strategy.md) | Dockerfile design, volumes, env vars, Deno caching |

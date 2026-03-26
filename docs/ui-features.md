@@ -234,3 +234,43 @@ Document storage and search system accessible via Settings → Data Vault in the
 - `POST /api/vault/search` — search vault
 
 **Source files:** `src/vault/manager.ts`, `src/vault/processor.ts`, `src/tools/vault-tools.ts`, `src/server/routes.ts`
+
+## Memories Editor
+
+Review and edit the entity's recorded memories accessible via Settings → Memories in the sidebar. Modeled after the Core Prompts UI with the same tabbed navigation pattern.
+
+**Features:**
+- Five tabs: Daily, Weekly, Monthly, Yearly, Significant
+- File lists sorted newest-first, each linking to a full editor
+- Editor displays read-only metadata (source instance, created/updated timestamps, version) when available from entity-core
+- Save writes the local file, pushes an overwrite update to entity-core via MCP (if connected), and reindexes the file in RAG
+- Significant tab includes a Create form for manually adding new significant memories
+- Works in offline mode (no MCP) — edits are saved locally only
+
+**Flow:**
+1. Settings hub → Memories card → tabbed view
+2. Click tab → file list for that granularity
+3. Click file → editor with textarea
+4. Edit and Save → writes local file + MCP update + RAG reindex
+5. Or (Significant tab): fill date + content → Create → new memory file
+
+**MCP Integration:**
+- **Read**: If MCP is connected, `memory_read` fetches richer metadata from entity-core (source instance, timestamps, version). Falls back to local file.
+- **Save**: Calls `memory_update` on entity-core (explicit overwrite, no append merge). Falls back to local-only if MCP is disconnected.
+- **Create**: Calls `memory_create` on entity-core for new significant memories.
+- **RAG**: `MemoryIndexer.reindexFile()` processes only the changed file — removes old chunks, re-reads, re-chunks, re-embeds, re-stores.
+
+**Security:**
+- Granularity validated against allowed values
+- Date validated against entity-core's regex (`^\d{4}(-W\d{2}|(-\d{2})?(-\d{2})?)$`)
+- Path traversal prevented by sanitizing date/granularity before file path construction
+- Only significant memories can be created new; other granularities are edit-only
+
+**API Endpoints:**
+- `GET /fragments/settings/memories` — tabbed view
+- `GET /fragments/settings/memories/:granularity` — file list
+- `GET /fragments/settings/memories/:granularity/:date` — editor
+- `POST /api/memories/:granularity/:date` — save edited memory
+- `POST /api/memories/significant/create` — create new significant memory
+
+**Source files:** `src/server/templates.ts` (render functions), `src/server/routes.ts` (handlers), `src/mcp-client/mod.ts` (MCP methods), `src/rag/indexer.ts` (reindexFile)

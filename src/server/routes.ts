@@ -19,6 +19,7 @@ import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
 import type { VaultManager } from "../vault/mod.ts";
+import type { MemoryIndexer } from "../rag/indexer.ts";
 import { EntityTurn, type EntityYield, generateAndSetTitle } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
 import {
@@ -31,6 +32,9 @@ import {
   renderFileEditor,
   renderSaveSuccess,
   renderSaveError,
+  renderMemoriesView,
+  renderMemoryList,
+  renderMemoryEditor,
   renderSnapshotsView,
   renderSnapshotPreview,
   renderLorebooksView,
@@ -51,6 +55,7 @@ import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
 import { MAX_SSE_MESSAGE_SIZE, SSE_TRUNCATION_SUFFIX } from "../constants.ts";
 import { getBroadcaster } from "./broadcaster.ts";
 import { runConsolidation, needsConsolidation } from "../memory/mod.ts";
+import { readMemoryFile, writeMemoryFile, listMemoryFiles } from "../memory/file-writer.ts";
 
 /**
  * Context passed to route handlers containing dependencies.
@@ -78,6 +83,8 @@ export interface RouteContext {
   lorebookManager?: LorebookManager;
   /** Optional vault manager for document storage */
   vaultManager?: VaultManager;
+  /** Optional memory indexer for reindexing after edits */
+  memoryIndexer?: MemoryIndexer;
   /** Get current LLM settings */
   getLLMSettings: () => LLMSettings;
   /** Update LLM settings and hot-reload */
@@ -1600,6 +1607,297 @@ export async function handleDeleteCustomFile(
         headers: { "Content-Type": "application/json" },
       }
     );
+  }
+}
+
+// =============================================================================
+// Memories Settings Routes
+// =============================================================================
+
+/**
+ * Valid memory granularities for route parameters.
+ */
+const VALID_MEMORY_GRANULARITIES = ["daily", "weekly", "monthly", "yearly", "significant"];
+
+/**
+ * Date validation regex (same as entity-core).
+ */
+const DATE_REGEX = /^\d{4}(-W\d{2}|(-\d{2})?(-\d{2})?)$/;
+
+/**
+ * Handle GET /fragments/settings/memories - Memories view fragment.
+ */
+export function handleMemoriesFragment(_ctx: RouteContext): Response {
+  const html = renderMemoriesView("daily");
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/memories/:granularity - Memory list fragment.
+ */
+export async function handleMemoriesListFragment(
+  ctx: RouteContext,
+  granularity: string,
+): Promise<Response> {
+  if (!VALID_MEMORY_GRANULARITIES.includes(granularity)) {
+    return new Response("Invalid granularity", {
+      status: 400,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  try {
+    const files = await listMemoryFiles(
+      granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
+      ctx.projectRoot,
+    );
+
+    const html = renderMemoryList(
+      granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
+      files,
+    );
+
+    return new Response(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch (error) {
+    console.error("[Routes] handleMemoriesListFragment error:", error);
+    return new Response(renderSaveError("Failed to list memories"), {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/memories/:granularity/:date - Memory editor fragment.
+ */
+export async function handleMemoriesEditorFragment(
+  ctx: RouteContext,
+  granularity: string,
+  date: string,
+): Promise<Response> {
+  if (!VALID_MEMORY_GRANULARITIES.includes(granularity)) {
+    return new Response("Invalid granularity", {
+      status: 400,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  // Sanitize date to prevent path traversal
+  const sanitizedDate = date.replace(/[^0-9W\-]/g, "");
+  if (!DATE_REGEX.test(sanitizedDate)) {
+    return new Response("Invalid date format", {
+      status: 400,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  const filePath = `${granularity}/${sanitizedDate}.md`;
+
+  try {
+    let content: string | null = null;
+    let metadata: { sourceInstance?: string; createdAt?: string; updatedAt?: string; version?: number; editedBy?: string } | undefined;
+
+    // Try MCP first for richer metadata
+    if (ctx.mcpClient?.isConnected()) {
+      const entry = await ctx.mcpClient.readMemory(
+        granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
+        sanitizedDate,
+      );
+      if (entry) {
+        content = entry.content;
+        metadata = {
+          sourceInstance: entry.sourceInstance,
+          createdAt: entry.createdAt,
+          updatedAt: entry.updatedAt,
+          version: entry.version,
+        };
+      }
+    }
+
+    // Fall back to local file
+    if (content === null) {
+      content = await readMemoryFile(filePath, ctx.projectRoot);
+    }
+
+    if (content === null) {
+      return new Response("Memory not found", {
+        status: 404,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+
+    const html = renderMemoryEditor(
+      granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
+      sanitizedDate,
+      content,
+      metadata,
+    );
+
+    return new Response(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch (error) {
+    console.error("[Routes] handleMemoriesEditorFragment error:", error);
+    return new Response(renderSaveError("Failed to load memory"), {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+}
+
+/**
+ * Handle POST /api/memories/:granularity/:date - Save edited memory.
+ */
+export async function handleSaveMemory(
+  ctx: RouteContext,
+  granularity: string,
+  date: string,
+  request: Request,
+): Promise<Response> {
+  if (!VALID_MEMORY_GRANULARITIES.includes(granularity)) {
+    return new Response(renderSaveError("Invalid granularity"), {
+      status: 400,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  // Sanitize date
+  const sanitizedDate = date.replace(/[^0-9W\-]/g, "");
+  if (!DATE_REGEX.test(sanitizedDate)) {
+    return new Response(renderSaveError("Invalid date format"), {
+      status: 400,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  try {
+    // Parse form data
+    const formData = await request.formData();
+    const content = formData.get("content") as string | null;
+
+    if (!content || content.trim().length === 0) {
+      return new Response(renderSaveError("Content cannot be empty"), {
+        status: 400,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Write local file
+    const filePath = `${granularity}/${sanitizedDate}.md`;
+    const fullPath = `${ctx.projectRoot}/memories/${filePath}`;
+
+    // Ensure directory exists
+    await Deno.mkdir(`${ctx.projectRoot}/memories/${granularity}`, { recursive: true });
+    await Deno.writeTextFile(fullPath, content);
+
+    // Push to entity-core via MCP (overwrite path)
+    if (ctx.mcpClient?.isConnected()) {
+      try {
+        await ctx.mcpClient.updateMemory(
+          granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
+          sanitizedDate,
+          content,
+        );
+      } catch (error) {
+        console.error("[Routes] MCP memory_update failed (local save succeeded):", error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    // Reindex the specific file in RAG
+    if (ctx.memoryIndexer) {
+      try {
+        await ctx.memoryIndexer.reindexFile(filePath);
+      } catch (error) {
+        console.error("[Routes] Memory reindex failed (non-fatal):", error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    return new Response(renderSaveSuccess(), {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch (error) {
+    console.error("[Routes] handleSaveMemory error:", error);
+    return new Response(renderSaveError("Failed to save memory"), {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+}
+
+/**
+ * Handle POST /api/memories/significant/create - Create a new significant memory.
+ */
+export async function handleCreateSignificantMemory(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const formData = await request.formData();
+    const date = formData.get("date") as string | null;
+    const content = formData.get("content") as string | null;
+
+    if (!date || !DATE_REGEX.test(date)) {
+      return new Response(renderSaveError("Invalid date format"), {
+        status: 400,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    if (!content || content.trim().length === 0) {
+      return new Response(renderSaveError("Content cannot be empty"), {
+        status: 400,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Write local file using writeMemoryFile (handles DB tracking for non-significant;
+    // significant skips DB tracking per file-writer.ts)
+    const memory = {
+      path: `significant/${date}.md`,
+      content,
+      chatIds: [],
+      granularity: "significant" as const,
+      date,
+    };
+
+    await writeMemoryFile(memory, ctx.db, ctx.projectRoot);
+
+    // Push to entity-core via MCP
+    if (ctx.mcpClient?.isConnected()) {
+      try {
+        await ctx.mcpClient.createMemory("significant", date, content);
+      } catch (error) {
+        console.error("[Routes] MCP memory_create for significant failed (local save succeeded):", error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    // Reindex
+    if (ctx.memoryIndexer) {
+      try {
+        await ctx.memoryIndexer.reindexFile(`significant/${date}.md`);
+      } catch (error) {
+        console.error("[Routes] Memory reindex failed (non-fatal):", error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    // Return redirect to refresh the significant tab
+    return new Response("", {
+      status: 200,
+      headers: {
+        "HX-Redirect": "/fragments/settings/memories/significant",
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] handleCreateSignificantMemory error:", error);
+    return new Response(renderSaveError("Failed to create significant memory"), {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
   }
 }
 

@@ -11,6 +11,7 @@ import { DBClient } from "../db/mod.ts";
 import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSettings, loadSettings, saveSettings, loadWebSearchSettings, saveWebSearchSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
+import type { MemoryIndexer } from "../rag/indexer.ts";
 import { catchUpSummarization, repairOrphanedSummaries, needsConsolidation, runConsolidation } from "../memory/mod.ts";
 import { initTracker, registerJob, registerTrigger, tracked } from "./cron-tracker.ts";
 
@@ -47,6 +48,11 @@ import {
   handleSaveSettingsFile,
   handleStaticFile,
   handleUpdateTitle,
+  handleMemoriesFragment,
+  handleMemoriesListFragment,
+  handleMemoriesEditorFragment,
+  handleSaveMemory,
+  handleCreateSignificantMemory,
   handleListSnapshots,
   handleGetSnapshot,
   handleCreateSnapshot,
@@ -166,6 +172,7 @@ export class Server {
   private ragRetriever: Retriever | null = null;
   private chatRAG: ConversationRAG | null = null;
   private ragConfig: RAGConfig;
+  private memoryIndexer: MemoryIndexer | null = null;
   private abortController: AbortController;
   private config: ServerConfig;
   private keepaliveInterval: number | null = null;
@@ -358,6 +365,7 @@ export class Server {
       try {
         const indexer = createIndexer(this.db.getRawDb(), this.ragConfig.memoriesDir);
         await indexer.indexAll();
+        this.memoryIndexer = indexer;
       } catch (error) {
         console.error(
           "[RAG] Failed to index memories on startup:",
@@ -526,6 +534,7 @@ export class Server {
       mcpClient: this.mcpClient ?? undefined,
       lorebookManager: this.lorebookManager,
       vaultManager: this.vaultManager,
+      memoryIndexer: this.memoryIndexer ?? undefined,
       getLLMSettings: () => this.llmSettings,
       updateLLMSettings: (settings) => this.updateLLMSettings(settings),
       getWebSearchSettings: () => this.webSearchSettings,
@@ -697,6 +706,24 @@ export class Server {
     if (method === "POST" && memoryConsolidateMatch) {
       const granularity = memoryConsolidateMatch[1];
       return await handleMemoryConsolidate(ctx, granularity);
+    }
+
+    // ========================================
+    // Memories API Routes
+    // ========================================
+
+    // POST /api/memories/significant/create - Create new significant memory
+    // Must be before the :granularity/:date catch-all
+    if (method === "POST" && path === "/api/memories/significant/create") {
+      return await handleCreateSignificantMemory(ctx, request);
+    }
+
+    // POST /api/memories/:granularity/:date - Save edited memory
+    const saveMemoryMatch = path.match(/^\/api\/memories\/(daily|weekly|monthly|yearly|significant)\/([^/]+)$/);
+    if (method === "POST" && saveMemoryMatch) {
+      const granularity = saveMemoryMatch[1];
+      const date = saveMemoryMatch[2];
+      return await handleSaveMemory(ctx, granularity, date, request);
     }
 
     // POST /api/mcp/sync - Manually trigger MCP sync
@@ -1111,6 +1138,27 @@ export class Server {
     // GET /fragments/settings/graph - Graph visualization fragment
     if (path === "/fragments/settings/graph") {
       return await handleGraphView(ctx);
+    }
+
+    // ========================================
+    // Memories Fragment Routes
+    // ========================================
+
+    // GET /fragments/settings/memories - Memories tabbed view
+    if (path === "/fragments/settings/memories") {
+      return handleMemoriesFragment(ctx);
+    }
+
+    // GET /fragments/settings/memories/:granularity - Memory file list
+    const memoriesListMatch = path.match(/^\/fragments\/settings\/memories\/([^/]+)$/);
+    if (memoriesListMatch) {
+      return await handleMemoriesListFragment(ctx, memoriesListMatch[1]);
+    }
+
+    // GET /fragments/settings/memories/:granularity/:date - Memory editor
+    const memoriesEditorMatch = path.match(/^\/fragments\/settings\/memories\/([^/]+)\/([^/]+)$/);
+    if (memoriesEditorMatch) {
+      return await handleMemoriesEditorFragment(ctx, memoriesEditorMatch[1], memoriesEditorMatch[2]);
     }
 
     // ========================================

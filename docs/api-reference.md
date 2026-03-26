@@ -62,6 +62,8 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/memory/consolidate/:granularity` | Trigger memory consolidation |
+| `POST` | `/api/memories/:granularity/:date` | Save edited memory (writes local file, pushes MCP update, reindexes RAG) |
+| `POST` | `/api/memories/significant/create` | Create new significant memory |
 
 ### Identity / Core Prompts
 
@@ -176,6 +178,9 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `GET` | `/fragments/admin/logs` | Log viewer HTML fragment |
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
 | `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
+| `GET` | `/fragments/settings/memories` | Memories tabbed view fragment |
+| `GET` | `/fragments/settings/memories/:granularity` | Memory file list fragment (daily/weekly/monthly/yearly/significant) |
+| `GET` | `/fragments/settings/memories/:granularity/:date` | Memory editor fragment |
 | `GET` | `/api/admin/diagnostics` | JSON diagnostics snapshot (all subsystems) |
 | `GET` | `/api/admin/logs` | JSON log entries with filtering (`?level=`, `?component=`, `?limit=`, `?since=`) |
 | `GET` | `/api/admin/logs/entries` | HTML partial of log entries (same query params as above) |
