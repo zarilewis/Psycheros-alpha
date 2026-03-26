@@ -112,12 +112,14 @@ import {
   handleAdminLogsFragment,
   handleAdminDiagnosticsFragment,
   handleAdminJobsFragment,
+  handleAdminActionsFragment,
   handleAdminLogsAPI,
   handleAdminLogEntriesAPI,
   handleAdminDiagnosticsAPI,
   handleAdminJobsAPI,
   handleAdminJobRowsFragment,
   handleAdminJobTriggerAPI,
+  handleAdminBatchPopulate,
 } from "./admin-routes.ts";
 import { setServerStartTime } from "./diagnostics.ts";
 
@@ -988,6 +990,12 @@ export class Server {
       return await handleAdminJobTriggerAPI(ctx, jobId);
     }
 
+    // POST /api/admin/actions/batch-populate - Run batch-populate-graph script
+    if (method === "POST" && path === "/api/admin/actions/batch-populate") {
+      const body = await request.json().catch(() => ({}));
+      return await handleAdminBatchPopulate(ctx, body);
+    }
+
     // ========================================
     // Vault API Routes
     // ========================================
@@ -1221,6 +1229,11 @@ export class Server {
     // GET /fragments/admin/jobs - Scheduled jobs dashboard
     if (path === "/fragments/admin/jobs") {
       return handleAdminJobsFragment(ctx);
+    }
+
+    // GET /fragments/admin/actions - Actions panel
+    if (path === "/fragments/admin/actions") {
+      return handleAdminActionsFragment(ctx);
     }
 
     // GET /backgrounds/:filename - Serve background image files

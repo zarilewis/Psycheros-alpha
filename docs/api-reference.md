@@ -176,6 +176,8 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `GET` | `/fragments/admin` | Admin hub with tab navigation |
 | `GET` | `/fragments/admin/diagnostics` | Diagnostics dashboard HTML fragment |
 | `GET` | `/fragments/admin/logs` | Log viewer HTML fragment |
+| `GET` | `/fragments/admin/jobs` | Scheduled jobs dashboard HTML fragment |
+| `GET` | `/fragments/admin/actions` | Actions panel HTML fragment |
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
 | `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
 | `GET` | `/fragments/settings/memories` | Memories tabbed view fragment |
@@ -184,6 +186,10 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `GET` | `/api/admin/diagnostics` | JSON diagnostics snapshot (all subsystems) |
 | `GET` | `/api/admin/logs` | JSON log entries with filtering (`?level=`, `?component=`, `?limit=`, `?since=`) |
 | `GET` | `/api/admin/logs/entries` | HTML partial of log entries (same query params as above) |
+| `GET` | `/api/admin/jobs` | JSON scheduled jobs status |
+| `GET` | `/api/admin/jobs/rows` | HTML partial of job table rows |
+| `POST` | `/api/admin/jobs/:id/trigger` | Manually trigger a scheduled job |
+| `POST` | `/api/admin/actions/batch-populate` | Run batch-populate-graph script (`{ days, granularity, dryRun, verbose }`) |
 
 ## Related Source Files
 

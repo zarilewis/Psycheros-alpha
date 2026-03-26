@@ -188,6 +188,20 @@ Ring buffer capturing the last 1,000 log entries from all `console.*` calls. Com
 
 Timestamps render in the browser's local timezone (not the server's).
 
+### Actions
+
+Manual operations panel for running one-off maintenance tasks. Currently hosts:
+
+- **Batch Populate Knowledge Graph**: Runs `entity-core/scripts/batch-populate-graph.ts` to backfill the knowledge graph from existing memory files. Extracts entities and relationships via LLM, creates `memory_ref` nodes with mentions edges, and generates embeddings. Idempotent — already-processed memories are skipped.
+
+**Parameters:**
+- **Days** (default 30) — how far back to look for memories
+- **Granularity** — `daily`, `weekly`, `monthly`, `yearly`, `significant`, or `all`
+- **Dry run** — extract entities without writing to the graph
+- **Verbose** — show per-entity detail in output
+
+Output includes exit code and full script stdout/stderr. The script runs as a subprocess against entity-core, so it uses entity-core's data directory and LLM settings (passed through from the Psycheros environment).
+
 **Source files:** `src/server/logger.ts`, `src/server/diagnostics.ts`, `src/server/admin-routes.ts`, `src/server/admin-templates.ts`, `web/js/admin.js`, `web/css/admin.css`
 
 ## Knowledge Graph Visualization

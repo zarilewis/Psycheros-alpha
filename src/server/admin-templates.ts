@@ -71,6 +71,16 @@ export function renderAdminHub(): string {
         </svg>
         Logs
       </button>
+      <button class="admin-nav-tab"
+        hx-get="/fragments/admin/actions"
+        hx-target="#admin-content"
+        hx-swap="innerHTML"
+        onclick="document.querySelectorAll('.admin-nav-tab').forEach(t => t.classList.remove('active')); this.classList.add('active')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+        </svg>
+        Actions
+      </button>
     </div>
     <div id="admin-content">
       <div hx-get="/fragments/admin/diagnostics" hx-trigger="load" hx-swap="outerHTML"></div>
@@ -488,4 +498,64 @@ export function renderLogEntries(entries: LogEntry[]): string {
   }).join("");
 
   return rows;
+}
+
+/**
+ * Render the actions panel — manual operations like batch-populate-graph.
+ */
+export function renderAdminActions(): string {
+  return `<div class="admin-actions">
+
+  <div class="admin-section">
+    <h3 class="admin-section-title">Batch Populate Knowledge Graph</h3>
+    <p class="admin-action-desc">
+      Runs <code>entity-core/scripts/batch-populate-graph.ts</code> to backfill
+      the knowledge graph from existing memory files. Extracts entities and
+      relationships via LLM, creates memory_ref nodes with mentions edges,
+      and generates embeddings. Idempotent — already-processed memories are skipped.
+    </p>
+    <div class="admin-action-form">
+      <div class="admin-action-fields">
+        <label class="admin-action-label" for="admin-batch-days">Days</label>
+        <input id="admin-batch-days" type="number" min="1" max="3650" value="30"
+          class="admin-input" />
+      </div>
+      <div class="admin-action-fields">
+        <label class="admin-action-label" for="admin-batch-granularity">Granularity</label>
+        <select id="admin-batch-granularity" class="admin-select">
+          <option value="daily" selected>daily</option>
+          <option value="weekly">weekly</option>
+          <option value="monthly">monthly</option>
+          <option value="yearly">yearly</option>
+          <option value="significant">significant</option>
+          <option value="all">all</option>
+        </select>
+      </div>
+      <div class="admin-action-fields">
+        <label class="admin-action-label">
+          <input id="admin-batch-dry-run" type="checkbox" class="admin-checkbox" />
+          Dry run
+        </label>
+      </div>
+      <div class="admin-action-fields">
+        <label class="admin-action-label">
+          <input id="admin-batch-verbose" type="checkbox" class="admin-checkbox" />
+          Verbose
+        </label>
+      </div>
+      <button id="admin-batch-run-btn" class="admin-action-btn" onclick="window.adminRunBatchPopulate()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        Run Script
+      </button>
+    </div>
+  </div>
+
+  <div class="admin-section" id="admin-action-output-section" style="display:none">
+    <h3 class="admin-section-title">Output</h3>
+    <div class="admin-action-output" id="admin-action-output"></div>
+  </div>
+
+</div>`;
 }

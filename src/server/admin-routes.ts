@@ -11,7 +11,7 @@ import type { RouteContext } from "./routes.ts";
 import { queryLogs, getLogComponents, getLogLevelCounts, type LogLevel } from "./logger.ts";
 import { collectDiagnostics } from "./diagnostics.ts";
 import { getAllJobs, triggerJob } from "./cron-tracker.ts";
-import { renderAdminHub, renderAdminLogs, renderLogEntries, renderAdminDiagnostics, renderAdminJobs, renderAdminJobRows } from "./admin-templates.ts";
+import { renderAdminHub, renderAdminLogs, renderLogEntries, renderAdminDiagnostics, renderAdminJobs, renderAdminJobRows, renderAdminActions } from "./admin-templates.ts";
 
 const HTML_HEADERS = { "Content-Type": "text/html; charset=utf-8" };
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -128,4 +128,72 @@ export async function handleAdminJobTriggerAPI(_ctx: RouteContext, jobId: string
   await triggerJob(jobId);
   const jobs = getAllJobs();
   return new Response(renderAdminJobRows(jobs), { headers: HTML_HEADERS });
+}
+
+/**
+ * GET /fragments/admin/actions — Actions panel fragment.
+ */
+export function handleAdminActionsFragment(_ctx: RouteContext): Response {
+  return new Response(renderAdminActions(), { headers: HTML_HEADERS });
+}
+
+/**
+ * POST /api/admin/actions/batch-populate — Run the batch-populate-graph script.
+ * Accepts JSON body with { days, granularity, dryRun, verbose }.
+ * Spawns the entity-core script as a subprocess and streams output.
+ */
+export async function handleAdminBatchPopulate(_ctx: RouteContext, body: Record<string, unknown>): Promise<Response> {
+  const days = typeof body.days === "number" ? body.days : 30;
+  const granularity = typeof body.granularity === "string" ? body.granularity : "daily";
+  const dryRun = body.dryRun === true;
+  const verbose = body.verbose === true;
+
+  const entityCoreRoot = Deno.env.get("PSYCHEROS_ENTITY_CORE_PATH") ||
+    new URL("../../entity-core", import.meta.url).pathname;
+
+  const args = [
+    "run", "-A",
+    `${entityCoreRoot}/scripts/batch-populate-graph.ts`,
+    `--days`, String(days),
+    `--granularity`, granularity,
+  ];
+  if (dryRun) args.push("--dry-run");
+  if (verbose) args.push("--verbose");
+
+  try {
+    const cmd = new Deno.Command("deno", {
+      args,
+      env: {
+        ENTITY_CORE_DATA_DIR: Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${entityCoreRoot}/data`,
+        ENTITY_CORE_LLM_API_KEY: Deno.env.get("ENTITY_CORE_LLM_API_KEY") || Deno.env.get("ZAI_API_KEY") || "",
+        ENTITY_CORE_LLM_BASE_URL: Deno.env.get("ENTITY_CORE_LLM_BASE_URL") || Deno.env.get("ZAI_BASE_URL") || "",
+        ENTITY_CORE_LLM_MODEL: Deno.env.get("ENTITY_CORE_LLM_MODEL") || Deno.env.get("ZAI_MODEL") || "",
+        ZAI_API_KEY: Deno.env.get("ZAI_API_KEY") || "",
+        ZAI_BASE_URL: Deno.env.get("ZAI_BASE_URL") || "",
+        ZAI_MODEL: Deno.env.get("ZAI_MODEL") || "",
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const process = cmd.spawn();
+    const [stdout, stderr] = await Promise.all([
+      new Response(process.stdout).text(),
+      new Response(process.stderr).text(),
+    ]);
+    const status = await process.status;
+
+    const output = stdout + (stderr ? `\n--- stderr ---\n${stderr}` : "");
+    const success = status.success;
+
+    return new Response(JSON.stringify({ success, exitCode: status.code, output }), {
+      headers: JSON_HEADERS,
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({
+      success: false,
+      exitCode: -1,
+      output: `Failed to spawn script: ${error instanceof Error ? error.message : String(error)}`,
+    }), { headers: JSON_HEADERS });
+  }
 }

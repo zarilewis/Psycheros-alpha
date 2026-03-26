@@ -169,6 +169,59 @@
     return (bytes / (1024 * 1024 * 1024)).toFixed(1) + " GB";
   }
 
+  /**
+   * Run the batch-populate-graph script via the admin API.
+   * Shows output in the #admin-action-output container.
+   */
+  window.adminRunBatchPopulate = async function () {
+    var btn = document.getElementById("admin-batch-run-btn");
+    var outputSection = document.getElementById("admin-action-output-section");
+    var outputEl = document.getElementById("admin-action-output");
+
+    if (!btn || !outputEl) return;
+
+    var days = parseInt(document.getElementById("admin-batch-days")?.value, 10) || 30;
+    var granularity = document.getElementById("admin-batch-granularity")?.value || "daily";
+    var dryRun = document.getElementById("admin-batch-dry-run")?.checked || false;
+    var verbose = document.getElementById("admin-batch-verbose")?.checked || false;
+
+    // Disable button and show loading state
+    btn.disabled = true;
+    btn.innerHTML = '<span class="admin-action-spinner"></span> Running...';
+
+    if (outputSection) outputSection.style.display = "";
+    outputEl.textContent = "Spawning batch-populate-graph script...\n(This may take a while depending on memory count)\n";
+
+    try {
+      var res = await fetch("/api/admin/actions/batch-populate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ days: days, granularity: granularity, dryRun: dryRun, verbose: verbose }),
+      });
+
+      var data = await res.json();
+
+      // Render output with monospace formatting
+      var header = data.success
+        ? "Exit code: " + data.exitCode
+        : "FAILED (exit code " + data.exitCode + ")";
+      outputEl.innerHTML = "<div class=\"admin-action-output-header\">" + escapeHtmlForOutput(header) + "</div>"
+        + "<pre class=\"admin-action-output-pre\">" + escapeHtmlForOutput(data.output) + "</pre>";
+    } catch (err) {
+      outputEl.innerHTML = "<div class=\"admin-action-output-header admin-action-error\">Request failed: " + escapeHtmlForOutput(err.message) + "</div>";
+    }
+
+    // Restore button
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Script';
+  };
+
+  function escapeHtmlForOutput(str) {
+    var div = document.createElement("div");
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+  }
+
   // Format timestamps already on the page
   formatLocalTimes();
 
