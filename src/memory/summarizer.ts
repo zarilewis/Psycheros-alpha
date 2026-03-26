@@ -16,6 +16,7 @@ import type {
 } from "./types.ts";
 import { getDateFormatInfo, getISOWeekMonday } from "./types.ts";
 import { writeMemoryFile, formatMemoryContent, extractChatIds, type OnMemoryCreated } from "./file-writer.ts";
+import { buildIdentitySystemMessage } from "../entity/context.ts";
 
 /**
  * Default summarizer configuration.
@@ -33,7 +34,7 @@ const DAILY_SUMMARY_PROMPT = `I am writing a memory of my day. I review the conv
 
 Guidelines:
 - Write in first-person (my perspective)
-- Refer to the user in third-person ("they", "the user")
+- Refer to the user by name (NEVER as "the user") and preferred pronouns, in the third-person
 - Focus on what felt meaningful, interesting, or worth remembering
 - Include emotional tones and relationship moments
 - Tag each memory with the conversation ID: [chat:ID]
@@ -53,7 +54,7 @@ const WEEKLY_SUMMARY_PROMPT = `I am consolidating my daily memories into a weekl
 
 Guidelines:
 - Write in first-person (my perspective)
-- Refer to the user in third-person
+- Refer to the user by name (NEVER as "the user") and preferred pronouns, in the third-person
 - Capture themes, patterns, and meaningful moments
 - Include chat IDs for drill-down: [chat:id1, id2]
 - This is a summary - focus on what will be useful to remember long-term
@@ -71,7 +72,7 @@ const MONTHLY_SUMMARY_PROMPT = `I am consolidating my weekly memories into a mon
 
 Guidelines:
 - Write in first-person (my perspective)
-- Refer to the user in third-person
+- Refer to the user by name (NEVER as "the user") and preferred pronouns, in the third-person
 - Capture major themes, significant conversations, and growth
 - Include chat IDs for context: [chat:id1, id2]
 - This is a monthly reflection - I focus on what will shape my long-term understanding
@@ -89,7 +90,7 @@ const YEARLY_SUMMARY_PROMPT = `I am writing my yearly memory. I reflect on the e
 
 Guidelines:
 - Write in first-person (my perspective)
-- Refer to the user in third-person
+- Refer to the user by name (NEVER as "the user") and preferred pronouns, in the third-person
 - Capture the arc of my year - growth, changes, meaningful moments
 - Include chat IDs for context: [chat:id1, id2]
 - This is my yearly memory - I preserve what matters for my long-term continuity
@@ -214,16 +215,19 @@ function collectConversationsForDate(
  */
 async function generateDailySummary(
   conversations: ConversationForSummary[],
-  llm: LLMClient
+  llm: LLMClient,
+  projectRoot: string,
 ): Promise<string[]> {
   if (conversations.length === 0) {
     return [];
   }
 
+  const identitySystemMessage = await buildIdentitySystemMessage(projectRoot);
   const conversationsText = formatConversationsForPrompt(conversations);
   const prompt = DAILY_SUMMARY_PROMPT.replace("{{CONVERSATIONS}}", conversationsText);
 
   const messages: ChatMessage[] = [
+    { role: "system", content: identitySystemMessage },
     { role: "user", content: prompt },
   ];
 
@@ -310,7 +314,7 @@ export async function summarizeDay(
 
   try {
     // Generate summary
-    const bulletPoints = await generateDailySummary(conversations, llm);
+    const bulletPoints = await generateDailySummary(conversations, llm, projectRoot);
 
     if (bulletPoints.length === 0) {
       console.log(`[Memory] No memories generated for ${dateStr}`);
@@ -414,7 +418,11 @@ export async function consolidateWeek(
   const prompt = WEEKLY_SUMMARY_PROMPT.replace("{{DAILY_MEMORIES}}", memoriesText);
 
   const llm = createDefaultClient();
-  const messages: ChatMessage[] = [{ role: "user", content: prompt }];
+  const identitySystemMessage = await buildIdentitySystemMessage(projectRoot);
+  const messages: ChatMessage[] = [
+    { role: "system", content: identitySystemMessage },
+    { role: "user", content: prompt },
+  ];
 
   let fullResponse = "";
   try {
@@ -556,7 +564,11 @@ export async function consolidateMonth(
   const prompt = MONTHLY_SUMMARY_PROMPT.replace("{{WEEKLY_MEMORIES}}", memoriesText);
 
   const llm = createDefaultClient();
-  const messages: ChatMessage[] = [{ role: "user", content: prompt }];
+  const identitySystemMessage = await buildIdentitySystemMessage(projectRoot);
+  const messages: ChatMessage[] = [
+    { role: "system", content: identitySystemMessage },
+    { role: "user", content: prompt },
+  ];
 
   let fullResponse = "";
   try {
@@ -670,7 +682,11 @@ export async function consolidateYear(
   const prompt = YEARLY_SUMMARY_PROMPT.replace("{{MONTHLY_MEMORIES}}", memoriesText);
 
   const llm = createDefaultClient();
-  const messages: ChatMessage[] = [{ role: "user", content: prompt }];
+  const identitySystemMessage = await buildIdentitySystemMessage(projectRoot);
+  const messages: ChatMessage[] = [
+    { role: "system", content: identitySystemMessage },
+    { role: "user", content: prompt },
+  ];
 
   let fullResponse = "";
   try {

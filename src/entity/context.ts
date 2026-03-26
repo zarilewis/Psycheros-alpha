@@ -364,6 +364,30 @@ export async function loadCustomContent(
 }
 
 /**
+ * Build the full identity system message (without RAG content) for use by
+ * background processes like the memory summarizer that need entity identity
+ * context but no retrieval augmentation.
+ *
+ * @param projectRoot - The root directory of the project
+ * @returns The formatted system message containing all identity context
+ */
+export async function buildIdentitySystemMessage(projectRoot: string): Promise<string> {
+  const baseInstructions = await loadBaseInstructions(projectRoot, undefined, "memory-writing");
+  const selfContent = await loadSelfContent(projectRoot);
+  const userContent = await loadUserContent(projectRoot);
+  const relationshipContent = await loadRelationshipContent(projectRoot);
+  const customContent = await loadCustomContent(projectRoot);
+
+  return buildSystemMessage(
+    baseInstructions,
+    selfContent,
+    userContent,
+    relationshipContent,
+    customContent,
+  );
+}
+
+/**
  * Build the system message from base instructions, self/, user/, relationship/,
  * custom/ directory content, optional RAG-retrieved memories, chat history,
  * lorebook content, and graph context.

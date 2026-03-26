@@ -4,7 +4,7 @@ Psycheros implements a hierarchical memory system where the entity writes their 
 
 ## Memory Hierarchy
 
-Memories are written in the entity's voice (first-person), with the user in third-person. They are organized hierarchically and consolidated over time via Deno cron jobs.
+Memories are written in the entity's voice (first-person), referring to the user by their actual name and preferred pronouns. All summarization LLM calls receive the entity's full identity context (base instructions, self, user, relationship, and custom files) as a system message, so memories reflect the entity's personality and knowledge of the user. They are organized hierarchically and consolidated over time via Deno cron jobs.
 
 ```
 memories/
@@ -138,7 +138,7 @@ Eager RAG over user-uploaded and entity-created reference documents. Documents a
 | `src/memory/mod.ts` | Hierarchical memory system |
 | `src/memory/types.ts` | Memory types with instance tagging |
 | `src/memory/consolidator.ts` | Weekly/monthly/yearly consolidation |
-| `src/memory/summarizer.ts` | Daily summarization |
+| `src/memory/summarizer.ts` | Daily/weekly/monthly/yearly summarization with identity context |
 | `src/memory/trigger.ts` | Day-change detection |
 | `src/memory/file-writer.ts` | Memory file operations |
 | `src/rag/mod.ts` | RAG retrieval system |
