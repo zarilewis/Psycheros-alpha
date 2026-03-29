@@ -88,7 +88,14 @@ function renderRegion(
   switch (region) {
     case "conv-list": {
       const conversations = db.listConversations();
-      return renderConversationList(conversations);
+      const allPulses = db.listPulses({ enabled: true });
+      const pulseConversationIds = new Set<string>();
+      for (const pulse of allPulses) {
+        if (pulse.conversationId) {
+          pulseConversationIds.add(pulse.conversationId);
+        }
+      }
+      return renderConversationList(conversations, pulseConversationIds);
     }
     case "header-title": {
       // Skip header-title if no conversationId provided
