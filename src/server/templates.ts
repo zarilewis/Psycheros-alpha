@@ -480,8 +480,8 @@ export function renderSettingsHub(): string {
         hx-target="#chat"
         hx-swap="innerHTML">
         <div class="settings-hub-card-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="2 12 6 12 8 4 12 20 14 10 16 14 18 12 22 12"/>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
           </svg>
         </div>
         <div class="settings-hub-card-body">
@@ -497,8 +497,11 @@ export function renderSettingsHub(): string {
         hx-target="#chat"
         hx-swap="innerHTML">
         <div class="settings-hub-card-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+            <line x1="2" y1="20" x2="22" y2="20"/>
           </svg>
         </div>
         <div class="settings-hub-card-body">
@@ -715,7 +718,7 @@ export function renderConversationItem(
   const escapedId = escapeHtml(conv.id);
   const encodedId = encodeURIComponent(conv.id);
   const pulseIndicator = hasPulse
-    ? `<svg class="pulse-indicator" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" title="Active Pulse"><polyline points="2 12 6 12 8 4 12 20 14 10 16 14 18 12 22 12"/></svg>`
+    ? `<svg class="pulse-indicator" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" title="Active Pulse"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`
     : "";
 
   // Swipe wrapper structure with edit action (delete removed - too easy to lose conversations)
