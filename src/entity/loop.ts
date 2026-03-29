@@ -62,6 +62,17 @@ export function formatMessageTimestamp(date: Date): string {
 }
 
 /**
+ * Options for EntityTurn.process() that modify behavior for specific callers
+ * (e.g., Pulse system).
+ */
+export interface ProcessOptions {
+  /** If this turn was triggered by a Pulse, the Pulse's ID */
+  pulseId?: string;
+  /** If this turn was triggered by a Pulse, the Pulse's display name */
+  pulseName?: string;
+}
+
+/**
  * Configuration for the entity turn processor.
  */
 export interface EntityConfig {
@@ -130,11 +141,13 @@ export class EntityTurn {
    *
    * @param conversationId - The conversation ID to use
    * @param userMessage - The user's message text
+   * @param options - Optional process options (e.g., Pulse metadata)
    * @yields Stream chunks and tool results as they occur
    */
   async *process(
     conversationId: string,
     userMessage: string,
+    options?: ProcessOptions,
   ): AsyncGenerator<EntityYield, void, unknown> {
     // Ensure conversation exists - if not, create one and use its ID
     let conversation = this.db.getConversation(conversationId);
@@ -311,13 +324,19 @@ export class EntityTurn {
     // Persist the user message
     // Note: This must succeed before we proceed, as it's the foundation of the turn
     // Store the message ID for chat RAG indexing
+    // For Pulse messages, prefix the content so the entity perceives it as system-initiated
+    const displayContent = options?.pulseId && options?.pulseName
+      ? `[System — Pulse "${options.pulseName}"] ${userMessage}`
+      : userMessage;
     let userMessageId: string | undefined;
     try {
       // Generate ID upfront so we can use it for chat RAG indexing
       userMessageId = crypto.randomUUID();
       this.db.addMessage(conversationId, {
         role: "user",
-        content: userMessage,
+        content: displayContent,
+        pulseId: options?.pulseId,
+        pulseName: options?.pulseName,
       }, userMessageId);
 
       // Index the user message for chat RAG (non-blocking, non-fatal)
@@ -326,7 +345,7 @@ export class EntityTurn {
           userMessageId,
           conversationId,
           "user",
-          userMessage
+          displayContent
         ).catch((error) => {
           console.warn("[ChatRAG] Failed to index user message:", error);
         });
@@ -338,7 +357,7 @@ export class EntityTurn {
     }
 
     // Build the messages array for the LLM
-    const messages = this.buildMessages(systemMessage, history, userMessage);
+    const messages = this.buildMessages(systemMessage, history, displayContent);
 
     // Get tool definitions
     const toolDefinitions = this.tools.getDefinitions();
@@ -347,7 +366,7 @@ export class EntityTurn {
     const contextSnapshot: LLMContextSnapshot = {
       timestamp: new Date().toISOString(),
       conversationId,
-      userMessage,
+      userMessage: displayContent,
       systemMessage,
       baseInstructions,
       selfContent,

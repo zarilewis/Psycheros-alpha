@@ -145,9 +145,136 @@ function initPersistentSSE() {
       const target = document.querySelector(update.target);
       if (target) {
         htmx.swap(target, update.html, { swapStyle: update.swap || 'innerHTML' });
+        // Auto-scroll when content is appended to messages
+        if (update.target === '#messages') {
+          AutoScroll.streamTick();
+        }
       }
     } catch (e) {
       console.error('Failed to handle dom_update:', e);
+    }
+  });
+
+  // Pulse streaming state (persistent SSE)
+  let pulseAssistantEl = null;
+  let pulseContent = null;
+  let pulseSegmentRaw = '';
+  let pulseThinking = null;
+
+  persistentSSE.addEventListener('content', (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      // Lazily create the assistant message element on first content
+      if (!pulseAssistantEl) {
+        const messages = document.getElementById('messages');
+        if (!messages) return;
+        document.getElementById('empty-state')?.remove();
+
+        // Disable input and show stop button
+        enterPulseStreamingMode();
+
+        pulseAssistantEl = document.createElement('div');
+        pulseAssistantEl.className = 'msg msg--assistant';
+        const streamTime = formatChatTimestamp(new Date());
+        pulseAssistantEl.innerHTML = `
+          <div class="msg-header">
+            <span>${globalThis.PsycherosSettings.entityName || 'Assistant'}</span>
+            <span class="msg-timestamp">${streamTime}</span>
+            <div class="streaming"><span></span><span></span><span></span></div>
+          </div>
+          <div class="msg-content"></div>
+        `;
+        messages.appendChild(pulseAssistantEl);
+        AutoScroll.streamStart();
+      }
+      handleSSEEvent('content', data, pulseAssistantEl, {
+        getThinking: () => pulseThinking,
+        setThinking: (el) => pulseThinking = el,
+        getContent: () => pulseContent,
+        setContent: (el) => pulseContent = el,
+        getSegmentRaw: () => pulseSegmentRaw,
+        setSegmentRaw: (text) => pulseSegmentRaw = text,
+        appendSegmentRaw: (text) => pulseSegmentRaw += text,
+      });
+    } catch (e) {
+      console.error('Failed to handle persistent content:', e);
+    }
+  });
+
+  persistentSSE.addEventListener('thinking', (event) => {
+    try {
+      if (!pulseAssistantEl) return;
+      handleSSEEvent('thinking', JSON.parse(event.data), pulseAssistantEl, {
+        getThinking: () => pulseThinking,
+        setThinking: (el) => pulseThinking = el,
+        getContent: () => pulseContent,
+        setContent: (el) => pulseContent = el,
+        getSegmentRaw: () => pulseSegmentRaw,
+        setSegmentRaw: (text) => pulseSegmentRaw = text,
+        appendSegmentRaw: (text) => pulseSegmentRaw += text,
+      });
+    } catch (e) {
+      console.error('Failed to handle persistent thinking:', e);
+    }
+  });
+
+  persistentSSE.addEventListener('tool_call', (event) => {
+    try {
+      if (!pulseAssistantEl) return;
+      handleSSEEvent('tool_call', event.data, pulseAssistantEl, {
+        getThinking: () => pulseThinking,
+        setThinking: (el) => pulseThinking = el,
+        getContent: () => pulseContent,
+        setContent: (el) => pulseContent = el,
+        getSegmentRaw: () => pulseSegmentRaw,
+        setSegmentRaw: (text) => pulseSegmentRaw = text,
+        appendSegmentRaw: (text) => pulseSegmentRaw += text,
+      });
+    } catch (e) {
+      console.error('Failed to handle persistent tool_call:', e);
+    }
+  });
+
+  persistentSSE.addEventListener('tool_result', (event) => {
+    try {
+      if (!pulseAssistantEl) return;
+      handleSSEEvent('tool_result', event.data, pulseAssistantEl, {
+        getThinking: () => pulseThinking,
+        setThinking: (el) => pulseThinking = el,
+        getContent: () => pulseContent,
+        setContent: (el) => pulseContent = el,
+        getSegmentRaw: () => pulseSegmentRaw,
+        setSegmentRaw: (text) => pulseSegmentRaw = text,
+        appendSegmentRaw: (text) => pulseSegmentRaw += text,
+      });
+    } catch (e) {
+      console.error('Failed to handle persistent tool_result:', e);
+    }
+  });
+
+  persistentSSE.addEventListener('done', (event) => {
+    try {
+      if (!pulseAssistantEl) return;
+      handleSSEEvent('done', event.data, pulseAssistantEl, {
+        getThinking: () => pulseThinking,
+        setThinking: (el) => pulseThinking = el,
+        getContent: () => pulseContent,
+        setContent: (el) => pulseContent = el,
+        getSegmentRaw: () => pulseSegmentRaw,
+        setSegmentRaw: (text) => pulseSegmentRaw = text,
+        appendSegmentRaw: (text) => pulseSegmentRaw += text,
+      });
+      // Reset pulse streaming state
+      pulseAssistantEl = null;
+      pulseContent = null;
+      pulseSegmentRaw = '';
+      pulseThinking = null;
+      pulseStreamingPulseId = null;
+
+      // Re-enable input and restore send button
+      exitPulseStreamingMode();
+    } catch (e) {
+      console.error('Failed to handle persistent done:', e);
     }
   });
 
@@ -527,6 +654,7 @@ function handleKeyDown(event) {
 
 // Track if stop button has been pressed once (for double-tap confirmation)
 let stopConfirmed = false;
+let pulseStreamingPulseId = null;
 
 /**
  * Handle first tap on stop button - require confirmation.
@@ -570,6 +698,99 @@ function stopGeneration() {
 }
 
 // =============================================================================
+// Pulse Streaming Controls
+// =============================================================================
+
+/**
+ * Enter Pulse streaming mode: disable input, show stop button.
+ */
+async function enterPulseStreamingMode() {
+  const input = document.getElementById('message-input');
+  const sendBtn = document.getElementById('send-btn');
+
+  input?.setAttribute('disabled', '');
+
+  if (sendBtn) {
+    stopConfirmed = false;
+    sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Stop';
+    sendBtn.onclick = requestStopPulseGeneration;
+    sendBtn.classList.add('stop-btn');
+    sendBtn.classList.remove('send-btn', 'stop-confirm');
+    sendBtn.disabled = false;
+  }
+
+  // Look up the running Pulse for this conversation
+  if (currentConversationId) {
+    try {
+      const res = await fetch(`/api/pulses/running/${currentConversationId}`);
+      if (res.ok) {
+        const data = await res.json();
+        pulseStreamingPulseId = data.pulseId;
+      }
+    } catch {
+      // Ignore — stop button just won't work if lookup fails
+    }
+  }
+}
+
+/**
+ * Exit Pulse streaming mode: re-enable input, restore send button.
+ */
+function exitPulseStreamingMode() {
+  const input = document.getElementById('message-input');
+  const sendBtn = document.getElementById('send-btn');
+
+  input?.removeAttribute('disabled');
+
+  if (sendBtn) {
+    sendBtn.textContent = 'Send';
+    sendBtn.onclick = Psycheros.sendMessage;
+    sendBtn.classList.remove('stop-btn', 'stop-confirm');
+    sendBtn.classList.add('send-btn');
+    sendBtn.disabled = false;
+  }
+
+  input?.focus();
+}
+
+/**
+ * Request stop for a Pulse-generated response (double-tap confirmation).
+ */
+function requestStopPulseGeneration() {
+  const sendBtn = document.getElementById('send-btn');
+  if (!sendBtn || !pulseStreamingPulseId) return;
+
+  if (stopConfirmed) {
+    stopPulseGeneration();
+  } else {
+    stopConfirmed = true;
+    sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Tap again';
+    sendBtn.classList.add('stop-confirm');
+    // Reset confirmation after 3 seconds if not confirmed
+    setTimeout(() => {
+      if (stopConfirmed && pulseStreamingPulseId) {
+        stopConfirmed = false;
+        sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Stop';
+        sendBtn.classList.remove('stop-confirm');
+      }
+    }, 3000);
+  }
+}
+
+/**
+ * Stop the running Pulse by calling the abort API.
+ */
+async function stopPulseGeneration() {
+  if (!pulseStreamingPulseId) return;
+  try {
+    await fetch(`/api/pulses/${pulseStreamingPulseId}/stop`, { method: 'POST' });
+  } catch (e) {
+    console.error('Failed to stop pulse:', e);
+  }
+  stopConfirmed = false;
+}
+
+// =============================================================================
 // Messaging
 // =============================================================================
 
@@ -578,7 +799,7 @@ async function sendMessage() {
   const sendBtn = document.getElementById('send-btn');
   const message = input?.value.trim();
 
-  if (!message || isStreaming) return;
+  if (!message || isStreaming || pulseStreamingPulseId) return;
 
   // Create conversation if needed
   if (!currentConversationId) {
@@ -1037,11 +1258,13 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         renderFinalContent(doneContentEl, doneSegmentRaw);
       }
 
-      // Remove any lingering cursors
+      // Remove any lingering cursors and streaming indicators
       contentContainer.querySelectorAll('.typing-cursor').forEach(el => el.remove());
       contentContainer.querySelectorAll('.streaming-active').forEach(el => {
         el.classList.remove('streaming-active');
       });
+      const header = messageEl.querySelector('.msg-header');
+      header?.querySelector('.streaming')?.remove();
       AutoScroll.streamEnd();
       break;
     }
@@ -2852,6 +3075,8 @@ globalThis.Psycheros = {
   sendMessage,
   requestStopGeneration,
   stopGeneration,
+  requestStopPulseGeneration,
+  stopPulseGeneration,
   // Selection mode
   enterSelectionMode,
   exitSelectionMode,

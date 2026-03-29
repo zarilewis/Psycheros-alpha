@@ -119,6 +119,8 @@ import {
   handleUpdatePulse,
   handleDeletePulse,
   handleTriggerPulse,
+  handleStopPulse,
+  handleGetRunningPulse,
   handleWebhookTrigger,
   handleListPulseRuns,
   handleListPulseRunsForPulse,
@@ -1082,6 +1084,18 @@ export class Server {
     const pulseTriggerMatch = path.match(/^\/api\/pulses\/([^/]+)\/trigger$/);
     if (method === "POST" && pulseTriggerMatch) {
       return await handleTriggerPulse(ctx, pulseTriggerMatch[1], request);
+    }
+
+    // POST /api/pulses/:id/stop - Abort a running Pulse
+    const pulseStopMatch = path.match(/^\/api\/pulses\/([^/]+)\/stop$/);
+    if (method === "POST" && pulseStopMatch) {
+      return await handleStopPulse(ctx, pulseStopMatch[1], request);
+    }
+
+    // GET /api/pulses/running/:conversationId - Get running Pulse for conversation
+    const pulseRunningMatch = path.match(/^\/api\/pulses\/running\/([^/]+)$/);
+    if (method === "GET" && pulseRunningMatch) {
+      return handleGetRunningPulse(ctx, pulseRunningMatch[1], request);
     }
 
     // GET /api/pulses/:id/runs - Runs for a specific pulse

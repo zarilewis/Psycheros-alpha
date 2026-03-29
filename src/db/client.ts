@@ -38,6 +38,8 @@ interface MessageRow {
   tool_calls: string | null;
   created_at: string;
   edited_at: string | null;
+  pulse_id: string | null;
+  pulse_name: string | null;
 }
 
 /**
@@ -427,8 +429,8 @@ export class DBClient {
 
       this.db.exec(
         `INSERT INTO messages
-         (id, conversation_id, role, content, reasoning_content, tool_call_id, tool_calls, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, conversation_id, role, content, reasoning_content, tool_call_id, tool_calls, created_at, pulse_id, pulse_name)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           conversationId,
@@ -438,6 +440,8 @@ export class DBClient {
           message.toolCallId ?? null,
           toolCallsJson,
           nowISO,
+          message.pulseId ?? null,
+          message.pulseName ?? null,
         ]
       );
 
@@ -461,6 +465,8 @@ export class DBClient {
       toolCallId: message.toolCallId,
       toolCalls: message.toolCalls,
       createdAt: now,
+      pulseId: message.pulseId,
+      pulseName: message.pulseName,
     };
   }
 
@@ -473,7 +479,8 @@ export class DBClient {
   getMessages(conversationId: string): Message[] {
     const stmt = this.db.prepare(
       `SELECT id, conversation_id, role, content, reasoning_content,
-              tool_call_id, tool_calls, created_at, edited_at
+              tool_call_id, tool_calls, created_at, edited_at,
+              pulse_id, pulse_name
        FROM messages
        WHERE conversation_id = ?
        ORDER BY created_at ASC`
@@ -519,6 +526,8 @@ export class DBClient {
       toolCalls,
       createdAt: new Date(row.created_at),
       editedAt: row.edited_at ? new Date(row.edited_at) : undefined,
+      pulseId: row.pulse_id ?? undefined,
+      pulseName: row.pulse_name ?? undefined,
     };
   }
 
@@ -563,7 +572,8 @@ export class DBClient {
       // Return the updated message by re-fetching it
       const getUpdatedStmt = this.db.prepare(
         `SELECT id, conversation_id, role, content, reasoning_content,
-                tool_call_id, tool_calls, created_at, edited_at
+                tool_call_id, tool_calls, created_at, edited_at,
+                pulse_id, pulse_name
          FROM messages WHERE id = ?`
       );
       const updatedRow = getUpdatedStmt.get<MessageRow>(id);
@@ -723,7 +733,8 @@ export class DBClient {
 
     const stmt = this.db.prepare(
       `SELECT id, conversation_id, role, content, reasoning_content,
-              tool_call_id, tool_calls, created_at
+              tool_call_id, tool_calls, created_at, edited_at,
+              pulse_id, pulse_name
        FROM messages
        WHERE date(created_at) = ?
        ORDER BY created_at ASC`

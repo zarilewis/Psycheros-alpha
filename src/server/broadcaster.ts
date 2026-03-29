@@ -89,6 +89,42 @@ export class EventBroadcaster {
   }
 
   /**
+   * Broadcast a typed SSE event to relevant clients.
+   * Used for streaming Pulse responses where content needs real-time delivery.
+   *
+   * @param eventType - The SSE event type (e.g., "content", "done")
+   * @param data - The event data to send
+   * @param conversationId - Target conversation ID (null for global updates)
+   */
+  broadcastEvent(eventType: string, data: unknown, conversationId: string | null): void {
+    const deadClients: string[] = [];
+
+    for (const [clientId, client] of this.clients) {
+      const shouldSend =
+        conversationId === null ||
+        client.conversationId === null ||
+        client.conversationId === conversationId;
+
+      if (!shouldSend) continue;
+
+      try {
+        const event = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
+        client.controller.enqueue(event);
+      } catch (error) {
+        console.log(
+          `EventBroadcaster: Failed to send to ${clientId}, marking for removal:`,
+          error instanceof Error ? error.message : String(error)
+        );
+        deadClients.push(clientId);
+      }
+    }
+
+    for (const clientId of deadClients) {
+      this.clients.delete(clientId);
+    }
+  }
+
+  /**
    * Broadcast multiple UI updates to relevant clients.
    *
    * When conversationId is null (global update): send to ALL clients.

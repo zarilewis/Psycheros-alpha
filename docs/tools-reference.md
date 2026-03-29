@@ -80,7 +80,7 @@ The entity can create, list, and search documents stored in the Data Vault for p
 
 ## Pulse Tools
 
-The entity can create, trigger, and delete autonomous scheduled prompts (Pulses). Entity-created Pulses default to silent mode and auto-delete after execution.
+The entity can create, trigger, and delete autonomous scheduled prompts (Pulses). Entity-created Pulses default to silent mode and auto-delete after execution. When a visible-mode Pulse fires, the entity perceives the prompt as system-initiated via a `[System — Pulse "name"]` prefix rather than a user message.
 
 | Tool | Description |
 |------|-------------|

@@ -13,6 +13,7 @@ import type { LLMSettings } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
 import { maskApiKey } from "../llm/mod.ts";
 import { renderMarkdown } from "./markdown.ts";
+import { pulseIconSvg } from "../pulse/templates.ts";
 
 // =============================================================================
 // Utilities
@@ -794,6 +795,9 @@ export function renderMessages(messages: Message[], metricsMap?: MetricsMap, dis
  */
 export function renderMessage(msg: Message, metrics?: TurnMetrics, displayNames?: { entityName: string; userName: string }): string {
   if (msg.role === "user") {
+    if (msg.pulseId) {
+      return renderPulseMessage(msg);
+    }
     return renderUserMessage(msg.content, msg.id, msg.editedAt, msg.createdAt, displayNames?.userName);
   } else if (msg.role === "assistant") {
     return renderAssistantMessage(msg, metrics, displayNames?.entityName);
@@ -839,6 +843,26 @@ export function renderUserMessage(
     ${editBtn}
   </div>
   <div class="msg-content user-text" data-raw-content="${escapeHtml(content)}">${renderMarkdown(content)}</div>
+</div>`;
+}
+
+/**
+ * Render a Pulse system message — centered with accent border and Pulse icon.
+ */
+function renderPulseMessage(msg: Message): string {
+  const dataAttr = msg.id ? `data-message-id="${escapeHtml(msg.id)}"` : "";
+  const timeStr = msg.createdAt ? formatMessageTime(msg.createdAt) : "";
+  const timeEl = timeStr ? `<span class="msg-timestamp">${escapeHtml(timeStr)}</span>` : "";
+  const pulseName = escapeHtml(msg.pulseName || "Pulse");
+  const icon = pulseIconSvg(14);
+
+  return `<div class="msg msg--pulse" ${dataAttr}>
+  <div class="msg-header">
+    <span class="pulse-header-icon">${icon}</span>
+    <span>${pulseName}</span>
+    ${timeEl}
+  </div>
+  <div class="msg-content" data-raw-content="${escapeHtml(msg.content)}">${renderMarkdown(msg.content)}</div>
 </div>`;
 }
 

@@ -686,6 +686,17 @@ function runMigrations(db: Database): void {
     db.exec("ALTER TABLE pulses ADD COLUMN inactivity_threshold_seconds INTEGER");
     console.log("[DB] Added inactivity_threshold_seconds column to pulses");
   }
+
+  // Migration: Add pulse_id and pulse_name columns to messages if missing
+  const hasPulseIdCol = db
+    .prepare("SELECT 1 FROM pragma_table_info('messages') WHERE name = 'pulse_id'")
+    .get();
+
+  if (!hasPulseIdCol) {
+    db.exec("ALTER TABLE messages ADD COLUMN pulse_id TEXT REFERENCES pulses(id) ON DELETE SET NULL");
+    db.exec("ALTER TABLE messages ADD COLUMN pulse_name TEXT");
+    console.log("[DB] Added pulse_id and pulse_name columns to messages");
+  }
 }
 
 /**

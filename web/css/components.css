@@ -240,6 +240,31 @@
   justify-content: flex-end;
 }
 
+/* Pulse system messages — centered, accented border */
+.msg--pulse {
+  align-self: center;
+  max-width: calc(var(--content-max-width) * 0.85);
+}
+
+.msg--pulse .msg-header {
+  justify-content: center;
+}
+
+.pulse-header-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--c-accent);
+}
+
+.msg--pulse .msg-content {
+  background-color: var(--c-bg-sunken);
+  color: var(--c-fg);
+  border: 1px solid var(--c-accent-muted);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height);
+}
+
 .msg-timestamp {
   font-variant-numeric: tabular-nums;
   text-transform: none;

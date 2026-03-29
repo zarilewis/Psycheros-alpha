@@ -72,7 +72,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 
 **SSE channels**:
 - `POST /api/chat` — per-request stream (context, thinking, content, tool calls, metrics, done)
-- `GET /api/events` — persistent channel (background dom_update events)
+- `GET /api/events` — persistent channel (dom_update events, Pulse streaming: content, thinking, tool_call, tool_result, done)
 
 **User data protection**:
 - `identity/`, `memories/`, `.snapshots/`, `data/vault/` are **runtime-only directories** — gitignored, never committed

@@ -446,6 +446,41 @@ export function handleTriggerPulse(ctx: RouteContext, pulseId: string, _request:
 }
 
 /**
+ * Handle POST /api/pulses/:id/stop — Abort a running Pulse.
+ */
+export function handleStopPulse(ctx: RouteContext, pulseId: string, _request: Request): Response {
+  const engine = (ctx as RouteContext & { pulseEngine?: PulseEngine }).pulseEngine;
+  if (!engine) {
+    return new Response(JSON.stringify({ error: "Pulse engine not available" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const aborted = engine.abortPulse(pulseId);
+  return new Response(JSON.stringify({ status: aborted ? "aborted" : "not_running", pulseId }), {
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/**
+ * Handle GET /api/pulses/running/:conversationId — Get running Pulse for a conversation.
+ */
+export function handleGetRunningPulse(ctx: RouteContext, conversationId: string, _request: Request): Response {
+  const engine = (ctx as RouteContext & { pulseEngine?: PulseEngine }).pulseEngine;
+  if (!engine) {
+    return new Response(JSON.stringify({ pulseId: null }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const pulseId = engine.getRunningPulseForConversation(conversationId);
+  return new Response(JSON.stringify({ pulseId }), {
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/**
  * Handle POST /api/webhook/pulse/:id — Webhook trigger (auth required).
  */
 export function handleWebhookTrigger(ctx: RouteContext, pulseId: string, request: Request): Response {

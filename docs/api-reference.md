@@ -201,6 +201,8 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `PUT` | `/api/pulses/:id` | Update a pulse |
 | `DELETE` | `/api/pulses/:id` | Delete a pulse |
 | `POST` | `/api/pulses/:id/trigger` | Manual trigger |
+| `POST` | `/api/pulses/:id/stop` | Abort a running Pulse |
+| `GET` | `/api/pulses/running/:conversationId` | Get pulse ID running for a conversation |
 | `POST` | `/api/webhook/pulse/:id` | Webhook trigger (Bearer token auth) |
 | `GET` | `/api/pulses/runs` | List pulse runs (paginated, filterable by `?pulseId=`, `?status=`) |
 | `GET` | `/api/pulses/:id/runs` | Runs for a specific pulse |

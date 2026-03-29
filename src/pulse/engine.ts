@@ -19,7 +19,8 @@ import type { VaultManager } from "../vault/mod.ts";
 import type { EntityConfig } from "../entity/mod.ts";
 import { EntityTurn } from "../entity/mod.ts";
 import { getBroadcaster } from "../server/broadcaster.ts";
-import type { PulseRow } from "../types.ts";
+import { renderMessage } from "../server/templates.ts";
+import type { Message, PulseRow } from "../types.ts";
 
 // =============================================================================
 // Constants
@@ -87,6 +88,7 @@ export interface PulseEngineConfig {
  */
 export class PulseEngine {
   private runningPulses: Set<string> = new Set();
+  private abortedPulses: Set<string> = new Set();
   private semaphore: Semaphore;
   private fsWatchers: Map<string, Deno.FsWatcher> = new Map();
   private fsDebounce: Map<string, number> = new Map();
@@ -181,6 +183,37 @@ export class PulseEngine {
     }
     // Cron and inactivity triggers check `enabled` at execution time,
     // so no explicit removal needed — they'll be skipped.
+  }
+
+  // ===========================================================================
+  // Abort Control
+  // ===========================================================================
+
+  /**
+   * Request abort of a running Pulse by pulse ID.
+   * The Pulse will stop on its next content chunk check.
+   */
+  abortPulse(pulseId: string): boolean {
+    if (this.runningPulses.has(pulseId)) {
+      this.abortedPulses.add(pulseId);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get the pulse ID currently running for a conversation, if any.
+   */
+  getRunningPulseForConversation(conversationId: string): string | null {
+    // Check if any running pulse has this conversation assigned
+    // We need to query the DB for this since we don't track conversationId in runningPulses
+    const pulses = this.db.listPulses({ enabled: true });
+    for (const pulse of pulses) {
+      if (this.runningPulses.has(pulse.id) && pulse.conversationId === conversationId) {
+        return pulse.id;
+      }
+    }
+    return null;
   }
 
   // ===========================================================================
@@ -489,33 +522,79 @@ export class PulseEngine {
 
       const turn = new EntityTurn(this.llm, this.db, this.tools, entityConfig);
 
+      // Broadcast the Pulse prompt message to the chat in real time
+      if (pulse.chatMode === "visible" && conversationId) {
+        try {
+          const pulseMsg: Message = {
+            id: crypto.randomUUID(),
+            role: "user",
+            content: pulse.promptText,
+            createdAt: new Date(),
+            pulseId: pulse.id,
+            pulseName: pulse.name,
+          };
+          const msgHtml = renderMessage(pulseMsg);
+          getBroadcaster().broadcastUpdate({
+            target: "#messages",
+            html: msgHtml,
+            swap: "beforeend",
+          }, conversationId);
+        } catch {
+          // Broadcaster may have no connected clients
+        }
+      }
+
       // Execute the agentic loop
       let fullContent = "";
       let toolCallsCount = 0;
 
-      for await (const chunk of turn.process(conversationId!, pulse.promptText)) {
+      for await (const chunk of turn.process(conversationId!, pulse.promptText, { pulseId: pulse.id, pulseName: pulse.name })) {
+        // Check if this Pulse was aborted by the user
+        if (this.abortedPulses.has(pulseId)) {
+          console.log(`[Pulse] "${pulse.name}" aborted by user`);
+          break;
+        }
         switch (chunk.type) {
           case "content":
             fullContent += chunk.content;
+            if (pulse.chatMode === "visible" && conversationId) {
+              try { getBroadcaster().broadcastEvent("content", chunk.content, conversationId); } catch { /* no clients */ }
+            }
+            break;
+          case "thinking":
+            if (pulse.chatMode === "visible" && conversationId) {
+              try { getBroadcaster().broadcastEvent("thinking", chunk.content, conversationId); } catch { /* no clients */ }
+            }
+            break;
+          case "tool_call":
+            if (pulse.chatMode === "visible" && conversationId) {
+              try { getBroadcaster().broadcastEvent("tool_call", chunk.toolCall, conversationId); } catch { /* no clients */ }
+            }
             break;
           case "tool_result":
             toolCallsCount++;
+            if (pulse.chatMode === "visible" && conversationId) {
+              try { getBroadcaster().broadcastEvent("tool_result", chunk.result, conversationId); } catch { /* no clients */ }
+            }
             break;
           case "dom_update":
-            // Broadcast DOM updates for visible mode
             if (pulse.chatMode === "visible" && conversationId) {
-              try {
-                getBroadcaster().broadcastUpdate(chunk.update, conversationId);
-              } catch {
-                // Broadcaster may have no connected clients
-              }
+              try { getBroadcaster().broadcastUpdate(chunk.update, conversationId); } catch { /* no clients */ }
             }
             break;
           case "status":
           case "metrics":
           case "context":
-            // Collect but don't stream to client
             break;
+        }
+      }
+
+      // Signal stream completion to the chat client
+      if (pulse.chatMode === "visible" && conversationId) {
+        try {
+          getBroadcaster().broadcastEvent("done", {}, conversationId);
+        } catch {
+          // Broadcaster may have no connected clients
         }
       }
 
@@ -562,6 +641,7 @@ export class PulseEngine {
       this.db.updatePulseRunStats(pulseId, "error");
     } finally {
       this.runningPulses.delete(pulseId);
+      this.abortedPulses.delete(pulseId);
       this.semaphore.release();
     }
   }

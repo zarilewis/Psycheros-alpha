@@ -22,6 +22,10 @@ export interface Message {
   createdAt: Date;
   /** When this message was last edited (if ever) */
   editedAt?: Date;
+  /** If this message was triggered by a Pulse, the Pulse's ID */
+  pulseId?: string;
+  /** If this message was triggered by a Pulse, the Pulse's display name */
+  pulseName?: string;
 }
 
 // =============================================================================

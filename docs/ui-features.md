@@ -307,8 +307,16 @@ Autonomous prompt scheduling system accessible via Settings → Pulse in the sid
 - **Filesystem** — Watch a directory for file creation/modification events (debounced at 1s)
 
 **Chat Modes:**
-- **Visible** — Entity response appears in the assigned conversation in real-time via SSE broadcast
+- **Visible** — Entity response streams in real-time to the assigned conversation. The Pulse prompt appears as a visually distinct system message (centered, accent-colored border, EKG Pulse icon header with timestamp). The entity's response streams live with full markdown rendering, thinking display, and tool call cards — identical to regular chat streaming.
 - **Silent** — Entity processes the prompt in the background; output stored in execution log only
+
+**Visible Mode Behavior:**
+- The Pulse prompt message appears in real-time with the entity's accent color border and Pulse icon
+- The entity perceives Pulse messages as system-initiated via a `[System — Pulse "name"]` prefix, not as user messages
+- Responses stream via the persistent SSE channel (content, thinking, tool_call, tool_result, done events)
+- Input is disabled during Pulse streaming; the stop button appears (double-tap to confirm)
+- Chat auto-scrolls as Pulse content arrives
+- Pulse message metadata (pulse_id, pulse_name) is stored on messages for traceability
 
 **Pulse Chaining:**
 - Pulses can chain into other Pulses for complex workflows
@@ -323,4 +331,4 @@ Autonomous prompt scheduling system accessible via Settings → Pulse in the sid
 - Paginated table showing time, pulse name, trigger source, status, duration, tool call count, and result preview
 - Filterable by pulse ID and status
 
-**Source files:** `src/pulse/engine.ts`, `src/pulse/routes.ts`, `src/pulse/templates.ts`, `src/tools/pulse-tools.ts`, `web/js/psycheros.js` (switchTab, savePulse, updatePulseTriggerFields), `web/css/settings.css` (pulse-specific styles)
+**Source files:** `src/pulse/engine.ts`, `src/pulse/routes.ts`, `src/pulse/templates.ts`, `src/tools/pulse-tools.ts`, `web/js/psycheros.js` (switchTab, savePulse, updatePulseTriggerFields), `web/css/settings.css` (pulse-specific styles), `web/css/components.css` (.msg--pulse styles)
