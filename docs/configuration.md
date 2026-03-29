@@ -55,6 +55,9 @@ Tools must be explicitly enabled via `PSYCHEROS_TOOLS`. Set to a comma-separated
 | `vault_list` | List vault documents (filterable by scope) |
 | `vault_search` | Search vault for relevant content |
 | `web_search` | Search the web via Tavily or Brave (auto-enabled when web search provider is set) |
+| `create_pulse` | Create an autonomous scheduled prompt |
+| `trigger_pulse` | Manually trigger an existing Pulse |
+| `delete_pulse` | Delete a Pulse and its triggers |
 
 **Example configurations:**
 ```bash

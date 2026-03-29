@@ -2486,6 +2486,134 @@ async function deleteCustomFile(filename) {
 }
 
 // =============================================================================
+// Pulse System
+// =============================================================================
+
+/**
+ * Switch between tabs in a tabbed view.
+ * @param {string} section - Section name (e.g., 'pulse', 'memories')
+ * @param {string} tab - Tab name (e.g., 'prompts', 'log')
+ */
+function switchTab(section, tab) {
+  // Hide all tab contents for this section
+  document.querySelectorAll(`[id^="${section}-"].tab-content`).forEach(el => {
+    el.style.display = 'none';
+  });
+
+  // Show the selected tab content
+  const target = document.getElementById(`${section}-${tab}`);
+  if (target) target.style.display = '';
+
+  // Update button active states
+  const tabContainer = document.querySelector(`[id^="${section}-tab-"]`)?.parentElement;
+  if (tabContainer) {
+    tabContainer.querySelectorAll('.settings-tab').forEach(btn => {
+      btn.classList.remove('active');
+    });
+  }
+  const activeBtn = document.getElementById(`${section}-tab-${tab}`);
+  if (activeBtn) activeBtn.classList.add('active');
+}
+
+/**
+ * Show/hide the appropriate trigger fields based on trigger type selection.
+ */
+function updatePulseTriggerFields(triggerType) {
+  const fields = {
+    scheduled: document.getElementById('pulse-trigger-scheduled'),
+    oneshot: document.getElementById('pulse-trigger-oneshot'),
+    inactivity: document.getElementById('pulse-trigger-inactivity'),
+    webhook: document.getElementById('pulse-trigger-webhook'),
+    filesystem: document.getElementById('pulse-trigger-filesystem'),
+  };
+
+  for (const [key, el] of Object.entries(fields)) {
+    if (el) el.style.display = key === triggerType ? '' : 'none';
+  }
+}
+
+/**
+ * Show/hide the appropriate schedule preset fields.
+ */
+function updatePulseSchedulePreset(preset) {
+  const fields = {
+    interval: document.getElementById('pulse-schedule-interval'),
+    daily: document.getElementById('pulse-schedule-daily'),
+    weekly: document.getElementById('pulse-schedule-weekly'),
+    monthly: document.getElementById('pulse-schedule-monthly'),
+    advanced: document.getElementById('pulse-schedule-advanced'),
+  };
+
+  for (const [key, el] of Object.entries(fields)) {
+    if (el) el.style.display = key === preset ? '' : 'none';
+  }
+}
+
+/**
+ * Save a Pulse (create or update).
+ * Gathers form data, translates friendly fields, sends JSON to the API.
+ */
+async function savePulse(event, pulseId) {
+  const btn = document.getElementById('pulse-save-btn');
+  const statusEl = document.getElementById('pulse-save-status');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  if (statusEl) { statusEl.className = 'settings-status visible'; statusEl.textContent = 'Saving...'; }
+
+  try {
+    const form = document.getElementById('pulse-editor-form');
+    const fd = new FormData(form);
+    const body = {};
+    for (const [key, value] of fd.entries()) {
+      if (key === 'enabled') {
+        body[key] = true; // checkbox is only in FormData when checked
+        continue;
+      }
+      if (value === '') {
+        body[key] = null;
+        continue;
+      }
+      body[key] = value;
+    }
+
+    // Checkbox for enabled: if not in FormData, it was unchecked
+    if (!('enabled' in body)) body.enabled = false;
+
+    // Checkbox for inactivity random
+    body.inactivityRandom = document.getElementById('pulse-inactivity-random')?.checked || false;
+
+    const url = pulseId ? `/api/pulses/${pulseId}` : '/api/pulses';
+    const resp = await fetch(url, {
+      method: pulseId ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const contentType = resp.headers.get('content-type') || '';
+
+    if (contentType.includes('text/html')) {
+      // Server returned the editor fragment on success
+      const html = await resp.text();
+      document.getElementById('chat').innerHTML = html;
+    } else {
+      const data = await resp.json();
+      if (statusEl) {
+        statusEl.className = 'settings-status visible error';
+        statusEl.textContent = data.error || 'Failed to save pulse.';
+      }
+    }
+  } catch (e) {
+    if (statusEl) {
+      statusEl.className = 'settings-status visible error';
+      statusEl.textContent = 'Failed to save: ' + e.message;
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = pulseId ? 'Save Changes' : 'Create Pulse';
+  }
+}
+
+// =============================================================================
 // Graph View
 // =============================================================================
 
@@ -2747,6 +2875,11 @@ globalThis.Psycheros = {
   // Custom file management
   createCustomFile,
   deleteCustomFile,
+  // Pulse system
+  switchTab,
+  updatePulseTriggerFields,
+  updatePulseSchedulePreset,
+  savePulse,
 };
 
 /**

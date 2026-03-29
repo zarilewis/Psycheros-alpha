@@ -5,10 +5,10 @@
  * conversation and message management.
  */
 
-import { Database } from "@db/sqlite";
+import { Database, type BindValue } from "@db/sqlite";
 import { initializeSchema } from "./schema.ts";
 import { getVecVersion } from "./vector.ts";
-import type { Conversation, Message, ToolCall, TurnMetrics, ContextSnapshotRecord } from "../types.ts";
+import type { Conversation, Message, ToolCall, TurnMetrics, ContextSnapshotRecord, PulseRow, PulseRunRow, CreatePulseInput, UpdatePulseInput } from "../types.ts";
 
 /**
  * Valid message roles that can be stored in the database.
@@ -1137,6 +1137,372 @@ export class DBClient {
       metricsJson: row.metrics_json,
       createdAt: row.created_at,
     };
+  }
+
+  // ===========================================================================
+  // Pulse Operations
+  // ===========================================================================
+
+  /**
+   * Row type for pulses as stored in SQLite.
+   */
+  private static pulseRowToPulse(row: Record<string, unknown>): PulseRow {
+    return {
+      id: row.id as string,
+      name: row.name as string,
+      description: (row.description as string) ?? null,
+      promptText: row.prompt_text as string,
+      chatMode: row.chat_mode as "visible" | "silent",
+      conversationId: (row.conversation_id as string) ?? null,
+      enabled: (row.enabled as number) === 1,
+      triggerType: row.trigger_type as "cron" | "inactivity" | "webhook" | "filesystem",
+      cronExpression: (row.cron_expression as string) ?? null,
+      intervalSeconds: (row.interval_seconds as number) ?? null,
+      randomIntervalMin: (row.random_interval_min as number) ?? null,
+      randomIntervalMax: (row.random_interval_max as number) ?? null,
+      runAt: (row.run_at as string) ?? null,
+      inactivityThresholdSeconds: (row.inactivity_threshold_seconds as number) ?? null,
+      chainPulseIds: row.chain_pulse_ids ? JSON.parse(row.chain_pulse_ids as string) as string[] : [],
+      maxChainDepth: row.max_chain_depth as number,
+      source: row.source as "user" | "entity",
+      autoDelete: (row.auto_delete as number) === 1,
+      webhookToken: (row.webhook_token as string) ?? null,
+      filesystemWatchPath: (row.filesystem_watch_path as string) ?? null,
+      successCount: row.success_count as number,
+      errorCount: row.error_count as number,
+      lastRunAt: (row.last_run_at as string) ?? null,
+      lastStatus: (row.last_status as string) ?? null,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+    };
+  }
+
+  /**
+   * List all pulses, optionally filtered.
+   */
+  listPulses(filter?: { enabled?: boolean }): PulseRow[] {
+    if (filter?.enabled !== undefined) {
+      const stmt = this.db.prepare(
+        `SELECT * FROM pulses WHERE enabled = ? ORDER BY created_at DESC`
+      );
+      const rows = stmt.all(filter.enabled ? 1 : 0) as Record<string, unknown>[];
+      stmt.finalize();
+      return rows.map((r) => DBClient.pulseRowToPulse(r));
+    }
+
+    const stmt = this.db.prepare("SELECT * FROM pulses ORDER BY created_at DESC");
+    const rows = stmt.all() as Record<string, unknown>[];
+    stmt.finalize();
+    return rows.map((r) => DBClient.pulseRowToPulse(r));
+  }
+
+  /**
+   * Get enabled pulses assigned to a specific conversation.
+   */
+  getActivePulsesForConversation(conversationId: string): PulseRow[] {
+    const stmt = this.db.prepare(
+      `SELECT * FROM pulses
+       WHERE enabled = 1 AND conversation_id = ?
+       ORDER BY created_at DESC`
+    );
+    const rows = stmt.all(conversationId) as Record<string, unknown>[];
+    stmt.finalize();
+    return rows.map((r) => DBClient.pulseRowToPulse(r));
+  }
+
+  /**
+   * Get a single pulse by ID.
+   */
+  getPulse(id: string): PulseRow | null {
+    const stmt = this.db.prepare("SELECT * FROM pulses WHERE id = ?");
+    const row = stmt.get(id) as Record<string, unknown> | undefined;
+    stmt.finalize();
+    return row ? DBClient.pulseRowToPulse(row) : null;
+  }
+
+  /**
+   * Get a pulse by its webhook token.
+   */
+  getPulseByWebhookToken(token: string): PulseRow | null {
+    const stmt = this.db.prepare("SELECT * FROM pulses WHERE webhook_token = ?");
+    const row = stmt.get(token) as Record<string, unknown> | undefined;
+    stmt.finalize();
+    return row ? DBClient.pulseRowToPulse(row) : null;
+  }
+
+  /**
+   * Create a new pulse.
+   */
+  createPulse(data: CreatePulseInput): PulseRow {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const webhookToken = data.webhookToken ?? crypto.randomUUID().replace(/-/g, "");
+
+    this.db.exec(
+      `INSERT INTO pulses
+       (id, name, description, prompt_text, chat_mode, conversation_id, enabled,
+        trigger_type, cron_expression, interval_seconds, random_interval_min,
+        random_interval_max, run_at, inactivity_threshold_seconds, chain_pulse_ids,
+        max_chain_depth, source, auto_delete, webhook_token, filesystem_watch_path,
+        success_count, error_count, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?)`,
+      [
+        id, data.name, data.description ?? null, data.promptText,
+        data.chatMode ?? "visible", data.conversationId ?? null,
+        data.enabled !== false ? 1 : 0,
+        data.triggerType ?? "cron",
+        data.cronExpression ?? null, data.intervalSeconds ?? null,
+        data.randomIntervalMin ?? null, data.randomIntervalMax ?? null,
+        data.runAt ?? null, data.inactivityThresholdSeconds ?? null,
+        JSON.stringify(data.chainPulseIds ?? []),
+        data.maxChainDepth ?? 3,
+        data.source ?? "user", data.autoDelete ? 1 : 0,
+        webhookToken, data.filesystemWatchPath ?? null,
+        now, now,
+      ]
+    );
+
+    return this.getPulse(id)!;
+  }
+
+  /**
+   * Update a pulse. Returns true if a row was updated.
+   */
+  updatePulse(id: string, data: Partial<UpdatePulseInput>): boolean {
+    const sets: string[] = [];
+    const values: unknown[] = [];
+
+    const fields: Array<[string, unknown]> = [
+      ["name", data.name],
+      ["description", data.description],
+      ["prompt_text", data.promptText],
+      ["chat_mode", data.chatMode],
+      ["conversation_id", data.conversationId],
+      ["enabled", data.enabled !== undefined ? (data.enabled ? 1 : 0) : undefined],
+      ["trigger_type", data.triggerType],
+      ["cron_expression", data.cronExpression],
+      ["interval_seconds", data.intervalSeconds],
+      ["random_interval_min", data.randomIntervalMin],
+      ["random_interval_max", data.randomIntervalMax],
+      ["run_at", data.runAt],
+      ["inactivity_threshold_seconds", data.inactivityThresholdSeconds],
+      ["chain_pulse_ids", data.chainPulseIds !== undefined ? JSON.stringify(data.chainPulseIds) : undefined],
+      ["max_chain_depth", data.maxChainDepth],
+      ["auto_delete", data.autoDelete !== undefined ? (data.autoDelete ? 1 : 0) : undefined],
+      ["filesystem_watch_path", data.filesystemWatchPath],
+    ];
+
+    for (const [col, val] of fields) {
+      if (val !== undefined) {
+        sets.push(`${col} = ?`);
+        values.push(val);
+      }
+    }
+
+    if (sets.length === 0) return false;
+
+    sets.push("updated_at = ?");
+    values.push(new Date().toISOString());
+    values.push(id);
+
+    this.db.exec(`UPDATE pulses SET ${sets.join(", ")} WHERE id = ?`, values as BindValue[]);
+    return true;
+  }
+
+  /**
+   * Delete a pulse and its runs.
+   */
+  deletePulse(id: string): boolean {
+    // Delete runs first (virtual table has no CASCADE)
+    this.db.exec("DELETE FROM pulse_runs WHERE pulse_id = ?", [id]);
+    const result = this.db.exec("DELETE FROM pulses WHERE id = ?", [id]);
+    return result > 0;
+  }
+
+  /**
+   * Increment pulse success/error counts and update last run info.
+   */
+  updatePulseRunStats(id: string, status: "success" | "error"): void {
+    const field = status === "success" ? "success_count" : "error_count";
+    this.db.exec(
+      `UPDATE pulses SET ${field} = ${field} + 1, last_run_at = ?, last_status = ?, updated_at = ? WHERE id = ?`,
+      [new Date().toISOString(), status, new Date().toISOString(), id]
+    );
+  }
+
+  // ===========================================================================
+  // Pulse Run Operations
+  // ===========================================================================
+
+  /**
+   * Create a new pulse run record.
+   */
+  addPulseRun(data: {
+    pulseId: string;
+    conversationId: string | null;
+    triggerSource: string;
+    chainDepth?: number;
+    chainParentRunId?: string | null;
+  }): string {
+    const id = crypto.randomUUID();
+    const now = new Date().toISOString();
+
+    this.db.exec(
+      `INSERT INTO pulse_runs
+       (id, pulse_id, conversation_id, trigger_source, started_at, status,
+        tool_calls_count, chain_depth, chain_parent_run_id, created_at)
+       VALUES (?, ?, ?, ?, ?, 'running', 0, ?, ?, ?)`,
+      [
+        id, data.pulseId, data.conversationId ?? null,
+        data.triggerSource, now,
+        data.chainDepth ?? 0, data.chainParentRunId ?? null, now,
+      ]
+    );
+
+    return id;
+  }
+
+  /**
+   * Complete a pulse run with results.
+   */
+  completePulseRun(id: string, data: {
+    status: "success" | "error" | "skipped";
+    resultSummary?: string | null;
+    errorMessage?: string | null;
+    toolCallsCount?: number;
+    outputContent?: string | null;
+  }): void {
+    this.db.exec(
+      `UPDATE pulse_runs SET status = ?, completed_at = ?, duration_ms = ?,
+        result_summary = ?, error_message = ?, tool_calls_count = ?,
+        output_content = ?
+       WHERE id = ?`,
+      [
+        data.status, new Date().toISOString(),
+        // Calculate duration from started_at
+        `CAST((julianday('now') - julianday((SELECT started_at FROM pulse_runs WHERE id = ?))) * 86400000 AS INTEGER)`,
+        data.resultSummary ?? null, data.errorMessage ?? null,
+        data.toolCallsCount ?? 0, data.outputContent ?? null,
+        id, id,
+      ]
+    );
+  }
+
+  /**
+   * Get a single pulse run by ID.
+   */
+  getPulseRun(id: string): PulseRunRow | null {
+    const stmt = this.db.prepare("SELECT * FROM pulse_runs WHERE id = ?");
+    const row = stmt.get(id) as Record<string, unknown> | undefined;
+    stmt.finalize();
+    if (!row) return null;
+    return {
+      id: row.id as string,
+      pulseId: row.pulse_id as string,
+      conversationId: (row.conversation_id as string) ?? null,
+      triggerSource: row.trigger_source as string,
+      startedAt: row.started_at as string,
+      completedAt: (row.completed_at as string) ?? null,
+      durationMs: (row.duration_ms as number) ?? null,
+      status: row.status as string,
+      resultSummary: (row.result_summary as string) ?? null,
+      errorMessage: (row.error_message as string) ?? null,
+      toolCallsCount: (row.tool_calls_count as number) ?? 0,
+      outputContent: (row.output_content as string) ?? null,
+      chainDepth: row.chain_depth as number,
+      chainParentRunId: (row.chain_parent_run_id as string) ?? null,
+      createdAt: row.created_at as string,
+    };
+  }
+
+  /**
+   * List pulse runs with pagination and optional filtering.
+   */
+  listPulseRuns(filter?: {
+    pulseId?: string;
+    status?: string;
+    limit?: number;
+    offset?: number;
+  }): { runs: PulseRunRow[]; total: number } {
+    const limit = filter?.limit ?? 50;
+    const offset = filter?.offset ?? 0;
+
+    let whereClause = "";
+    const params: unknown[] = [];
+
+    if (filter?.pulseId) {
+      whereClause += "WHERE pulse_id = ?";
+      params.push(filter.pulseId);
+    }
+    if (filter?.status) {
+      whereClause += whereClause ? " AND status = ?" : "WHERE status = ?";
+      params.push(filter.status);
+    }
+
+    const countStmt = this.db.prepare(`SELECT COUNT(*) as count FROM pulse_runs ${whereClause}`);
+    const total = (countStmt.get(...(params as BindValue[])) as { count: number })?.count ?? 0;
+    countStmt.finalize();
+
+    const stmt = this.db.prepare(
+      `SELECT * FROM pulse_runs ${whereClause} ORDER BY started_at DESC LIMIT ? OFFSET ?`
+    );
+    const rows = stmt.all(...(params as BindValue[]), limit, offset) as Record<string, unknown>[];
+    stmt.finalize();
+
+    const runs: PulseRunRow[] = rows.map((row) => ({
+      id: row.id as string,
+      pulseId: row.pulse_id as string,
+      conversationId: (row.conversation_id as string) ?? null,
+      triggerSource: row.trigger_source as string,
+      startedAt: row.started_at as string,
+      completedAt: (row.completed_at as string) ?? null,
+      durationMs: (row.duration_ms as number) ?? null,
+      status: row.status as string,
+      resultSummary: (row.result_summary as string) ?? null,
+      errorMessage: (row.error_message as string) ?? null,
+      toolCallsCount: (row.tool_calls_count as number) ?? 0,
+      outputContent: (row.output_content as string) ?? null,
+      chainDepth: row.chain_depth as number,
+      chainParentRunId: (row.chain_parent_run_id as string) ?? null,
+      createdAt: row.created_at as string,
+    }));
+
+    return { runs, total };
+  }
+
+  /**
+   * Get the timestamp of the most recent user message across all conversations.
+   * Used by the inactivity trigger system.
+   */
+  getLastUserMessageTimestamp(): string | null {
+    const stmt = this.db.prepare(
+      `SELECT created_at FROM messages WHERE role = 'user' ORDER BY created_at DESC LIMIT 1`
+    );
+    const row = stmt.get<{ created_at: string }>();
+    stmt.finalize();
+    return row?.created_at ?? null;
+  }
+
+  /**
+   * Detect if a chain would create a cycle by walking the parent run chain.
+   */
+  detectPulseChainCycle(pulseId: string, parentRunId: string | null): boolean {
+    if (!parentRunId) return false;
+
+    const visited = new Set<string>();
+    let currentRunId: string | null = parentRunId;
+
+    while (currentRunId) {
+      if (visited.has(currentRunId)) return true;
+      visited.add(currentRunId);
+
+      const run = this.getPulseRun(currentRunId);
+      if (!run) break;
+      if (run.pulseId === pulseId) return true;
+      currentRunId = run.chainParentRunId;
+    }
+
+    return false;
   }
 
   // ===========================================================================

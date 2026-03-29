@@ -45,6 +45,8 @@ import {
 } from "./vault-tools.ts";
 // Web search tool
 import { webSearchTool } from "./web-search.ts";
+// Pulse tools
+import { createPulseTool, triggerPulseTool, deletePulseTool } from "./pulse-tools.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -88,6 +90,10 @@ const AVAILABLE_TOOLS: Record<string, Tool> = {
   vault_search: vaultSearchTool,
   // Web search tool (Tavily / Brave)
   web_search: webSearchTool,
+  // Pulse tools (autonomous entity prompts)
+  create_pulse: createPulseTool,
+  trigger_pulse: triggerPulseTool,
+  delete_pulse: deletePulseTool,
 };
 
 /**

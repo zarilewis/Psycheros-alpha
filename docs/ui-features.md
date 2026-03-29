@@ -288,3 +288,39 @@ Review and edit the entity's recorded memories accessible via Settings → Memor
 - `POST /api/memories/significant/create` — create new significant memory
 
 **Source files:** `src/server/templates.ts` (render functions), `src/server/routes.ts` (handlers), `src/mcp-client/mod.ts` (MCP methods), `src/rag/indexer.ts` (reindexFile)
+
+## Pulse System
+
+Autonomous prompt scheduling system accessible via Settings → Pulse in the sidebar. The entity can act on its own initiative by processing user-defined prompts on schedules, timers, or external triggers.
+
+**Features:**
+- Tabbed view: Prompts list and Execution Log
+- Create, edit, enable/disable, and delete Pulses
+- Manual "Run Now" trigger for any Pulse
+- Conversations with active Pulses show a heartbeat indicator in the sidebar
+
+**Trigger Types:**
+- **Scheduled** — Friendly presets (every N minutes/hours, daily at time, weekly on day, monthly on date) plus advanced cron expression
+- **One-shot** — Fire once at a specific datetime, then auto-disable
+- **Inactivity** — Fire after no user messages across all chats for a set duration, with optional ±35% random jitter for organic feel
+- **Webhook** — External trigger via `POST /api/webhook/pulse/:id` with Bearer token authentication (rate-limited to 1 per 10s)
+- **Filesystem** — Watch a directory for file creation/modification events (debounced at 1s)
+
+**Chat Modes:**
+- **Visible** — Entity response appears in the assigned conversation in real-time via SSE broadcast
+- **Silent** — Entity processes the prompt in the background; output stored in execution log only
+
+**Pulse Chaining:**
+- Pulses can chain into other Pulses for complex workflows
+- Cycle detection via ancestry walking and max chain depth (default 3)
+- Errors in chained Pulses don't prevent sibling chains
+
+**Entity-Created Pulses:**
+- Entity can create, trigger, and delete Pulses via tools (`create_pulse`, `trigger_pulse`, `delete_pulse`)
+- Entity-created Pulses default to silent mode and auto-delete after successful execution
+
+**Execution Log:**
+- Paginated table showing time, pulse name, trigger source, status, duration, tool call count, and result preview
+- Filterable by pulse ID and status
+
+**Source files:** `src/pulse/engine.ts`, `src/pulse/routes.ts`, `src/pulse/templates.ts`, `src/tools/pulse-tools.ts`, `web/js/psycheros.js` (switchTab, savePulse, updatePulseTriggerFields), `web/css/settings.css` (pulse-specific styles)

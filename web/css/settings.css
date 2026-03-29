@@ -1522,3 +1522,166 @@
     flex-wrap: wrap;
   }
 }
+
+/* =============================================================================
+   Pulse Badges
+   ============================================================================= */
+
+.badge {
+  display: inline-block;
+  padding: 0.125rem var(--sp-2);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.badge-success {
+  background-color: var(--c-accent-subtle);
+  color: var(--c-accent);
+}
+
+.badge-error {
+  background-color: rgba(255, 68, 68, 0.12);
+  color: #ff6b6b;
+}
+
+.badge-muted {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: var(--c-fg-muted);
+}
+
+.badge-secondary {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--c-fg);
+}
+
+.badge-primary {
+  background-color: var(--c-accent-subtle);
+  color: var(--c-accent);
+}
+
+.badge-info {
+  background-color: rgba(100, 180, 255, 0.1);
+  color: #64b4ff;
+}
+
+/* =============================================================================
+   Pulse List & Editor
+   ============================================================================= */
+
+.pulse-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.autoprompt-item {
+  padding: var(--sp-3) var(--sp-4);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-md);
+}
+
+.autoprompt-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex-wrap: wrap;
+}
+
+.autoprompt-name {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--c-fg);
+}
+
+.autoprompt-desc {
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  margin: var(--sp-1) 0;
+}
+
+.autoprompt-meta {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  margin-top: var(--sp-1);
+}
+
+.autoprompt-actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-3);
+  border-top: 1px solid var(--c-border);
+  padding-top: var(--sp-2);
+}
+
+.trigger-fields {
+  margin-top: var(--sp-3);
+}
+
+.schedule-fields {
+  margin-top: var(--sp-2);
+}
+
+.pulse-log {
+  overflow-x: auto;
+}
+
+.log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-xs);
+}
+
+.log-table th {
+  text-align: left;
+  padding: var(--sp-2);
+  color: var(--c-fg-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--c-border);
+  white-space: nowrap;
+}
+
+.log-table td {
+  padding: var(--sp-2);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  white-space: nowrap;
+}
+
+.log-table tr:hover td {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.log-result {
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-header {
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  margin-bottom: var(--sp-2);
+}
+
+.log-more {
+  text-align: center;
+  padding: var(--sp-3);
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  cursor: pointer;
+}
+
+.log-more:hover {
+  color: var(--c-fg);
+}
+
+.pulse-indicator {
+  margin-right: 6px;
+  flex-shrink: 0;
+}

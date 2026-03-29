@@ -19,6 +19,7 @@ import type { MCPClient } from "../mcp-client/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import { LorebookManager } from "../lorebook/mod.ts";
 import { VaultManager } from "../vault/mod.ts";
+import { PulseEngine } from "../pulse/mod.ts";
 import { join } from "@std/path";
 import { MAX_REQUEST_BODY_SIZE, MAX_UPLOAD_BODY_SIZE } from "../constants.ts";
 import {
@@ -106,6 +107,23 @@ import {
   handleWebSearchSettingsFragment,
   type RouteContext,
 } from "./routes.ts";
+import {
+  handlePulseFragment,
+  handlePulseNewFragment,
+  handlePulseEditFragment,
+  handlePulseLogFragment,
+  handlePulseListFragment,
+  handleListPulses,
+  handleCreatePulse,
+  handleGetPulse,
+  handleUpdatePulse,
+  handleDeletePulse,
+  handleTriggerPulse,
+  handleWebhookTrigger,
+  handleListPulseRuns,
+  handleListPulseRunsForPulse,
+  handleGetPulseRun,
+} from "../pulse/routes.ts";
 import { getBroadcaster } from "./broadcaster.ts";
 import {
   handleAdminFragment,
@@ -183,6 +201,7 @@ export class Server {
   private vaultManager: VaultManager;
   private llmSettings: LLMSettings;
   private webSearchSettings: WebSearchSettings;
+  private pulseEngine: PulseEngine | null = null;
 
   /**
    * Create a new Server instance.
@@ -488,6 +507,23 @@ export class Server {
       broadcaster.sendKeepalive();
     }, KEEPALIVE_INTERVAL_MS);
 
+    // Initialize Pulse engine for autonomous entity prompts
+    this.pulseEngine = new PulseEngine(
+      this.db,
+      this.llm,
+      this.tools,
+      {
+        projectRoot: this.config.projectRoot,
+        ragRetriever: this.ragRetriever ?? undefined,
+        chatRAG: this.chatRAG ?? undefined,
+        mcpClient: this.mcpClient ?? undefined,
+        lorebookManager: this.lorebookManager,
+        vaultManager: this.vaultManager,
+        webSearchSettings: this.webSearchSettings,
+      }
+    );
+    this.pulseEngine.start();
+
     await Deno.serve(
       {
         port,
@@ -508,6 +544,11 @@ export class Server {
    */
   stop(): void {
     console.log("Stopping Psycheros server...");
+
+    // Stop pulse engine
+    if (this.pulseEngine) {
+      this.pulseEngine.stop();
+    }
 
     // Clear keepalive timer
     if (this.keepaliveInterval !== null) {
@@ -537,6 +578,7 @@ export class Server {
       lorebookManager: this.lorebookManager,
       vaultManager: this.vaultManager,
       memoryIndexer: this.memoryIndexer ?? undefined,
+      pulseEngine: this.pulseEngine ?? undefined,
       getLLMSettings: () => this.llmSettings,
       updateLLMSettings: (settings) => this.updateLLMSettings(settings),
       getWebSearchSettings: () => this.webSearchSettings,
@@ -997,6 +1039,64 @@ export class Server {
     }
 
     // ========================================
+    // Pulse API Routes
+    // ========================================
+
+    // GET /api/pulses - List all pulses
+    if (method === "GET" && path === "/api/pulses") {
+      return handleListPulses(ctx);
+    }
+
+    // POST /api/pulses - Create pulse
+    if (method === "POST" && path === "/api/pulses") {
+      return await handleCreatePulse(ctx, request);
+    }
+
+    // GET /api/pulses/runs - List pulse runs
+    if (method === "GET" && path === "/api/pulses/runs") {
+      return handleListPulseRuns(ctx, new URL(request.url));
+    }
+
+    // POST /api/webhook/pulse/:id - Webhook trigger
+    const webhookPulseMatch = path.match(/^\/api\/webhook\/pulse\/([^/]+)$/);
+    if (method === "POST" && webhookPulseMatch) {
+      return await handleWebhookTrigger(ctx, webhookPulseMatch[1], request);
+    }
+
+    // Pulse-specific routes
+    const pulseMatch = path.match(/^\/api\/pulses\/([^/]+)$/);
+    if (pulseMatch) {
+      const pulseId = pulseMatch[1];
+      if (method === "GET") {
+        return handleGetPulse(ctx, pulseId);
+      }
+      if (method === "PUT") {
+        return await handleUpdatePulse(ctx, pulseId, request);
+      }
+      if (method === "DELETE") {
+        return handleDeletePulse(ctx, pulseId);
+      }
+    }
+
+    // POST /api/pulses/:id/trigger - Manual trigger
+    const pulseTriggerMatch = path.match(/^\/api\/pulses\/([^/]+)\/trigger$/);
+    if (method === "POST" && pulseTriggerMatch) {
+      return await handleTriggerPulse(ctx, pulseTriggerMatch[1], request);
+    }
+
+    // GET /api/pulses/:id/runs - Runs for a specific pulse
+    const pulseRunsMatch = path.match(/^\/api\/pulses\/([^/]+)\/runs$/);
+    if (method === "GET" && pulseRunsMatch) {
+      return handleListPulseRunsForPulse(ctx, pulseRunsMatch[1], new URL(request.url));
+    }
+
+    // GET /api/pulses/runs/:runId - Single run details
+    const pulseRunMatch = path.match(/^\/api\/pulses\/runs\/([^/]+)$/);
+    if (method === "GET" && pulseRunMatch) {
+      return handleGetPulseRun(ctx, pulseRunMatch[1]);
+    }
+
+    // ========================================
     // Vault API Routes
     // ========================================
 
@@ -1205,6 +1305,36 @@ export class Server {
     // GET /fragments/settings/web-search - Web search settings UI fragment
     if (path === "/fragments/settings/web-search") {
       return handleWebSearchSettingsFragment(ctx);
+    }
+
+    // ========================================
+    // Pulse Fragment Routes
+    // ========================================
+
+    // GET /fragments/settings/pulse - Main Pulse tabbed view
+    if (path === "/fragments/settings/pulse") {
+      return handlePulseFragment(ctx);
+    }
+
+    // GET /fragments/settings/pulse/new - New Pulse editor
+    if (path === "/fragments/settings/pulse/new") {
+      return handlePulseNewFragment(ctx);
+    }
+
+    // GET /fragments/settings/pulse/log - Execution log
+    if (path === "/fragments/settings/pulse/log") {
+      return handlePulseLogFragment(ctx, new URL(`http://localhost${path}`));
+    }
+
+    // GET /fragments/settings/pulse/list - Prompt list partial
+    if (path === "/fragments/settings/pulse/list") {
+      return handlePulseListFragment(ctx);
+    }
+
+    // GET /fragments/settings/pulse/:id/edit - Edit Pulse editor
+    const pulseEditMatch = path.match(/^\/fragments\/settings\/pulse\/([^/]+)\/edit$/);
+    if (pulseEditMatch) {
+      return handlePulseEditFragment(ctx, pulseEditMatch[1]);
     }
 
     // ========================================

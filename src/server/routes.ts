@@ -69,6 +69,8 @@ export interface RouteContext {
   tools: ToolRegistry;
   /** Root directory of the project for file serving */
   projectRoot: string;
+  /** Pulse engine for autonomous entity prompts */
+  pulseEngine?: import("../pulse/mod.ts").PulseEngine;
   /** Optional RAG retriever for memory search */
   ragRetriever?: Retriever;
   /** Optional chat RAG for searching conversation history */
@@ -389,7 +391,17 @@ export async function handleChatFragment(
  */
 export function handleConversationListFragment(ctx: RouteContext): Response {
   const conversations = ctx.db.listConversations();
-  const html = renderConversationList(conversations);
+
+  // Build set of conversation IDs that have active pulses
+  const allPulses = ctx.db.listPulses({ enabled: true });
+  const pulseConversationIds = new Set<string>();
+  for (const pulse of allPulses) {
+    if (pulse.conversationId) {
+      pulseConversationIds.add(pulse.conversationId);
+    }
+  }
+
+  const html = renderConversationList(conversations, pulseConversationIds);
 
   return new Response(html, {
     headers: {
@@ -862,6 +874,11 @@ export async function handleChat(
         const titlePromise = isFirstMessage
           ? generateAndSetTitle(body.conversationId, body.message, ctx.db)
           : null;
+
+        // Update pulse engine's last user message timestamp (for inactivity triggers)
+        if (ctx.pulseEngine) {
+          ctx.pulseEngine.updateLastUserMessage();
+        }
 
         // Create EntityTurn instance
         const turn = new EntityTurn(

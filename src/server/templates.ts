@@ -476,6 +476,23 @@ export function renderSettingsHub(): string {
         </svg>
       </a>
       <a class="settings-hub-card"
+        hx-get="/fragments/settings/pulse"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="2 12 6 12 8 4 12 20 14 10 16 14 18 12 22 12"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Pulse</span>
+          <span class="settings-hub-card-desc">Schedule autonomous entity prompts and reminders</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
         hx-get="/fragments/admin"
         hx-target="#chat"
         hx-swap="innerHTML">
@@ -668,13 +685,20 @@ export function renderSidebar(conversations: Conversation[]): string {
  * Render the conversation list items.
  * This can be returned as a partial for HTMX swaps.
  */
-export function renderConversationList(conversations: Conversation[]): string {
+export function renderConversationList(
+  conversations: Conversation[],
+  pulseConversationIds?: Set<string>,
+): string {
   if (conversations.length === 0) {
     return `<div class="conv-empty">No conversations yet</div>`;
   }
 
   return conversations
-    .map((conv) => renderConversationItem(conv))
+    .map((conv) => renderConversationItem(
+      conv,
+      false,
+      pulseConversationIds?.has(conv.id),
+    ))
     .join("");
 }
 
@@ -683,12 +707,16 @@ export function renderConversationList(conversations: Conversation[]): string {
  */
 export function renderConversationItem(
   conv: Conversation,
-  isActive = false
+  isActive = false,
+  hasPulse = false,
 ): string {
   const title = escapeHtml(conv.title || "Untitled");
   const date = formatDate(conv.updatedAt || conv.createdAt);
   const escapedId = escapeHtml(conv.id);
   const encodedId = encodeURIComponent(conv.id);
+  const pulseIndicator = hasPulse
+    ? `<svg class="pulse-indicator" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" title="Active Pulse"><polyline points="2 12 6 12 8 4 12 20 14 10 16 14 18 12 22 12"/></svg>`
+    : "";
 
   // Swipe wrapper structure with edit action (delete removed - too easy to lose conversations)
   return `<div class="conv-item-wrapper" data-conv-id="${escapedId}">
@@ -705,7 +733,7 @@ export function renderConversationItem(
     hx-swap="innerHTML"
     hx-push-url="/c/${encodedId}">
     <input type="checkbox" class="conv-select-checkbox" data-conv-id="${escapedId}" onclick="event.stopPropagation()">
-    <span class="conv-title">${title}</span>
+    <span class="conv-title">${pulseIndicator}${title}</span>
     <span class="conv-date">${date}</span>
     <div class="conv-actions">
       <button class="conv-action-btn conv-action-btn--edit" data-action="edit" title="Edit title" onclick="event.preventDefault(); event.stopPropagation(); Psycheros.startTitleEdit('${escapedId}')">

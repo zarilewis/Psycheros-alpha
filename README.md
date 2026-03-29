@@ -79,6 +79,7 @@ src/
 │   ├── identity-helpers.ts  # XML parsing, MCP fallback
 │   ├── identity-casual.ts   # Tier 1: append-only
 │   └── identity-maintain.ts # Tier 2: maintenance
+│   └── pulse-tools.ts        # Entity-facing Pulse tools
 ├── rag/              # Retrieval-Augmented Generation
 │   ├── mod.ts
 │   ├── embedder.ts   # HuggingFace transformer embeddings
@@ -98,6 +99,11 @@ src/
 │   ├── manager.ts    # CRUD operations
 │   ├── evaluator.ts  # Trigger evaluation
 │   └── context-builder.ts
+├── pulse/            # Autonomous scheduled prompts
+│   ├── mod.ts
+│   ├── engine.ts     # PulseEngine — cron, inactivity, webhook, filesystem triggers
+│   ├── routes.ts     # CRUD API, trigger endpoints, HTMX fragments
+│   └── templates.ts  # Settings hub card, editor, execution log
 ├── mcp-client/       # Entity-core MCP client
 │   └── mod.ts
 ├── entity/           # Agentic loop

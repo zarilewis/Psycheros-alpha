@@ -224,3 +224,103 @@ export interface ContextSnapshotRecord {
   createdAt: string;
 }
 
+// =============================================================================
+// Pulse Types
+// =============================================================================
+
+/**
+ * A Pulse is a user- or entity-defined prompt that executes on a schedule
+ * or in response to external triggers, enabling the entity to act autonomously.
+ */
+export interface PulseRow {
+  id: string;
+  name: string;
+  description: string | null;
+  promptText: string;
+  chatMode: "visible" | "silent";
+  conversationId: string | null;
+  enabled: boolean;
+  triggerType: "cron" | "inactivity" | "webhook" | "filesystem";
+  cronExpression: string | null;
+  intervalSeconds: number | null;
+  randomIntervalMin: number | null;
+  randomIntervalMax: number | null;
+  runAt: string | null;
+  inactivityThresholdSeconds: number | null;
+  chainPulseIds: string[];
+  maxChainDepth: number;
+  source: "user" | "entity";
+  autoDelete: boolean;
+  webhookToken: string | null;
+  filesystemWatchPath: string | null;
+  successCount: number;
+  errorCount: number;
+  lastRunAt: string | null;
+  lastStatus: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Input for creating a new Pulse. */
+export interface CreatePulseInput {
+  name: string;
+  description?: string | null;
+  promptText: string;
+  chatMode?: "visible" | "silent";
+  conversationId?: string | null;
+  enabled?: boolean;
+  triggerType?: "cron" | "inactivity" | "webhook" | "filesystem";
+  cronExpression?: string | null;
+  intervalSeconds?: number | null;
+  randomIntervalMin?: number | null;
+  randomIntervalMax?: number | null;
+  runAt?: string | null;
+  inactivityThresholdSeconds?: number | null;
+  chainPulseIds?: string[];
+  maxChainDepth?: number;
+  source?: "user" | "entity";
+  autoDelete?: boolean;
+  webhookToken?: string;
+  filesystemWatchPath?: string | null;
+}
+
+/** Input for updating an existing Pulse (all fields optional). */
+export interface UpdatePulseInput {
+  name?: string;
+  description?: string | null;
+  promptText?: string;
+  chatMode?: "visible" | "silent";
+  conversationId?: string | null;
+  enabled?: boolean;
+  triggerType?: "cron" | "inactivity" | "webhook" | "filesystem";
+  cronExpression?: string | null;
+  intervalSeconds?: number | null;
+  randomIntervalMin?: number | null;
+  randomIntervalMax?: number | null;
+  runAt?: string | null;
+  inactivityThresholdSeconds?: number | null;
+  chainPulseIds?: string[];
+  maxChainDepth?: number;
+  autoDelete?: boolean;
+  filesystemWatchPath?: string | null;
+}
+
+/** A record of a single Pulse execution. */
+export interface PulseRunRow {
+  id: string;
+  pulseId: string;
+  conversationId: string | null;
+  triggerSource: string;
+  startedAt: string;
+  completedAt: string | null;
+  durationMs: number | null;
+  status: string;
+  resultSummary: string | null;
+  errorMessage: string | null;
+  toolCallsCount: number;
+  outputContent: string | null;
+  chainDepth: number;
+  chainParentRunId: string | null;
+  createdAt: string;
+}
+

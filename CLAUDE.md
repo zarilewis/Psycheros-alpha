@@ -51,6 +51,10 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/vault/mod.ts` | Data Vault — document storage and eager RAG |
 | `src/db/schema.ts` | Database schema, migrations, vector table sync |
 | `src/init/mod.ts` | Initialization — copies templates to empty identity directories |
+| `src/pulse/engine.ts` | Pulse system — autonomous scheduled entity prompts |
+| `src/pulse/routes.ts` | Pulse API routes, CRUD, triggers, webhook endpoint |
+| `src/pulse/templates.ts` | Pulse UI — settings hub card, editor, execution log |
+| `src/tools/pulse-tools.ts` | Entity-facing Pulse tools (create, trigger, delete) |
 
 ## Core Patterns
 
@@ -84,7 +88,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | [docs/tools-reference.md](docs/tools-reference.md) | Tool system, identity tiers, MCP fallback, core prompt file structure |
 | [docs/memory-and-rag.md](docs/memory-and-rag.md) | Memory hierarchy, consolidation, 4 RAG systems (memory, chat, lorebook, vault), vector search |
 | [docs/ui-features.md](docs/ui-features.md) | Context viewer, stop generation, message editing, appearance, graph viz |
-| [docs/api-reference.md](docs/api-reference.md) | Full API endpoints (67 routes), dual SSE architecture |
+| [docs/api-reference.md](docs/api-reference.md) | Full API endpoints (67+ routes), dual SSE architecture |
 | [docs/code-review-findings.md](docs/code-review-findings.md) | Code review bugs fixed, architectural decisions |
 | [docs/security-audit.md](docs/security-audit.md) | Security audit findings, threat model, accepted risks |
 | [docs/deployment/docker-strategy.md](docs/deployment/docker-strategy.md) | Dockerfile design, volumes, env vars, Deno caching |

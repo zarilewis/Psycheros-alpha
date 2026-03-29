@@ -78,6 +78,25 @@ The entity can create, list, and search documents stored in the Data Vault for p
 | `src/tools/vault-tools.ts` | 3 vault document management tools |
 | `src/vault/manager.ts` | VaultManager — CRUD, chunking, embedding, search |
 
+## Pulse Tools
+
+The entity can create, trigger, and delete autonomous scheduled prompts (Pulses). Entity-created Pulses default to silent mode and auto-delete after execution.
+
+| Tool | Description |
+|------|-------------|
+| `create_pulse` | Create a new Pulse with name, prompt, schedule, and optional chain configuration |
+| `trigger_pulse` | Manually fire an existing Pulse by ID |
+| `delete_pulse` | Delete a Pulse and its associated triggers |
+
+### Related Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/tools/pulse-tools.ts` | 3 entity-facing Pulse tools |
+| `src/pulse/engine.ts` | PulseEngine — scheduling, execution, chain handling |
+| `src/pulse/routes.ts` | CRUD API, trigger endpoints, webhook receiver |
+| `src/pulse/templates.ts` | Settings UI — hub card, editor, execution log |
+
 ### Related Source Files
 
 | File | Purpose |

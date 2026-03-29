@@ -581,6 +581,111 @@ function runMigrations(db: Database): void {
     db.exec("ALTER TABLE context_snapshots ADD COLUMN custom_content TEXT");
     console.log("[DB] Added custom_content column to context_snapshots");
   }
+
+  // Migration: Add Pulse tables if missing
+  const hasPulseTables = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'pulses'")
+    .get();
+
+  if (!hasPulseTables) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS pulses (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        prompt_text TEXT NOT NULL,
+        chat_mode TEXT NOT NULL DEFAULT 'visible' CHECK (chat_mode IN ('visible', 'silent')),
+        conversation_id TEXT REFERENCES conversations(id) ON DELETE SET NULL,
+        enabled INTEGER NOT NULL DEFAULT 1,
+        trigger_type TEXT NOT NULL DEFAULT 'cron' CHECK (trigger_type IN ('cron', 'inactivity', 'webhook', 'filesystem')),
+        cron_expression TEXT,
+        interval_seconds INTEGER,
+        random_interval_min INTEGER,
+        random_interval_max INTEGER,
+        run_at TEXT,
+        inactivity_threshold_seconds INTEGER,
+        chain_pulse_ids TEXT,
+        max_chain_depth INTEGER NOT NULL DEFAULT 3,
+        source TEXT NOT NULL DEFAULT 'user' CHECK (source IN ('user', 'entity')),
+        auto_delete INTEGER NOT NULL DEFAULT 0,
+        webhook_token TEXT,
+        filesystem_watch_path TEXT,
+        success_count INTEGER NOT NULL DEFAULT 0,
+        error_count INTEGER NOT NULL DEFAULT 0,
+        last_run_at TEXT,
+        last_status TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_pulses_enabled
+        ON pulses(enabled);
+
+      CREATE INDEX IF NOT EXISTS idx_pulses_trigger_type
+        ON pulses(trigger_type);
+
+      CREATE INDEX IF NOT EXISTS idx_pulses_conversation
+        ON pulses(conversation_id);
+
+      CREATE TABLE IF NOT EXISTS pulse_runs (
+        id TEXT PRIMARY KEY,
+        pulse_id TEXT NOT NULL REFERENCES pulses(id) ON DELETE CASCADE,
+        conversation_id TEXT REFERENCES conversations(id) ON DELETE SET NULL,
+        trigger_source TEXT NOT NULL CHECK (trigger_source IN ('cron', 'webhook', 'filesystem', 'chain', 'manual', 'inactivity')),
+        started_at TEXT NOT NULL,
+        completed_at TEXT,
+        duration_ms INTEGER,
+        status TEXT NOT NULL CHECK (status IN ('running', 'success', 'error', 'skipped')),
+        result_summary TEXT,
+        error_message TEXT,
+        tool_calls_count INTEGER DEFAULT 0,
+        output_content TEXT,
+        chain_depth INTEGER NOT NULL DEFAULT 0,
+        chain_parent_run_id TEXT REFERENCES pulse_runs(id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_pulse_runs_pulse
+        ON pulse_runs(pulse_id, completed_at DESC);
+
+      CREATE INDEX IF NOT EXISTS idx_pulse_runs_status
+        ON pulse_runs(status);
+
+      CREATE INDEX IF NOT EXISTS idx_pulse_runs_conversation
+        ON pulse_runs(conversation_id);
+    `);
+    console.log("[DB] Created pulse tables");
+  }
+
+  // Migration: Add source column to pulses if missing (for existing installs)
+  const hasPulseSourceCol = db
+    .prepare("SELECT 1 FROM pragma_table_info('pulses') WHERE name = 'source'")
+    .get();
+
+  if (!hasPulseSourceCol && hasPulseTables) {
+    db.exec("ALTER TABLE pulses ADD COLUMN source TEXT NOT NULL DEFAULT 'user' CHECK (source IN ('user', 'entity'))");
+    console.log("[DB] Added source column to pulses");
+  }
+
+  // Migration: Add auto_delete column to pulses if missing
+  const hasPulseAutoDeleteCol = db
+    .prepare("SELECT 1 FROM pragma_table_info('pulses') WHERE name = 'auto_delete'")
+    .get();
+
+  if (!hasPulseAutoDeleteCol && hasPulseTables) {
+    db.exec("ALTER TABLE pulses ADD COLUMN auto_delete INTEGER NOT NULL DEFAULT 0");
+    console.log("[DB] Added auto_delete column to pulses");
+  }
+
+  // Migration: Add inactivity_threshold_seconds column to pulses if missing
+  const hasInactivityCol = db
+    .prepare("SELECT 1 FROM pragma_table_info('pulses') WHERE name = 'inactivity_threshold_seconds'")
+    .get();
+
+  if (!hasInactivityCol && hasPulseTables) {
+    db.exec("ALTER TABLE pulses ADD COLUMN inactivity_threshold_seconds INTEGER");
+    console.log("[DB] Added inactivity_threshold_seconds column to pulses");
+  }
 }
 
 /**

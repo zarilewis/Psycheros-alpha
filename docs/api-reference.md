@@ -191,6 +191,26 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `POST` | `/api/admin/jobs/:id/trigger` | Manually trigger a scheduled job |
 | `POST` | `/api/admin/actions/batch-populate` | Run batch-populate-graph script (`{ days, granularity, dryRun, verbose }`) |
 
+### Pulse
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/pulses` | List all pulses |
+| `POST` | `/api/pulses` | Create a new pulse (JSON body) |
+| `GET` | `/api/pulses/:id` | Get single pulse |
+| `PUT` | `/api/pulses/:id` | Update a pulse |
+| `DELETE` | `/api/pulses/:id` | Delete a pulse |
+| `POST` | `/api/pulses/:id/trigger` | Manual trigger |
+| `POST` | `/api/webhook/pulse/:id` | Webhook trigger (Bearer token auth) |
+| `GET` | `/api/pulses/runs` | List pulse runs (paginated, filterable by `?pulseId=`, `?status=`) |
+| `GET` | `/api/pulses/:id/runs` | Runs for a specific pulse |
+| `GET` | `/api/pulses/runs/:runId` | Single run details |
+| `GET` | `/fragments/settings/pulse` | Main tabbed Pulse view (Prompts + Execution Log) |
+| `GET` | `/fragments/settings/pulse/new` | New Pulse editor |
+| `GET` | `/fragments/settings/pulse/:id/edit` | Edit Pulse editor |
+| `GET` | `/fragments/settings/pulse/list` | Prompt list partial (for HTMX reload) |
+| `GET` | `/fragments/settings/pulse/log` | Execution log partial (paginated) |
+
 ## Related Source Files
 
 | File | Purpose |
@@ -205,3 +225,6 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `src/server/state-changes.ts` | Unified state mutations |
 | `src/server/ui-updates.ts` | Reactive DOM updates |
 | `src/server/templates.ts` | HTML rendering for fragments |
+| `src/pulse/engine.ts` | Pulse scheduling and execution engine |
+| `src/pulse/routes.ts` | Pulse CRUD and trigger API handlers |
+| `src/pulse/templates.ts` | Pulse settings UI rendering |
