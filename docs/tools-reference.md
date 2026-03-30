@@ -31,7 +31,7 @@ Invalid custom tool files are logged as warnings and skipped.
 Accessible via Settings > Tools in the sidebar. Provides a web interface for managing tool enable/disable state.
 
 **Features:**
-- Tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory)
+- Tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory, Notification)
 - Toggle switches for each individual tool
 - Per-category "Enable All" / "Disable All" buttons
 - Global "Enable All" / "Disable All" buttons
@@ -198,6 +198,29 @@ Changes are timestamped and preserve XML tag structure in identity files.
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
 | `src/tools/identity-casual.ts` | Tier 1 append-only identity tools |
 | `src/tools/identity-maintain.ts` | Tier 2 maintenance identity tools |
+
+## Push Notification Tool
+
+The entity can send push notifications to the user's device. This works even when the app is closed — tapping the notification opens Psycheros directly to the conversation. Uses the Web Push protocol with VAPID keys.
+
+| Tool | Description |
+|------|-------------|
+| `send_notification` | Send a push notification with a title and body; optionally link to a conversation |
+
+**Parameters:** `title` (required, short title), `body` (required, up to ~200 chars), `conversation_id` (optional, opens Psycheros to this conversation on tap).
+
+**Setup:** The user must grant notification permission via Settings > General > Enable Push Notifications. VAPID keys are auto-generated on first use and stored in `.psycheros/push-vapid-keys.json` (gitignored). Subscriptions are stored in the `push_subscriptions` SQLite table. Expired subscriptions are automatically cleaned up when the entity sends a notification.
+
+**Data flow:** Entity calls `send_notification` → server encrypts payload with VAPID keys → push service (FCCM) delivers to browser → service worker receives `push` event → calls `showNotification()` → user taps notification → service worker's `notificationclick` opens Psycheros at `/c/{conversationId}`.
+
+### Related Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/tools/send-notification.ts` | `send_notification` tool implementation |
+| `src/push/mod.ts` | VAPID key management, subscription CRUD, `web-push` integration |
+| `web/sw.js` | `push` and `notificationclick` event handlers |
+| `web/js/psycheros.js` | Client-side subscription logic, `requestNotificationPermission()` |
 
 ## Identity File Structure (Core Prompts)
 

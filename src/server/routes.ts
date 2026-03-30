@@ -59,6 +59,11 @@ import { MAX_SSE_MESSAGE_SIZE, SSE_TRUNCATION_SUFFIX } from "../constants.ts";
 import { getBroadcaster } from "./broadcaster.ts";
 import { runConsolidation, needsConsolidation } from "../memory/mod.ts";
 import { readMemoryFile, writeMemoryFile, listMemoryFiles } from "../memory/file-writer.ts";
+import {
+  loadOrGenerateKeys,
+  saveSubscription,
+  deleteSubscription as deletePushSubscription,
+} from "../push/mod.ts";
 
 /**
  * Context passed to route handlers containing dependencies.
@@ -4728,4 +4733,133 @@ async function renderVaultDetailView(ctx: RouteContext, id: string): Promise<str
     </div>
   </div>
 </div>`;
+}
+
+// =============================================================================
+// Push Notification Routes
+// =============================================================================
+
+/**
+ * POST /api/push/subscribe - Store a push subscription.
+ * Expects JSON body: { endpoint: string, keys: { p256dh: string, auth: string } }
+ */
+export async function handlePushSubscribe(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as {
+      endpoint?: string;
+      keys?: { p256dh: string; auth: string };
+    };
+
+    if (!body.endpoint || !body.keys?.p256dh || !body.keys?.auth) {
+      return new Response(
+        JSON.stringify({ error: "Invalid subscription: endpoint and keys (p256dh, auth) are required" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const db = ctx.db.getRawDb();
+    const keysJson = JSON.stringify(body.keys);
+    saveSubscription(db, body.endpoint, keysJson);
+
+    console.log(`[Push] Subscription stored: ${body.endpoint.substring(0, 60)}...`);
+
+    // Return VAPID public key so client can verify
+    const vapidKeys = await loadOrGenerateKeys(ctx.projectRoot);
+
+    return new Response(
+      JSON.stringify({ success: true, publicKey: vapidKeys.publicKey }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  } catch (error) {
+    console.error("[Push] Subscribe error:", error instanceof Error ? error.message : String(error));
+    return new Response(
+      JSON.stringify({ error: "Failed to store subscription" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
+}
+
+/**
+ * POST /api/push/unsubscribe - Remove a push subscription.
+ * Expects JSON body: { endpoint: string }
+ */
+export async function handlePushUnsubscribe(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as { endpoint?: string };
+
+    if (!body.endpoint) {
+      return new Response(
+        JSON.stringify({ error: "endpoint is required" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const db = ctx.db.getRawDb();
+    deletePushSubscription(db, body.endpoint);
+
+    console.log(`[Push] Subscription removed: ${body.endpoint.substring(0, 60)}...`);
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  } catch (error) {
+    console.error("[Push] Unsubscribe error:", error instanceof Error ? error.message : String(error));
+    return new Response(
+      JSON.stringify({ error: "Failed to remove subscription" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
+}
+
+/**
+ * GET /api/push/vapid-key - Return the VAPID public key.
+ * The client needs this to call pushManager.subscribe().
+ */
+export async function handlePushVapidKey(
+  ctx: RouteContext,
+): Promise<Response> {
+  try {
+    const vapidKeys = await loadOrGenerateKeys(ctx.projectRoot);
+    return new Response(
+      JSON.stringify({ publicKey: vapidKeys.publicKey }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  } catch (error) {
+    console.error("[Push] VAPID key error:", error instanceof Error ? error.message : String(error));
+    return new Response(
+      JSON.stringify({ error: "Failed to get VAPID key" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
 }

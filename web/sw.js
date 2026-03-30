@@ -108,3 +108,57 @@ async function networkFirstStatic(request) {
     return new Response('Not Found', { status: 404 });
   }
 }
+
+// =============================================================================
+// Push Notification Handlers
+// =============================================================================
+
+// Handle incoming push messages
+self.addEventListener('push', (event) => {
+  let payload = { title: 'Psycheros', body: 'You have a new message' };
+
+  if (event.data) {
+    try {
+      payload = event.data.json();
+    } catch {
+      payload = { title: 'Psycheros', body: event.data.text() };
+    }
+  }
+
+  const notificationOptions = {
+    body: payload.body || '',
+    icon: '/icons/icon-192.svg',
+    badge: '/icons/icon-192.svg',
+    data: {
+      conversationId: payload.conversationId || null,
+      url: payload.url || null,
+    },
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title || 'Psycheros', notificationOptions)
+  );
+});
+
+// Handle notification clicks — open or focus the app
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const conversationId = event.notification.data?.conversationId;
+  const targetUrl = conversationId ? `/c/${conversationId}` : '/';
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If the app is already open, focus it and navigate
+      for (const client of clientList) {
+        if (client.url.includes(targetUrl) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      // Otherwise open a new window
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl);
+      }
+    })
+  );
+});

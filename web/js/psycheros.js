@@ -296,6 +296,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Push notification subscription
+  // Automatically subscribes if permission is already granted
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    if (Notification.permission === 'granted') {
+      subscribeToPushNotifications();
+    }
+  }
+
   // Check if URL has a conversation ID (e.g., /c/abc123)
   const match = globalThis.location.pathname.match(/^\/c\/([^/]+)$/);
   if (match) {
@@ -410,8 +418,88 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =============================================================================
-// Sidebar
+// Push Notifications
 // =============================================================================
+
+/**
+ * Convert a base64 URL-encoded string to a Uint8Array.
+ * Needed for the applicationServerKey in pushManager.subscribe().
+ */
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
+/**
+ * Subscribe to push notifications.
+ * Fetches the VAPID public key from the server, then subscribes via the
+ * push manager and sends the subscription to the server for storage.
+ */
+async function subscribeToPushNotifications() {
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const existing = await registration.pushManager.getSubscription();
+    if (existing) {
+      return; // Already subscribed
+    }
+
+    // Fetch VAPID public key
+    const keyResponse = await fetch('/api/push/vapid-key');
+    if (!keyResponse.ok) {
+      console.warn('[Push] Failed to fetch VAPID key');
+      return;
+    }
+    const { publicKey } = await keyResponse.json();
+    const applicationServerKey = urlBase64ToUint8Array(publicKey);
+
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey,
+    });
+
+    // Send subscription to server
+    await fetch('/api/push/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        endpoint: subscription.endpoint,
+        keys: subscription.toJSON().keys,
+      }),
+    });
+
+    console.log('[Push] Subscribed to push notifications');
+  } catch (err) {
+    console.warn('[Push] Subscription failed:', err);
+  }
+}
+
+/**
+ * Request notification permission from the user.
+ * If granted, automatically subscribes to push notifications.
+ * Returns the permission state string.
+ *
+ * Exposed as window.requestNotificationPermission for use by settings UI.
+ */
+window.requestNotificationPermission = async function() {
+  if (!('Notification' in window)) {
+    return 'unsupported';
+  }
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+    return 'unsupported';
+  }
+
+  const permission = await Notification.requestPermission();
+  if (permission === 'granted') {
+    await subscribeToPushNotifications();
+  }
+  return permission;
+};
 
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');

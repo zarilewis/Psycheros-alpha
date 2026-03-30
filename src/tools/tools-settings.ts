@@ -100,6 +100,12 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     description: "Significant memory creation",
     toolNames: ["create_significant_memory"],
   },
+  {
+    id: "notification",
+    name: "Notification",
+    description: "Send push notifications to the user's device",
+    toolNames: ["send_notification"],
+  },
 ];
 
 // =============================================================================

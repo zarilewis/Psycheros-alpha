@@ -60,6 +60,7 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 | `create_pulse` | Create an autonomous scheduled prompt |
 | `trigger_pulse` | Manually trigger an existing Pulse |
 | `delete_pulse` | Delete a Pulse and its triggers |
+| `send_notification` | Send a push notification to the user's device |
 
 **Example configurations:**
 ```bash

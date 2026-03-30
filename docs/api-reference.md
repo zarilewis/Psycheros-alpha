@@ -178,6 +178,16 @@ Settings stored in `.psycheros/tools-settings.json`. Shape: `{ "toolOverrides": 
 |--------|------|-------------|
 | `POST` | `/api/mcp/sync` | Manually trigger MCP sync |
 
+### Push Notifications
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/push/vapid-key` | Get VAPID public key for push subscription |
+| `POST` | `/api/push/subscribe` | Store a push subscription (`{ endpoint, keys: { p256dh, auth } }`) |
+| `POST` | `/api/push/unsubscribe` | Remove a push subscription (`{ endpoint }`) |
+
+Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID keys are auto-generated on first use and persisted to `.psycheros/push-vapid-keys.json`.
+
 ### System Admin
 
 | Method | Path | Description |
@@ -242,3 +252,4 @@ Settings stored in `.psycheros/tools-settings.json`. Shape: `{ "toolOverrides": 
 | `src/pulse/engine.ts` | Pulse scheduling and execution engine |
 | `src/pulse/routes.ts` | Pulse CRUD and trigger API handlers |
 | `src/pulse/templates.ts` | Pulse settings UI rendering |
+| `src/push/mod.ts` | VAPID key management, subscription CRUD, push sending |

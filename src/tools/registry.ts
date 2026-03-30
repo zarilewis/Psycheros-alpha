@@ -47,6 +47,8 @@ import {
 import { webSearchTool } from "./web-search.ts";
 // Pulse tools
 import { createPulseTool, triggerPulseTool, deletePulseTool } from "./pulse-tools.ts";
+// Push notification tool
+import { sendNotificationTool } from "./send-notification.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -94,6 +96,8 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   create_pulse: createPulseTool,
   trigger_pulse: triggerPulseTool,
   delete_pulse: deletePulseTool,
+  // Push notification tool
+  send_notification: sendNotificationTool,
 };
 
 /**

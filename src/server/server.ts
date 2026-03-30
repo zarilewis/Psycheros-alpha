@@ -108,6 +108,9 @@ import {
   handleGetToolsSettings,
   handleSaveToolsSettings,
   handleToolsSettingsFragment,
+  handlePushSubscribe,
+  handlePushUnsubscribe,
+  handlePushVapidKey,
   type RouteContext,
 } from "./routes.ts";
 import {
@@ -1212,6 +1215,25 @@ export class Server {
       if (method === "DELETE") {
         return handleDeleteVault(ctx, vaultId);
       }
+    }
+
+    // ========================================
+    // Push Notification API Routes
+    // ========================================
+
+    // GET /api/push/vapid-key - Get VAPID public key
+    if (method === "GET" && path === "/api/push/vapid-key") {
+      return await handlePushVapidKey(ctx);
+    }
+
+    // POST /api/push/subscribe - Store push subscription
+    if (method === "POST" && path === "/api/push/subscribe") {
+      return await handlePushSubscribe(ctx, request);
+    }
+
+    // POST /api/push/unsubscribe - Remove push subscription
+    if (method === "POST" && path === "/api/push/unsubscribe") {
+      return await handlePushUnsubscribe(ctx, request);
     }
 
     // 404 for unknown API routes

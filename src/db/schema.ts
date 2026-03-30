@@ -697,6 +697,22 @@ function runMigrations(db: Database): void {
     db.exec("ALTER TABLE messages ADD COLUMN pulse_name TEXT");
     console.log("[DB] Added pulse_id and pulse_name columns to messages");
   }
+
+  // Migration: Add push_subscriptions table if missing
+  const hasPushSubscriptions = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'push_subscriptions'")
+    .get();
+
+  if (!hasPushSubscriptions) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        endpoint TEXT PRIMARY KEY,
+        keys_json TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
+    console.log("[DB] Created push_subscriptions table");
+  }
 }
 
 /**

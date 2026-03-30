@@ -20,7 +20,8 @@
     "jsdom": "npm:jsdom@^26",
     "pdf-parse": "npm:pdf-parse@^1.1.1",
     "mammoth": "npm:mammoth@^1.8.0",
-    "xlsx": "npm:xlsx@^0.18.5"
+    "xlsx": "npm:xlsx@^0.18.5",
+    "web-push": "npm:web-push@^3.6"
   },
   "lint": {
     "exclude": ["web/lib/", "web/js/"]

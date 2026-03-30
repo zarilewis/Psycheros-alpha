@@ -573,6 +573,19 @@ export function renderGeneralSettings(settings: GeneralSettings): string {
     </section>
 
     <section class="theme-section">
+      <h3 class="theme-section-title">Notifications</h3>
+      <p class="theme-section-desc">Allow the entity to send push notifications to your device</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <div class="notification-status" id="notification-status">
+            <span id="notification-permission-label">Checking...</span>
+          </div>
+          <button class="btn btn--primary" id="notification-enable-btn" onclick="enablePushNotifications()">Enable Push Notifications</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="theme-section">
       <h3 class="theme-section-title">Timezone</h3>
       <p class="theme-section-desc">Set the timezone used for message timestamps</p>
       <div class="llm-fields">
@@ -637,7 +650,42 @@ export function renderGeneralSettings(settings: GeneralSettings): string {
   if (sel && window.PsycherosSettings && window.PsycherosSettings.timezone) {
     sel.value = window.PsycherosSettings.timezone;
   }
+
+  // Update notification permission label
+  const label = document.getElementById('notification-permission-label');
+  const btn = document.getElementById('notification-enable-btn');
+  if (label) {
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      label.textContent = 'Not supported by this browser';
+      if (btn) btn.disabled = true;
+    } else if (Notification.permission === 'granted') {
+      label.textContent = 'Push notifications enabled';
+      if (btn) { btn.textContent = 'Notifications Enabled'; btn.disabled = true; }
+    } else if (Notification.permission === 'denied') {
+      label.textContent = 'Blocked — enable in browser settings';
+      if (btn) btn.disabled = true;
+    } else {
+      label.textContent = 'Not enabled';
+    }
+  }
 })();
+
+async function enablePushNotifications() {
+  if (typeof window.requestNotificationPermission !== 'function') {
+    alert('Push notifications are not available in this browser.');
+    return;
+  }
+  const result = await window.requestNotificationPermission();
+  const label = document.getElementById('notification-permission-label');
+  const btn = document.getElementById('notification-enable-btn');
+  if (result === 'granted') {
+    if (label) label.textContent = 'Push notifications enabled';
+    if (btn) { btn.textContent = 'Notifications Enabled'; btn.disabled = true; }
+  } else if (result === 'denied') {
+    if (label) label.textContent = 'Blocked — enable in browser settings';
+    if (btn) btn.disabled = true;
+  }
+}
 
 async function saveGeneralSettings() {
   const entityName = document.getElementById('general-entity-name').value.trim();
