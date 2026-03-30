@@ -3,6 +3,7 @@
 
 # Deno cache and lock
 deno.lock
+*_cache_v2/
 
 # Tool/IDE specific
 .claude/
@@ -12,6 +13,7 @@ deno.lock
 /identity/
 /memories/
 /backgrounds/
+/custom-tools/
 web/backgrounds/*
 !web/backgrounds/.gitkeep
 .psycheros/

@@ -73,7 +73,9 @@ src/
 │   └── vector.ts     # sqlite-vec helpers, serialization, search
 ├── tools/            # Tool system
 │   ├── mod.ts
-│   ├── registry.ts   # Tool registration
+│   ├── registry.ts   # Tool catalog (AVAILABLE_TOOLS) and registration
+│   ├── tools-settings.ts  # Tool enable/disable persistence and resolution
+│   ├── custom-loader.ts    # Dynamic loader for user-written tools
 │   ├── shell.ts
 │   ├── web-search.ts # Web search (Tavily / Brave)
 │   ├── identity-helpers.ts  # XML parsing, MCP fallback
@@ -141,6 +143,8 @@ Psycheros/
 │   ├── manifest.json  # PWA manifest
 │   └── sw.js          # Service worker
 ├── templates/identity/ # Default identity templates (tracked in git)
+├── templates/custom-tools/ # Custom tools README template (tracked in git)
+├── custom-tools/      # User-written custom tools (gitignored)
 ├── identity/          # Live identity files (gitignored)
 ├── memories/          # Hierarchical memory storage (gitignored)
 ├── .snapshots/        # Identity file backups (gitignored)
@@ -153,7 +157,7 @@ Full configuration reference: [docs/configuration.md](docs/configuration.md)
 
 **Essential variables:**
 - `ZAI_API_KEY` — Z.ai API key (required)
-- `PSYCHEROS_TOOLS` — comma-separated list of enabled tools (see docs for full list)
+- `PSYCHEROS_TOOLS` — comma-separated list of enabled tools (see docs for full list); can also be managed via Settings > Tools UI
 - `PSYCHEROS_MCP_ENABLED` — enable entity-core connection (`true`/`false`)
 - `TZ` — timezone for message timestamps
 

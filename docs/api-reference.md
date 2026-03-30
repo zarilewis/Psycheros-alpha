@@ -163,6 +163,15 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `POST` | `/api/web-search-settings` | Save web search settings |
 | `POST` | `/api/web-search-settings/reset` | Reset to environment variable defaults |
 
+### Tools Settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/tools-settings` | Get all tools metadata, categories, current overrides, and custom tool names |
+| `POST` | `/api/tools-settings` | Save tool overrides and hot-reload registry (`{ "toolOverrides": { "shell": true, ... } }`) |
+
+Settings stored in `.psycheros/tools-settings.json`. Shape: `{ "toolOverrides": Record<string, boolean> }`. When this file exists, overrides take precedence over `PSYCHEROS_TOOLS` env var.
+
 ### MCP
 
 | Method | Path | Description |
@@ -178,6 +187,7 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `GET` | `/fragments/admin/logs` | Log viewer HTML fragment |
 | `GET` | `/fragments/admin/jobs` | Scheduled jobs dashboard HTML fragment |
 | `GET` | `/fragments/admin/actions` | Actions panel HTML fragment |
+| `GET` | `/fragments/settings/tools` | Tools settings UI fragment |
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
 | `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
 | `GET` | `/fragments/settings/memories` | Memories tabbed view fragment |
@@ -227,6 +237,8 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `src/server/state-changes.ts` | Unified state mutations |
 | `src/server/ui-updates.ts` | Reactive DOM updates |
 | `src/server/templates.ts` | HTML rendering for fragments |
+| `src/tools/tools-settings.ts` | Tool settings types, categories, persistence |
+| `src/tools/custom-loader.ts` | Dynamic custom tool loader |
 | `src/pulse/engine.ts` | Pulse scheduling and execution engine |
 | `src/pulse/routes.ts` | Pulse CRUD and trigger API handlers |
 | `src/pulse/templates.ts` | Pulse settings UI rendering |

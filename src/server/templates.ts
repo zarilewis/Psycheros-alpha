@@ -12,6 +12,9 @@ import type { Lorebook, LorebookEntry } from "../lorebook/mod.ts";
 import type { LLMSettings } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
 import { maskApiKey } from "../llm/mod.ts";
+import type { ToolsSettings } from "../tools/mod.ts";
+import { TOOL_CATEGORIES } from "../tools/mod.ts";
+import type { Tool } from "../tools/mod.ts";
 import { renderMarkdown } from "./markdown.ts";
 import { pulseIconSvg } from "../pulse/templates.ts";
 
@@ -452,6 +455,23 @@ export function renderSettingsHub(): string {
         <div class="settings-hub-card-body">
           <span class="settings-hub-card-title">Web Search</span>
           <span class="settings-hub-card-desc">Enable web search for current information and news</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/tools"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Tools</span>
+          <span class="settings-hub-card-desc">Manage entity tools and add custom tools</span>
         </div>
         <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 18 15 12 9 6"/>
@@ -2813,6 +2833,236 @@ async function resetLLMDefaults(event) {
     btn.textContent = 'Reset to Defaults';
     btn.classList.remove('btn--danger');
     btn.classList.add('btn--ghost');
+  }
+}
+</script>
+`;
+}
+
+// =============================================================================
+// Tools Settings Template
+// =============================================================================
+
+function renderToolCategory(
+  category: typeof TOOL_CATEGORIES[number],
+  tools: { name: string; description: string; enabled: boolean }[],
+): string {
+  const catId = `cat-${category.id}`;
+  return `<section class="tools-category" id="${catId}">
+  <div class="tools-category-header">
+    <div>
+      <h3 class="tools-category-title">${escapeHtml(category.name)}</h3>
+      <p class="tools-category-desc">${escapeHtml(category.description)}</p>
+    </div>
+    <div class="tools-category-actions">
+      <button class="btn btn--ghost btn--xs" onclick="toggleCategoryTools('${category.id}', true)">Enable All</button>
+      <button class="btn btn--ghost btn--xs" onclick="toggleCategoryTools('${category.id}', false)">Disable All</button>
+    </div>
+  </div>
+  <div class="tools-list">
+    ${tools.map((t) => renderToolItem(t)).join("\n")}
+  </div>
+</section>`;
+}
+
+function renderToolItem(tool: { name: string; description: string; enabled: boolean }): string {
+  const inputId = `tool-${tool.name}`;
+  const descTrunc = tool.description.length > 80
+    ? escapeHtml(tool.description.slice(0, 80)) + "..."
+    : escapeHtml(tool.description);
+  return `<div class="tool-item">
+  <label class="toggle-label" for="${inputId}">
+    <input type="checkbox" id="${inputId}" name="${tool.name}" data-tool-name="${tool.name}" ${tool.enabled ? "checked" : ""}>
+    <span class="toggle-slider"></span>
+  </label>
+  <div class="tool-item-info">
+    <span class="tool-item-name">${escapeHtml(tool.name)}</span>
+    <span class="tool-item-desc">${descTrunc}</span>
+  </div>
+  <button class="tool-item-expand" onclick="toggleToolDetail('${tool.name}')" title="Show details">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+  </button>
+  <div class="tool-detail" id="detail-${tool.name}" style="display:none;">
+    <p class="tool-detail-desc">${escapeHtml(tool.description)}</p>
+    <div class="tool-detail-params" id="params-${tool.name}"></div>
+  </div>
+</div>`;
+}
+
+export function renderToolsSettings(
+  settings: ToolsSettings,
+  availableTools: Record<string, Tool>,
+  customTools: Record<string, Tool>,
+): string {
+  const overrides = settings.toolOverrides;
+
+  // Build category sections
+  const categorySections = TOOL_CATEGORIES.map((cat) => {
+    const tools = cat.toolNames
+      .filter((name) => availableTools[name])
+      .map((name) => {
+        const tool = availableTools[name];
+        const hasOverride = name in overrides;
+        const enabled = hasOverride ? overrides[name] : true;
+        return {
+          name,
+          description: tool.definition.function.description,
+          enabled,
+        };
+      });
+    return renderToolCategory(cat, tools);
+  }).join("\n");
+
+  // Build custom tools section
+  const customNames = Object.keys(customTools);
+  let customSection: string;
+  if (customNames.length > 0) {
+    const customToolsHtml = customNames.map((name) => {
+      const tool = customTools[name];
+      const hasOverride = name in overrides;
+      const enabled = hasOverride ? overrides[name] : true;
+      return renderToolItem({
+        name,
+        description: tool.definition.function.description,
+        enabled,
+      });
+    }).join("\n");
+    customSection = `<section class="tools-category" id="cat-custom">
+  <div class="tools-category-header">
+    <div>
+      <h3 class="tools-category-title">Custom Tools</h3>
+      <p class="tools-category-desc">User-written tools loaded from custom-tools/</p>
+    </div>
+  </div>
+  <div class="tools-list">
+    ${customToolsHtml}
+  </div>
+</section>`;
+  } else {
+    customSection = `<section class="tools-category" id="cat-custom">
+  <div class="tools-category-header">
+    <div>
+      <h3 class="tools-category-title">Custom Tools</h3>
+      <p class="tools-category-desc">No custom tools loaded. Place .js files in the custom-tools/ directory.</p>
+    </div>
+  </div>
+</section>`;
+  }
+
+  // Build tool params JSON for the JS to use
+  const allToolParams: Record<string, Record<string, unknown>> = {};
+  for (const [name, tool] of Object.entries(availableTools)) {
+    allToolParams[name] = tool.definition.function.parameters as Record<string, unknown>;
+  }
+  for (const [name, tool] of Object.entries(customTools)) {
+    allToolParams[name] = tool.definition.function.parameters as Record<string, unknown>;
+  }
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Tools</h1>
+        <p class="settings-desc">Manage entity tools and add custom tools</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <!-- Actions -->
+    <div class="tools-actions">
+      <button class="btn btn--ghost btn--xs" onclick="toggleAllTools(true)">Enable All</button>
+      <button class="btn btn--ghost btn--xs" onclick="toggleAllTools(false)">Disable All</button>
+      <div style="flex:1"></div>
+      <button class="btn btn--primary" onclick="saveToolsSettings(event)">Save Settings</button>
+    </div>
+
+    ${categorySections}
+    ${customSection}
+
+    <!-- Status -->
+    <div id="tools-status" class="llm-status" style="display:none;"></div>
+
+  </div>
+</div>
+
+<script>
+// Tool parameters data embedded for detail view
+const TOOL_PARAMS = ${JSON.stringify(allToolParams)};
+
+function showToolsStatus(type, message) {
+  const el = document.getElementById('tools-status');
+  if (!el) return;
+  el.style.display = 'block';
+  el.className = 'llm-status ' + type;
+  el.textContent = message;
+}
+
+function toggleToolDetail(name) {
+  const detail = document.getElementById('detail-' + name);
+  if (!detail) return;
+  const visible = detail.style.display !== 'none';
+  detail.style.display = visible ? 'none' : 'block';
+  if (!visible) {
+    const paramsEl = document.getElementById('params-' + name);
+    if (paramsEl && !paramsEl.hasChildNodes() && TOOL_PARAMS[name]) {
+      const pre = document.createElement('pre');
+      pre.className = 'tool-detail-json';
+      pre.textContent = JSON.stringify(TOOL_PARAMS[name], null, 2);
+      paramsEl.appendChild(pre);
+    }
+  }
+}
+
+function toggleCategoryTools(catId, enable) {
+  const cat = document.getElementById('cat-' + catId);
+  if (!cat) return;
+  cat.querySelectorAll('input[data-tool-name]').forEach(cb => {
+    cb.checked = enable;
+  });
+}
+
+function toggleAllTools(enable) {
+  document.querySelectorAll('input[data-tool-name]').forEach(cb => {
+    cb.checked = enable;
+  });
+}
+
+function gatherOverrides() {
+  const overrides = {};
+  document.querySelectorAll('input[data-tool-name]').forEach(cb => {
+    overrides[cb.dataset.toolName] = cb.checked;
+  });
+  return overrides;
+}
+
+async function saveToolsSettings(event) {
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  showToolsStatus('loading', 'Saving settings...');
+
+  try {
+    const overrides = gatherOverrides();
+    const resp = await fetch('/api/tools-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ toolOverrides: overrides }),
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showToolsStatus('success', 'Settings saved. Tool registry reloaded.');
+    } else {
+      showToolsStatus('error', 'Failed to save: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    showToolsStatus('error', 'Failed to save: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Settings';
   }
 }
 </script>

@@ -9,7 +9,7 @@
 
 import { DBClient } from "../db/mod.ts";
 import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSettings, loadSettings, saveSettings, loadWebSearchSettings, saveWebSearchSettings } from "../llm/mod.ts";
-import { createDefaultRegistry, type ToolRegistry } from "../tools/mod.ts";
+import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSettings, getEnabledToolNames, loadCustomTools, ToolRegistry, type ToolsSettings } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import type { MemoryIndexer } from "../rag/indexer.ts";
 import { catchUpSummarization, repairOrphanedSummaries, needsConsolidation, runConsolidation } from "../memory/mod.ts";
@@ -105,6 +105,9 @@ import {
   handleGetWebSearchSettings,
   handleSaveWebSearchSettings,
   handleWebSearchSettingsFragment,
+  handleGetToolsSettings,
+  handleSaveToolsSettings,
+  handleToolsSettingsFragment,
   type RouteContext,
 } from "./routes.ts";
 import {
@@ -203,6 +206,8 @@ export class Server {
   private vaultManager: VaultManager;
   private llmSettings: LLMSettings;
   private webSearchSettings: WebSearchSettings;
+  private toolSettings: ToolsSettings;
+  private customTools: Record<string, import("../tools/types.ts").Tool>;
   private pulseEngine: PulseEngine | null = null;
 
   /**
@@ -241,6 +246,12 @@ export class Server {
       braveApiKey: "",
     };
 
+    // Initialize tool settings (will be reloaded from settings in init())
+    this.toolSettings = { toolOverrides: {} };
+
+    // Initialize custom tools (will be loaded in init())
+    this.customTools = {};
+
     // Initialize tool registry with only allowed tools
     this.tools = createDefaultRegistry(config.allowedTools ?? []);
 
@@ -278,6 +289,8 @@ export class Server {
   async init(): Promise<void> {
     this.llmSettings = await loadSettings(this.config.projectRoot);
     this.webSearchSettings = await loadWebSearchSettings(this.config.projectRoot);
+    this.toolSettings = await loadToolsSettings(this.config.projectRoot);
+    this.customTools = await loadCustomTools(this.config.projectRoot);
     this.reloadLLMClient();
     this.reloadToolRegistry();
 
@@ -326,6 +339,22 @@ export class Server {
   }
 
   /**
+   * Get the current tools settings.
+   */
+  getToolSettings(): ToolsSettings {
+    return this.toolSettings;
+  }
+
+  /**
+   * Update tools settings, persist to disk, and reload tool registry.
+   */
+  async updateToolSettings(settings: ToolsSettings): Promise<void> {
+    this.toolSettings = settings;
+    await saveToolsSettings(this.config.projectRoot, settings);
+    this.reloadToolRegistry();
+  }
+
+  /**
    * Re-create the LLM client from current settings.
    */
   private reloadLLMClient(): void {
@@ -345,17 +374,40 @@ export class Server {
 
   /**
    * Re-create the tool registry from current allowed tools.
-   * Adds web_search to the allowed list when a custom provider is configured.
+   * Merges built-in tools with custom tools and resolves enabled list
+   * from env var, user overrides, and auto-enabled tools.
    */
   private reloadToolRegistry(): void {
-    const allowed = [...(this.config.allowedTools ?? [])];
-    // Auto-enable web_search tool when using Tavily or Brave provider
+    // Build merged catalog: built-in + custom
+    const allTools: Record<string, import("../tools/types.ts").Tool> = {
+      ...AVAILABLE_TOOLS,
+      ...this.customTools,
+    };
+    const allNames = Object.keys(allTools);
+
+    // Determine auto-enabled tools (e.g. web_search when provider is configured)
+    const autoEnabled: string[] = [];
     if (this.webSearchSettings.provider === "tavily" || this.webSearchSettings.provider === "brave") {
-      if (!allowed.includes("web_search")) {
-        allowed.push("web_search");
+      autoEnabled.push("web_search");
+    }
+
+    // Resolve the final enabled list
+    const enabledNames = getEnabledToolNames(
+      this.toolSettings,
+      allNames,
+      this.config.allowedTools ?? [],
+      autoEnabled,
+    );
+
+    // Build registry from resolved list
+    const enabledSet = new Set(enabledNames.map((n) => n.toLowerCase()));
+    const registry = new ToolRegistry();
+    for (const [name, tool] of Object.entries(allTools)) {
+      if (enabledSet.has(name.toLowerCase())) {
+        registry.register(tool);
       }
     }
-    this.tools = createDefaultRegistry(allowed);
+    this.tools = registry;
   }
 
   /**
@@ -585,6 +637,9 @@ export class Server {
       updateLLMSettings: (settings) => this.updateLLMSettings(settings),
       getWebSearchSettings: () => this.webSearchSettings,
       updateWebSearchSettings: (settings) => this.updateWebSearchSettings(settings),
+      getToolSettings: () => this.toolSettings,
+      updateToolSettings: (settings) => this.updateToolSettings(settings),
+      customTools: this.customTools,
     };
   }
 
@@ -1000,6 +1055,20 @@ export class Server {
     }
 
     // ========================================
+    // Tools Settings API Routes
+    // ========================================
+
+    // GET /api/tools-settings - Get current tools settings
+    if (method === "GET" && path === "/api/tools-settings") {
+      return handleGetToolsSettings(ctx);
+    }
+
+    // POST /api/tools-settings - Save tools settings
+    if (method === "POST" && path === "/api/tools-settings") {
+      return await handleSaveToolsSettings(ctx, request);
+    }
+
+    // ========================================
     // Admin API Routes
     // ========================================
 
@@ -1319,6 +1388,11 @@ export class Server {
     // GET /fragments/settings/web-search - Web search settings UI fragment
     if (path === "/fragments/settings/web-search") {
       return handleWebSearchSettingsFragment(ctx);
+    }
+
+    // GET /fragments/settings/tools - Tools settings UI fragment
+    if (path === "/fragments/settings/tools") {
+      return handleToolsSettingsFragment(ctx);
     }
 
     // ========================================

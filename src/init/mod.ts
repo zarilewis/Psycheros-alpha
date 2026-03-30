@@ -122,8 +122,29 @@ export async function initializeFromTemplates(
 }
 
 /**
+ * Seed the custom-tools/ directory with template files if it doesn't exist.
+ */
+async function initializeCustomToolsDir(projectRoot: string): Promise<void> {
+  const templateDir = join(projectRoot, "templates", "custom-tools");
+  const targetDir = join(projectRoot, "custom-tools");
+
+  try {
+    const entries = Array.from(Deno.readDirSync(templateDir));
+    if (entries.length === 0) return;
+
+    const result = await copyTemplateFiles(templateDir, targetDir);
+    if (result.copied > 0) {
+      console.log(`[Init] Seeded custom-tools/ with ${result.copied} template file(s)`);
+    }
+  } catch {
+    // Template dir doesn't exist, skip
+  }
+}
+
+/**
  * Run all initialization tasks
  */
 export async function initialize(projectRoot: string): Promise<void> {
   await initializeFromTemplates(projectRoot);
+  await initializeCustomToolsDir(projectRoot);
 }

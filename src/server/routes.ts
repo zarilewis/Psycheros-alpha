@@ -14,6 +14,8 @@ import type { LLMClient, LLMSettings } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
 import { maskApiKey, getDefaultSettings, getDefaultWebSearchSettings, maskWebSearchSettings } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
+import type { ToolsSettings } from "../tools/mod.ts";
+import { AVAILABLE_TOOLS, TOOL_CATEGORIES } from "../tools/mod.ts";
 import type { Retriever, RAGConfig } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
@@ -46,6 +48,7 @@ import {
   renderSettingsHub,
   renderGeneralSettings,
   renderWebSearchSettings,
+  renderToolsSettings,
   type GeneralSettings,
   escapeHtml,
   type MetricsMap,
@@ -95,6 +98,12 @@ export interface RouteContext {
   getWebSearchSettings: () => WebSearchSettings;
   /** Update web search settings and hot-reload tool registry */
   updateWebSearchSettings: (settings: WebSearchSettings) => Promise<void>;
+  /** Get current tools settings */
+  getToolSettings: () => ToolsSettings;
+  /** Update tools settings and hot-reload tool registry */
+  updateToolSettings: (settings: ToolsSettings) => Promise<void>;
+  /** Custom tools loaded from custom-tools/ directory */
+  customTools: Record<string, import("../tools/types.ts").Tool>;
 }
 
 /**
@@ -4024,6 +4033,116 @@ export async function handleResetWebSearchSettings(
  */
 export function handleWebSearchSettingsFragment(ctx: RouteContext): Response {
   const html = renderWebSearchSettings(maskWebSearchSettings(ctx.getWebSearchSettings()));
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+// =============================================================================
+// Tools Settings API Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/tools-settings - Return current tools settings with all tool metadata.
+ */
+export function handleGetToolsSettings(ctx: RouteContext): Response {
+  const settings = ctx.getToolSettings();
+  const overrides = settings.toolOverrides;
+
+  // Build tool entries from built-in catalog
+  const allTools: Record<string, { name: string; description: string; category: string; parameters?: Record<string, unknown> }> = {};
+
+  for (const [name, tool] of Object.entries(AVAILABLE_TOOLS)) {
+    const cat = TOOL_CATEGORIES.find((c) => c.toolNames.includes(name));
+    allTools[name] = {
+      name,
+      description: tool.definition.function.description,
+      category: cat?.id ?? "other",
+      parameters: tool.definition.function.parameters as Record<string, unknown> | undefined,
+    };
+  }
+
+  // Add custom tools
+  for (const [name, tool] of Object.entries(ctx.customTools)) {
+    allTools[name] = {
+      name,
+      description: tool.definition.function.description,
+      category: "custom",
+      parameters: tool.definition.function.parameters as Record<string, unknown> | undefined,
+    };
+  }
+
+  return new Response(JSON.stringify({
+    toolOverrides: overrides,
+    categories: TOOL_CATEGORIES,
+    tools: allTools,
+    customToolNames: Object.keys(ctx.customTools),
+  }), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/tools-settings - Save and apply tools settings.
+ */
+export async function handleSaveToolsSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<ToolsSettings>;
+
+    if (!body.toolOverrides || typeof body.toolOverrides !== "object") {
+      return new Response(
+        JSON.stringify({ error: "toolOverrides is required and must be an object" }),
+        {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+          },
+        },
+      );
+    }
+
+    const updated: ToolsSettings = {
+      toolOverrides: body.toolOverrides,
+    };
+
+    await ctx.updateToolSettings(updated);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] handleSaveToolsSettings error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save settings" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/tools - Tools settings UI fragment.
+ */
+export function handleToolsSettingsFragment(ctx: RouteContext): Response {
+  const settings = ctx.getToolSettings();
+  const html = renderToolsSettings(settings, AVAILABLE_TOOLS, ctx.customTools);
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

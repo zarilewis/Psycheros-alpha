@@ -42,8 +42,25 @@ export type {
   ShellToolArgs,
 } from "./types.ts";
 
-// Re-export registry
+// Re-export registry and catalog
 export {
   ToolRegistry,
   createDefaultRegistry,
+  AVAILABLE_TOOLS,
 } from "./registry.ts";
+
+// Re-export tools settings
+export {
+  loadToolsSettings,
+  saveToolsSettings,
+  getEnabledToolNames,
+  TOOL_CATEGORIES,
+} from "./tools-settings.ts";
+export type {
+  ToolCategory,
+  ToolEntry,
+  ToolsSettings,
+} from "./tools-settings.ts";
+
+// Re-export custom tools loader
+export { loadCustomTools } from "./custom-loader.ts";

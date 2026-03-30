@@ -56,7 +56,7 @@ import { createPulseTool, triggerPulseTool, deletePulseTool } from "./pulse-tool
  * All tools that can be enabled via the PSYCHEROS_TOOLS environment variable.
  * Each tool is keyed by its name (lowercase).
  */
-const AVAILABLE_TOOLS: Record<string, Tool> = {
+export const AVAILABLE_TOOLS: Record<string, Tool> = {
   shell: shellTool,
   update_title: updateTitleTool,
   get_metrics: getMetricsTool,

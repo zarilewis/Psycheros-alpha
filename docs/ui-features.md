@@ -157,6 +157,39 @@ Theme preferences persist server-side in `.psycheros/appearance-settings.json`. 
 - `DELETE /api/backgrounds/:filename` — delete background
 - `GET /backgrounds/:filename` — serve background image file
 
+## Tools Settings
+
+Manage which tools are available to the entity. Access via Settings > Tools in the sidebar.
+
+**Features:**
+- Tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory)
+- Toggle switches for each individual tool — changes take effect immediately (hot-reload)
+- Per-category "Enable All" / "Disable All" buttons
+- Global "Enable All" / "Disable All" buttons
+- Expandable detail panel on each tool showing full description and JSON Schema parameters
+- Custom Tools section at the bottom showing any user-written tools loaded from `custom-tools/`
+- Message when no custom tools are loaded, with instructions
+
+**Settings Priority:**
+1. User overrides (saved toggles) take precedence
+2. Auto-enabled tools (e.g., `web_search` when a web search provider is configured) are always on
+3. `PSYCHEROS_TOOLS` environment variable as fallback
+
+**Persistence:** Settings stored in `.psycheros/tools-settings.json`. Only tools the user has explicitly toggled are stored (as `toolOverrides`). Defaults to empty (no overrides), meaning the env var controls initial behavior until the user makes changes via the UI.
+
+**Custom Tools:**
+- Place `.js` files in the `custom-tools/` directory at the project root
+- Each file exports a default `Tool` object with `definition` and `execute` properties
+- Custom tools are loaded on server startup and appear in the Custom Tools section
+- Toggle them on to enable — no core code changes needed
+
+**API Endpoints:**
+- `GET /api/tools-settings` — get all tools, categories, and current overrides
+- `POST /api/tools-settings` — save overrides and hot-reload (`{ "toolOverrides": { "shell": true } }`)
+- `GET /fragments/settings/tools` — render Tools settings page fragment
+
+**Source files:** `src/tools/tools-settings.ts`, `src/tools/custom-loader.ts`, `src/server/templates.ts`, `src/server/routes.ts`, `web/css/settings.css`
+
 ## System Admin Panel
 
 Built-in diagnostics and log viewer for inspecting system health without shell access. Access via Settings → System Admin.

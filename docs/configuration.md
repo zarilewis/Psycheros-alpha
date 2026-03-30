@@ -24,7 +24,9 @@ All Psycheros configuration is via environment variables. Copy `.env.example` to
 
 ## Available Tools
 
-Tools must be explicitly enabled via `PSYCHEROS_TOOLS`. Set to a comma-separated list.
+Tools are enabled via the `PSYCHEROS_TOOLS` environment variable or the Settings > Tools UI. When the Tools settings file (`.psycheros/tools-settings.json`) exists, user overrides take precedence over the env var. The env var serves as a fallback when no settings file exists.
+
+Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. Changes hot-reload the tool registry without a restart.
 
 | Tool | Description |
 |------|-------------|

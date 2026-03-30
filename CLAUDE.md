@@ -41,7 +41,9 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/server/routes.ts` | API endpoints and handlers |
 | `src/server/state-changes.ts` | Unified state mutations |
 | `src/server/broadcaster.ts` | Persistent SSE for background updates |
-| `src/tools/registry.ts` | Tool registration |
+| `src/tools/registry.ts` | Tool catalog (`AVAILABLE_TOOLS`) and registration |
+| `src/tools/tools-settings.ts` | Tool enable/disable persistence and resolution |
+| `src/tools/custom-loader.ts` | Dynamic loader for user-written tools in `custom-tools/` |
 | `src/tools/web-search.ts` | Web search tool (Tavily / Brave) |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
 | `src/memory/mod.ts` | Hierarchical memory system |
@@ -50,7 +52,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/lorebook/mod.ts` | Lorebook/world info system |
 | `src/vault/mod.ts` | Data Vault — document storage and eager RAG |
 | `src/db/schema.ts` | Database schema, migrations, vector table sync |
-| `src/init/mod.ts` | Initialization — copies templates to empty identity directories |
+| `src/init/mod.ts` | Initialization — seeds identity and custom-tools directories |
 | `src/pulse/engine.ts` | Pulse system — autonomous scheduled entity prompts |
 | `src/pulse/routes.ts` | Pulse API routes, CRUD, triggers, webhook endpoint |
 | `src/pulse/templates.ts` | Pulse UI — settings hub card, editor, execution log |
@@ -60,10 +62,16 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 
 **Module structure**: Each `src/*/` has a `mod.ts` barrel file. Import from `mod.ts`, not internal files.
 
-**Adding a tool**:
+**Adding a built-in tool**:
 1. Create `src/tools/my-tool.ts` implementing the `Tool` interface
-2. Register in `createDefaultRegistry()` in `src/tools/registry.ts`
-3. For UI updates: use state-change function, return `affectedRegions`
+2. Register in `AVAILABLE_TOOLS` in `src/tools/registry.ts`
+3. Add tool name to the appropriate category in `TOOL_CATEGORIES` in `src/tools/tools-settings.ts`
+4. For UI updates: use state-change function, return `affectedRegions`
+
+**Adding a custom tool** (no core code changes needed):
+1. Create `custom-tools/my-tool.js` exporting a default `Tool` object
+2. Restart the server — it appears in Settings > Tools under Custom Tools
+3. Toggle it on to enable
 
 **State changes** (for reactive UI):
 1. Add function to `src/server/state-changes.ts` returning `{ success, data, affectedRegions }`

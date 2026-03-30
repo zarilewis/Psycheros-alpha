@@ -2,14 +2,62 @@
 
 ## Tool System Overview
 
-Tools are registered in `src/tools/registry.ts` via `createDefaultRegistry()`. Each tool implements the `Tool` interface and must be explicitly enabled via the `PSYCHEROS_TOOLS` environment variable.
+Tools are registered in `src/tools/registry.ts` via `AVAILABLE_TOOLS`. Each tool implements the `Tool` interface and can be enabled via the `PSYCHEROS_TOOLS` environment variable or the Settings > Tools UI.
 
-### Adding a New Tool
+Tool enable/disable state persists to `.psycheros/tools-settings.json`. When this file exists, user overrides take precedence over the env var. Some tools are auto-enabled regardless (e.g., `web_search` when a web search provider is configured).
+
+### Adding a New Built-in Tool
 
 1. Create `src/tools/my-tool.ts` implementing the `Tool` interface
-2. Register in `createDefaultRegistry()` in `src/tools/registry.ts`
-3. For UI updates: use a state-change function, return `affectedRegions`
-4. Tool descriptions use first-person: "I use this to..."
+2. Add the tool to `AVAILABLE_TOOLS` in `src/tools/registry.ts`
+3. Add the tool name to the appropriate category in `TOOL_CATEGORIES` in `src/tools/tools-settings.ts`
+4. For UI updates: use a state-change function, return `affectedRegions`
+5. Tool descriptions use first-person: "I use this to..."
+
+### Adding a Custom Tool
+
+Custom tools live in the `custom-tools/` directory at the project root. No core code changes are needed.
+
+1. Create `custom-tools/my-tool.js` exporting a default `Tool` object
+2. The file must export `{ definition: { type: "function", function: { name, description, parameters } }, execute: async (args, ctx) => { ... } }`
+3. `ctx` provides: `toolCallId`, `conversationId`, `db` (database client), `config` (with `projectRoot`)
+4. Restart the server — the tool appears in Settings > Tools under Custom Tools
+5. Toggle it on to enable it for the entity
+
+Invalid custom tool files are logged as warnings and skipped.
+
+### Tools Settings UI
+
+Accessible via Settings > Tools in the sidebar. Provides a web interface for managing tool enable/disable state.
+
+**Features:**
+- Tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory)
+- Toggle switches for each individual tool
+- Per-category "Enable All" / "Disable All" buttons
+- Global "Enable All" / "Disable All" buttons
+- Expandable detail view showing full description and parameters schema
+- Custom Tools section showing user-loaded tools from `custom-tools/`
+- Save persists to `.psycheros/tools-settings.json` and hot-reloads the tool registry
+
+**Priority order for resolving enabled state:**
+1. User override (from settings file) — explicit toggle
+2. Auto-enabled tools (e.g., `web_search` when provider configured)
+3. `PSYCHEROS_TOOLS` environment variable
+
+**API Endpoints:**
+- `GET /api/tools-settings` — get all tools metadata, categories, and current overrides
+- `POST /api/tools-settings` — save overrides and hot-reload (`{ "toolOverrides": { "shell": true, ... } }`)
+- `GET /fragments/settings/tools` — render Tools settings UI fragment
+
+**Related Source Files:**
+
+| File | Purpose |
+|------|---------|
+| `src/tools/registry.ts` | `AVAILABLE_TOOLS` catalog and `ToolRegistry` class |
+| `src/tools/tools-settings.ts` | `ToolsSettings` type, categories, load/save, enable resolution |
+| `src/tools/custom-loader.ts` | Dynamic loader for `custom-tools/` directory |
+| `src/server/templates.ts` | `renderToolsSettings()` and helper functions |
+| `src/server/routes.ts` | `handleGetToolsSettings`, `handleSaveToolsSettings`, `handleToolsSettingsFragment` |
 
 See [configuration.md](configuration.md) for the full list of available tools.
 
