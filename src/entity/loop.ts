@@ -122,7 +122,7 @@ export class EntityTurn {
   constructor(
     private llm: LLMClient,
     private db: DBClient,
-    private tools: ToolRegistry,
+    private tools: () => ToolRegistry,
     private config: EntityConfig,
   ) {
     this.maxToolIterations =
@@ -360,7 +360,7 @@ export class EntityTurn {
     const messages = this.buildMessages(systemMessage, history, displayContent);
 
     // Get tool definitions
-    const toolDefinitions = this.tools.getDefinitions();
+    const toolDefinitions = this.tools().getDefinitions();
 
     // Create and yield context snapshot for debugging
     const contextSnapshot: LLMContextSnapshot = {
@@ -595,7 +595,7 @@ export class EntityTurn {
       };
 
       // Execute all tool calls with context
-      const toolResults = await this.tools.executeAll(toolCalls, toolContext);
+      const toolResults = await this.tools().executeAll(toolCalls, toolContext);
 
       // Persist tool results and add to messages for next iteration
       // Track UI regions that need updating (from tool results, not metadata)

@@ -565,7 +565,7 @@ export class Server {
     this.pulseEngine = new PulseEngine(
       this.db,
       this.llm,
-      this.tools,
+      () => this.tools,
       {
         projectRoot: this.config.projectRoot,
         ragRetriever: this.ragRetriever ?? undefined,
@@ -622,7 +622,7 @@ export class Server {
     return {
       db: this.db,
       llm: this.llm,
-      tools: this.tools,
+      tools: () => this.tools,
       projectRoot: this.config.projectRoot,
       ragRetriever: this.ragRetriever ?? undefined,
       chatRAG: this.chatRAG ?? undefined,

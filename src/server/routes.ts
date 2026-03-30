@@ -68,8 +68,8 @@ export interface RouteContext {
   db: DBClient;
   /** LLM client for chat completions */
   llm: LLMClient;
-  /** Tool registry for tool execution */
-  tools: ToolRegistry;
+  /** Tool registry getter for tool execution */
+  tools: () => ToolRegistry;
   /** Root directory of the project for file serving */
   projectRoot: string;
   /** Pulse engine for autonomous entity prompts */

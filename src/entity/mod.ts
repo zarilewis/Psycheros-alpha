@@ -17,7 +17,7 @@
  * const db = new DBClient("./.psycheros/psycheros.db");
  * const tools = createDefaultRegistry();
  *
- * const turn = new EntityTurn(llm, db, tools, {
+ * const turn = new EntityTurn(llm, db, () => tools, {
  *   projectRoot: "/path/to/project",
  * });
  *

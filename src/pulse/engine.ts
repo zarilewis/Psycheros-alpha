@@ -99,7 +99,7 @@ export class PulseEngine {
   constructor(
     private db: DBClient,
     private llm: LLMClient,
-    private tools: ToolRegistry,
+    private tools: () => ToolRegistry,
     private config: PulseEngineConfig,
   ) {
     this.semaphore = new Semaphore(MAX_CONCURRENT_PULSES);
