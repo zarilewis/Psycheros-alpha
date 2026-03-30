@@ -94,6 +94,7 @@ export class PulseEngine {
   private fsDebounce: Map<string, number> = new Map();
   private webhookRateLimit: Map<string, number> = new Map();
   private lastGlobalUserMessage: string | null = null;
+  private inactivityEnabledAt: Map<string, number> = new Map();
   private started = false;
 
   constructor(
@@ -162,6 +163,9 @@ export class PulseEngine {
     if (pulse.triggerType === "cron") {
       this.registerCronTrigger(pulse);
     } else if (pulse.triggerType === "inactivity") {
+      // Track when this pulse was enabled so the inactivity timer
+      // starts from now, not retroactively from an old user message.
+      this.inactivityEnabledAt.set(pulse.id, Date.now());
       this.registerInactivityTrigger(pulse);
     } else if (pulse.triggerType === "filesystem") {
       this.registerFilesystemTrigger(pulse);
@@ -247,10 +251,19 @@ export class PulseEngine {
         await this.handleCronTick(pulse.id);
       });
     } catch (error) {
-      console.error(
-        `[Pulse] Failed to register cron for "${pulse.name}":`,
-        error instanceof Error ? error.message : String(error)
-      );
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("already exists")) {
+        // Deno.cron can't be cancelled. The existing handler still reads
+        // pulse state from DB each tick, so it will pick up any changes.
+        console.log(
+          `[Pulse] Cron "${cronName}" already registered for "${pulse.name}" — existing handler will use updated config`,
+        );
+      } else {
+        console.error(
+          `[Pulse] Failed to register cron for "${pulse.name}":`,
+          msg,
+        );
+      }
     }
   }
 
@@ -300,10 +313,19 @@ export class PulseEngine {
         await this.handleInactivityTick(pulse.id);
       });
     } catch (error) {
-      console.error(
-        `[Pulse] Failed to register inactivity trigger for "${pulse.name}":`,
-        error instanceof Error ? error.message : String(error)
-      );
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes("already exists")) {
+        // Deno.cron can't be cancelled. The existing handler still reads
+        // pulse state from DB each tick, so it will pick up any changes.
+        console.log(
+          `[Pulse] Inactivity cron "${cronName}" already registered for "${pulse.name}" — existing handler will use updated config`,
+        );
+      } else {
+        console.error(
+          `[Pulse] Failed to register inactivity trigger for "${pulse.name}":`,
+          msg,
+        );
+      }
     }
   }
 
@@ -320,7 +342,14 @@ export class PulseEngine {
       return;
     }
 
-    const elapsedMs = Date.now() - new Date(this.lastGlobalUserMessage).getTime();
+    // The inactivity clock starts from whichever is more recent:
+    // - when the pulse was enabled/saved (prevents retroactive firing)
+    // - when the user last sent a message (resets on activity)
+    const lastMessageMs = new Date(this.lastGlobalUserMessage).getTime();
+    const enabledAtMs = this.inactivityEnabledAt.get(pulseId) ?? lastMessageMs;
+    const effectiveStartMs = Math.max(enabledAtMs, lastMessageMs);
+
+    const elapsedMs = Date.now() - effectiveStartMs;
     const thresholdMs = pulse.inactivityThresholdSeconds * 1000;
 
     console.log(`[Pulse] Inactivity check "${pulse.name}": ${Math.round(elapsedMs / 1000)}s elapsed, threshold: ${pulse.inactivityThresholdSeconds}s`);
@@ -328,21 +357,36 @@ export class PulseEngine {
     // Hard threshold: must be inactive for at least the set duration
     if (elapsedMs < thresholdMs) return;
 
-    // If random jitter is enabled (randomIntervalMin/Max set), add organic delay
+    // Cooldown: don't fire again until the full threshold has elapsed since
+    // the last successful run (or since user activity, whichever is later).
+    // This prevents rapid-fire when the user stays inactive.
+    if (pulse.lastRunAt) {
+      const sinceLastRunMs = Date.now() - new Date(pulse.lastRunAt).getTime();
+      if (sinceLastRunMs < thresholdMs) {
+        console.log(`[Pulse] Inactivity "${pulse.name}": cooldown (${Math.round(sinceLastRunMs / 1000)}s since last run)`);
+        return;
+      }
+    }
+
+    // If random jitter is enabled (randomIntervalMin/Max set), add organic delay.
+    // randomIntervalMin/Max represent the absolute elapsed time range from
+    // the effective start during which the pulse may fire.
     if (pulse.randomIntervalMin && pulse.randomIntervalMax) {
-      // After threshold is met, use probability that increases with time
-      // This creates a window between randomIntervalMin and randomIntervalMax
-      // after the threshold, during which the pulse may fire at any minute
-      const windowStartMs = thresholdMs + (pulse.randomIntervalMin * 1000);
-      const windowEndMs = thresholdMs + (pulse.randomIntervalMax * 1000);
+      const windowStartMs = pulse.randomIntervalMin * 1000;
+      const windowEndMs = pulse.randomIntervalMax * 1000;
 
       if (elapsedMs < windowStartMs) return; // Too early even with jitter
-      if (elapsedMs > windowEndMs) return; // Missed the window — don't fire stale
 
-      // Linear probability ramp within the window
-      const windowProgress = (elapsedMs - windowStartMs) / (windowEndMs - windowStartMs);
-      const probability = Math.min(0.4, windowProgress * 0.6);
-      if (Math.random() > probability) return;
+      if (elapsedMs <= windowEndMs) {
+        // Within the jitter window — use probability for organic feel.
+        // Linear ramp from 0 to 40% across the window.
+        const windowProgress = (elapsedMs - windowStartMs) / (windowEndMs - windowStartMs);
+        const probability = Math.min(0.4, windowProgress * 0.6);
+        if (Math.random() > probability) return;
+      }
+      // Past the window — fall through and fire.
+      // The threshold is exceeded and the jitter window was just for timing,
+      // not permanent suppression.
     }
 
     await this.executePulse(pulseId, "inactivity", 0, null);
@@ -480,9 +524,8 @@ export class PulseEngine {
     this.runningPulses.add(pulseId);
 
     let errorMessage: string | null = null;
+    let conversationId: string | null = pulse.conversationId;
     try {
-      // Determine conversation
-      let conversationId = pulse.conversationId;
 
       // For visible mode with no assigned conversation, create a dedicated one
       if (!conversationId && pulse.chatMode === "visible") {
@@ -593,6 +636,8 @@ export class PulseEngine {
       if (pulse.chatMode === "visible" && conversationId) {
         try {
           getBroadcaster().broadcastEvent("done", {}, conversationId);
+          // Fallback: tell client to reload messages in case streaming was missed
+          getBroadcaster().broadcastEvent("pulse_complete", { conversationId }, conversationId);
         } catch {
           // Broadcaster may have no connected clients
         }
@@ -636,8 +681,19 @@ export class PulseEngine {
       errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[Pulse] Error executing "${pulse.name}":`, errorMessage);
 
+      // Notify the client of the error
+      if (pulse.chatMode === "visible" && conversationId) {
+        try {
+          getBroadcaster().broadcastEvent("status", { error: `Pulse error: ${errorMessage}` }, conversationId);
+          getBroadcaster().broadcastEvent("done", "error", conversationId);
+          // Fallback: tell client to reload messages in case streaming was missed
+          getBroadcaster().broadcastEvent("pulse_complete", { conversationId }, conversationId);
+        } catch {
+          // Broadcaster may have no connected clients
+        }
+      }
+
       // Complete run with error status
-      // We need to find the running run for this pulse
       this.db.updatePulseRunStats(pulseId, "error");
     } finally {
       this.runningPulses.delete(pulseId);

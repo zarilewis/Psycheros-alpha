@@ -133,3 +133,35 @@ Full code review covering code quality, error handling, input validation, SQLite
 - Prepared statements wrapped in try/finally for guaranteed finalization
 
 See also: [security-audit.md](security-audit.md) for the full security assessment.
+
+## Pulse System Bug Fixes
+
+### Inactivity trigger rapid-fire (High — UX/exhaustion)
+- **Problem**: `handleInactivityTick()` had no cooldown mechanism. Once the inactivity threshold was exceeded, the Pulse fired every minute (the cron tick interval). The `lastRunAt` guard present in `handleCronTick()` was missing from the inactivity handler.
+- **Location**: `src/pulse/engine.ts` — `handleInactivityTick()`
+- **Fix**: Added `lastRunAt` check — after firing, the Pulse won't fire again until the full threshold period has elapsed since the last run.
+
+### Inactivity jitter window never fires for short thresholds (High — functionality)
+- **Problem**: The jitter window was calculated as `threshold + [randomIntervalMin, randomIntervalMax]`. For a 4-min threshold, the window was 16.5–23.5 min instead of the intended 6.5–13.5 min. Combined with a max probability of 40% and only 1-2 tick chances, the Pulse frequently missed its window entirely. Additionally, once past the window, the Pulse was permanently suppressed (`elapsedMs > windowEndMs → return`).
+- **Location**: `src/pulse/engine.ts` — `handleInactivityTick()` jitter logic
+- **Fix**: Window now uses `randomIntervalMin/Max` as absolute elapsed times from the effective start. Upper window bound changed from hard return to fall-through, so the Pulse fires if the jitter window is missed.
+
+### Inactivity trigger fires retroactively on enable (Medium — UX)
+- **Problem**: The inactivity timer was based solely on `lastGlobalUserMessage`. Enabling a Pulse after the threshold had already elapsed caused it to fire immediately on the next tick.
+- **Location**: `src/pulse/engine.ts` — `handleInactivityTick()` and `registerTriggers()`
+- **Fix**: Track `inactivityEnabledAt` per Pulse (set to `Date.now()` on registration). Effective start time is `max(enabledAt, lastUserMessage)`. User activity still resets the clock as expected.
+
+### Pulse run duration stored as literal SQL string (Medium — data integrity)
+- **Problem**: `completePulseRun()` passed a CAST expression as a string parameter value instead of inlining it in the SQL. This stored `"CAST(...)"` as the duration_ms value and caused "column index out of range" errors (9 values for 8 placeholders).
+- **Location**: `src/db/client.ts` — `completePulseRun()`
+- **Fix**: Inlined the CAST expression in the SQL statement and adjusted parameter order to match the 8 placeholders.
+
+### Pulse errors not reported to client (Medium — UX)
+- **Problem**: When a visible Pulse failed (LLM error, etc.), the catch block only logged to console and updated the DB. No notification was sent to the client — the chat bar stayed active and no error toast appeared.
+- **Location**: `src/pulse/engine.ts` — `executePulse()` catch block
+- **Fix**: On error, broadcast `status` event with error details and `done` event with `"error"` to trigger the client's error UI (red toast + inline error message).
+
+### Pulse streaming lost on SSE reconnection (Medium — UX)
+- **Problem**: Pulse responses stream via the persistent SSE channel. If the EventSource connection drops during the inactivity wait (common on WSL2), all streaming events are lost. The user sees no response until manually refreshing.
+- **Location**: `src/pulse/engine.ts` — `executePulse()`; `web/js/psycheros.js` — persistent SSE handlers
+- **Fix**: Added `pulse_complete` event broadcast after Pulse execution (success or error). Client-side handler detects if streaming was missed (`pulseAssistantEl === null`) and reloads the conversation from the server.

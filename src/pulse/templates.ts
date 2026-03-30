@@ -124,8 +124,8 @@ function formatCronToMonthlyDate(cronExpr: string | null): string | null {
  * The Pulse icon SVG (EKG-style heartbeat monitor line).
  */
 export function pulseIconSvg(size = 20): string {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="2 12 6 12 8 4 12 20 14 10 16 14 18 12 22 12"/>
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
   </svg>`;
 }
 

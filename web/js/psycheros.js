@@ -278,6 +278,18 @@ function initPersistentSSE() {
     }
   });
 
+  persistentSSE.addEventListener('pulse_complete', (event) => {
+    try {
+      const { conversationId } = JSON.parse(event.data);
+      if (!pulseAssistantEl && conversationId === currentConversationId) {
+        // Streaming was missed — reload the conversation to show the response
+        loadConversationFromUrl(conversationId);
+      }
+    } catch (e) {
+      console.error('Failed to handle pulse_complete:', e);
+    }
+  });
+
   persistentSSE.onerror = (error) => {
     console.warn('Persistent SSE error, will reconnect:', error);
     // EventSource automatically reconnects on error

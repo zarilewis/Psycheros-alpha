@@ -350,6 +350,7 @@ Autonomous prompt scheduling system accessible via Settings → Pulse in the sid
 - Input is disabled during Pulse streaming; the stop button appears (double-tap to confirm)
 - Chat auto-scrolls as Pulse content arrives
 - Pulse message metadata (pulse_id, pulse_name) is stored on messages for traceability
+- **Streaming fallback**: If the persistent SSE connection drops during pulse execution (common during idle periods), a `pulse_complete` event triggers a conversation reload so the response is always visible even when real-time streaming was missed
 
 **Pulse Chaining:**
 - Pulses can chain into other Pulses for complex workflows
@@ -364,4 +365,11 @@ Autonomous prompt scheduling system accessible via Settings → Pulse in the sid
 - Paginated table showing time, pulse name, trigger source, status, duration, tool call count, and result preview
 - Filterable by pulse ID and status
 
-**Source files:** `src/pulse/engine.ts`, `src/pulse/routes.ts`, `src/pulse/templates.ts`, `src/tools/pulse-tools.ts`, `web/js/psycheros.js` (switchTab, savePulse, updatePulseTriggerFields), `web/css/settings.css` (pulse-specific styles), `web/css/components.css` (.msg--pulse styles)
+**Inactivity Trigger Details:**
+- The inactivity timer starts from when the Pulse is saved/enabled, not retroactively from the last user message
+- User activity (sending a message) resets the inactivity clock
+- A cooldown equal to the threshold prevents rapid-fire re-execution when the user stays inactive
+- With random jitter enabled, the fire window uses absolute elapsed times (e.g., a 10-min threshold with jitter fires between 6.5–13.5 min), not threshold + offset
+- If the probability-based jitter window is missed, the Pulse falls through and fires once the threshold is exceeded (rather than being permanently suppressed)
+
+**Source files:** `src/pulse/engine.ts`, `src/pulse/routes.ts`, `src/pulse/templates.ts`, `src/tools/pulse-tools.ts`, `src/db/client.ts` (pulse run persistence), `web/js/psycheros.js` (switchTab, savePulse, updatePulseTriggerFields, pulse_complete handler), `web/css/settings.css` (pulse-specific styles), `web/css/components.css` (.msg--pulse styles)

@@ -1384,17 +1384,17 @@ export class DBClient {
     outputContent?: string | null;
   }): void {
     this.db.exec(
-      `UPDATE pulse_runs SET status = ?, completed_at = ?, duration_ms = ?,
+      `UPDATE pulse_runs SET status = ?, completed_at = ?,
+        duration_ms = CAST((julianday('now') - julianday((SELECT started_at FROM pulse_runs WHERE id = ?)) * 86400000) AS INTEGER),
         result_summary = ?, error_message = ?, tool_calls_count = ?,
         output_content = ?
        WHERE id = ?`,
       [
         data.status, new Date().toISOString(),
-        // Calculate duration from started_at
-        `CAST((julianday('now') - julianday((SELECT started_at FROM pulse_runs WHERE id = ?))) * 86400000 AS INTEGER)`,
+        id,
         data.resultSummary ?? null, data.errorMessage ?? null,
         data.toolCallsCount ?? 0, data.outputContent ?? null,
-        id, id,
+        id,
       ]
     );
   }
