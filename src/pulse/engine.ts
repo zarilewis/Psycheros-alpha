@@ -134,7 +134,7 @@ export class PulseEngine {
    * Stop the pulse engine. Closes filesystem watchers.
    * Should be called during graceful shutdown.
    */
-  async stop(): Promise<void> {
+  stop(): void {
     this.started = false;
 
     for (const [, watcher] of this.fsWatchers) {
