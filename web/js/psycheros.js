@@ -2877,6 +2877,7 @@ function updatePulseSchedulePreset(preset) {
  * Gathers form data, translates friendly fields, sends JSON to the API.
  */
 async function savePulse(event, pulseId) {
+  event.preventDefault();
   const btn = document.getElementById('pulse-save-btn');
   const statusEl = document.getElementById('pulse-save-status');
   if (!btn) return;
