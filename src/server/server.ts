@@ -607,8 +607,8 @@ export class Server {
         mcpClient: this.mcpClient ?? undefined,
         lorebookManager: this.lorebookManager,
         vaultManager: this.vaultManager,
-        webSearchSettings: this.webSearchSettings,
-        discordSettings: this.discordSettings,
+        webSearchSettings: () => this.webSearchSettings,
+        discordSettings: () => this.discordSettings,
       }
     );
     this.pulseEngine.start();

@@ -78,8 +78,10 @@ export interface PulseEngineConfig {
   mcpClient?: MCPClient;
   lorebookManager?: LorebookManager;
   vaultManager?: VaultManager;
-  webSearchSettings?: WebSearchSettings;
-  discordSettings?: DiscordSettings;
+  /** Getter for web search settings (read fresh each pulse execution) */
+  webSearchSettings?: () => WebSearchSettings | undefined;
+  /** Getter for Discord settings (read fresh each pulse execution) */
+  discordSettings?: () => DiscordSettings | undefined;
 }
 
 /**
@@ -562,8 +564,8 @@ export class PulseEngine {
         mcpClient: this.config.mcpClient,
         lorebookManager: this.config.lorebookManager,
         vaultManager: this.config.vaultManager,
-        webSearchSettings: this.config.webSearchSettings,
-        discordSettings: this.config.discordSettings,
+        webSearchSettings: this.config.webSearchSettings?.(),
+        discordSettings: this.config.discordSettings?.(),
       };
 
       const turn = new EntityTurn(this.llm, this.db, this.tools, entityConfig);
