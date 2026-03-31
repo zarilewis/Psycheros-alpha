@@ -65,6 +65,7 @@ src/
 │   ├── client.ts     # Streaming client, tool calls, thinking content
 │   ├── settings.ts   # LLM settings persistence
 │   ├── web-search-settings.ts  # Web search settings persistence
+│   └── discord-settings.ts     # Discord settings persistence
 │   └── types.ts
 ├── db/               # SQLite persistence
 │   ├── mod.ts
@@ -78,6 +79,7 @@ src/
 │   ├── custom-loader.ts    # Dynamic loader for user-written tools
 │   ├── shell.ts
 │   ├── web-search.ts # Web search (Tavily / Brave)
+│   ├── send-discord-dm.ts # Discord DM notifications
 │   ├── identity-helpers.ts  # XML parsing, MCP fallback
 │   ├── identity-casual.ts   # Tier 1: append-only
 │   └── identity-maintain.ts # Tier 2: maintenance

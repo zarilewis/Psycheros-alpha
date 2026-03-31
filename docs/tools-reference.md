@@ -206,6 +206,7 @@ The entity can send push notifications to the user's device. This works even whe
 | Tool | Description |
 |------|-------------|
 | `send_notification` | Send a push notification with a title and body; optionally link to a conversation |
+| `send_discord_dm` | Send a Discord DM to the user |
 
 **Parameters:** `title` (required, short title), `body` (required, up to ~200 chars), `conversation_id` (optional, opens Psycheros to this conversation on tap).
 
@@ -221,6 +222,36 @@ The entity can send push notifications to the user's device. This works even whe
 | `src/push/mod.ts` | VAPID key management, subscription CRUD, `web-push` integration |
 | `web/sw.js` | `push` and `notificationclick` event handlers |
 | `web/js/psycheros.js` | Client-side subscription logic, `requestNotificationPermission()` |
+
+## Discord DM Tool
+
+The entity can send Discord DMs to the user as an alternative notification channel. This is useful when push notifications are unreliable (e.g., on Android web apps). Uses a Discord bot token to open a DM channel and send messages via the Discord REST API.
+
+| Tool | Description |
+|------|-------------|
+| `send_discord_dm` | Send a Discord DM with a message; optionally specify a target channel/user ID |
+
+**Parameters:** `message` (required, up to 2000 chars), `channel_id` (optional, overrides the configured default).
+
+**Setup:** Configure via Settings > External Connections in the web UI, or set environment variables:
+
+| Setting | Env Var | Description |
+|---------|---------|-------------|
+| Bot Token | `DISCORD_BOT_TOKEN` | Discord bot token (create at discord.com/developers/applications) |
+| Default Channel ID | `DISCORD_DEFAULT_CHANNEL_ID` | Discord user ID to DM by default |
+
+Settings are persisted to `.psycheros/discord-settings.json` (gitignored). The tool is auto-enabled when a bot token is configured and the feature is enabled.
+
+**Data flow:** Entity calls `send_discord_dm` → server opens DM channel via `POST /users/@me/channels` with the user ID → sends message via `POST /channels/{dm_channel_id}/messages` with bot auth.
+
+**Error handling:** The tool returns clear messages for common Discord API errors — 401 (invalid token), 403 (missing access), 404 (unknown channel/user), 429 (rate limited with retry-after info).
+
+### Related Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/tools/send-discord-dm.ts` | `send_discord_dm` tool implementation |
+| `src/llm/discord-settings.ts` | Settings type, load/save, token masking |
 
 ## Identity File Structure (Core Prompts)
 

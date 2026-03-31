@@ -104,7 +104,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     id: "notification",
     name: "Notification",
     description: "Send push notifications to the user's device",
-    toolNames: ["send_notification"],
+    toolNames: ["send_notification", "send_discord_dm"],
   },
 ];
 

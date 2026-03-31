@@ -49,6 +49,8 @@ import { webSearchTool } from "./web-search.ts";
 import { createPulseTool, triggerPulseTool, deletePulseTool } from "./pulse-tools.ts";
 // Push notification tool
 import { sendNotificationTool } from "./send-notification.ts";
+// Discord DM tool
+import { sendDiscordDmTool } from "./send-discord-dm.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -98,6 +100,8 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   delete_pulse: deletePulseTool,
   // Push notification tool
   send_notification: sendNotificationTool,
+  // Discord DM tool
+  send_discord_dm: sendDiscordDmTool,
 };
 
 /**

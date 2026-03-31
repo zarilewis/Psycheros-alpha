@@ -45,6 +45,8 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/tools/tools-settings.ts` | Tool enable/disable persistence and resolution |
 | `src/tools/custom-loader.ts` | Dynamic loader for user-written tools in `custom-tools/` |
 | `src/tools/web-search.ts` | Web search tool (Tavily / Brave) |
+| `src/tools/send-discord-dm.ts` | Discord DM tool (sends DMs via Discord bot API) |
+| `src/llm/discord-settings.ts` | Discord settings type, load/save, token masking |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
 | `src/memory/mod.ts` | Hierarchical memory system |
 | `src/rag/mod.ts` | RAG retrieval system |
@@ -58,6 +60,12 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/pulse/templates.ts` | Pulse UI — settings hub card, editor, execution log |
 | `src/tools/pulse-tools.ts` | Entity-facing Pulse tools (create, trigger, delete) |
 | `src/push/mod.ts` | Push notification manager (VAPID keys, subscriptions, sending) |
+
+## External Connections
+
+Psycheros supports third-party integrations for out-of-band notifications. Currently supported:
+
+- **Discord DM** — Entity sends DMs via a Discord bot. Configured via Settings > External Connections or env vars (`DISCORD_BOT_TOKEN`, `DISCORD_DEFAULT_CHANNEL_ID`). Auto-enables the `send_discord_dm` tool when configured. Settings persist to `.psycheros/discord-settings.json`.
 
 ## Core Patterns
 

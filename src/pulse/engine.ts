@@ -10,6 +10,7 @@
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/web-search-settings.ts";
+import type { DiscordSettings } from "../llm/discord-settings.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { Retriever } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
@@ -78,6 +79,7 @@ export interface PulseEngineConfig {
   lorebookManager?: LorebookManager;
   vaultManager?: VaultManager;
   webSearchSettings?: WebSearchSettings;
+  discordSettings?: DiscordSettings;
 }
 
 /**
@@ -561,6 +563,7 @@ export class PulseEngine {
         lorebookManager: this.config.lorebookManager,
         vaultManager: this.config.vaultManager,
         webSearchSettings: this.config.webSearchSettings,
+        discordSettings: this.config.discordSettings,
       };
 
       const turn = new EntityTurn(this.llm, this.db, this.tools, entityConfig);

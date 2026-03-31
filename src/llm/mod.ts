@@ -21,3 +21,7 @@ export { loadSettings, saveSettings, getDefaultSettings, maskApiKey } from "./se
 // Re-export web search settings
 export type { WebSearchSettings } from "./web-search-settings.ts";
 export { loadWebSearchSettings, saveWebSearchSettings, getDefaultWebSearchSettings, maskWebSearchSettings } from "./web-search-settings.ts";
+
+// Re-export Discord settings
+export type { DiscordSettings } from "./discord-settings.ts";
+export { loadDiscordSettings, saveDiscordSettings, getDefaultDiscordSettings, maskDiscordSettings } from "./discord-settings.ts";

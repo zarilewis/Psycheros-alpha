@@ -8,7 +8,7 @@
  */
 
 import { DBClient } from "../db/mod.ts";
-import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSettings, loadSettings, saveSettings, loadWebSearchSettings, saveWebSearchSettings } from "../llm/mod.ts";
+import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSettings, type DiscordSettings, loadSettings, saveSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSettings, getEnabledToolNames, loadCustomTools, ToolRegistry, type ToolsSettings } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import type { MemoryIndexer } from "../rag/indexer.ts";
@@ -105,6 +105,9 @@ import {
   handleGetWebSearchSettings,
   handleSaveWebSearchSettings,
   handleWebSearchSettingsFragment,
+  handleGetDiscordSettings,
+  handleSaveDiscordSettings,
+  handleConnectionsSettingsFragment,
   handleGetToolsSettings,
   handleSaveToolsSettings,
   handleToolsSettingsFragment,
@@ -209,6 +212,7 @@ export class Server {
   private vaultManager: VaultManager;
   private llmSettings: LLMSettings;
   private webSearchSettings: WebSearchSettings;
+  private discordSettings: DiscordSettings;
   private toolSettings: ToolsSettings;
   private customTools: Record<string, import("../tools/types.ts").Tool>;
   private pulseEngine: PulseEngine | null = null;
@@ -247,6 +251,13 @@ export class Server {
       provider: "disabled",
       tavilyApiKey: "",
       braveApiKey: "",
+    };
+
+    // Initialize Discord settings (will be reloaded from settings in init())
+    this.discordSettings = {
+      botToken: "",
+      defaultChannelId: "",
+      enabled: false,
     };
 
     // Initialize tool settings (will be reloaded from settings in init())
@@ -292,6 +303,7 @@ export class Server {
   async init(): Promise<void> {
     this.llmSettings = await loadSettings(this.config.projectRoot);
     this.webSearchSettings = await loadWebSearchSettings(this.config.projectRoot);
+    this.discordSettings = await loadDiscordSettings(this.config.projectRoot);
     this.toolSettings = await loadToolsSettings(this.config.projectRoot);
     this.customTools = await loadCustomTools(this.config.projectRoot);
     this.reloadLLMClient();
@@ -338,6 +350,22 @@ export class Server {
   async updateWebSearchSettings(settings: WebSearchSettings): Promise<void> {
     this.webSearchSettings = settings;
     await saveWebSearchSettings(this.config.projectRoot, settings);
+    this.reloadToolRegistry();
+  }
+
+  /**
+   * Get the current Discord settings.
+   */
+  getDiscordSettings(): DiscordSettings {
+    return this.discordSettings;
+  }
+
+  /**
+   * Update Discord settings, persist to disk, and reload tool registry.
+   */
+  async updateDiscordSettings(settings: DiscordSettings): Promise<void> {
+    this.discordSettings = settings;
+    await saveDiscordSettings(this.config.projectRoot, settings);
     this.reloadToolRegistry();
   }
 
@@ -392,6 +420,9 @@ export class Server {
     const autoEnabled: string[] = [];
     if (this.webSearchSettings.provider === "tavily" || this.webSearchSettings.provider === "brave") {
       autoEnabled.push("web_search");
+    }
+    if (this.discordSettings.enabled && this.discordSettings.botToken) {
+      autoEnabled.push("send_discord_dm");
     }
 
     // Resolve the final enabled list
@@ -577,6 +608,7 @@ export class Server {
         lorebookManager: this.lorebookManager,
         vaultManager: this.vaultManager,
         webSearchSettings: this.webSearchSettings,
+        discordSettings: this.discordSettings,
       }
     );
     this.pulseEngine.start();
@@ -640,6 +672,8 @@ export class Server {
       updateLLMSettings: (settings) => this.updateLLMSettings(settings),
       getWebSearchSettings: () => this.webSearchSettings,
       updateWebSearchSettings: (settings) => this.updateWebSearchSettings(settings),
+      getDiscordSettings: () => this.discordSettings,
+      updateDiscordSettings: (settings) => this.updateDiscordSettings(settings),
       getToolSettings: () => this.toolSettings,
       updateToolSettings: (settings) => this.updateToolSettings(settings),
       customTools: this.customTools,
@@ -1058,6 +1092,26 @@ export class Server {
     }
 
     // ========================================
+    // Discord Settings API Routes
+    // ========================================
+
+    // GET /api/discord-settings - Get current Discord settings
+    if (method === "GET" && path === "/api/discord-settings") {
+      return handleGetDiscordSettings(ctx);
+    }
+
+    // POST /api/discord-settings - Save Discord settings
+    if (method === "POST" && path === "/api/discord-settings") {
+      return await handleSaveDiscordSettings(ctx, request);
+    }
+
+    // POST /api/discord-settings/reset - Reset to defaults
+    if (method === "POST" && path === "/api/discord-settings/reset") {
+      const { handleResetDiscordSettings } = await import("./routes.ts");
+      return await handleResetDiscordSettings(ctx);
+    }
+
+    // ========================================
     // Tools Settings API Routes
     // ========================================
 
@@ -1410,6 +1464,11 @@ export class Server {
     // GET /fragments/settings/web-search - Web search settings UI fragment
     if (path === "/fragments/settings/web-search") {
       return handleWebSearchSettingsFragment(ctx);
+    }
+
+    // GET /fragments/settings/connections - External connections settings fragment
+    if (path === "/fragments/settings/connections") {
+      return handleConnectionsSettingsFragment(ctx);
     }
 
     // GET /fragments/settings/tools - Tools settings UI fragment

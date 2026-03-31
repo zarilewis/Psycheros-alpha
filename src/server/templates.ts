@@ -11,6 +11,7 @@ import type { Conversation, Message, ToolCall, ToolResult, TurnMetrics } from ".
 import type { Lorebook, LorebookEntry } from "../lorebook/mod.ts";
 import type { LLMSettings } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
+import type { DiscordSettings } from "../llm/mod.ts";
 import { maskApiKey } from "../llm/mod.ts";
 import type { ToolsSettings } from "../tools/mod.ts";
 import { TOOL_CATEGORIES } from "../tools/mod.ts";
@@ -455,6 +456,25 @@ export function renderSettingsHub(): string {
         <div class="settings-hub-card-body">
           <span class="settings-hub-card-title">Web Search</span>
           <span class="settings-hub-card-desc">Enable web search for current information and news</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/connections"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">External Connections</span>
+          <span class="settings-hub-card-desc">Discord, notifications, and third-party integrations</span>
         </div>
         <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 18 15 12 9 6"/>
@@ -2937,6 +2957,160 @@ function renderToolItem(tool: { name: string; description: string; enabled: bool
     <div class="tool-detail-params" id="params-${tool.name}"></div>
   </div>
 </div>`;
+}
+
+export function renderConnectionsSettings(settings: DiscordSettings): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">External Connections</h1>
+        <p class="settings-desc">Configure third-party integrations for notifications and external access</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <!-- Discord Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Discord</h3>
+      <p class="theme-section-desc">Send DMs to your Discord account when the entity needs your attention</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label class="toggle-label" for="discord-enabled">
+            <span>Enable Discord DMs</span>
+            <label class="toggle">
+              <input type="checkbox" id="discord-enabled" ${settings.enabled ? "checked" : ""}>
+              <span class="toggle-slider"></span>
+            </label>
+          </label>
+        </div>
+        <div class="llm-field" id="discord-fields-section" style="${settings.enabled ? "" : "display:none;"}">
+          <label for="discord-bot-token">Bot Token</label>
+          <input type="password" id="discord-bot-token" class="input-field llm-input" value="${escapeHtml(settings.botToken || "")}" placeholder="Paste your Discord bot token">
+          <span class="field-hint">Create a bot at discord.com/developers/applications</span>
+        </div>
+        <div class="llm-field" id="discord-channel-section" style="${settings.enabled ? "" : "display:none;"}">
+          <label for="discord-channel-id">Default Channel ID</label>
+          <input type="text" id="discord-channel-id" class="input-field llm-input" value="${escapeHtml(settings.defaultChannelId || "")}" placeholder="e.g. 123456789012345678">
+          <span class="field-hint">The Discord user or channel ID to DM by default</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <div class="llm-actions">
+      <div class="llm-actions-left">
+        <button class="btn btn--primary" onclick="saveDiscordSettings(event)">Save Settings</button>
+      </div>
+      <button class="btn btn--ghost" onclick="resetDiscordDefaults(event)">Reset to Defaults</button>
+    </div>
+
+    <!-- Status -->
+    <div id="discord-status" class="llm-status" style="display:none;"></div>
+
+    <p class="settings-note">More integrations can be added here in the future.</p>
+
+  </div>
+</div>
+
+<script>
+const discordEnabled = document.getElementById('discord-enabled');
+const discordFields = document.getElementById('discord-fields-section');
+const discordChannel = document.getElementById('discord-channel-section');
+if (discordEnabled && discordFields && discordChannel) {
+  discordEnabled.addEventListener('change', () => {
+    const show = discordEnabled.checked;
+    discordFields.style.display = show ? '' : 'none';
+    discordChannel.style.display = show ? '' : 'none';
+  });
+}
+
+function showDiscordStatus(type, message) {
+  const el = document.getElementById('discord-status');
+  if (!el) return;
+  el.style.display = 'block';
+  el.className = 'llm-status ' + type;
+  el.textContent = message;
+}
+
+async function saveDiscordSettings(event) {
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  showDiscordStatus('loading', 'Saving settings...');
+
+  try {
+    const settings = {
+      enabled: document.getElementById('discord-enabled')?.checked ?? false,
+      botToken: document.getElementById('discord-bot-token')?.value.trim() || '',
+      defaultChannelId: document.getElementById('discord-channel-id')?.value.trim() || '',
+    };
+    const resp = await fetch('/api/discord-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showDiscordStatus('success', 'Settings saved successfully.');
+    } else {
+      showDiscordStatus('error', 'Failed to save: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    showDiscordStatus('error', 'Failed to save: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Settings';
+  }
+}
+
+let discordResetPending = false;
+async function resetDiscordDefaults(event) {
+  const btn = event.currentTarget;
+  if (!discordResetPending) {
+    discordResetPending = true;
+    btn.textContent = 'Confirm Reset?';
+    btn.classList.add('btn--danger');
+    btn.classList.remove('btn--ghost');
+    setTimeout(() => {
+      if (discordResetPending) {
+        discordResetPending = false;
+        btn.textContent = 'Reset to Defaults';
+        btn.classList.remove('btn--danger');
+        btn.classList.add('btn--ghost');
+      }
+    }, 3000);
+    return;
+  }
+  discordResetPending = false;
+  btn.textContent = 'Resetting...';
+  btn.disabled = true;
+  showDiscordStatus('loading', 'Resetting to defaults...');
+
+  try {
+    const resp = await fetch('/api/discord-settings/reset', { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      htmx.ajax('GET', '/fragments/settings/connections', { target: '#chat', swap: 'innerHTML' });
+    } else {
+      showDiscordStatus('error', 'Failed to reset: ' + (data.error || 'Unknown error'));
+      btn.disabled = false;
+      btn.textContent = 'Reset to Defaults';
+      btn.classList.remove('btn--danger');
+      btn.classList.add('btn--ghost');
+    }
+  } catch (e) {
+    showDiscordStatus('error', 'Failed to reset: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'Reset to Defaults';
+    btn.classList.remove('btn--danger');
+    btn.classList.add('btn--ghost');
+  }
+}
+</script>
+`;
 }
 
 export function renderToolsSettings(

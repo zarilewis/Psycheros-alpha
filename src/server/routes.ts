@@ -12,7 +12,8 @@ import type { SSEEvent, TurnMetrics } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, LLMSettings } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
-import { maskApiKey, getDefaultSettings, getDefaultWebSearchSettings, maskWebSearchSettings } from "../llm/mod.ts";
+import type { DiscordSettings } from "../llm/mod.ts";
+import { maskApiKey, getDefaultSettings, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { ToolsSettings } from "../tools/mod.ts";
 import { AVAILABLE_TOOLS, TOOL_CATEGORIES } from "../tools/mod.ts";
@@ -48,6 +49,7 @@ import {
   renderSettingsHub,
   renderGeneralSettings,
   renderWebSearchSettings,
+  renderConnectionsSettings,
   renderToolsSettings,
   type GeneralSettings,
   escapeHtml,
@@ -103,6 +105,10 @@ export interface RouteContext {
   getWebSearchSettings: () => WebSearchSettings;
   /** Update web search settings and hot-reload tool registry */
   updateWebSearchSettings: (settings: WebSearchSettings) => Promise<void>;
+  /** Get current Discord settings */
+  getDiscordSettings: () => DiscordSettings;
+  /** Update Discord settings and hot-reload tool registry */
+  updateDiscordSettings: (settings: DiscordSettings) => Promise<void>;
   /** Get current tools settings */
   getToolSettings: () => ToolsSettings;
   /** Update tools settings and hot-reload tool registry */
@@ -907,6 +913,7 @@ export async function handleChat(
             lorebookManager: ctx.lorebookManager,
             vaultManager: ctx.vaultManager,
             webSearchSettings: ctx.getWebSearchSettings(),
+            discordSettings: ctx.getDiscordSettings(),
           }
         );
 
@@ -4038,6 +4045,109 @@ export async function handleResetWebSearchSettings(
  */
 export function handleWebSearchSettingsFragment(ctx: RouteContext): Response {
   const html = renderWebSearchSettings(maskWebSearchSettings(ctx.getWebSearchSettings()));
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+// =============================================================================
+// Discord Settings API Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/discord-settings - Get current Discord settings (masked).
+ */
+export function handleGetDiscordSettings(ctx: RouteContext): Response {
+  const settings = maskDiscordSettings(ctx.getDiscordSettings());
+  return new Response(JSON.stringify(settings), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/discord-settings - Save and apply Discord settings.
+ * If the bot token field contains the masked value, it keeps the existing token.
+ */
+export async function handleSaveDiscordSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<DiscordSettings>;
+    const current = ctx.getDiscordSettings();
+
+    const updated: DiscordSettings = {
+      enabled: body.enabled ?? current.enabled,
+      botToken: (body.botToken && !body.botToken.includes("••••"))
+        ? body.botToken
+        : current.botToken,
+      defaultChannelId: body.defaultChannelId ?? current.defaultChannelId,
+    };
+
+    await ctx.updateDiscordSettings(updated);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] handleSaveDiscordSettings error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save settings" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+/**
+ * Handle POST /api/discord-settings/reset - Reset to env-based defaults.
+ */
+export async function handleResetDiscordSettings(
+  ctx: RouteContext,
+): Promise<Response> {
+  try {
+    const defaults = getDefaultDiscordSettings();
+    await ctx.updateDiscordSettings(defaults);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] handleResetDiscordSettings error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to reset settings" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/connections - External connections settings UI fragment.
+ */
+export function handleConnectionsSettingsFragment(ctx: RouteContext): Response {
+  const html = renderConnectionsSettings(maskDiscordSettings(ctx.getDiscordSettings()));
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

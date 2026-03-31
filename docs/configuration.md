@@ -20,6 +20,8 @@ All Psycheros configuration is via environment variables. Copy `.env.example` to
 | `PSYCHEROS_WEB_SEARCH` | No | `disabled` | Web search provider: `disabled`, `tavily`, or `brave` |
 | `TAVILY_API_KEY` | No | — | API key for Tavily search (when `PSYCHEROS_WEB_SEARCH=tavily`) |
 | `BRAVE_SEARCH_API_KEY` | No | — | API key for Brave search (when `PSYCHEROS_WEB_SEARCH=brave`) |
+| `DISCORD_BOT_TOKEN` | No | — | Discord bot token for sending DMs |
+| `DISCORD_DEFAULT_CHANNEL_ID` | No | — | Discord user ID to DM by default |
 | `TZ` | No | `UTC` | Timezone for message timestamps (e.g., `America/Los_Angeles`) |
 
 ## Available Tools
@@ -61,6 +63,7 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 | `trigger_pulse` | Manually trigger an existing Pulse |
 | `delete_pulse` | Delete a Pulse and its triggers |
 | `send_notification` | Send a push notification to the user's device |
+| `send_discord_dm` | Send a Discord DM to the user (auto-enabled when bot token is configured) |
 
 **Example configurations:**
 ```bash

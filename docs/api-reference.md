@@ -163,6 +163,16 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 | `POST` | `/api/web-search-settings` | Save web search settings |
 | `POST` | `/api/web-search-settings/reset` | Reset to environment variable defaults |
 
+### Discord Settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/discord-settings` | Get current Discord settings (bot token masked) |
+| `POST` | `/api/discord-settings` | Save Discord settings |
+| `POST` | `/api/discord-settings/reset` | Reset to environment variable defaults |
+
+Settings stored in `.psycheros/discord-settings.json`. Shape: `{ "enabled": boolean, "botToken": string, "defaultChannelId": string }`.
+
 ### Tools Settings
 
 | Method | Path | Description |
@@ -197,6 +207,7 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/admin/logs` | Log viewer HTML fragment |
 | `GET` | `/fragments/admin/jobs` | Scheduled jobs dashboard HTML fragment |
 | `GET` | `/fragments/admin/actions` | Actions panel HTML fragment |
+| `GET` | `/fragments/settings/connections` | External connections settings fragment |
 | `GET` | `/fragments/settings/tools` | Tools settings UI fragment |
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
 | `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
@@ -253,3 +264,4 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `src/pulse/routes.ts` | Pulse CRUD and trigger API handlers |
 | `src/pulse/templates.ts` | Pulse settings UI rendering |
 | `src/push/mod.ts` | VAPID key management, subscription CRUD, push sending |
+| `src/llm/discord-settings.ts` | Discord settings type, persistence, token masking |

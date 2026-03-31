@@ -25,6 +25,7 @@
 
 import type { LLMClient, StreamChunk, ChatMessage } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/web-search-settings.ts";
+import type { DiscordSettings } from "../llm/discord-settings.ts";
 import { LLMError } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
@@ -92,6 +93,8 @@ export interface EntityConfig {
   vaultManager?: VaultManager;
   /** Optional web search settings */
   webSearchSettings?: WebSearchSettings;
+  /** Optional Discord settings */
+  discordSettings?: DiscordSettings;
 }
 
 /**
