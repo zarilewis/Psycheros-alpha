@@ -144,6 +144,7 @@ The entity can create, trigger, and delete autonomous scheduled prompts (Pulses)
 | `src/pulse/engine.ts` | PulseEngine — scheduling, execution, chain handling |
 | `src/pulse/routes.ts` | CRUD API, trigger endpoints, webhook receiver |
 | `src/pulse/templates.ts` | Settings UI — hub card, editor, execution log |
+| `src/pulse/timezone.ts` | Timezone conversion helpers for local↔UTC cron scheduling |
 
 ### Related Source Files
 

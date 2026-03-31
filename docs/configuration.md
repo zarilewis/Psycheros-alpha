@@ -22,6 +22,7 @@ All Psycheros configuration is via environment variables. Copy `.env.example` to
 | `BRAVE_SEARCH_API_KEY` | No | — | API key for Brave search (when `PSYCHEROS_WEB_SEARCH=brave`) |
 | `DISCORD_BOT_TOKEN` | No | — | Discord bot token for sending DMs |
 | `DISCORD_DEFAULT_CHANNEL_ID` | No | — | Discord user ID to DM by default |
+| `PSYCHEROS_DISPLAY_TZ` | No | — | IANA timezone for display and Pulse scheduling (e.g. `America/New_York`). Falls back to `TZ`, then UTC |
 | `TZ` | No | `UTC` | Timezone for message timestamps (e.g., `America/Los_Angeles`) |
 
 ## Available Tools

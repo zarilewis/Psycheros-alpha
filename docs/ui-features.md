@@ -332,6 +332,9 @@ Autonomous prompt scheduling system accessible via Settings → Pulse in the sid
 - Manual "Run Now" trigger for any Pulse
 - Conversations with active Pulses show a heartbeat indicator in the sidebar
 
+**Timezone-Aware Scheduling:**
+When `PSYCHEROS_DISPLAY_TZ` (or `TZ`) is set, daily/weekly/monthly and one-shot schedules are automatically converted from the user's local timezone to UTC before being stored as cron expressions. The editor pre-fills and list view display times in local time. Advanced cron expressions are not converted and are always interpreted in UTC. If no timezone is configured, behavior is unchanged (times treated as UTC).
+
 **Trigger Types:**
 - **Scheduled** — Friendly presets (every N minutes/hours, daily at time, weekly on day, monthly on date) plus advanced cron expression
 - **One-shot** — Fire once at a specific datetime, then auto-disable
@@ -372,4 +375,4 @@ Autonomous prompt scheduling system accessible via Settings → Pulse in the sid
 - With random jitter enabled, the fire window uses absolute elapsed times (e.g., a 10-min threshold with jitter fires between 6.5–13.5 min), not threshold + offset
 - If the probability-based jitter window is missed, the Pulse falls through and fires once the threshold is exceeded (rather than being permanently suppressed)
 
-**Source files:** `src/pulse/engine.ts`, `src/pulse/routes.ts`, `src/pulse/templates.ts`, `src/tools/pulse-tools.ts`, `src/db/client.ts` (pulse run persistence), `web/js/psycheros.js` (switchTab, savePulse, updatePulseTriggerFields, pulse_complete handler), `web/css/settings.css` (pulse-specific styles), `web/css/components.css` (.msg--pulse styles)
+**Source files:** `src/pulse/engine.ts`, `src/pulse/routes.ts`, `src/pulse/templates.ts`, `src/pulse/timezone.ts`, `src/tools/pulse-tools.ts`, `src/db/client.ts` (pulse run persistence), `web/js/psycheros.js` (switchTab, savePulse, updatePulseTriggerFields, pulse_complete handler), `web/css/settings.css` (pulse-specific styles), `web/css/components.css` (.msg--pulse styles)
