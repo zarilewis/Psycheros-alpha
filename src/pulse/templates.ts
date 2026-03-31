@@ -8,6 +8,13 @@
  */
 
 import type { PulseRow, PulseRunRow } from "../types.ts";
+import {
+  getDisplayTimezone,
+  utcCronToLocalTime,
+  utcCronToLocalWeekly,
+  utcCronToLocalMonthly,
+  formatUtcIsoToLocalDatetimeLocal,
+} from "./timezone.ts";
 
 // =============================================================================
 // Helpers
@@ -26,11 +33,13 @@ function formatTimestamp(iso: string | null): string {
   if (!iso) return "Never";
   try {
     const d = new Date(iso);
+    const tz = getDisplayTimezone();
     return d.toLocaleString("en-US", {
       month: "short",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      ...(tz ? { timeZone: tz } : {}),
     });
   } catch {
     return iso;
@@ -74,19 +83,33 @@ function humanizeCron(expr: string): string {
   if (parts.length !== 5) return expr;
   const [min, hour, day, month, weekday] = parts;
 
+  const tz = getDisplayTimezone();
+
   // Once a day at specific time
   if (day === "*" && month === "*" && weekday === "*" && /^\d+$/.test(min) && /^\d+$/.test(hour)) {
+    if (tz) {
+      const local = utcCronToLocalTime(parseInt(hour), parseInt(min), tz);
+      return `Daily at ${String(local.localHour).padStart(2, "0")}:${String(local.localMin).padStart(2, "0")}`;
+    }
     return `Daily at ${hour.padStart(2, "0")}:${min.padStart(2, "0")}`;
   }
 
   // Weekly
   if (/^\d+$/.test(min) && /^\d+$/.test(hour) && day === "*" && month === "*" && /^\d+$/.test(weekday)) {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    if (tz) {
+      const local = utcCronToLocalWeekly(parseInt(weekday), parseInt(hour), parseInt(min), tz);
+      return `Weekly on ${days[local.localDayOfWeek]} at ${String(local.localHour).padStart(2, "0")}:${String(local.localMin).padStart(2, "0")}`;
+    }
     return `Weekly on ${days[parseInt(weekday)]} at ${hour.padStart(2, "0")}:${min.padStart(2, "0")}`;
   }
 
   // Monthly
   if (/^\d+$/.test(min) && /^\d+$/.test(hour) && /^\d+$/.test(day) && month === "*" && weekday === "*") {
+    if (tz) {
+      const local = utcCronToLocalMonthly(parseInt(day), parseInt(hour), parseInt(min), tz);
+      return `Monthly on the ${local.localDayOfMonth}${ordinalSuffix(local.localDayOfMonth)} at ${String(local.localHour).padStart(2, "0")}:${String(local.localMin).padStart(2, "0")}`;
+    }
     return `Monthly on the ${parseInt(day)}${ordinalSuffix(parseInt(day))} at ${hour.padStart(2, "0")}:${min.padStart(2, "0")}`;
   }
 
@@ -108,6 +131,11 @@ function formatCronToTime(cronExpr: string | null): string | null {
   if (parts.length < 2) return null;
   const [min, hour] = parts;
   if (!/^\d+$/.test(min) || !/^\d+$/.test(hour)) return null;
+  const tz = getDisplayTimezone();
+  if (tz) {
+    const local = utcCronToLocalTime(parseInt(hour), parseInt(min), tz);
+    return `${String(local.localHour).padStart(2, "0")}:${String(local.localMin).padStart(2, "0")}`;
+  }
   return `${hour.padStart(2, "0")}:${min.padStart(2, "0")}`;
 }
 
@@ -117,7 +145,30 @@ function formatCronToMonthlyDate(cronExpr: string | null): string | null {
   if (parts.length < 3) return null;
   const day = parts[2];
   if (!/^\d+$/.test(day)) return null;
+  const tz = getDisplayTimezone();
+  if (tz) {
+    const hour = parseInt(parts[1]);
+    const min = parseInt(parts[0]);
+    const local = utcCronToLocalMonthly(parseInt(day), hour, min, tz);
+    return String(local.localDayOfMonth);
+  }
   return day;
+}
+
+function formatCronToWeeklyDay(cronExpr: string | null): string | null {
+  if (!cronExpr) return null;
+  const parts = cronExpr.trim().split(/\s+/);
+  if (parts.length < 5) return null;
+  const weekday = parts[4];
+  if (!/^\d+$/.test(weekday)) return null;
+  const tz = getDisplayTimezone();
+  if (tz) {
+    const hour = parseInt(parts[1]);
+    const min = parseInt(parts[0]);
+    const local = utcCronToLocalWeekly(parseInt(weekday), hour, min, tz);
+    return String(local.localDayOfWeek);
+  }
+  return weekday;
 }
 
 /**
@@ -402,13 +453,13 @@ export function renderPulseEditor(
             <div class="form-group">
               <label for="pulse-weekly-day">On</label>
               <select id="pulse-weekly-day" name="weeklyDay">
-                <option value="1" ${p.cronExpression?.endsWith(" 1") ? "selected" : ""}>Monday</option>
-                <option value="2" ${p.cronExpression?.endsWith(" 2") ? "selected" : ""}>Tuesday</option>
-                <option value="3" ${p.cronExpression?.endsWith(" 3") ? "selected" : ""}>Wednesday</option>
-                <option value="4" ${p.cronExpression?.endsWith(" 4") ? "selected" : ""}>Thursday</option>
-                <option value="5" ${p.cronExpression?.endsWith(" 5") ? "selected" : ""}>Friday</option>
-                <option value="6" ${p.cronExpression?.endsWith(" 6") ? "selected" : ""}>Saturday</option>
-                <option value="0" ${p.cronExpression?.endsWith(" 0") ? "selected" : ""}>Sunday</option>
+                <option value="1" ${formatCronToWeeklyDay(p.cronExpression) === "1" ? "selected" : ""}>Monday</option>
+                <option value="2" ${formatCronToWeeklyDay(p.cronExpression) === "2" ? "selected" : ""}>Tuesday</option>
+                <option value="3" ${formatCronToWeeklyDay(p.cronExpression) === "3" ? "selected" : ""}>Wednesday</option>
+                <option value="4" ${formatCronToWeeklyDay(p.cronExpression) === "4" ? "selected" : ""}>Thursday</option>
+                <option value="5" ${formatCronToWeeklyDay(p.cronExpression) === "5" ? "selected" : ""}>Friday</option>
+                <option value="6" ${formatCronToWeeklyDay(p.cronExpression) === "6" ? "selected" : ""}>Saturday</option>
+                <option value="0" ${formatCronToWeeklyDay(p.cronExpression) === "0" ? "selected" : ""}>Sunday</option>
               </select>
             </div>
             <div class="form-group">
@@ -442,7 +493,7 @@ export function renderPulseEditor(
             <input type="text" id="pulse-cron-advanced" name="cronExpression"
               value="${escapeHtml(p.cronExpression ?? "")}"
               placeholder="0 8 * * *">
-            <small>Standard cron format: minute hour day month weekday</small>
+            <small>Standard cron format: minute hour day month weekday. Interpreted in UTC.</small>
           </div>
         </div>
       </div>
@@ -452,7 +503,7 @@ export function renderPulseEditor(
         <div class="form-group">
           <label for="pulse-run-at">When?</label>
           <input type="datetime-local" id="pulse-run-at" name="runAt"
-            value="${p.runAt ? new Date(p.runAt).toISOString().slice(0, 16) : ""}">
+            value="${p.runAt && getDisplayTimezone() ? formatUtcIsoToLocalDatetimeLocal(p.runAt, getDisplayTimezone()!) : p.runAt ? new Date(p.runAt).toISOString().slice(0, 16) : ""}">
           <small>Fire once at this date and time, then disable.</small>
         </div>
       </div>

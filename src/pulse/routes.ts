@@ -15,6 +15,13 @@ import {
   renderPulseEditor,
   renderPulseLog,
 } from "./templates.ts";
+import {
+  getDisplayTimezone,
+  localTimeToUtcCron,
+  localWeeklyToUtcCron,
+  localMonthlyToUtcCron,
+  localDatetimeLocalToUtcIso,
+} from "./timezone.ts";
 
 // =============================================================================
 // Form Translation Helpers
@@ -57,10 +64,17 @@ function translateFormData(body: Record<string, unknown>): {
 
     if (preset === "daily") {
       const time = (body.dailyTime as string) || "09:00";
-      const [hour, min] = time.split(":");
+      const [hour, min] = time.split(":").map(Number);
+      const tz = getDisplayTimezone();
+      let utcHour = hour, utcMin = min;
+      if (tz) {
+        const converted = localTimeToUtcCron(hour, min, tz);
+        utcHour = converted.utcHour;
+        utcMin = converted.utcMin;
+      }
       return {
         triggerType: "cron",
-        cronExpression: `${min} ${hour} * * *`,
+        cronExpression: `${utcMin} ${utcHour} * * *`,
         intervalSeconds: null,
         runAt: null,
         inactivityThresholdSeconds: null,
@@ -71,11 +85,19 @@ function translateFormData(body: Record<string, unknown>): {
 
     if (preset === "weekly") {
       const time = (body.weeklyTime as string) || "09:00";
-      const day = (body.weeklyDay as string) || "1";
-      const [hour, min] = time.split(":");
+      const day = parseInt((body.weeklyDay as string) || "1", 10);
+      const [hour, min] = time.split(":").map(Number);
+      const tz = getDisplayTimezone();
+      let utcDay = day, utcHour = hour, utcMin = min;
+      if (tz) {
+        const converted = localWeeklyToUtcCron(day, hour, min, tz);
+        utcDay = converted.utcDayOfWeek;
+        utcHour = converted.utcHour;
+        utcMin = converted.utcMin;
+      }
       return {
         triggerType: "cron",
-        cronExpression: `${min} ${hour} * * ${day}`,
+        cronExpression: `${utcMin} ${utcHour} * * ${utcDay}`,
         intervalSeconds: null,
         runAt: null,
         inactivityThresholdSeconds: null,
@@ -86,11 +108,19 @@ function translateFormData(body: Record<string, unknown>): {
 
     if (preset === "monthly") {
       const time = (body.monthlyTime as string) || "09:00";
-      const date = (body.monthlyDate as string) || "1";
-      const [hour, min] = time.split(":");
+      const date = parseInt((body.monthlyDate as string) || "1", 10);
+      const [hour, min] = time.split(":").map(Number);
+      const tz = getDisplayTimezone();
+      let utcDate = date, utcHour = hour, utcMin = min;
+      if (tz) {
+        const converted = localMonthlyToUtcCron(date, hour, min, tz);
+        utcDate = converted.utcDayOfMonth;
+        utcHour = converted.utcHour;
+        utcMin = converted.utcMin;
+      }
       return {
         triggerType: "cron",
-        cronExpression: `${min} ${hour} ${date} * *`,
+        cronExpression: `${utcMin} ${utcHour} ${utcDate} * *`,
         intervalSeconds: null,
         runAt: null,
         inactivityThresholdSeconds: null,
@@ -125,11 +155,18 @@ function translateFormData(body: Record<string, unknown>): {
 
   // One-shot mode
   if (triggerType === "oneshot") {
+    const tz = getDisplayTimezone();
+    let runAt: string | null = null;
+    if (body.runAt) {
+      runAt = tz
+        ? localDatetimeLocalToUtcIso(String(body.runAt), tz)
+        : new Date(String(body.runAt)).toISOString();
+    }
     return {
       triggerType: "cron",
       cronExpression: null,
       intervalSeconds: null,
-      runAt: body.runAt ? new Date(String(body.runAt)).toISOString() : null,
+      runAt,
       inactivityThresholdSeconds: null,
       randomIntervalMin: null,
       randomIntervalMax: null,
