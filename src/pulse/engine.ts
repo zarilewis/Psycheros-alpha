@@ -342,7 +342,7 @@ export class PulseEngine {
 
     // Use cached timestamp (updated when user messages arrive)
     if (!this.lastGlobalUserMessage) {
-      console.log(`[Pulse] Inactivity tick for "${pulse.name}": no user message history, skipping`);
+      console.debug(`[Pulse] Inactivity tick for "${pulse.name}": no user message history, skipping`);
       return;
     }
 
@@ -356,7 +356,7 @@ export class PulseEngine {
     const elapsedMs = Date.now() - effectiveStartMs;
     const thresholdMs = pulse.inactivityThresholdSeconds * 1000;
 
-    console.log(`[Pulse] Inactivity check "${pulse.name}": ${Math.round(elapsedMs / 1000)}s elapsed, threshold: ${pulse.inactivityThresholdSeconds}s`);
+    console.debug(`[Pulse] Inactivity check "${pulse.name}": ${Math.round(elapsedMs / 1000)}s elapsed, threshold: ${pulse.inactivityThresholdSeconds}s`);
 
     // Hard threshold: must be inactive for at least the set duration
     if (elapsedMs < thresholdMs) return;
@@ -367,7 +367,7 @@ export class PulseEngine {
     if (pulse.lastRunAt) {
       const sinceLastRunMs = Date.now() - new Date(pulse.lastRunAt).getTime();
       if (sinceLastRunMs < thresholdMs) {
-        console.log(`[Pulse] Inactivity "${pulse.name}": cooldown (${Math.round(sinceLastRunMs / 1000)}s since last run)`);
+        console.debug(`[Pulse] Inactivity "${pulse.name}": cooldown (${Math.round(sinceLastRunMs / 1000)}s since last run)`);
         return;
       }
     }
@@ -507,19 +507,19 @@ export class PulseEngine {
 
     // Guard: already running
     if (this.runningPulses.has(pulseId)) {
-      console.log(`[Pulse] Skipping "${pulse.name}" — already running`);
+      console.debug(`[Pulse] Skipping "${pulse.name}" — already running`);
       return;
     }
 
     // Guard: chain depth
     if (chainDepth > pulse.maxChainDepth) {
-      console.log(`[Pulse] Skipping "${pulse.name}" — chain depth ${chainDepth} exceeds max ${pulse.maxChainDepth}`);
+      console.debug(`[Pulse] Skipping "${pulse.name}" — chain depth ${chainDepth} exceeds max ${pulse.maxChainDepth}`);
       return;
     }
 
     // Guard: cycle detection
     if (parentRunId && this.db.detectPulseChainCycle(pulseId, parentRunId)) {
-      console.log(`[Pulse] Skipping "${pulse.name}" — cycle detected in chain`);
+      console.debug(`[Pulse] Skipping "${pulse.name}" — cycle detected in chain`);
       return;
     }
 
