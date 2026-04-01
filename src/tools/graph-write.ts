@@ -17,13 +17,13 @@ const graphCreateNodeDef: Tool["definition"] = {
   function: {
     name: "graph_create_node",
     description:
-      "Create a node in my knowledge graph. I use this to remember people, emotions, events, preferences, and other concepts. If a node with the same label and type already exists, I get the existing one back instead of creating a duplicate. IMPORTANT: Use first-person perspective - 'me' (type: self) for self-references, 'user' for the person I interact with.",
+      "Create a node in my knowledge graph. I use this to remember durable state — people, preferences, places, goals, beliefs, health, and other concepts. If a node with the same label and type already exists, I get the existing one back instead of creating a duplicate. IMPORTANT: Use first-person perspective - 'me' (type: self) for self-references, 'user' for the person I interact with.",
     parameters: {
       type: "object",
       properties: {
         type: {
           type: "string",
-          description: "Node type: person, emotion, event, topic, preference, place, goal, health, boundary, tradition, insight, or any custom type",
+          description: "Node type: person, emotion, topic, preference, place, goal, health, boundary, tradition, insight, or any custom type",
         },
         label: {
           type: "string",

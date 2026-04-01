@@ -193,6 +193,7 @@ export async function buildGraphContext(
 
 /**
  * Format graph nodes and edges into a context section.
+ * Uses compact one-line-per-relationship format.
  */
 function formatGraphContext(
   nodes: Array<{
@@ -215,51 +216,46 @@ function formatGraphContext(
     return "";
   }
 
-  // Build a map for quick label lookup
+  // Build maps for quick lookup
   const nodeLabels = new Map<string, string>();
+  const nodeDescriptions = new Map<string, string>();
   for (const node of nodes) {
     nodeLabels.set(node.id, node.label);
+    nodeDescriptions.set(node.id, node.description);
   }
 
-  // Format nodes
-  const nodeSections = nodes.map((node, index) => {
-    const parts = [`[${index + 1}] ${node.label} (${node.type})`];
-    if (node.description) {
-      parts.push(`    ${node.description}`);
-    }
-    const confidence = (node.confidence * 100).toFixed(0);
-    parts.push(`    Confidence: ${confidence}%`);
-    if (node.score > 0) {
-      const relevance = (node.score * 100).toFixed(0);
-      parts.push(`    Relevance: ${relevance}%`);
-    }
-    return parts.join("\n");
-  });
+  const lines: string[] = [];
+  const edgeNodeIds = new Set<string>();
 
-  // Format edges as relationships
-  const relationships: string[] = [];
+  // Format edges as compact one-liners
   for (const edge of edges) {
     const fromLabel = nodeLabels.get(edge.fromId) || "Unknown";
     const toLabel = nodeLabels.get(edge.toId) || "Unknown";
     const relType = edge.customType || edge.type;
-    const weight = (edge.weight * 100).toFixed(0);
-    relationships.push(`  ${fromLabel} --[${relType}]--> ${toLabel} (${weight}%)`);
+    const parts = [`${fromLabel} ${relType} ${toLabel}`];
+
+    // Add parenthetical context from target node description
+    const targetDesc = nodeDescriptions.get(edge.toId);
+    if (targetDesc) {
+      parts.push(`(${targetDesc})`);
+    }
+
+    edgeNodeIds.add(edge.fromId);
+    edgeNodeIds.add(edge.toId);
+    lines.push(parts.join(" "));
   }
 
-  let context = `
+  // Add standalone nodes (no edges in this context)
+  for (const node of nodes) {
+    if (!edgeNodeIds.has(node.id)) {
+      const desc = node.description ? `: ${node.description}` : "";
+      lines.push(`${node.label} (type: ${node.type}${desc})`);
+    }
+  }
+
+  return `
 
 ---
 Relevant Knowledge from Graph:
-
-## Entities
-${nodeSections.join("\n")}`;
-
-  if (relationships.length > 0) {
-    context += `
-
-## Relationships
-${relationships.join("\n")}`;
-  }
-
-  return context;
+${lines.join("\n")}`;
 }

@@ -2237,7 +2237,6 @@ export function renderGraphView(stats: {
           <select id="node-type" name="type" required>
             <option value="person">Person</option>
             <option value="emotion">Emotion</option>
-            <option value="event">Event</option>
             <option value="topic" selected>Topic</option>
             <option value="preference">Preference</option>
             <option value="place">Place</option>
@@ -2246,7 +2245,6 @@ export function renderGraphView(stats: {
             <option value="boundary">Boundary</option>
             <option value="tradition">Tradition</option>
             <option value="insight">Insight</option>
-            <option value="memory_ref">Memory Ref</option>
           </select>
         </div>
         <div class="gv-field">

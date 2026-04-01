@@ -78,19 +78,29 @@ deno run -A scripts/index-messages.ts
 
 ### Graph RAG
 
-Knowledge graph context when MCP is enabled. The entity can both read from and write to its knowledge graph during conversation.
+Knowledge graph context when MCP is enabled. The entity can both read from and write to its knowledge graph during conversation. The graph is a relational index of durable state (relationships, preferences, attributes) — not narrative memory.
 
 **Context injection (automatic):**
 1. **Semantic Search**: Queries the knowledge graph for relevant nodes using vector similarity (embeddings auto-generated via all-MiniLM-L6-v2)
 2. **Graph Traversal**: Follows edges to find connected concepts (depth 1 by default)
 3. **Anchor Nodes**: Includes "me" and "user" nodes when referenced by edges in the result set
-4. **Context Injection**: Relevant nodes and relationships are formatted and added to the system prompt
+4. **Context Injection**: Relevant nodes and relationships are formatted in compact one-line-per-relationship format and added to the system prompt
+
+**Context format example:**
+```
+---
+Relevant Knowledge from Graph:
+user friends_with Sarah (had a bad argument Aug 2020, reconciled since)
+user drives_a Subaru (red 2010 WRX)
+Sarah dating Mike (met through user)
+```
 
 **Graph building (via tools):**
-- The entity can create/update nodes and edges during conversation using 5 write tools
+- The entity can create/update nodes and edges during conversation using 7 write tools
 - All node creation auto-generates vector embeddings for semantic search
 - Duplicate prevention: creating a node with an existing label+type returns the existing node
 - Batch operations support referencing existing nodes by label (e.g., "me", "user")
+- Only durable state should be stored (people, preferences, places, goals, beliefs, health) — events and episodes belong in the memory system
 
 Requires `PSYCHEROS_MCP_ENABLED=true`.
 

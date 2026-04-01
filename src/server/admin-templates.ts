@@ -514,8 +514,8 @@ export function renderAdminActions(): string {
     <p class="admin-action-desc">
       Runs <code>entity-core/scripts/batch-populate-graph.ts</code> to backfill
       the knowledge graph from existing memory files. Extracts entities and
-      relationships via LLM, creates memory_ref nodes with mentions edges,
-      and generates embeddings. Idempotent — already-processed memories are skipped.
+      relationships via LLM, with semantic dedup to prevent duplicate nodes.
+      Idempotent — semantic dedup prevents duplicate entities on re-runs.
     </p>
     <div class="admin-action-form">
       <div class="admin-action-fields">

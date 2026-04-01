@@ -28,7 +28,7 @@ const graphSearchNodesDef: Tool["definition"] = {
         },
         type: {
           type: "string",
-          description: "Optional filter by node type (person, emotion, topic, event, preference, place, goal, health, boundary, tradition, insight)",
+          description: "Optional filter by node type (person, emotion, topic, preference, place, goal, health, boundary, tradition, insight)",
         },
         limit: {
           type: "number",
