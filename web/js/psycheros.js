@@ -2919,6 +2919,11 @@ async function savePulse(event, pulseId) {
       // Server returned the editor fragment on success
       const html = await resp.text();
       document.getElementById('chat').innerHTML = html;
+      // Re-initialize schedule field visibility after DOM replacement
+      const triggerType = document.getElementById('pulse-trigger-type')?.value;
+      if (triggerType) updatePulseTriggerFields(triggerType);
+      const schedulePreset = document.getElementById('pulse-schedule-preset')?.value;
+      if (schedulePreset) updatePulseSchedulePreset(schedulePreset);
     } else {
       const data = await resp.json();
       if (statusEl) {

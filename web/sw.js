@@ -7,7 +7,7 @@
  * - Static assets (CSS, JS, libs) — cached on successful fetch for offline use
  */
 
-const CACHE_NAME = 'psycheros-offline';
+const CACHE_NAME = 'psycheros-offline-v2';
 const STATIC_ASSETS = [
   '/',
   '/css/main.css',

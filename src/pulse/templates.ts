@@ -406,7 +406,7 @@ export function renderPulseEditor(
       </div>
 
       <!-- Scheduled trigger fields (friendly presets) -->
-      <div id="pulse-trigger-scheduled" class="trigger-fields" ${!(p.triggerType === "cron" && !p.runAt && !p.cronExpression) ? "style='display:none'" : ""}>
+      <div id="pulse-trigger-scheduled" class="trigger-fields" ${!(p.triggerType === "cron" && !p.runAt) ? "style='display:none'" : ""}>
         <div class="form-group">
           <label for="pulse-schedule-preset">How often?</label>
           <select id="pulse-schedule-preset" name="schedulePreset"
@@ -415,7 +415,7 @@ export function renderPulseEditor(
             <option value="daily" ${p.cronExpression && /^\d+ \d+ \* \* \*$/.test(p.cronExpression) ? "selected" : ""}>Once a day</option>
             <option value="weekly" ${p.cronExpression && /\d+ \d+ \* \* \d+/.test(p.cronExpression) && !/^\d+ \d+ \* \* \*$/.test(p.cronExpression) ? "selected" : ""}>Once a week</option>
             <option value="monthly" ${p.cronExpression && /\d+ \d+ \d+ \* \*/.test(p.cronExpression) ? "selected" : ""}>Once a month</option>
-            <option value="advanced" ${p.cronExpression && !/^\d+ \d+ \* \* \*$/.test(p.cronExpression) ? "selected" : ""}>Custom (advanced)</option>
+            <option value="advanced" ${p.cronExpression && !/^\d+ \d+ \* \* \*$/.test(p.cronExpression) && !/\d+ \d+ \* \* \d+/.test(p.cronExpression) && !/\d+ \d+ \d+ \* \*/.test(p.cronExpression) ? "selected" : ""}>Custom (advanced)</option>
           </select>
         </div>
 
@@ -425,7 +425,7 @@ export function renderPulseEditor(
             <div class="form-group">
               <label for="pulse-interval-amount">Repeat every</label>
               <input type="number" id="pulse-interval-amount" name="intervalAmount"
-                value="${p.intervalSeconds ? Math.round(p.intervalSeconds / 60) : "30"}" min="1">
+                value="${p.intervalSeconds ? (p.intervalSeconds >= 3600 ? Math.round(p.intervalSeconds / 3600) : Math.round(p.intervalSeconds / 60)) : "30"}" min="1">
             </div>
             <div class="form-group form-group--small" style="justify-content: flex-end;">
               <select id="pulse-interval-unit" name="intervalUnit">
@@ -437,7 +437,7 @@ export function renderPulseEditor(
         </div>
 
         <!-- Daily: at specific time -->
-        <div id="pulse-schedule-daily" class="schedule-fields" style="display:none">
+        <div id="pulse-schedule-daily" class="schedule-fields" ${!(p.cronExpression && /^\d+ \d+ \* \* \*$/.test(p.cronExpression)) ? "style='display:none'" : ""}>
           <div class="form-row">
             <div class="form-group">
               <label for="pulse-daily-time">At time</label>
@@ -448,7 +448,7 @@ export function renderPulseEditor(
         </div>
 
         <!-- Weekly: on specific day at time -->
-        <div id="pulse-schedule-weekly" class="schedule-fields" style="display:none">
+        <div id="pulse-schedule-weekly" class="schedule-fields" ${!(p.cronExpression && /\d+ \d+ \* \* \d+/.test(p.cronExpression) && !/^\d+ \d+ \* \* \*$/.test(p.cronExpression)) ? "style='display:none'" : ""}>
           <div class="form-row">
             <div class="form-group">
               <label for="pulse-weekly-day">On</label>
@@ -471,7 +471,7 @@ export function renderPulseEditor(
         </div>
 
         <!-- Monthly: on specific date at time -->
-        <div id="pulse-schedule-monthly" class="schedule-fields" style="display:none">
+        <div id="pulse-schedule-monthly" class="schedule-fields" ${!(p.cronExpression && /\d+ \d+ \d+ \* \*/.test(p.cronExpression)) ? "style='display:none'" : ""}>
           <div class="form-row">
             <div class="form-group">
               <label for="pulse-monthly-date">On day of month</label>
@@ -487,7 +487,7 @@ export function renderPulseEditor(
         </div>
 
         <!-- Advanced: raw cron expression -->
-        <div id="pulse-schedule-advanced" class="schedule-fields" style="display:none">
+        <div id="pulse-schedule-advanced" class="schedule-fields" ${!(p.cronExpression && !/^\d+ \d+ \* \* \*$/.test(p.cronExpression) && !/\d+ \d+ \* \* \d+/.test(p.cronExpression) && !/\d+ \d+ \d+ \* \*/.test(p.cronExpression)) ? "style='display:none'" : ""}>
           <div class="form-group">
             <label for="pulse-cron-advanced">Cron Expression</label>
             <input type="text" id="pulse-cron-advanced" name="cronExpression"
@@ -514,7 +514,7 @@ export function renderPulseEditor(
           <div class="form-group">
             <label for="pulse-inactivity-amount">Fire after you've been inactive for at least</label>
             <input type="number" id="pulse-inactivity-amount" name="inactivityAmount"
-              value="${p.inactivityThresholdSeconds ? Math.round(p.inactivityThresholdSeconds / 60) : "30"}" min="1">
+              value="${p.inactivityThresholdSeconds ? (p.inactivityThresholdSeconds >= 3600 ? Math.round(p.inactivityThresholdSeconds / 3600) : Math.round(p.inactivityThresholdSeconds / 60)) : "30"}" min="1">
           </div>
           <div class="form-group form-group--small" style="justify-content: flex-end;">
             <select id="pulse-inactivity-unit" name="inactivityUnit">
