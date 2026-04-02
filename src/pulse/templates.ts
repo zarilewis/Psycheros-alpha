@@ -338,7 +338,7 @@ export function renderPulseEditor(
 
   return `<div class="settings-view">
   <div class="settings-header">
-    <a class="settings-back-btn" hx-get="/fragments/settings/pulse" hx-target="#chat" hx-swap="innerHTML">
+    <a class="settings-back-btn" onclick="htmx.ajax('GET', '/fragments/settings/pulse', {target: '#chat', swap: 'innerHTML'})">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="15 18 9 12 15 6"/>
       </svg>
