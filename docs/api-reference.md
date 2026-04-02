@@ -47,7 +47,7 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 | `GET` | `/api/conversations/:id/messages` | Get messages |
 | `GET` | `/api/conversations/:id/context` | Get all context snapshots |
 | `GET` | `/api/conversations/:id/context/latest` | Get latest context snapshot |
-| `PATCH` | `/api/conversations/:id/title` | Update title |
+| `PATCH` | `/api/conversations/:id/title` | Update title (auto-deduplicates with numeric suffix) |
 | `DELETE` | `/api/conversations/:id` | Delete conversation |
 | `DELETE` | `/api/conversations` | Batch delete conversations |
 

@@ -17,6 +17,49 @@ import type { DBClient } from "../db/mod.ts";
 import { MAX_TITLE_LENGTH } from "../constants.ts";
 
 /**
+ * Ensure a title is unique across all conversations by appending
+ * a suffix like " (2)", " (3)" if needed (case-insensitive).
+ */
+function deduplicateTitle(
+  db: DBClient,
+  title: string,
+  excludeConversationId: string,
+): string {
+  const conversations = db.listConversations();
+  const normalizedTitle = title.toLowerCase();
+
+  const otherMatches = conversations.filter(
+    (c) => c.id !== excludeConversationId && c.title?.toLowerCase() === normalizedTitle,
+  );
+
+  if (otherMatches.length === 0) {
+    return title;
+  }
+
+  // If this conversation already has this exact title, keep it unchanged
+  const self = conversations.find((c) => c.id === excludeConversationId);
+  if (self?.title?.toLowerCase() === normalizedTitle) {
+    return title;
+  }
+
+  // Find next available suffix
+  let suffix = 2;
+  while (true) {
+    const candidate = `${title} (${suffix})`;
+    if (
+      !conversations.some(
+        (c) =>
+          c.id !== excludeConversationId &&
+          c.title?.toLowerCase() === candidate.toLowerCase(),
+      )
+    ) {
+      return candidate;
+    }
+    suffix++;
+  }
+}
+
+/**
  * Result of a state change operation.
  */
 export interface StateChangeResult<T = unknown> {
@@ -64,8 +107,11 @@ export function updateConversationTitle(
     };
   }
 
+  // Deduplicate the title before storing
+  const uniqueTitle = deduplicateTitle(db, trimmedTitle, conversationId);
+
   // Perform the update
-  const updated = db.updateConversationTitle(conversationId, trimmedTitle);
+  const updated = db.updateConversationTitle(conversationId, uniqueTitle);
 
   if (!updated) {
     return {
@@ -77,7 +123,7 @@ export function updateConversationTitle(
 
   return {
     success: true,
-    data: { title: trimmedTitle },
+    data: { title: uniqueTitle },
     affectedRegions: ["conv-list", "header-title"],
   };
 }
