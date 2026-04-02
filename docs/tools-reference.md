@@ -189,7 +189,7 @@ Tool called → MCP connected?
          manipulation
 ```
 
-Changes are timestamped and preserve XML tag structure in identity files.
+Changes preserve XML tag structure in identity files. Content is added cleanly without metadata comments — core prompts load every turn, so token efficiency matters.
 
 ### Related Source Files
 

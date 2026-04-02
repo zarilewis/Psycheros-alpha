@@ -97,25 +97,15 @@ export function parseXmlContent(content: string, expectedTag?: string): {
 
 /**
  * Append content before the closing XML tag.
- * Adds timestamp comment if reason is provided.
  */
 export function appendToXmlContent(
   existingContent: string,
   newContent: string,
-  reason?: string
 ): string {
-  const today = new Date().toISOString().split("T")[0];
-
   // Parse existing content
   const { tag, innerContent } = parseXmlContent(existingContent);
 
-  // Format the addition
-  let addition = newContent.trim();
-  if (reason) {
-    addition = `\n\n<!-- Added ${today}: ${reason} -->\n${addition}`;
-  } else {
-    addition = `\n\n<!-- Added ${today} -->\n${addition}`;
-  }
+  const addition = `\n\n${newContent.trim()}`;
 
   // Reconstruct with XML tags
   if (tag) {
@@ -128,25 +118,15 @@ export function appendToXmlContent(
 
 /**
  * Prepend content after the opening XML tag.
- * Adds timestamp comment if reason is provided.
  */
 export function prependToXmlContent(
   existingContent: string,
   newContent: string,
-  reason?: string
 ): string {
-  const today = new Date().toISOString().split("T")[0];
-
   // Parse existing content
   const { tag, innerContent } = parseXmlContent(existingContent);
 
-  // Format the addition
-  let addition = newContent.trim();
-  if (reason) {
-    addition = `<!-- Added ${today}: ${reason} -->\n${addition}\n\n`;
-  } else {
-    addition = `<!-- Added ${today} -->\n${addition}\n\n`;
-  }
+  const addition = `${newContent.trim()}\n\n`;
 
   // Reconstruct with XML tags
   if (tag) {
@@ -165,10 +145,7 @@ export function updateSection(
   existingContent: string,
   sectionName: string,
   newSectionContent: string,
-  reason?: string
 ): { content: string; found: boolean } {
-  const today = new Date().toISOString().split("T")[0];
-
   // Parse XML content
   const { tag, innerContent } = parseXmlContent(existingContent);
 
@@ -203,11 +180,7 @@ export function updateSection(
   }
 
   // Build the new section content
-  const timestampComment = reason
-    ? `\n<!-- Updated ${today}: ${reason} -->`
-    : `\n<!-- Updated ${today} -->`;
-
-  const newSection = `${match[0]}${timestampComment}\n${newSectionContent.trim()}`;
+  const newSection = `${match[0]}\n${newSectionContent.trim()}`;
 
   // Reconstruct the content
   const newInnerContent =
@@ -378,7 +351,7 @@ export class IdentityFileManager {
 
     // Fallback: local manipulation
     const existingContent = await this.readFile(category, filename);
-    const newContent = appendToXmlContent(existingContent, content, reason);
+    const newContent = appendToXmlContent(existingContent, content);
 
     try {
       await this.writeFile(category, filename, newContent);
@@ -440,7 +413,7 @@ export class IdentityFileManager {
 
     // Fallback: local manipulation
     const existingContent = await this.readFile(category, filename);
-    const newContent = prependToXmlContent(existingContent, content, reason);
+    const newContent = prependToXmlContent(existingContent, content);
 
     try {
       await this.writeFile(category, filename, newContent);
@@ -507,7 +480,7 @@ export class IdentityFileManager {
 
     // Fallback: local manipulation
     const existingContent = await this.readFile(category, filename);
-    const { content: newContent, found } = updateSection(existingContent, sectionName, content, reason);
+    const { content: newContent, found } = updateSection(existingContent, sectionName, content);
 
     if (!found) {
       return {

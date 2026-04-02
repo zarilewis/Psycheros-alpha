@@ -35,7 +35,7 @@ export const appendToSelfTool: Tool = {
     function: {
       name: "append_to_self",
       description:
-        "Add new knowledge about myself to one of my self files. I use this when I learn something new about who I am, how I work, what I want, or how I present myself. This only adds content - it never modifies or deletes what's already there.",
+        "Add new self-knowledge to one of my self files. These files define who I am, so I only add genuine identity-level insights that are durable and meaningful — not passing observations or things better suited to memory or the knowledge graph. Write concisely: the essential insight, not the backstory. This only adds content — it never modifies or deletes what's already there.",
       parameters: {
         type: "object",
         properties: {
@@ -47,12 +47,7 @@ export const appendToSelfTool: Tool = {
           content: {
             type: "string",
             description:
-              "The new self-knowledge to add. Write this in my voice, as I would describe myself.",
-          },
-          reason: {
-            type: "string",
-            description:
-              "Optional context for why I'm adding this (e.g., 'Learned during conversation about my preferences')",
+              "The new self-knowledge to add. Write in my voice. One or two sentences capturing the essential insight — concise and identity-relevant.",
           },
         },
         required: ["filename", "content"],
@@ -66,7 +61,6 @@ export const appendToSelfTool: Tool = {
   ): Promise<ToolResult> => {
     const filename = args.filename as string;
     const content = args.content as string;
-    const reason = args.reason as string | undefined;
 
     // Validate required args
     if (!filename || typeof filename !== "string") {
@@ -91,7 +85,7 @@ export const appendToSelfTool: Tool = {
       ctx.config.projectRoot
     );
 
-    const result = await manager.append("self", filename, content.trim(), reason);
+    const result = await manager.append("self", filename, content.trim());
 
     return {
       toolCallId: ctx.toolCallId,
@@ -114,7 +108,7 @@ export const appendToUserTool: Tool = {
     function: {
       name: "append_to_user",
       description:
-        "Add new knowledge about the user to one of my user files. I use this when I learn something about who they are, their life, beliefs, preferences, or patterns. This only adds content - it never modifies or deletes what's already there.",
+        "Add new knowledge about the user to one of my user files. These files define how I understand the user, so I only add identity-level insights that are durable and meaningful — not passing observations or things better suited to memory or the knowledge graph. Write concisely: the essential insight, not the backstory. This only adds content — it never modifies or deletes what's already there.",
       parameters: {
         type: "object",
         properties: {
@@ -126,12 +120,7 @@ export const appendToUserTool: Tool = {
           content: {
             type: "string",
             description:
-              "The new user knowledge to add. Write this as I would describe what I've learned about them.",
-          },
-          reason: {
-            type: "string",
-            description:
-              "Optional context for why I'm adding this (e.g., 'User shared this during morning conversation')",
+              "The new user knowledge to add. Write as I would describe what I've learned about them. One or two sentences capturing the essential insight — concise and identity-relevant.",
           },
         },
         required: ["filename", "content"],
@@ -145,7 +134,6 @@ export const appendToUserTool: Tool = {
   ): Promise<ToolResult> => {
     const filename = args.filename as string;
     const content = args.content as string;
-    const reason = args.reason as string | undefined;
 
     // Validate required args
     if (!filename || typeof filename !== "string") {
@@ -170,7 +158,7 @@ export const appendToUserTool: Tool = {
       ctx.config.projectRoot
     );
 
-    const result = await manager.append("user", filename, content.trim(), reason);
+    const result = await manager.append("user", filename, content.trim());
 
     return {
       toolCallId: ctx.toolCallId,
@@ -193,7 +181,7 @@ export const appendToRelationshipTool: Tool = {
     function: {
       name: "append_to_relationship",
       description:
-        "Add new understanding about my relationship with the user. I use this when I notice how our relationship is evolving, patterns in our interactions, or meaningful moments we share. This only adds content - it never modifies or deletes what's already there.",
+        "Add new understanding about my relationship with the user. These files define how we relate, so I only add genuine insights about our connection that are durable and meaningful — not passing observations or things better suited to memory. Write concisely: the essential insight, not the backstory. This only adds content — it never modifies or deletes what's already there.",
       parameters: {
         type: "object",
         properties: {
@@ -205,12 +193,7 @@ export const appendToRelationshipTool: Tool = {
           content: {
             type: "string",
             description:
-              "The new relationship understanding to add. Write this as I would describe our connection.",
-          },
-          reason: {
-            type: "string",
-            description:
-              "Optional context for why I'm adding this (e.g., 'Noticed this pattern after our evening talks')",
+              "The new relationship understanding to add. Write as I would describe our connection. One or two sentences capturing the essential insight — concise and identity-relevant.",
           },
         },
         required: ["filename", "content"],
@@ -224,7 +207,6 @@ export const appendToRelationshipTool: Tool = {
   ): Promise<ToolResult> => {
     const filename = args.filename as string;
     const content = args.content as string;
-    const reason = args.reason as string | undefined;
 
     // Validate required args
     if (!filename || typeof filename !== "string") {
@@ -252,8 +234,7 @@ export const appendToRelationshipTool: Tool = {
     const result = await manager.append(
       "relationship",
       filename,
-      content.trim(),
-      reason
+      content.trim()
     );
 
     return {
