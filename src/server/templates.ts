@@ -1669,15 +1669,23 @@ export function renderMemoryList(
   let createFormHtml = "";
   if (isSignificant) {
     createFormHtml = `
-      <div class="settings-create-file">
+      <div class="settings-create-file" style="flex-wrap: wrap; gap: 8px;">
         <input
           type="date"
           class="settings-create-file-input"
           id="significant-date-input"
+          style="flex: 0 1 auto;"
         />
+        <textarea
+          id="significant-content-input"
+          placeholder="Memory content..."
+          rows="2"
+          style="flex: 1 1 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--input-bg); color: var(--fg); resize: vertical; font-family: inherit; font-size: 13px;"
+        ></textarea>
         <button
           class="btn btn--primary btn--sm"
           onclick="Psycheros.createSignificantMemory()"
+          style="align-self: flex-end;"
         >
           Create
         </button>

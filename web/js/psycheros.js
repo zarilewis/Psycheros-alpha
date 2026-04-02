@@ -3171,6 +3171,62 @@ async function saveMessageEdit(messageId) {
   }
 }
 
+/**
+ * Create a new significant memory via the API.
+ */
+async function createSignificantMemory() {
+  const dateInput = document.getElementById('significant-date-input');
+  const contentInput = document.getElementById('significant-content-input');
+  if (!dateInput || !contentInput) {
+    showToast('Form elements not found');
+    return;
+  }
+
+  const date = dateInput.value.trim();
+  if (!date) {
+    showToast('Please select a date');
+    return;
+  }
+
+  const content = contentInput.value.trim();
+  if (!content) {
+    showToast('Please enter memory content');
+    return;
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('date', date);
+    formData.append('content', content);
+
+    const response = await fetch('/api/memories/significant/create', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(text || `HTTP ${response.status}`);
+    }
+
+    // The endpoint returns HX-Redirect — reload the significant tab content
+    const target = document.getElementById('settings-content');
+    if (target) {
+      target.innerHTML = '<div style="padding: 16px; color: var(--muted);">Loading...</div>';
+      const resp = await fetch('/fragments/settings/memories/significant');
+      if (resp.ok) {
+        target.innerHTML = await resp.text();
+      } else {
+        target.reload();
+      }
+    }
+
+    showToast('Significant memory created');
+  } catch (error) {
+    showToast('Failed to create memory: ' + error.message);
+  }
+}
+
 globalThis.Psycheros = {
   toggleSidebar,
   closeSidebarAfterNav,
@@ -3211,6 +3267,8 @@ globalThis.Psycheros = {
   updatePulseTriggerFields,
   updatePulseSchedulePreset,
   savePulse,
+  // Significant memory
+  createSignificantMemory,
 };
 
 /**
