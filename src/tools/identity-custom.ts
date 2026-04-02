@@ -14,6 +14,8 @@ import { IdentityFileManager } from "./identity-helpers.ts";
 // custom_file Tool
 // =============================================================================
 
+const VALID_OPERATIONS = ["create", "append", "prepend", "update_section", "replace"];
+
 export const customFileTool: Tool = {
   definition: {
     type: "function",
@@ -27,8 +29,8 @@ export const customFileTool: Tool = {
           operation: {
             type: "string",
             description:
-              "The operation to perform: 'create' (new file), 'append' (add to existing), 'replace' (overwrite, creates snapshot)",
-            enum: ["create", "append", "replace"],
+              "The operation to perform: 'create' (new file, auto-wraps in XML tags), 'append' (add to end), 'prepend' (add to beginning), 'update_section' (replace content under a heading), 'replace' (overwrite entire file, creates snapshot)",
+            enum: VALID_OPERATIONS,
           },
           filename: {
             type: "string",
@@ -38,7 +40,12 @@ export const customFileTool: Tool = {
           content: {
             type: "string",
             description:
-              "Content for create, append, or replace operations. Write concisely — these files load every turn. For create, content is auto-wrapped in XML tags. For replace, provide the complete file content including XML tags.",
+              "The content to add or replace with. Write concisely — these files load every turn. For create, content is auto-wrapped in XML tags. For replace, provide the complete file content including XML tags.",
+          },
+          section: {
+            type: "string",
+            description:
+              "Required for update_section: the heading name (without ##) of the section to update.",
           },
         },
         required: ["operation", "filename"],
@@ -53,12 +60,13 @@ export const customFileTool: Tool = {
     const operation = args.operation as string;
     const filename = args.filename as string;
     const content = args.content as string | undefined;
+    const section = args.section as string | undefined;
 
     // Validate operation
-    if (!operation || !["create", "append", "replace"].includes(operation)) {
+    if (!operation || !VALID_OPERATIONS.includes(operation)) {
       return {
         toolCallId: ctx.toolCallId,
-        content: `Error: Invalid operation '${operation}'. Valid operations: create, append, replace`,
+        content: `Error: Invalid operation '${operation}'. Valid operations: ${VALID_OPERATIONS.join(", ")}`,
         isError: true,
       };
     }
@@ -76,7 +84,16 @@ export const customFileTool: Tool = {
     if (!content || typeof content !== "string") {
       return {
         toolCallId: ctx.toolCallId,
-        content: "Error: 'content' is required for create, append, and replace operations",
+        content: "Error: 'content' is required",
+        isError: true,
+      };
+    }
+
+    // Validate section for update_section
+    if (operation === "update_section" && !section) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: "Error: 'section' is required when operation is 'update_section'",
         isError: true,
       };
     }
@@ -98,6 +115,21 @@ export const customFileTool: Tool = {
 
       case "append": {
         const result = await manager.append("custom", filename, content!.trim());
+        return { toolCallId: ctx.toolCallId, content: result.message, isError: !result.success };
+      }
+
+      case "prepend": {
+        const result = await manager.prepend("custom", filename, content!.trim());
+        return { toolCallId: ctx.toolCallId, content: result.message, isError: !result.success };
+      }
+
+      case "update_section": {
+        const result = await manager.updateSection(
+          "custom",
+          filename,
+          section!,
+          content!.trim()
+        );
         return { toolCallId: ctx.toolCallId, content: result.message, isError: !result.success };
       }
 

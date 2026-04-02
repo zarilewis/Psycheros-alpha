@@ -43,7 +43,7 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 | `append_to_relationship` | Add relationship understanding (Tier 1) |
 | `maintain_identity` | Full identity file maintenance (Tier 2 — includes replace) |
 | `list_identity_snapshots` | View available backups (Tier 2) |
-| `custom_file` | Create, append, or replace custom identity files |
+| `custom_file` | Create and modify custom identity files (create, append, prepend, update_section, replace) |
 | `graph_search_nodes` | Search knowledge graph for relevant nodes |
 | `graph_get_node` | Get a specific node by ID |
 | `graph_get_edges` | Get relationships from the graph |
