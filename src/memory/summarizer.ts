@@ -374,9 +374,9 @@ export async function consolidateWeek(
     return null;
   }
 
-  // Get all daily files for this week (including archived)
-  const { readMemoryFile, listMemoryFiles, archiveDailyMemory } = await import("./file-writer.ts");
-  const dailyFiles = await listMemoryFiles("daily", projectRoot, true);
+  // Get all daily files for this week
+  const { readMemoryFile, listMemoryFiles } = await import("./file-writer.ts");
+  const dailyFiles = await listMemoryFiles("daily", projectRoot, false);
 
   // Filter to files from this week
   const weekStart = getWeekStart(weekDate);
@@ -385,7 +385,7 @@ export async function consolidateWeek(
 
   const weekFiles: string[] = [];
   for (const file of dailyFiles) {
-    // Match both daily/YYYY-MM-DD.md and archive/daily/YYYY-MM-DD.md
+    // Match daily/YYYY-MM-DD.md
     const match = file.match(/(?:^|\/)daily\/(\d{4}-\d{2}-\d{2})\.md$/);
     if (match) {
       const fileDate = new Date(match[1]);
@@ -464,13 +464,6 @@ export async function consolidateWeek(
 
   const success = await writeMemoryFile(memoryFile, db, projectRoot, onCreated);
 
-  if (success) {
-    // Archive the daily files
-    for (const file of weekFiles) {
-      await archiveDailyMemory(file, projectRoot);
-    }
-  }
-
   return success ? memoryFile : null;
 }
 
@@ -516,18 +509,20 @@ export async function consolidateMonth(
     return null;
   }
 
-  const { readMemoryFile, listMemoryFiles, archiveDailyMemory } = await import("./file-writer.ts");
-  const weeklyFiles = await listMemoryFiles("weekly", projectRoot, true);
+  const { readMemoryFile, listMemoryFiles } = await import("./file-writer.ts");
+  const weeklyFiles = await listMemoryFiles("weekly", projectRoot, false);
 
-  // Filter to files from this month
+  // Filter to files from this month — a week belongs to a month if ANY of its days
+  // fall within that month, so we check if the week's Monday is within the month's
+  // range. Since weeks can span month boundaries, we use the next month's start
+  // as the exclusive upper bound to ensure we don't double-count.
   const monthStart = getMonthStart(monthDate);
-  const monthEnd = new Date(monthStart);
-  monthEnd.setUTCMonth(monthEnd.getUTCMonth() + 1);
-  monthEnd.setUTCDate(monthEnd.getUTCDate() - 1);
+  const nextMonthStart = new Date(monthStart);
+  nextMonthStart.setUTCMonth(nextMonthStart.getUTCMonth() + 1);
 
   const monthFiles: string[] = [];
   for (const file of weeklyFiles) {
-    // Match both weekly/YYYY-WNN.md and archive/weekly/YYYY-WNN.md
+    // Match weekly/YYYY-WNN.md
     const match = file.match(/(?:^|\/)weekly\/(\d{4}-W\d{2})\.md$/);
     if (match) {
       // Parse week file date - get the Monday of that ISO week
@@ -535,7 +530,7 @@ export async function consolidateMonth(
       const [year, week] = weekStr.split("-W").map(Number);
       const weekStart = getISOWeekMonday(year, week);
 
-      if (weekStart >= monthStart && weekStart <= monthEnd) {
+      if (weekStart >= monthStart && weekStart < nextMonthStart) {
         monthFiles.push(file);
       }
     }
@@ -610,13 +605,6 @@ export async function consolidateMonth(
 
   const success = await writeMemoryFile(memoryFile, db, projectRoot, onCreated);
 
-  if (success) {
-    // Archive the weekly files
-    for (const file of monthFiles) {
-      await archiveDailyMemory(file, projectRoot);
-    }
-  }
-
   return success ? memoryFile : null;
 }
 
@@ -642,14 +630,14 @@ export async function consolidateYear(
     return null;
   }
 
-  const { readMemoryFile, listMemoryFiles, archiveDailyMemory } = await import("./file-writer.ts");
-  const monthlyFiles = await listMemoryFiles("monthly", projectRoot, true);
+  const { readMemoryFile, listMemoryFiles } = await import("./file-writer.ts");
+  const monthlyFiles = await listMemoryFiles("monthly", projectRoot, false);
 
   // Filter to files from this year
   const year = yearDate.getUTCFullYear();
   const yearFiles: string[] = [];
   for (const file of monthlyFiles) {
-    // Match both monthly/YYYY-MM.md and archive/monthly/YYYY-MM.md
+    // Match monthly/YYYY-MM.md
     const match = file.match(/(?:^|\/)monthly\/(\d{4})-\d{2}\.md$/);
     if (match) {
       const fileYear = parseInt(match[1]);
@@ -727,13 +715,6 @@ export async function consolidateYear(
   };
 
   const success = await writeMemoryFile(memoryFile, db, projectRoot, onCreated);
-
-  if (success) {
-    // Archive the monthly files
-    for (const file of yearFiles) {
-      await archiveDailyMemory(file, projectRoot);
-    }
-  }
 
   return success ? memoryFile : null;
 }

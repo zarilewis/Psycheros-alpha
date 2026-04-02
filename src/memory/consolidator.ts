@@ -16,7 +16,6 @@ import { listMemoryFiles, type OnMemoryCreated } from "./file-writer.ts";
 export interface ConsolidationResult {
   success: boolean;
   memoryFile?: MemoryFile;
-  archivedFiles?: string[];
   error?: string;
 }
 
@@ -51,56 +50,48 @@ function getPreviousPeriodStart(granularity: "weekly" | "monthly" | "yearly", no
 }
 
 /**
- * Check if there are unconsolidated source files from a completed period.
- * Checks both active and archive directories, and verifies database records.
+ * Collect all target consolidation periods that have unconsolidated source files.
+ * Checks active directories only and verifies database records.
+ *
+ * @returns Set of target date strings that need consolidation
  */
-async function hasUnconsolidatedFiles(
+async function findUnconsolidatedPeriods(
   sourceGranularity: Granularity,
   targetGranularity: Granularity,
   periodStart: Date,
   db: DBClient,
   projectRoot: string
-): Promise<boolean> {
-  // Include archived files since they may still need consolidation
-  const sourceFiles = await listMemoryFiles(sourceGranularity, projectRoot, true);
+): Promise<Set<string>> {
+  const sourceFiles = await listMemoryFiles(sourceGranularity, projectRoot, false);
 
   if (sourceFiles.length === 0) {
-    return false;
+    return new Set();
   }
 
-  // Check if any source files are from a completed period that hasn't been consolidated
+  const unconsolidatedPeriods = new Set<string>();
+
   for (const file of sourceFiles) {
     let fileDate: Date | null = null;
-    let fileDateStr: string | null = null;
 
-    // Handle both active and archive paths
     if (sourceGranularity === "daily") {
-      // Match both daily/YYYY-MM-DD.md and archive/daily/YYYY-MM-DD.md
       const match = file.match(/(?:^|\/)daily\/(\d{4}-\d{2}-\d{2})\.md$/);
       if (match) {
-        fileDateStr = match[1];
         fileDate = new Date(match[1]);
       }
     } else if (sourceGranularity === "weekly") {
-      // Match both weekly/YYYY-WNN.md and archive/weekly/YYYY-WNN.md
       const match = file.match(/(?:^|\/)weekly\/(\d{4}-W\d{2})\.md$/);
       if (match) {
-        fileDateStr = match[1];
         const [year, week] = match[1].split("-W").map(Number);
         fileDate = getISOWeekMonday(year, week);
       }
     } else if (sourceGranularity === "monthly") {
-      // Match both monthly/YYYY-MM.md and archive/monthly/YYYY-MM.md
       const match = file.match(/(?:^|\/)monthly\/(\d{4}-\d{2})\.md$/);
       if (match) {
-        fileDateStr = match[1];
         fileDate = new Date(match[1] + "-01");
       }
     }
 
-    if (fileDate && fileDateStr && fileDate < periodStart) {
-      // This file is from a period that should have been consolidated
-      // Check the DATABASE for a consolidated record (not just file existence)
+    if (fileDate && fileDate < periodStart) {
       const targetDateInfo = getTargetDateInfo(targetGranularity, fileDate);
       const existingSummary = db.getMemorySummary(
         targetDateInfo.dateStr,
@@ -108,12 +99,12 @@ async function hasUnconsolidatedFiles(
       );
       if (!existingSummary) {
         console.log(`[Memory] Found unconsolidated ${sourceGranularity} file: ${file} -> needs ${targetGranularity} ${targetDateInfo.dateStr}`);
-        return true; // Source file exists but no consolidated record in DB
+        unconsolidatedPeriods.add(targetDateInfo.dateStr);
       }
     }
   }
 
-  return false;
+  return unconsolidatedPeriods;
 }
 
 /**
@@ -159,22 +150,22 @@ export async function needsConsolidation(
   const now = new Date();
   const previousPeriodStart = getPreviousPeriodStart(granularity, now);
 
-  switch (granularity) {
-    case "weekly":
-      return await hasUnconsolidatedFiles("daily", "weekly", previousPeriodStart, db, projectRoot);
-    case "monthly":
-      return await hasUnconsolidatedFiles("weekly", "monthly", previousPeriodStart, db, projectRoot);
-    case "yearly":
-      return await hasUnconsolidatedFiles("monthly", "yearly", previousPeriodStart, db, projectRoot);
-  }
+  const sourceGranularity = granularity === "weekly" ? "daily"
+    : granularity === "monthly" ? "weekly"
+    : "monthly";
+
+  const periods = await findUnconsolidatedPeriods(sourceGranularity, granularity, previousPeriodStart, db, projectRoot);
+  return periods.size > 0;
 }
 
 /**
- * Run consolidation for a specific granularity level.
+ * Run consolidation for a specific target period.
  *
  * @param granularity - The granularity level
+ * @param targetDateStr - The target period date string (e.g., "2026-W13", "2026-03", "2026")
  * @param db - Database client
  * @param projectRoot - Root directory of the project
+ * @param onCreated - Optional callback for when a memory is created
  * @returns Consolidation result
  */
 export async function runConsolidation(
@@ -182,52 +173,100 @@ export async function runConsolidation(
   db: DBClient,
   projectRoot: string,
   onCreated?: OnMemoryCreated,
+  targetDateStr?: string,
 ): Promise<ConsolidationResult> {
-  // Get a date in the previous period to consolidate
-  const now = new Date();
-  const targetDate = getPreviousPeriodStart(granularity, now);
+  let targetDate: Date;
 
-  switch (granularity) {
-    case "weekly":
-      try {
-        const memoryFile = await consolidateWeek(targetDate, db, projectRoot, undefined, onCreated);
-        return {
-          success: !!memoryFile,
-          memoryFile: memoryFile ?? undefined,
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
+  if (targetDateStr) {
+    // Parse the provided target date string
+    if (granularity === "weekly") {
+      const match = targetDateStr.match(/^(\d{4})-W(\d{2})$/);
+      if (match) {
+        targetDate = getISOWeekMonday(parseInt(match[1]), parseInt(match[2]));
+      } else {
+        return { success: false, error: `Invalid weekly date string: ${targetDateStr}` };
       }
-
-    case "monthly":
-      try {
-        const memoryFile = await consolidateMonth(targetDate, db, projectRoot, undefined, onCreated);
-        return {
-          success: !!memoryFile,
-          memoryFile: memoryFile ?? undefined,
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
-
-    case "yearly":
-      try {
-        const memoryFile = await consolidateYear(targetDate, db, projectRoot, undefined, onCreated);
-        return {
-          success: !!memoryFile,
-          memoryFile: memoryFile ?? undefined,
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
+    } else if (granularity === "monthly") {
+      targetDate = new Date(targetDateStr + "-01");
+    } else {
+      targetDate = new Date(`${targetDateStr}-01-01`);
+    }
+  } else {
+    // Fall back to previous period for backwards compatibility
+    const now = new Date();
+    targetDate = getPreviousPeriodStart(granularity, now);
   }
+
+  try {
+    let memoryFile: import("./types.ts").MemoryFile | null = null;
+
+    switch (granularity) {
+      case "weekly":
+        memoryFile = await consolidateWeek(targetDate, db, projectRoot, undefined, onCreated);
+        break;
+      case "monthly":
+        memoryFile = await consolidateMonth(targetDate, db, projectRoot, undefined, onCreated);
+        break;
+      case "yearly":
+        memoryFile = await consolidateYear(targetDate, db, projectRoot, undefined, onCreated);
+        break;
+    }
+
+    return {
+      success: !!memoryFile,
+      memoryFile: memoryFile ?? undefined,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+/**
+ * Run consolidation for ALL unconsolidated periods across all granularity levels.
+ * This is the catch-up function that ensures no period is missed.
+ *
+ * @param db - Database client
+ * @param projectRoot - Root directory of the project
+ * @param onCreated - Optional callback for when a memory is created
+ * @returns Array of consolidation results for all periods processed
+ */
+export async function runAllConsolidations(
+  db: DBClient,
+  projectRoot: string,
+  onCreated?: OnMemoryCreated,
+): Promise<ConsolidationResult[]> {
+  const now = new Date();
+  const results: ConsolidationResult[] = [];
+
+  // Weekly: find all unconsolidated weeks
+  const weeklyPeriodStart = getPreviousPeriodStart("weekly", now);
+  const weeklyPeriods = await findUnconsolidatedPeriods("daily", "weekly", weeklyPeriodStart, db, projectRoot);
+  for (const periodStr of weeklyPeriods) {
+    console.log(`[Memory] Consolidating week: ${periodStr}`);
+    const result = await runConsolidation("weekly", db, projectRoot, onCreated, periodStr);
+    results.push(result);
+  }
+
+  // Monthly: find all unconsolidated months
+  const monthlyPeriodStart = getPreviousPeriodStart("monthly", now);
+  const monthlyPeriods = await findUnconsolidatedPeriods("weekly", "monthly", monthlyPeriodStart, db, projectRoot);
+  for (const periodStr of monthlyPeriods) {
+    console.log(`[Memory] Consolidating month: ${periodStr}`);
+    const result = await runConsolidation("monthly", db, projectRoot, onCreated, periodStr);
+    results.push(result);
+  }
+
+  // Yearly: find all unconsolidated years
+  const yearlyPeriodStart = getPreviousPeriodStart("yearly", now);
+  const yearlyPeriods = await findUnconsolidatedPeriods("monthly", "yearly", yearlyPeriodStart, db, projectRoot);
+  for (const periodStr of yearlyPeriods) {
+    console.log(`[Memory] Consolidating year: ${periodStr}`);
+    const result = await runConsolidation("yearly", db, projectRoot, onCreated, periodStr);
+    results.push(result);
+  }
+
+  return results;
 }

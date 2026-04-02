@@ -76,7 +76,6 @@ export {
   formatMemoryContent,
   readMemoryFile,
   listMemoryFiles,
-  archiveDailyMemory,
   type OnMemoryCreated,
 } from "./file-writer.ts";
 
@@ -91,5 +90,6 @@ export {
 export {
   needsConsolidation,
   runConsolidation,
+  runAllConsolidations,
   type ConsolidationResult,
 } from "./consolidator.ts";

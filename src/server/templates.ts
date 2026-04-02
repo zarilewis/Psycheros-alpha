@@ -1594,13 +1594,14 @@ type MemoryGranularity = typeof VALID_MEMORY_GRANULARITIES[number];
 /**
  * Render the memories view with tabs.
  */
-export function renderMemoriesView(activeGranularity: MemoryGranularity = "daily"): string {
-  const tabs = [
+export function renderMemoriesView(activeGranularity: string = "daily"): string {
+  const tabs: { id: string; label: string }[] = [
     { id: "daily", label: "Daily" },
     { id: "weekly", label: "Weekly" },
     { id: "monthly", label: "Monthly" },
     { id: "yearly", label: "Yearly" },
     { id: "significant", label: "Significant" },
+    { id: "consolidation", label: "Catch-up" },
   ];
 
   const tabsHtml = tabs.map((tab) => {
@@ -1639,11 +1640,11 @@ export function renderMemoriesView(activeGranularity: MemoryGranularity = "daily
 /**
  * Render the active tab indicator for memories as an OOB swap.
  */
-function renderMemoryTabActiveState(activeGranularity: MemoryGranularity): string {
-  const tabs = VALID_MEMORY_GRANULARITIES;
+function renderMemoryTabActiveState(activeGranularity: string): string {
+  const tabs = [...VALID_MEMORY_GRANULARITIES, "consolidation"];
   return tabs.map((g) => {
     const isActive = g === activeGranularity;
-    const label = g.charAt(0).toUpperCase() + g.slice(1);
+    const label = g === "consolidation" ? "Catch-up" : g.charAt(0).toUpperCase() + g.slice(1);
     return `<button
       class="settings-tab${isActive ? " active" : ""}"
       hx-get="/fragments/settings/memories/${g}"
@@ -3491,4 +3492,117 @@ async function resetWebSearchDefaults(event) {
 }
 </script>
 `;
+}
+
+// =============================================================================
+// Consolidation Tab Templates
+// =============================================================================
+
+interface ConsolidationStatus {
+  weekly: boolean;
+  monthly: boolean;
+  yearly: boolean;
+}
+
+/**
+ * Render the consolidation catch-up tab with status rows and run button.
+ */
+export function renderConsolidationTab(status: ConsolidationStatus): string {
+  const oobTabs = renderMemoryTabActiveState("consolidation");
+  const anyNeeded = status.weekly || status.monthly || status.yearly;
+
+  const rows = ([
+    { key: "weekly", label: "Weekly", needed: status.weekly },
+    { key: "monthly", label: "Monthly", needed: status.monthly },
+    { key: "yearly", label: "Yearly", needed: status.yearly },
+  ] as const).map(({ key: _key, label, needed }) => `
+    <div class="consolidation-row">
+      <span class="consolidation-row-label">${label}</span>
+      <span class="consolidation-row-status ${needed ? "consolidation-needed" : "consolidation-up-to-date"}">${needed ? "Needs catch-up" : "Up to date"}</span>
+    </div>
+  `).join("");
+
+  let actionHtml = "";
+  if (anyNeeded) {
+    actionHtml = `<button
+      class="btn btn--primary"
+      id="run-consolidation-btn"
+      hx-post="/api/memories/consolidation/run"
+      hx-target="#consolidation-content"
+      hx-swap="outerHTML"
+    >Run Catch-up</button>`;
+  } else {
+    actionHtml = `<div class="consolidation-all-clear">All consolidation levels are up to date.</div>`;
+  }
+
+  return `${oobTabs}
+<div id="consolidation-content">
+  <div class="consolidation-section">
+    <h2 class="consolidation-heading">Consolidation Status</h2>
+    <div class="consolidation-status-list">
+      ${rows}
+    </div>
+    <div class="consolidation-actions">
+      ${actionHtml}
+    </div>
+  </div>
+</div>`;
+}
+
+/**
+ * Render the running state shown immediately after the user clicks Run Catch-up.
+ */
+export function renderConsolidationRunning(): string {
+  const oobTabs = renderMemoryTabActiveState("consolidation");
+
+  return `${oobTabs}
+<div id="consolidation-content">
+  <div class="consolidation-section">
+    <h2 class="consolidation-heading">Consolidation Status</h2>
+    <div class="consolidation-running">
+      <span class="consolidation-spinner"></span>
+      Running catch-up consolidation...
+    </div>
+    <div id="consolidation-results"></div>
+  </div>
+</div>`;
+}
+
+/**
+ * Render the completed state broadcast via SSE when consolidation finishes.
+ */
+export function renderConsolidationComplete(results: { granularity: string; success: boolean; error?: string }[]): string {
+  const oobTabs = renderMemoryTabActiveState("consolidation");
+
+  const successCount = results.filter((r) => r.success).length;
+  const failCount = results.filter((r) => !r.success).length;
+
+  const summaryParts: string[] = [];
+  if (successCount > 0) summaryParts.push(`${successCount} succeeded`);
+  if (failCount > 0) summaryParts.push(`${failCount} failed`);
+
+  const itemsHtml = results.map((r) => {
+    const cls = r.success ? "consolidation-result-success" : "consolidation-result-failure";
+    const text = r.success
+      ? `${r.granularity}: created`
+      : `${r.granularity}: ${escapeHtml(r.error || "failed")}`;
+    return `<div class="consolidation-result-item ${cls}">${escapeHtml(text)}</div>`;
+  }).join("");
+
+  return `${oobTabs}
+<div id="consolidation-content">
+  <div class="consolidation-section">
+    <h2 class="consolidation-heading">Consolidation Status</h2>
+    <div class="consolidation-summary">${summaryParts.join(", ")}</div>
+    ${itemsHtml ? `<div class="consolidation-results-list">${itemsHtml}</div>` : ""}
+    <div class="consolidation-actions">
+      <button
+        class="btn btn--ghost btn--sm"
+        hx-get="/fragments/settings/memories/consolidation"
+        hx-target="#consolidation-content"
+        hx-swap="outerHTML"
+      >Refresh Status</button>
+    </div>
+  </div>
+</div>`;
 }

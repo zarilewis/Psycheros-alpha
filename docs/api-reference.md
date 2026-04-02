@@ -62,6 +62,7 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/memory/consolidate/:granularity` | Trigger memory consolidation |
+| `POST` | `/api/memories/consolidation/run` | Run catch-up consolidation for all missed periods |
 | `POST` | `/api/memories/:granularity/:date` | Save edited memory (writes local file, pushes MCP update, reindexes RAG) |
 | `POST` | `/api/memories/significant/create` | Create new significant memory |
 
@@ -212,6 +213,7 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
 | `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
 | `GET` | `/fragments/settings/memories` | Memories tabbed view fragment |
+| `GET` | `/fragments/settings/memories/consolidation` | Consolidation catch-up status tab |
 | `GET` | `/fragments/settings/memories/:granularity` | Memory file list fragment (daily/weekly/monthly/yearly/significant) |
 | `GET` | `/fragments/settings/memories/:granularity/:date` | Memory editor fragment |
 | `GET` | `/api/admin/diagnostics` | JSON diagnostics snapshot (all subsystems) |

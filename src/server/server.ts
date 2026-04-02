@@ -54,6 +54,8 @@ import {
   handleMemoriesEditorFragment,
   handleSaveMemory,
   handleCreateSignificantMemory,
+  handleConsolidationFragment,
+  handleConsolidationRun,
   handleListSnapshots,
   handleGetSnapshot,
   handleCreateSnapshot,
@@ -846,6 +848,11 @@ export class Server {
       return await handleMemoryConsolidate(ctx, granularity);
     }
 
+    // POST /api/memories/consolidation/run - Run catch-up consolidation
+    if (method === "POST" && path === "/api/memories/consolidation/run") {
+      return await handleConsolidationRun(ctx);
+    }
+
     // ========================================
     // Memories API Routes
     // ========================================
@@ -1414,6 +1421,11 @@ export class Server {
     // GET /fragments/settings/memories - Memories tabbed view
     if (path === "/fragments/settings/memories") {
       return handleMemoriesFragment(ctx);
+    }
+
+    // GET /fragments/settings/memories/consolidation - Consolidation catch-up tab
+    if (path === "/fragments/settings/memories/consolidation") {
+      return await handleConsolidationFragment(ctx);
     }
 
     // GET /fragments/settings/memories/:granularity - Memory file list

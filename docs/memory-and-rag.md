@@ -44,6 +44,10 @@ Configured via environment variables:
 - Monthly: 1st of month 5 AM
 - Yearly: January 1st 5 AM
 
+### Catch-up Consolidation
+
+If the server was offline when a consolidation was scheduled, missed periods can be backfilled. The Catch-up tab in Settings > Memories shows the current consolidation status for weekly, monthly, and yearly levels. Clicking "Run Catch-up" fires `runAllConsolidations` in the background, which finds all unconsolidated periods across all granularity levels and processes them sequentially (weekly first, then monthly, then yearly). Results are displayed in the UI via SSE. A double-run guard prevents concurrent consolidation.
+
 ### Instance Tagging
 
 Memories are tagged with `sourceInstance` to track which embodiment created them. This enables instance-aware RAG retrieval.

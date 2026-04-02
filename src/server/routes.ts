@@ -38,6 +38,9 @@ import {
   renderMemoriesView,
   renderMemoryList,
   renderMemoryEditor,
+  renderConsolidationTab,
+  renderConsolidationRunning,
+  renderConsolidationComplete,
   renderSnapshotsView,
   renderSnapshotPreview,
   renderLorebooksView,
@@ -59,7 +62,7 @@ import { updateConversationTitle, deleteConversation, deleteConversations, updat
 import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
 import { MAX_SSE_MESSAGE_SIZE, SSE_TRUNCATION_SUFFIX } from "../constants.ts";
 import { getBroadcaster } from "./broadcaster.ts";
-import { runConsolidation, needsConsolidation } from "../memory/mod.ts";
+import { runConsolidation, needsConsolidation, runAllConsolidations, type ConsolidationResult } from "../memory/mod.ts";
 import { readMemoryFile, writeMemoryFile, listMemoryFiles } from "../memory/file-writer.ts";
 import {
   loadOrGenerateKeys,
@@ -2013,7 +2016,6 @@ export async function handleMemoryConsolidate(
           success: true,
           message: `${granularity} consolidation completed`,
           memoryFile: result.memoryFile,
-          archivedFiles: result.archivedFiles,
         }),
         {
           headers: {
@@ -2055,6 +2057,104 @@ export async function handleMemoryConsolidate(
 // =============================================================================
 // MCP Sync Routes
 // =============================================================================
+
+// In-memory guard to prevent double-runs
+let consolidationRunning = false;
+
+/**
+ * Handle GET /fragments/settings/memories/consolidation - Consolidation status tab.
+ */
+export async function handleConsolidationFragment(ctx: RouteContext): Promise<Response> {
+  try {
+    const [weekly, monthly, yearly] = await Promise.all([
+      needsConsolidation("weekly", ctx.db, ctx.projectRoot),
+      needsConsolidation("monthly", ctx.db, ctx.projectRoot),
+      needsConsolidation("yearly", ctx.db, ctx.projectRoot),
+    ]);
+
+    const html = renderConsolidationTab({ weekly, monthly, yearly });
+    return new Response(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  } catch (error) {
+    console.error("[Routes] handleConsolidationFragment error:", error);
+    return new Response(renderSaveError("Failed to check consolidation status"), {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+}
+
+/**
+ * Handle POST /api/memories/consolidation/run - Run catch-up consolidation.
+ */
+export async function handleConsolidationRun(ctx: RouteContext): Promise<Response> {
+  if (!ctx.memoryEnabled) {
+    return new Response(renderSaveError("Memory summarization is disabled"), {
+      status: 400,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  if (consolidationRunning) {
+    return new Response(renderSaveError("Consolidation is already running"), {
+      status: 409,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  consolidationRunning = true;
+
+  // Return the loading state immediately
+  const html = renderConsolidationRunning();
+  const response = new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+
+  // Fire consolidation in background
+  runConsolidationInBackground(ctx);
+
+  return response;
+}
+
+/**
+ * Run all consolidations in the background and broadcast results via SSE.
+ */
+function runConsolidationInBackground(ctx: RouteContext): void {
+  const db = ctx.db;
+  const projectRoot = ctx.projectRoot;
+
+  runAllConsolidations(db, projectRoot)
+    .then((results: ConsolidationResult[]) => {
+      const displayResults: { granularity: string; success: boolean; error?: string }[] =
+        results.map((r) => ({
+          granularity: r.memoryFile?.granularity ?? "unknown",
+          success: r.success,
+          error: r.error,
+        }));
+
+      const html = renderConsolidationComplete(displayResults);
+      getBroadcaster().broadcastUpdate({
+        target: "#consolidation-content",
+        html,
+        swap: "outerHTML",
+      }, null);
+    })
+    .catch((error) => {
+      console.error("[Routes] Background consolidation failed:", error);
+      const html = renderConsolidationComplete([
+        { granularity: "consolidation", success: false, error: error instanceof Error ? error.message : String(error) },
+      ]);
+      getBroadcaster().broadcastUpdate({
+        target: "#consolidation-content",
+        html,
+        swap: "outerHTML",
+      }, null);
+    })
+    .finally(() => {
+      consolidationRunning = false;
+    });
+}
 
 /**
  * Handle POST /api/mcp/sync - Manually trigger MCP sync
