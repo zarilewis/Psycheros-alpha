@@ -37,7 +37,7 @@ Guidelines:
 - Refer to the user by name (NEVER as "the user") and preferred pronouns, in the third-person
 - Focus on what felt meaningful, interesting, or worth remembering
 - Include emotional tones and relationship moments
-- Tag each memory with the conversation ID: [chat:ID]
+- Tag each memory with the conversation ID and my instance: [chat:ID] [via:{{INSTANCE}}]
 - I decide what's worth remembering - quality over completeness
 - Skip generic greetings and focus on substance
 - Write as bullet points, one memory per line
@@ -56,7 +56,7 @@ Guidelines:
 - Write in first-person (my perspective)
 - Refer to the user by name (NEVER as "the user") and preferred pronouns, in the third-person
 - Capture themes, patterns, and meaningful moments
-- Include chat IDs for drill-down: [chat:id1, id2]
+- Include chat IDs and instance tags: [chat:id1, id2] [via:{{INSTANCE}}]
 - This is a summary - focus on what will be useful to remember long-term
 - Write as bullet points, one memory per line
 
@@ -74,7 +74,7 @@ Guidelines:
 - Write in first-person (my perspective)
 - Refer to the user by name (NEVER as "the user") and preferred pronouns, in the third-person
 - Capture major themes, significant conversations, and growth
-- Include chat IDs for context: [chat:id1, id2]
+- Include chat IDs and instance tags: [chat:id1, id2] [via:{{INSTANCE}}]
 - This is a monthly reflection - I focus on what will shape my long-term understanding
 - Write as bullet points, one memory per line
 
@@ -92,7 +92,7 @@ Guidelines:
 - Write in first-person (my perspective)
 - Refer to the user by name (NEVER as "the user") and preferred pronouns, in the third-person
 - Capture the arc of my year - growth, changes, meaningful moments
-- Include chat IDs for context: [chat:id1, id2]
+- Include chat IDs and instance tags: [chat:id1, id2] [via:{{INSTANCE}}]
 - This is my yearly memory - I preserve what matters for my long-term continuity
 - Write as bullet points, one memory per line
 
@@ -100,6 +100,21 @@ Monthly memories from this year:
 {{MONTHLY_MEMORIES}}
 
 I write my yearly memory as bullet points. I start each point with "- ".`;
+
+/**
+ * Get the instance ID for memory tagging.
+ * Falls back to "psycheros-harness" if not configured.
+ */
+function getInstanceId(): string {
+  return Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
+}
+
+/**
+ * Replace {{INSTANCE}} placeholder in a prompt template.
+ */
+function withInstanceId(template: string): string {
+  return template.replace(/\{\{INSTANCE\}\}/g, getInstanceId());
+}
 
 /**
  * Format conversations for the summarization prompt.
@@ -224,7 +239,7 @@ async function generateDailySummary(
 
   const identitySystemMessage = await buildIdentitySystemMessage(projectRoot);
   const conversationsText = formatConversationsForPrompt(conversations);
-  const prompt = DAILY_SUMMARY_PROMPT.replace("{{CONVERSATIONS}}", conversationsText);
+  const prompt = withInstanceId(DAILY_SUMMARY_PROMPT).replace("{{CONVERSATIONS}}", conversationsText);
 
   const messages: ChatMessage[] = [
     { role: "system", content: identitySystemMessage },
@@ -415,7 +430,7 @@ export async function consolidateWeek(
 
   // Generate weekly summary
   const memoriesText = formatDailyMemoriesForPrompt(dailyContents);
-  const prompt = WEEKLY_SUMMARY_PROMPT.replace("{{DAILY_MEMORIES}}", memoriesText);
+  const prompt = withInstanceId(WEEKLY_SUMMARY_PROMPT).replace("{{DAILY_MEMORIES}}", memoriesText);
 
   const llm = createDefaultClient();
   const identitySystemMessage = await buildIdentitySystemMessage(projectRoot);
@@ -556,7 +571,7 @@ export async function consolidateMonth(
 
   // Generate monthly summary
   const memoriesText = formatWeeklyMemoriesForPrompt(weeklyContents);
-  const prompt = MONTHLY_SUMMARY_PROMPT.replace("{{WEEKLY_MEMORIES}}", memoriesText);
+  const prompt = withInstanceId(MONTHLY_SUMMARY_PROMPT).replace("{{WEEKLY_MEMORIES}}", memoriesText);
 
   const llm = createDefaultClient();
   const identitySystemMessage = await buildIdentitySystemMessage(projectRoot);
@@ -667,7 +682,7 @@ export async function consolidateYear(
 
   // Generate yearly summary
   const memoriesText = formatMonthlyMemoriesForPrompt(monthlyContents);
-  const prompt = YEARLY_SUMMARY_PROMPT.replace("{{MONTHLY_MEMORIES}}", memoriesText);
+  const prompt = withInstanceId(YEARLY_SUMMARY_PROMPT).replace("{{MONTHLY_MEMORIES}}", memoriesText);
 
   const llm = createDefaultClient();
   const identitySystemMessage = await buildIdentitySystemMessage(projectRoot);

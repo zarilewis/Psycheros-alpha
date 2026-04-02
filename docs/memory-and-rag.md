@@ -50,7 +50,7 @@ If the server was offline when a consolidation was scheduled, missed periods can
 
 ### Instance Tagging
 
-Memories are tagged with `sourceInstance` to track which embodiment created them. This enables instance-aware RAG retrieval.
+Memories are tagged with `sourceInstance` to track which embodiment created them. Each bullet point in memory content includes inline `[chat:id]` and `[via:instanceId]` tags so the entity can identify the source of individual memories when multiple embodiments contribute to the same file. This enables instance-aware RAG retrieval.
 
 ## RAG Systems
 
