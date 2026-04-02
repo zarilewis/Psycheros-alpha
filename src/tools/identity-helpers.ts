@@ -674,6 +674,80 @@ ${content}
   }
 
   /**
+   * Check if an identity file exists.
+   */
+  async exists(category: IdentityCategory, filename: string): Promise<boolean> {
+    const filePath = this.getFilePath(category, filename);
+    try {
+      await Deno.stat(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Create a new identity file.
+   * Fails if the file already exists. Routes through MCP if connected.
+   */
+  async create(
+    category: IdentityCategory,
+    filename: string,
+    content: string
+  ): Promise<IdentityOperationResult> {
+    const validation = this.validateFile(category, filename);
+    if (validation) return validation;
+
+    if (await this.exists(category, filename)) {
+      return {
+        success: false,
+        message: `File ${category}/${filename} already exists. Use replace to overwrite it.`,
+        error: "already_exists",
+      };
+    }
+
+    // Try MCP first
+    if (this.mcpClient?.isConnected()) {
+      try {
+        const success = await this.mcpClient.writeIdentityFile(
+          category,
+          filename,
+          content,
+          this.projectRoot
+        );
+        if (success) {
+          console.log(`[Identity] Created ${category}/${filename} via MCP`);
+          return { success: true, message: `I've created my ${category}/${filename} file.` };
+        }
+      } catch (e) {
+        console.warn(`[Identity] MCP create failed, falling back to local:`, e);
+      }
+    }
+
+    // Fallback to local write
+    try {
+      await this.writeFile(category, filename, content);
+
+      if (this.mcpClient) {
+        this.mcpClient.queueIdentityChange(category, filename, content);
+      }
+
+      console.log(`[Identity] Created ${category}/${filename} locally`);
+      return {
+        success: true,
+        message: `I've created my ${category}/${filename} file (saved locally).`,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        message: `Failed to create ${category}/${filename}: ${errorMessage}`,
+        error: "write_failed",
+      };
+    }
+  }
+
+  /**
    * Delete a custom identity file.
    * Only custom files can be deleted; predefined files in other categories cannot.
    */

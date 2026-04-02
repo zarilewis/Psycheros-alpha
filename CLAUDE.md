@@ -48,6 +48,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/tools/send-discord-dm.ts` | Discord DM tool (sends DMs via Discord bot API) |
 | `src/llm/discord-settings.ts` | Discord settings type, load/save, token masking |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
+| `src/tools/identity-custom.ts` | Custom identity file tool (create, append, replace, delete) |
 | `src/memory/mod.ts` | Hierarchical memory system |
 | `src/rag/mod.ts` | RAG retrieval system |
 | `src/mcp-client/mod.ts` | MCP client for entity-core connection |

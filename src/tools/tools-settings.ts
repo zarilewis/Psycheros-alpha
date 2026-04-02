@@ -54,6 +54,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
       "append_to_relationship",
       "maintain_identity",
       "list_identity_snapshots",
+      "custom_file",
     ],
   },
   {
