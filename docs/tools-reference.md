@@ -182,9 +182,9 @@ For managing freeform custom files in `identity/custom/` — topics that don't f
 
 | Tool | Description |
 |------|-------------|
-| `custom_file` | Create, append, replace, or delete custom identity files |
+| `custom_file` | Create, append, or replace custom identity files |
 
-Operations: `create` (new file, content auto-wrapped in XML tags), `append` (add to existing), `replace` (overwrite with snapshot), `delete` (remove file). Filenames use `.md` extension with letters, numbers, and underscores only.
+Operations: `create` (new file, content auto-wrapped in XML tags), `append` (add to existing), `replace` (overwrite with snapshot). Filenames use `.md` extension with letters, numbers, and underscores only. Deletion is user-only via the Core Prompts UI.
 
 ### MCP Fallback Pattern
 
@@ -209,7 +209,7 @@ Changes preserve XML tag structure in identity files. Content is added cleanly w
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
 | `src/tools/identity-casual.ts` | Tier 1 append-only identity tools |
 | `src/tools/identity-maintain.ts` | Tier 2 maintenance identity tools |
-| `src/tools/identity-custom.ts` | Custom identity file tool (create, append, replace, delete) |
+| `src/tools/identity-custom.ts` | Custom identity file tool (create, append, replace) |
 
 ## Push Notification Tool
 

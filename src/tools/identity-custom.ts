@@ -1,7 +1,7 @@
 /**
  * Custom Identity File Tool
  *
- * Allows the entity to create, modify, and delete custom identity files.
+ * Allows the entity to create and modify custom identity files.
  * Custom files are freeform files in identity/custom/ for topics that
  * don't fit the predefined self/user/relationship structure.
  */
@@ -20,15 +20,15 @@ export const customFileTool: Tool = {
     function: {
       name: "custom_file",
       description:
-        "Create, modify, or delete a custom identity file. Custom files are freeform files in identity/custom/ that load into my context every turn alongside my other identity files. I use these for topics that don't fit the predefined self/user/relationship structure. The same selectivity applies — only store identity-level, durable knowledge.",
+        "Create or modify a custom identity file. Custom files are freeform files in identity/custom/ that load into my context every turn alongside my other identity files. I use these for topics that don't fit the predefined self/user/relationship structure. The same selectivity applies — only store identity-level, durable knowledge.",
       parameters: {
         type: "object",
         properties: {
           operation: {
             type: "string",
             description:
-              "The operation to perform: 'create' (new file), 'append' (add to existing), 'replace' (overwrite, creates snapshot), 'delete' (remove file)",
-            enum: ["create", "append", "replace", "delete"],
+              "The operation to perform: 'create' (new file), 'append' (add to existing), 'replace' (overwrite, creates snapshot)",
+            enum: ["create", "append", "replace"],
           },
           filename: {
             type: "string",
@@ -55,10 +55,10 @@ export const customFileTool: Tool = {
     const content = args.content as string | undefined;
 
     // Validate operation
-    if (!operation || !["create", "append", "replace", "delete"].includes(operation)) {
+    if (!operation || !["create", "append", "replace"].includes(operation)) {
       return {
         toolCallId: ctx.toolCallId,
-        content: `Error: Invalid operation '${operation}'. Valid operations: create, append, replace, delete`,
+        content: `Error: Invalid operation '${operation}'. Valid operations: create, append, replace`,
         isError: true,
       };
     }
@@ -72,8 +72,8 @@ export const customFileTool: Tool = {
       };
     }
 
-    // Validate content is present for non-delete operations
-    if (operation !== "delete" && (!content || typeof content !== "string")) {
+    // Validate content is present
+    if (!content || typeof content !== "string") {
       return {
         toolCallId: ctx.toolCallId,
         content: "Error: 'content' is required for create, append, and replace operations",
@@ -108,11 +108,6 @@ export const customFileTool: Tool = {
           content!.trim(),
           "Entity-initiated replace"
         );
-        return { toolCallId: ctx.toolCallId, content: result.message, isError: !result.success };
-      }
-
-      case "delete": {
-        const result = await manager.deleteCustomFile(filename);
         return { toolCallId: ctx.toolCallId, content: result.message, isError: !result.success };
       }
 
