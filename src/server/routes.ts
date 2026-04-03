@@ -62,7 +62,6 @@ import { updateConversationTitle, deleteConversation, deleteConversations, updat
 import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
 import { MAX_SSE_MESSAGE_SIZE, SSE_TRUNCATION_SUFFIX } from "../constants.ts";
 import { getBroadcaster } from "./broadcaster.ts";
-import { runConsolidation, needsConsolidation, runAllConsolidations, type ConsolidationResult } from "../memory/mod.ts";
 import { readMemoryFile, writeMemoryFile, listMemoryFiles } from "../memory/file-writer.ts";
 import {
   loadOrGenerateKeys,
@@ -1981,6 +1980,7 @@ Date: ${date}
  * Handle POST /api/memory/consolidate/:granularity - Trigger memory consolidation
  *
  * Manually triggers consolidation for testing/debugging purposes.
+ * Delegates to entity-core via MCP.
  * Granularity can be "weekly", "monthly", or "yearly".
  *
  * @param ctx - Route context
@@ -2005,10 +2005,9 @@ export async function handleMemoryConsolidate(
     );
   }
 
-  // Check if memory is enabled
-  if (!ctx.memoryEnabled) {
+  if (!ctx.mcpClient) {
     return new Response(
-      JSON.stringify({ error: "Memory summarization is disabled" }),
+      JSON.stringify({ error: "Consolidation requires MCP connection to entity-core" }),
       {
         status: 400,
         headers: {
@@ -2020,56 +2019,19 @@ export async function handleMemoryConsolidate(
   }
 
   try {
-    // Check if consolidation is needed
-    const needed = await needsConsolidation(granularity, ctx.db, ctx.projectRoot);
+    const result = await ctx.mcpClient.consolidateMemories({
+      granularity: granularity as "weekly" | "monthly" | "yearly",
+    });
 
-    if (!needed) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: `No ${granularity} consolidation needed - no unconsolidated source files from a completed period`,
-        }),
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
-        }
-      );
-    }
-
-    // Run consolidation
-    const result = await runConsolidation(granularity, ctx.db, ctx.projectRoot);
-
-    if (result.success) {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: `${granularity} consolidation completed`,
-          memoryFile: result.memoryFile,
-        }),
-        {
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
-        }
-      );
-    } else {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: result.error || "Consolidation failed",
-        }),
-        {
-          status: 500,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
-        }
-      );
-    }
+    return new Response(
+      JSON.stringify(result),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
   } catch (error) {
     console.error("[Routes] handleMemoryConsolidate error:", error);
     return new Response(
@@ -2094,16 +2056,20 @@ let consolidationRunning = false;
 
 /**
  * Handle GET /fragments/settings/memories/consolidation - Consolidation status tab.
+ * Consolidation status is now managed by entity-core. If MCP is connected, show
+ * the UI with a catch-up button that delegates to entity-core.
  */
 export async function handleConsolidationFragment(ctx: RouteContext): Promise<Response> {
   try {
-    const [weekly, monthly, yearly] = await Promise.all([
-      needsConsolidation("weekly", ctx.db, ctx.projectRoot),
-      needsConsolidation("monthly", ctx.db, ctx.projectRoot),
-      needsConsolidation("yearly", ctx.db, ctx.projectRoot),
-    ]);
-
-    const html = renderConsolidationTab({ weekly, monthly, yearly });
+    // Consolidation runs in entity-core; if MCP is available, show the UI.
+    // Since we can't check entity-core's consolidation status without calling it,
+    // assume all may need consolidation and let the user trigger it.
+    const mcpAvailable = !!ctx.mcpClient;
+    const html = renderConsolidationTab({
+      weekly: mcpAvailable,
+      monthly: mcpAvailable,
+      yearly: mcpAvailable,
+    });
     return new Response(html, {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
@@ -2118,10 +2084,11 @@ export async function handleConsolidationFragment(ctx: RouteContext): Promise<Re
 
 /**
  * Handle POST /api/memories/consolidation/run - Run catch-up consolidation.
+ * Delegates to entity-core via MCP.
  */
 export async function handleConsolidationRun(ctx: RouteContext): Promise<Response> {
-  if (!ctx.memoryEnabled) {
-    return new Response(renderSaveError("Memory summarization is disabled"), {
+  if (!ctx.mcpClient) {
+    return new Response(renderSaveError("Consolidation requires MCP connection to entity-core"), {
       status: 400,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
@@ -2142,27 +2109,30 @@ export async function handleConsolidationRun(ctx: RouteContext): Promise<Respons
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
 
-  // Fire consolidation in background
+  // Fire consolidation in background via MCP
   runConsolidationInBackground(ctx);
 
   return response;
 }
 
 /**
- * Run all consolidations in the background and broadcast results via SSE.
+ * Run all consolidations in the background via MCP and broadcast results via SSE.
  */
 function runConsolidationInBackground(ctx: RouteContext): void {
-  const db = ctx.db;
-  const projectRoot = ctx.projectRoot;
+  const mcpClient = ctx.mcpClient;
 
-  runAllConsolidations(db, projectRoot)
-    .then((results: ConsolidationResult[]) => {
-      const displayResults: { granularity: string; success: boolean; error?: string }[] =
-        results.map((r) => ({
-          granularity: r.memoryFile?.granularity ?? "unknown",
-          success: r.success,
-          error: r.error,
-        }));
+  if (!mcpClient) {
+    consolidationRunning = false;
+    return;
+  }
+
+  mcpClient.consolidateMemories({ all: true })
+    .then((result) => {
+      const displayResults = result.consolidations.map((c) => ({
+        granularity: c.granularity,
+        success: c.success,
+        error: c.error,
+      }));
 
       const html = renderConsolidationComplete(displayResults);
       getBroadcaster().broadcastUpdate({

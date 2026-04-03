@@ -16,6 +16,8 @@
  * On first message of a new day (detected by date change from last message),
  * the previous day's conversations are summarized and stored.
  *
+ * Note: Weekly/monthly/yearly consolidation has been moved to entity-core.
+ *
  * ## Usage
  *
  * ```typescript
@@ -35,11 +37,11 @@
  * ├── daily/
  * │   └── 2026-02-22.md        # Daily summaries
  * ├── weekly/
- * │   └── 2026-W08.md          # Weekly summaries
+ * │   └── 2026-W08.md          # Weekly summaries (managed by entity-core)
  * ├── monthly/
- * │   └── 2026-02.md           # Monthly summaries
+ * │   └── 2026-02.md           # Monthly summaries (managed by entity-core)
  * ├── yearly/
- * │   └── 2026.md              # Yearly summaries
+ * │   └── 2026.md              # Yearly summaries (managed by entity-core)
  * └── archive/
  *     └── daily/
  *         └── 2026-02-22.md    # Archived dailies
@@ -61,12 +63,9 @@ export type {
 
 export { getDateFormatInfo, getISOWeek, getISOWeekMonday } from "./types.ts";
 
-// Summarization
+// Summarization (daily only — weekly/monthly/yearly consolidation is in entity-core)
 export {
   summarizeDay,
-  consolidateWeek,
-  consolidateMonth,
-  consolidateYear,
 } from "./summarizer.ts";
 
 // File operations
@@ -85,11 +84,3 @@ export {
   repairOrphanedSummaries,
   type MemoryTriggerConfig,
 } from "./trigger.ts";
-
-// Consolidation
-export {
-  needsConsolidation,
-  runConsolidation,
-  runAllConsolidations,
-  type ConsolidationResult,
-} from "./consolidator.ts";

@@ -49,7 +49,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/llm/discord-settings.ts` | Discord settings type, load/save, token masking |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
 | `src/tools/identity-custom.ts` | Custom identity file tool (create, append, prepend, update_section, replace) |
-| `src/memory/mod.ts` | Hierarchical memory system |
+| `src/memory/mod.ts` | Hierarchical memory system (daily summarization only; weekly/monthly/yearly consolidation moved to entity-core) |
 | `src/rag/mod.ts` | RAG retrieval system |
 | `src/mcp-client/mod.ts` | MCP client for entity-core connection |
 | `src/lorebook/mod.ts` | Lorebook/world info system |

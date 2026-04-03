@@ -12,7 +12,7 @@ import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSe
 import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSettings, getEnabledToolNames, loadCustomTools, ToolRegistry, type ToolsSettings } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import type { MemoryIndexer } from "../rag/indexer.ts";
-import { catchUpSummarization, repairOrphanedSummaries, needsConsolidation, runConsolidation } from "../memory/mod.ts";
+import { catchUpSummarization, repairOrphanedSummaries } from "../memory/mod.ts";
 import { initTracker, registerJob, registerTrigger, tracked } from "./cron-tracker.ts";
 
 import type { MCPClient } from "../mcp-client/mod.ts";
@@ -530,44 +530,8 @@ export class Server {
       registerJob("memory-daily", "Daily Memory Summarization", cronPattern, "Summarize conversations into daily memory files");
       Deno.cron("memory-daily-summarization", cronPattern, tracked("memory-daily", dailySummarizationHandler));
 
-      // Weekly consolidation - runs Sunday at 5 AM (7 = Sunday in Deno cron)
-      const weeklyHandler = async (): Promise<string> => {
-        if (await needsConsolidation("weekly", this.db, this.config.projectRoot)) {
-          const result = await runConsolidation("weekly", this.db, this.config.projectRoot, syncMemoryToMCP);
-          if (result.success) return "Weekly consolidation complete";
-          if (result.error) throw new Error(result.error);
-        }
-        return "No consolidation needed";
-      };
-
-      registerJob("memory-weekly", "Weekly Memory Consolidation", "0 5 * * 7", "Consolidate daily memories into weekly summaries");
-      Deno.cron("memory-weekly-consolidation", "0 5 * * 7", tracked("memory-weekly", weeklyHandler));
-
-      // Monthly consolidation - runs 1st of month at 5 AM
-      const monthlyHandler = async (): Promise<string> => {
-        if (await needsConsolidation("monthly", this.db, this.config.projectRoot)) {
-          const result = await runConsolidation("monthly", this.db, this.config.projectRoot, syncMemoryToMCP);
-          if (result.success) return "Monthly consolidation complete";
-          if (result.error) throw new Error(result.error);
-        }
-        return "No consolidation needed";
-      };
-
-      registerJob("memory-monthly", "Monthly Memory Consolidation", "0 5 1 * *", "Consolidate weekly memories into monthly summaries");
-      Deno.cron("memory-monthly-consolidation", "0 5 1 * *", tracked("memory-monthly", monthlyHandler));
-
-      // Yearly consolidation - runs Jan 1st at 5 AM
-      const yearlyHandler = async (): Promise<string> => {
-        if (await needsConsolidation("yearly", this.db, this.config.projectRoot)) {
-          const result = await runConsolidation("yearly", this.db, this.config.projectRoot, syncMemoryToMCP);
-          if (result.success) return "Yearly consolidation complete";
-          if (result.error) throw new Error(result.error);
-        }
-        return "No consolidation needed";
-      };
-
-      registerJob("memory-yearly", "Yearly Memory Consolidation", "0 5 1 1 *", "Consolidate monthly memories into yearly summaries");
-      Deno.cron("memory-yearly-consolidation", "0 5 1 1 *", tracked("memory-yearly", yearlyHandler));
+      // Note: Weekly, monthly, and yearly consolidation now runs in entity-core
+      // via its own cron jobs, not here.
 
       // Daily identity snapshot - runs at configured hour (default 3 AM)
       const snapshotHour = parseInt(Deno.env.get("PSYCHEROS_SNAPSHOT_HOUR") || "3");

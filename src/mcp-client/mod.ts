@@ -1808,6 +1808,52 @@ export class MCPClient {
       return { success: false, nodesCreated: 0, edgesCreated: 0, error: String(error) };
     }
   }
+
+  /**
+   * Run memory consolidation via entity-core's memory_consolidate tool.
+   */
+  async consolidateMemories(options?: {
+    granularity?: "weekly" | "monthly" | "yearly";
+    targetDate?: string;
+    all?: boolean;
+  }): Promise<{
+    success: boolean;
+    consolidations: Array<{ granularity: string; dateStr: string; success: boolean; error?: string }>;
+    message: string;
+  }> {
+    if (!this.client) {
+      return {
+        success: false,
+        consolidations: [],
+        message: "MCP not connected — consolidation requires entity-core",
+      };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "memory_consolidate",
+        arguments: {
+          granularity: options?.granularity,
+          targetDate: options?.targetDate,
+          all: options?.all,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return {
+          success: response.success,
+          consolidations: response.consolidations ?? [],
+          message: response.message ?? "Consolidation complete",
+        };
+      }
+      return { success: false, consolidations: [], message: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] Memory consolidation failed:", error);
+      return { success: false, consolidations: [], message: String(error) };
+    }
+  }
 }
 
 /**

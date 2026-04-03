@@ -4,7 +4,9 @@ Psycheros implements a hierarchical memory system where the entity writes their 
 
 ## Memory Hierarchy
 
-Memories are written in the entity's voice (first-person), referring to the user by their actual name and preferred pronouns. All summarization LLM calls receive the entity's full identity context (base instructions, self, user, relationship, and custom files) as a system message, so memories reflect the entity's personality and knowledge of the user. They are organized hierarchically and consolidated over time via Deno cron jobs.
+Memories are written in the entity's voice (first-person), referring to the user by their actual name and preferred pronouns. All summarization LLM calls receive the entity's full identity context (base instructions, self, user, relationship, and custom files) as a system message, so memories reflect the entity's personality and knowledge of the user. They are organized hierarchically and consolidated over time.
+
+Daily summarization runs locally in Psycheros (triggered by day-change detection). Weekly, monthly, and yearly consolidation runs in [entity-core](https://github.com/zarilewis/entity-core) via its own cron jobs, independently of whether any Psycheros instance is connected. The consolidation UI in Settings > Memories delegates to entity-core via MCP when available.
 
 ```
 memories/
@@ -26,10 +28,10 @@ memories/
 
 | Type | Description | Created By |
 |------|-------------|------------|
-| **Daily** | Auto-generated conversation summaries | Day-change trigger |
-| **Weekly** | Consolidated from daily entries | Cron (Sunday 5 AM) |
-| **Monthly** | Consolidated from weekly entries | Cron (1st of month 5 AM) |
-| **Yearly** | Consolidated from monthly entries | Cron (January 1st 5 AM) |
+| **Daily** | Auto-generated conversation summaries | Psycheros day-change trigger |
+| **Weekly** | Consolidated from daily entries | entity-core cron (Sunday 5 AM) |
+| **Monthly** | Consolidated from weekly entries | entity-core cron (1st of month 5 AM) |
+| **Yearly** | Consolidated from monthly entries | entity-core cron (January 1st 5 AM) |
 | **Significant** | Emotionally important events, permanently remembered | Entity via `create_significant_memory` tool |
 
 ### Trigger
@@ -38,15 +40,16 @@ On first message of a new day (detected by date change), the previous day's conv
 
 ### Consolidation Schedule
 
-Configured via environment variables:
-- Daily summarization: `PSYCHEROS_MEMORY_HOUR` (default: 4 AM)
-- Weekly: Sunday 5 AM
-- Monthly: 1st of month 5 AM
-- Yearly: January 1st 5 AM
+- **Daily summarization**: Psycheros `PSYCHEROS_MEMORY_HOUR` (default: 4 AM) — runs locally
+- **Weekly**: entity-core cron (Sunday 5 AM) — runs in entity-core
+- **Monthly**: entity-core cron (1st of month 5 AM) — runs in entity-core
+- **Yearly**: entity-core cron (January 1st 5 AM) — runs in entity-core
+
+Weekly, monthly, and yearly consolidation run independently in entity-core regardless of whether Psycheros is connected. Entity-core uses the `memory_consolidate` MCP tool and `Deno.cron` jobs to manage this.
 
 ### Catch-up Consolidation
 
-If the server was offline when a consolidation was scheduled, missed periods can be backfilled. The Catch-up tab in Settings > Memories shows the current consolidation status for weekly, monthly, and yearly levels. Clicking "Run Catch-up" fires `runAllConsolidations` in the background, which finds all unconsolidated periods across all granularity levels and processes them sequentially (weekly first, then monthly, then yearly). Results are displayed in the UI via SSE. A double-run guard prevents concurrent consolidation.
+If entity-core was offline when a consolidation was scheduled, missed periods can be backfilled via the `memory_consolidate` MCP tool (with `all=true`). The Catch-up tab in Settings > Memories delegates to entity-core via MCP when available. A double-run guard prevents concurrent consolidation.
 
 ### Instance Tagging
 
@@ -149,11 +152,10 @@ Eager RAG over user-uploaded and entity-created reference documents. Documents a
 
 | File | Purpose |
 |------|---------|
-| `src/memory/mod.ts` | Hierarchical memory system |
+| `src/memory/mod.ts` | Hierarchical memory system (daily only) |
 | `src/memory/types.ts` | Memory types with instance tagging |
-| `src/memory/consolidator.ts` | Weekly/monthly/yearly consolidation |
-| `src/memory/summarizer.ts` | Daily/weekly/monthly/yearly summarization with identity context |
-| `src/memory/trigger.ts` | Day-change detection |
+| `src/memory/summarizer.ts` | Daily summarization with identity context |
+| `src/memory/trigger.ts` | Day-change detection, catch-up, orphan repair |
 | `src/memory/file-writer.ts` | Memory file operations |
 | `src/rag/mod.ts` | RAG retrieval system |
 | `src/rag/embedder.ts` | HuggingFace transformer embeddings |
