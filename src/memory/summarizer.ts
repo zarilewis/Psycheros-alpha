@@ -337,7 +337,7 @@ export async function summarizeDay(
     }
 
     // Format the memory file
-    const dateInfo = getDateFormatInfo(date, "daily");
+    const dateInfo = getDateFormatInfo(date, "daily", getInstanceId());
     const content = formatMemoryContent(dateInfo.title, bulletPoints);
 
     // Extract chat IDs from the content
@@ -400,8 +400,9 @@ export async function consolidateWeek(
 
   const weekFiles: string[] = [];
   for (const file of dailyFiles) {
-    // Match daily/YYYY-MM-DD.md
-    const match = file.match(/(?:^|\/)daily\/(\d{4}-\d{2}-\d{2})\.md$/);
+    // Match daily/YYYY-MM-DD_instance.md or legacy daily/YYYY-MM-DD.md
+    const match = file.match(/(?:^|\/)daily\/(\d{4}-\d{2}-\d{2})_(?:\w+)\.md$/)
+      || file.match(/(?:^|\/)daily\/(\d{4}-\d{2}-\d{2})\.md$/);
     if (match) {
       const fileDate = new Date(match[1]);
       if (fileDate >= weekStart && fileDate <= weekEnd) {

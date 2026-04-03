@@ -132,8 +132,9 @@ export function getISOWeekMonday(year: number, week: number): Date {
 
 /**
  * Get date format info for a given date and granularity.
+ * Daily memories use instance-scoped filenames when instanceId is provided.
  */
-export function getDateFormatInfo(date: Date, granularity: Granularity): DateFormatInfo {
+export function getDateFormatInfo(date: Date, granularity: Granularity, instanceId?: string): DateFormatInfo {
   const year = date.getUTCFullYear();
   const month = String(date.getUTCMonth() + 1).padStart(2, "0");
   const day = String(date.getUTCDate()).padStart(2, "0");
@@ -141,9 +142,10 @@ export function getDateFormatInfo(date: Date, granularity: Granularity): DateFor
   switch (granularity) {
     case "daily": {
       const dateStr = `${year}-${month}-${day}`;
+      const fileName = instanceId ? `${dateStr}_${instanceId}.md` : `${dateStr}.md`;
       return {
         dateStr,
-        filePath: `daily/${dateStr}.md`,
+        filePath: `daily/${fileName}`,
         title: `Daily Memory - ${dateStr}`,
       };
     }

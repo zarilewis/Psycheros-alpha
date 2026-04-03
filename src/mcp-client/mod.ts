@@ -856,6 +856,7 @@ export class MCPClient {
             date,
             content,
             editedBy: this.config.instanceId,
+            instanceId: this.config.instanceId,
           },
         });
 

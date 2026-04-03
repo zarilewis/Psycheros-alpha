@@ -74,7 +74,8 @@ async function findUnconsolidatedPeriods(
     let fileDate: Date | null = null;
 
     if (sourceGranularity === "daily") {
-      const match = file.match(/(?:^|\/)daily\/(\d{4}-\d{2}-\d{2})\.md$/);
+      const match = file.match(/(?:^|\/)daily\/(\d{4}-\d{2}-\d{2})_(?:\w+)\.md$/)
+        || file.match(/(?:^|\/)daily\/(\d{4}-\d{2}-\d{2})\.md$/);
       if (match) {
         fileDate = new Date(match[1]);
       }
