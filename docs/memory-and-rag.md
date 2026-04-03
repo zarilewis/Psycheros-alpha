@@ -8,8 +8,8 @@ Memories are written in the entity's voice (first-person), referring to the user
 
 ```
 memories/
-├── daily/           # Daily summaries (auto-generated)
-│   └── 2026-02-22.md
+├── daily/           # Daily summaries (auto-generated, per-instance)
+│   └── 2026-02-22_psycheros.md
 ├── weekly/          # Weekly consolidation (Sundays)
 │   └── 2026-W08.md
 ├── monthly/         # Monthly consolidation (1st of month)
