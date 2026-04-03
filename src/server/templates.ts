@@ -1671,6 +1671,13 @@ export function renderMemoryList(
     createFormHtml = `
       <div class="settings-create-file" style="flex-wrap: wrap; gap: 8px;">
         <input
+          type="text"
+          class="settings-create-file-input"
+          id="significant-title-input"
+          placeholder="Memory title..."
+          style="flex: 1 1 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--input-bg); color: var(--fg); font-family: inherit; font-size: 13px;"
+        />
+        <input
           type="date"
           class="settings-create-file-input"
           id="significant-date-input"

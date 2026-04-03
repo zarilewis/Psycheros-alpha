@@ -109,16 +109,11 @@ export function extractChatIds(content: string): string[] {
  * @returns Formatted markdown content
  */
 export function formatMemoryContent(title: string, bulletPoints: string[]): string {
-  const timestamp = new Date().toISOString();
   const bulletList = bulletPoints.map((point) => `- ${point}`).join("\n");
 
   return `# ${title}
 
 ${bulletList}
-
-<!--
-Generated: ${timestamp}
--->
 `;
 }
 

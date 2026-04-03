@@ -3175,6 +3175,7 @@ async function saveMessageEdit(messageId) {
  * Create a new significant memory via the API.
  */
 async function createSignificantMemory() {
+  const titleInput = document.getElementById('significant-title-input');
   const dateInput = document.getElementById('significant-date-input');
   const contentInput = document.getElementById('significant-content-input');
   if (!dateInput || !contentInput) {
@@ -3182,6 +3183,7 @@ async function createSignificantMemory() {
     return;
   }
 
+  const title = titleInput ? titleInput.value.trim() : '';
   const date = dateInput.value.trim();
   if (!date) {
     showToast('Please select a date');
@@ -3196,6 +3198,7 @@ async function createSignificantMemory() {
 
   try {
     const formData = new FormData();
+    formData.append('title', title);
     formData.append('date', date);
     formData.append('content', content);
 

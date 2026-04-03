@@ -29,11 +29,8 @@ function slugify(title: string): string {
 function formatSignificantMemory(
   title: string,
   content: string,
-  conversationId: string
 ): string {
-  const now = new Date();
-  const dateStr = now.toISOString().split("T")[0];
-  const timestamp = now.toISOString();
+  const dateStr = new Date().toISOString().split("T")[0];
 
   return `# ${title}
 
@@ -41,8 +38,6 @@ ${content}
 
 <!--
 Date: ${dateStr}
-Conversation: ${conversationId}
-Created: ${timestamp}
 -->
 `;
 }
@@ -110,11 +105,10 @@ export const createSignificantMemoryTool: Tool = {
       };
     }
 
-    // Build file path
-    const now = new Date();
-    const dateStr = now.toISOString().split("T")[0];
+    // Build file path — slug + instance, no date in filename
+    const instanceId = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
     const slug = slugify(title);
-    const fileName = `${dateStr}_${slug}.md`;
+    const fileName = `${slug}_${instanceId}.md`;
     const filePath = join(ctx.config.projectRoot, "memories", "significant", fileName);
 
     try {
@@ -126,7 +120,6 @@ export const createSignificantMemoryTool: Tool = {
       const formattedContent = formatSignificantMemory(
         title.trim(),
         content.trim(),
-        ctx.conversationId
       );
       await Deno.writeTextFile(filePath, formattedContent);
 

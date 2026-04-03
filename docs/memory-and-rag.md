@@ -17,7 +17,7 @@ memories/
 ├── yearly/          # Yearly consolidation (Jan 1st)
 │   └── 2026.md
 ├── significant/     # Permanently remembered events (never consolidated)
-│   └── 2026-02-23_first-conversation.md
+│   └── first-conversation_psycheros.md
 └── archive/
     └── daily/       # Archived daily files after weekly consolidation
 ```

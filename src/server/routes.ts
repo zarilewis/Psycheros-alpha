@@ -1870,6 +1870,20 @@ export async function handleSaveMemory(
 }
 
 /**
+ * Convert a title to a URL-safe filename slug.
+ */
+function slugify(title: string): string {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .substring(0, 50);
+}
+
+/**
  * Handle POST /api/memories/significant/create - Create a new significant memory.
  */
 export async function handleCreateSignificantMemory(
@@ -1878,6 +1892,7 @@ export async function handleCreateSignificantMemory(
 ): Promise<Response> {
   try {
     const formData = await request.formData();
+    const title = formData.get("title") as string | null;
     const date = formData.get("date") as string | null;
     const content = formData.get("content") as string | null;
 
@@ -1895,11 +1910,27 @@ export async function handleCreateSignificantMemory(
       });
     }
 
+    // Derive slug from title, or auto-generate from first line of content
+    const slug = (title && title.trim().length > 0)
+      ? slugify(title)
+      : slugify(content.trim().split("\n")[0].replace(/^[-*#>\s]+/, ""));
+
+    const instanceId = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
+    const fileName = `${slug}_${instanceId}.md`;
+    const formattedContent = `# ${title || content.trim().split("\n")[0]}
+
+${content.trim()}
+
+<!--
+Date: ${date}
+-->
+`;
+
     // Write local file using writeMemoryFile (handles DB tracking for non-significant;
     // significant skips DB tracking per file-writer.ts)
     const memory = {
-      path: `significant/${date}.md`,
-      content,
+      path: `significant/${fileName}`,
+      content: formattedContent,
       chatIds: [],
       granularity: "significant" as const,
       date,
@@ -1910,7 +1941,7 @@ export async function handleCreateSignificantMemory(
     // Push to entity-core via MCP
     if (ctx.mcpClient?.isConnected()) {
       try {
-        await ctx.mcpClient.createMemory("significant", date, content);
+        await ctx.mcpClient.createMemory("significant", date, formattedContent);
       } catch (error) {
         console.error("[Routes] MCP memory_create for significant failed (local save succeeded):", error instanceof Error ? error.message : String(error));
       }
@@ -1919,7 +1950,7 @@ export async function handleCreateSignificantMemory(
     // Reindex
     if (ctx.memoryIndexer) {
       try {
-        await ctx.memoryIndexer.reindexFile(`significant/${date}.md`);
+        await ctx.memoryIndexer.reindexFile(`significant/${fileName}`);
       } catch (error) {
         console.error("[Routes] Memory reindex failed (non-fatal):", error instanceof Error ? error.message : String(error));
       }
