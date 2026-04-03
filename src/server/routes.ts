@@ -54,7 +54,16 @@ import {
   renderWebSearchSettings,
   renderConnectionsSettings,
   renderToolsSettings,
+  renderEntityCoreHub,
+  renderEntityCoreOverview,
+  renderEntityCoreGraph,
+  renderEntityCoreMaintenance,
+  renderEntityCoreSnapshots,
+  renderEntityCoreSnapshotPreview,
+  renderECConsolidationRunning,
+  renderECConsolidationComplete,
   type GeneralSettings,
+  type EntityCoreOverviewData,
   escapeHtml,
   type MetricsMap,
 } from "./templates.ts";
@@ -5072,5 +5081,286 @@ export async function handlePushVapidKey(
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       },
     );
+  }
+}
+
+// =============================================================================
+// Entity Core Routes
+// =============================================================================
+
+/**
+ * Handle GET /fragments/settings/entity-core — Entity Core hub with tab navigation.
+ */
+export function handleEntityCoreFragment(_ctx: RouteContext): Response {
+  const html = renderEntityCoreHub();
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/entity-core/overview — Overview tab.
+ */
+export async function handleEntityCoreOverview(ctx: RouteContext): Promise<Response> {
+  const connected = ctx.mcpClient?.isConnected() ?? false;
+
+  let stats = null;
+  let pendingIdentity = 0;
+  let pendingMemories = 0;
+  let lastSyncTime = null;
+
+  if (connected && ctx.mcpClient) {
+    stats = await ctx.mcpClient.getGraphStats();
+    const pending = ctx.mcpClient.getPendingCount();
+    pendingIdentity = pending.identity;
+    pendingMemories = pending.memories;
+    lastSyncTime = ctx.mcpClient.getLastSyncTime();
+  }
+
+  const data: EntityCoreOverviewData = {
+    connected,
+    stats,
+    pendingIdentity,
+    pendingMemories,
+    lastSyncTime,
+  };
+
+  const html = renderEntityCoreOverview(data);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/entity-core/graph — Knowledge Graph tab.
+ */
+export async function handleEntityCoreGraph(ctx: RouteContext): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      `<div class="error">Knowledge Graph requires entity-core connection.</div>`,
+      {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      }
+    );
+  }
+
+  const stats = await ctx.mcpClient.getGraphStats();
+  const html = renderEntityCoreGraph(stats);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/entity-core/maintenance — Maintenance tab.
+ */
+export function handleEntityCoreMaintenance(ctx: RouteContext): Response {
+  const mcpAvailable = !!ctx.mcpClient;
+  const html = renderEntityCoreMaintenance(mcpAvailable);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/entity-core/snapshots — Snapshots tab.
+ */
+export async function handleEntityCoreSnapshots(ctx: RouteContext): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      `<div class="error">Snapshots require entity-core connection.</div>`,
+      {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      }
+    );
+  }
+
+  const result = await ctx.mcpClient.listSnapshots();
+  const snapshots = result.snapshots ?? [];
+  const html = renderEntityCoreSnapshots(snapshots);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/entity-core/snapshots/:id — Snapshot preview.
+ */
+export async function handleEntityCoreSnapshotPreview(ctx: RouteContext, snapshotId: string): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(
+      `<div class="error">Snapshots require entity-core connection.</div>`,
+      {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      }
+    );
+  }
+
+  const result = await ctx.mcpClient.getSnapshotContent(snapshotId);
+  if (!result.success || !result.content) {
+    return new Response(
+      `<div class="error">${escapeHtml(result.error || "Snapshot not found")}</div>`,
+      {
+        status: 404,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      }
+    );
+  }
+
+  // Parse metadata from snapshot header
+  const lines = result.content.split("\n");
+  let category = "self";
+  let filename = "unknown";
+  for (const line of lines.slice(0, 10)) {
+    const catMatch = line.match(/^# Snapshot: (.+)\/(.+)$/);
+    if (catMatch) {
+      category = catMatch[1];
+      filename = catMatch[2];
+    }
+  }
+
+  const html = renderEntityCoreSnapshotPreview(category, filename, result.content, snapshotId);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle POST /api/entity-core/consolidation/run — Run consolidation from Entity Core context.
+ */
+let ecConsolidationRunning = false;
+
+export async function handleEntityCoreConsolidationRun(ctx: RouteContext): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(renderSaveError("Consolidation requires MCP connection to entity-core"), {
+      status: 400,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  if (ecConsolidationRunning) {
+    return new Response(renderSaveError("Consolidation is already running"), {
+      status: 409,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  ecConsolidationRunning = true;
+
+  const html = renderECConsolidationRunning();
+  const response = new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+
+  // Fire consolidation in background
+  const mcpClient = ctx.mcpClient;
+  mcpClient.consolidateMemories({ all: true })
+    .then((result) => {
+      const displayResults = result.consolidations.map((c) => ({
+        granularity: c.granularity,
+        success: c.success,
+        error: c.error,
+      }));
+
+      const html = renderECConsolidationComplete(displayResults);
+      getBroadcaster().broadcastUpdate({
+        target: "#ec-consolidation-content",
+        html,
+        swap: "outerHTML",
+      }, null);
+    })
+    .catch((error) => {
+      console.error("[Routes] EC consolidation failed:", error);
+      const html = renderECConsolidationComplete([
+        { granularity: "consolidation", success: false, error: error instanceof Error ? error.message : String(error) },
+      ]);
+      getBroadcaster().broadcastUpdate({
+        target: "#ec-consolidation-content",
+        html,
+        swap: "outerHTML",
+      }, null);
+    })
+    .finally(() => {
+      ecConsolidationRunning = false;
+    });
+
+  return response;
+}
+
+/**
+ * Handle POST /api/entity-core/sync — Manual sync (pull then push).
+ */
+export async function handleEntityCoreSync(ctx: RouteContext): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(JSON.stringify({ success: false, error: "MCP not connected" }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  try {
+    await ctx.mcpClient.pull();
+    await ctx.mcpClient.push();
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
+/**
+ * Handle POST /api/entity-core/actions/embed-memories — Run embed-existing-memories script.
+ */
+export async function handleEmbedMemories(_ctx: RouteContext, body: Record<string, unknown>): Promise<Response> {
+  const dryRun = body.dryRun === true;
+  const verbose = body.verbose === true;
+
+  const entityCoreRoot = Deno.env.get("PSYCHEROS_ENTITY_CORE_PATH") ||
+    new URL("../../entity-core", import.meta.url).pathname;
+
+  const args = [
+    "run", "-A",
+    `${entityCoreRoot}/scripts/embed-existing-memories.ts`,
+  ];
+  if (dryRun) args.push("--dry-run");
+  if (verbose) args.push("--verbose");
+
+  try {
+    const cmd = new Deno.Command("deno", {
+      args,
+      env: {
+        ENTITY_CORE_DATA_DIR: Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${entityCoreRoot}/data`,
+      },
+      stdout: "piped",
+      stderr: "piped",
+    });
+
+    const process = cmd.spawn();
+    const [stdout, stderr] = await Promise.all([
+      new Response(process.stdout).text(),
+      new Response(process.stderr).text(),
+    ]);
+    const status = await process.status;
+
+    const output = stdout + (stderr ? `\n--- stderr ---\n${stderr}` : "");
+    const success = status.success;
+
+    return new Response(JSON.stringify({ success, exitCode: status.code, output }), {
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({
+      success: false,
+      exitCode: -1,
+      output: `Failed to spawn script: ${error instanceof Error ? error.message : String(error)}`,
+    }), { headers: { "Content-Type": "application/json" } });
   }
 }

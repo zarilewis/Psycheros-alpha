@@ -241,7 +241,7 @@ Output includes exit code and full script stdout/stderr. The script runs as a su
 
 Interactive graph viewer for the knowledge graph stored in entity-core. Requires MCP connection (`PSYCHEROS_MCP_ENABLED=true`).
 
-Access via Settings → Knowledge Graph in the sidebar.
+Access via Settings → Entity Core → Knowledge Graph tab.
 
 **Features:**
 - Create/delete nodes (person, emotion, event, topic, preference, place, goal, health, boundary, tradition, insight)
@@ -287,7 +287,7 @@ Document storage and search system accessible via Settings → Data Vault in the
 Review and edit the entity's recorded memories accessible via Settings → Memories in the sidebar. Modeled after the Core Prompts UI with the same tabbed navigation pattern.
 
 **Features:**
-- Six tabs: Daily, Weekly, Monthly, Yearly, Significant, Catch-up
+- Five tabs: Daily, Weekly, Monthly, Yearly, Significant
 - File lists sorted newest-first, each linking to a full editor
 - Editor displays read-only metadata (source instance, created/updated timestamps, version) when available from entity-core
 - Save writes the local file, pushes an overwrite update to entity-core via MCP (if connected), and reindexes the file in RAG

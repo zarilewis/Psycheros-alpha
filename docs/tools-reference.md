@@ -322,10 +322,10 @@ The `identity/custom/` directory allows creating arbitrary identity files:
 
 Accessible via Settings hub in the sidebar. Provides a web interface for managing identity files:
 
-**Tabs:** Self, User, Relationship, Custom, Snapshots
+**Tabs:** Self, User, Relationship, Custom
 
 **Features:**
 - View and edit any identity file
 - Create/delete custom files
-- Create manual snapshots
-- Preview and restore from snapshots (requires MCP connection)
+
+Snapshots (browse, create, preview, restore) are accessible via Settings → Entity Core → Snapshots.

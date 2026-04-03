@@ -213,6 +213,13 @@ export class MCPClient {
   }
 
   /**
+   * Get the timestamp of the last successful sync (pull or push).
+   */
+  getLastSyncTime(): string | null {
+    return this.cache.lastSync;
+  }
+
+  /**
    * Pull identity and memories from entity-core.
    */
   async pull(): Promise<IdentityContent | null> {

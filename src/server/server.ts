@@ -77,6 +77,15 @@ import {
   handleLorebookEntryEditFragment,
   handleGraphView,
   handleGetGraphData,
+  handleEntityCoreFragment,
+  handleEntityCoreOverview,
+  handleEntityCoreGraph,
+  handleEntityCoreMaintenance,
+  handleEntityCoreSnapshots,
+  handleEntityCoreSnapshotPreview,
+  handleEntityCoreConsolidationRun,
+  handleEntityCoreSync,
+  handleEmbedMemories,
   handleCreateGraphNode,
   handleCreateGraphEdge,
   handleDeleteGraphNode,
@@ -817,6 +826,22 @@ export class Server {
       return await handleConsolidationRun(ctx);
     }
 
+    // POST /api/entity-core/consolidation/run - Run consolidation from Entity Core context
+    if (method === "POST" && path === "/api/entity-core/consolidation/run") {
+      return await handleEntityCoreConsolidationRun(ctx);
+    }
+
+    // POST /api/entity-core/sync - Manual sync (pull + push)
+    if (method === "POST" && path === "/api/entity-core/sync") {
+      return await handleEntityCoreSync(ctx);
+    }
+
+    // POST /api/entity-core/actions/embed-memories - Run embed-existing-memories script
+    if (method === "POST" && path === "/api/entity-core/actions/embed-memories") {
+      const body = await request.json() as Record<string, unknown>;
+      return await handleEmbedMemories(ctx, body);
+    }
+
     // ========================================
     // Memories API Routes
     // ========================================
@@ -1376,6 +1401,41 @@ export class Server {
     // GET /fragments/settings/graph - Graph visualization fragment
     if (path === "/fragments/settings/graph") {
       return await handleGraphView(ctx);
+    }
+
+    // ========================================
+    // Entity Core Fragment Routes
+    // ========================================
+
+    // GET /fragments/settings/entity-core - Entity Core hub
+    if (path === "/fragments/settings/entity-core") {
+      return handleEntityCoreFragment(ctx);
+    }
+
+    // GET /fragments/settings/entity-core/overview
+    if (path === "/fragments/settings/entity-core/overview") {
+      return await handleEntityCoreOverview(ctx);
+    }
+
+    // GET /fragments/settings/entity-core/graph
+    if (path === "/fragments/settings/entity-core/graph") {
+      return await handleEntityCoreGraph(ctx);
+    }
+
+    // GET /fragments/settings/entity-core/maintenance
+    if (path === "/fragments/settings/entity-core/maintenance") {
+      return handleEntityCoreMaintenance(ctx);
+    }
+
+    // GET /fragments/settings/entity-core/snapshots
+    if (path === "/fragments/settings/entity-core/snapshots") {
+      return await handleEntityCoreSnapshots(ctx);
+    }
+
+    // GET /fragments/entity-core/snapshots/:id - Snapshot preview in Entity Core context
+    if (path.startsWith("/fragments/entity-core/snapshots/")) {
+      const snapshotId = decodeURIComponent(path.slice("/fragments/entity-core/snapshots/".length));
+      return await handleEntityCoreSnapshotPreview(ctx, snapshotId);
     }
 
     // ========================================

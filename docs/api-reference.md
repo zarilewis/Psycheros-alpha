@@ -74,6 +74,14 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 | `POST` | `/api/settings/custom` | Create custom identity file |
 | `DELETE` | `/api/settings/custom/:filename` | Delete custom identity file |
 
+### Entity Core
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/entity-core/consolidation/run` | Run catch-up memory consolidation (delegates to entity-core) |
+| `POST` | `/api/entity-core/sync` | Manually trigger identity pull then push sync |
+| `POST` | `/api/entity-core/actions/embed-memories` | Run embed-existing-memories script in entity-core |
+
 ### Snapshots
 
 | Method | Path | Description |
@@ -212,8 +220,13 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/settings/tools` | Tools settings UI fragment |
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
 | `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
+| `GET` | `/fragments/settings/entity-core` | Entity Core hub with tab navigation |
+| `GET` | `/fragments/settings/entity-core/overview` | Entity Core overview tab (connection status, stats, sync) |
+| `GET` | `/fragments/settings/entity-core/graph` | Knowledge Graph visualization tab |
+| `GET` | `/fragments/settings/entity-core/maintenance` | Entity Core maintenance tab (consolidation, batch populate, embed) |
+| `GET` | `/fragments/settings/entity-core/snapshots` | Snapshot browser tab |
+| `GET` | `/fragments/entity-core/snapshots/:id` | Snapshot preview fragment |
 | `GET` | `/fragments/settings/memories` | Memories tabbed view fragment |
-| `GET` | `/fragments/settings/memories/consolidation` | Consolidation catch-up status tab |
 | `GET` | `/fragments/settings/memories/:granularity` | Memory file list fragment (daily/weekly/monthly/yearly/significant) |
 | `GET` | `/fragments/settings/memories/:granularity/:date` | Memory editor fragment |
 | `GET` | `/api/admin/diagnostics` | JSON diagnostics snapshot (all subsystems) |

@@ -1941,3 +1941,153 @@
   color: #ef4444;
   background-color: rgba(239, 68, 68, 0.1);
 }
+
+/* =============================================================================
+   Entity Core Styles
+   ============================================================================= */
+
+/* Connection status indicator */
+.ec-status {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--sp-4);
+}
+
+.ec-status--connected {
+  background-color: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+}
+
+.ec-status--disconnected {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+}
+
+.ec-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ec-status--connected .ec-status-dot {
+  background-color: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
+}
+
+.ec-status--disconnected .ec-status-dot {
+  background-color: #ef4444;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.4);
+}
+
+/* Disconnected message */
+.ec-disconnected {
+  padding: var(--sp-5);
+  text-align: center;
+}
+
+.ec-disconnected p {
+  color: var(--c-fg-dim);
+  margin: var(--sp-3) 0 var(--sp-4);
+  line-height: 1.6;
+}
+
+.ec-disconnected code {
+  background-color: var(--c-bg-sunken);
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  font-size: var(--font-size-xs);
+}
+
+/* Stats grid */
+.ec-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.ec-stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm);
+  background-color: var(--c-bg-sunken);
+  border: 1px solid var(--c-border);
+}
+
+.ec-stat-value {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--c-fg);
+}
+
+.ec-stat-value--active {
+  color: #22c55e;
+}
+
+.ec-stat-value--off {
+  color: var(--c-fg-dim);
+}
+
+.ec-stat-label {
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Detail rows */
+.ec-detail {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+  font-size: var(--font-size-sm);
+  color: var(--c-fg-dim);
+}
+
+.ec-detail-label {
+  font-weight: 500;
+  color: var(--c-fg);
+}
+
+.ec-detail-value {
+  color: var(--c-fg-dim);
+}
+
+/* Actions area */
+.ec-actions {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--c-border);
+}
+
+/* Maintenance sections */
+.ec-maintenance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.ec-maintenance-section {
+  border-bottom: 1px solid var(--c-border);
+  padding-bottom: var(--sp-5);
+}
+
+.ec-maintenance-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+/* Snapshots container in Entity Core */
+.ec-snapshots {
+  /* Reuses snapshot styles from existing CSS */
+}

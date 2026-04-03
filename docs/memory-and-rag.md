@@ -6,7 +6,7 @@ Psycheros implements a hierarchical memory system where the entity writes their 
 
 Memories are written in the entity's voice (first-person), referring to the user by their actual name and preferred pronouns. All summarization LLM calls receive the entity's full identity context (base instructions, self, user, relationship, and custom files) as a system message, so memories reflect the entity's personality and knowledge of the user. They are organized hierarchically and consolidated over time.
 
-Daily summarization runs locally in Psycheros (triggered by day-change detection). Weekly, monthly, and yearly consolidation runs in [entity-core](https://github.com/zarilewis/entity-core) via its own cron jobs, independently of whether any Psycheros instance is connected. The consolidation UI in Settings > Memories delegates to entity-core via MCP when available.
+Daily summarization runs locally in Psycheros (triggered by day-change detection). Weekly, monthly, and yearly consolidation runs in [entity-core](https://github.com/zarilewis/entity-core) via its own cron jobs, independently of whether any Psycheros instance is connected. Consolidation and catch-up can be triggered from the Entity Core card (Settings → Entity Core → Maintenance).
 
 ```
 memories/
@@ -49,7 +49,7 @@ Weekly, monthly, and yearly consolidation run independently in entity-core regar
 
 ### Catch-up Consolidation
 
-If entity-core was offline when a consolidation was scheduled, missed periods can be backfilled via the `memory_consolidate` MCP tool (with `all=true`). The Catch-up tab in Settings > Memories delegates to entity-core via MCP when available. A double-run guard prevents concurrent consolidation.
+If entity-core was offline when a consolidation was scheduled, missed periods can be backfilled via the `memory_consolidate` MCP tool (with `all=true`). The Maintenance tab in Settings → Entity Core delegates to entity-core via MCP when available. A double-run guard prevents concurrent consolidation.
 
 ### Instance Tagging
 

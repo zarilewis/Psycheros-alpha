@@ -341,25 +341,7 @@ export function renderSettingsHub(): string {
         </svg>
       </a>
       <a class="settings-hub-card"
-        hx-get="/fragments/settings/lorebooks"
-        hx-target="#chat"
-        hx-swap="innerHTML">
-        <div class="settings-hub-card-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-          </svg>
-        </div>
-        <div class="settings-hub-card-body">
-          <span class="settings-hub-card-title">Context Books</span>
-          <span class="settings-hub-card-desc">Manage context books and keyword-triggered entries</span>
-        </div>
-        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </a>
-      <a class="settings-hub-card"
-        hx-get="/fragments/settings/graph"
+        hx-get="/fragments/settings/entity-core"
         hx-target="#chat"
         hx-swap="innerHTML">
         <div class="settings-hub-card-icon">
@@ -372,8 +354,26 @@ export function renderSettingsHub(): string {
           </svg>
         </div>
         <div class="settings-hub-card-body">
-          <span class="settings-hub-card-title">Knowledge Graph</span>
-          <span class="settings-hub-card-desc">Interactive knowledge graph visualization</span>
+          <span class="settings-hub-card-title">Entity Core</span>
+          <span class="settings-hub-card-desc">Manage entity-core connection, knowledge graph, and maintenance</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/lorebooks"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Context Books</span>
+          <span class="settings-hub-card-desc">Manage context books and keyword-triggered entries</span>
         </div>
         <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 18 15 12 9 6"/>
@@ -1214,17 +1214,13 @@ export function renderCorePromptsSettings(activeDir: PromptDirectory = "self"): 
     { id: "user", label: "User" },
     { id: "relationship", label: "Relationship" },
     { id: "custom", label: "Custom" },
-    { id: "snapshots", label: "Snapshots" },
   ];
 
   const tabsHtml = tabs.map((tab) => {
     const isActive = tab.id === activeDir;
-    const getUrl = tab.id === "snapshots"
-      ? "/fragments/settings/snapshots"
-      : `/fragments/settings/core-prompts/${tab.id}`;
     return `<button
       class="settings-tab${isActive ? " active" : ""}"
-      hx-get="${getUrl}"
+      hx-get="/fragments/settings/core-prompts/${tab.id}"
       hx-target="#settings-content"
       hx-swap="innerHTML"
       id="tab-${tab.id}"
@@ -1601,7 +1597,6 @@ export function renderMemoriesView(activeGranularity: string = "daily"): string 
     { id: "monthly", label: "Monthly" },
     { id: "yearly", label: "Yearly" },
     { id: "significant", label: "Significant" },
-    { id: "consolidation", label: "Catch-up" },
   ];
 
   const tabsHtml = tabs.map((tab) => {
@@ -2341,6 +2336,701 @@ export function renderGraphView(stats: {
 
 <!-- Graph styles in graph.css -->
 `;
+}
+
+// =============================================================================
+// Entity Core Templates
+// =============================================================================
+
+/**
+ * Render the Entity Core hub with tab navigation.
+ */
+export function renderEntityCoreHub(activeTab: string = "overview"): string {
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "graph", label: "Knowledge Graph" },
+    { id: "maintenance", label: "Maintenance" },
+    { id: "snapshots", label: "Snapshots" },
+  ];
+
+  const tabsHtml = tabs.map((tab) => {
+    const isActive = tab.id === activeTab;
+    return `<button
+      class="settings-tab${isActive ? " active" : ""}"
+      hx-get="/fragments/settings/entity-core/${tab.id}"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      id="ectab-${tab.id}"
+    >${tab.label}</button>`;
+  }).join("");
+
+  return `<div class="settings-view">
+  <script src="/js/entity-core.js"></script>
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Entity Core</h1>
+        <p class="settings-desc">Manage connection, knowledge graph, maintenance, and snapshots</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-tabs">
+    ${tabsHtml}
+  </div>
+  <div class="settings-content" id="settings-content"
+    hx-get="/fragments/settings/entity-core/${activeTab}"
+    hx-trigger="load"
+    hx-swap="innerHTML">
+    <div class="settings-loading">Loading...</div>
+  </div>
+</div>`;
+}
+
+/**
+ * Render Entity Core tab active state as an OOB swap.
+ */
+function renderEntityCoreTabActiveState(activeTab: string): string {
+  const tabs = ["overview", "graph", "maintenance", "snapshots"];
+  return tabs.map((tab) => {
+    const isActive = tab === activeTab;
+    const label = tab.charAt(0).toUpperCase() + tab.slice(1);
+    return `<button
+      class="settings-tab${isActive ? " active" : ""}"
+      hx-get="/fragments/settings/entity-core/${tab}"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-swap-oob="true"
+      id="ectab-${tab}"
+    >${label}</button>`;
+  }).join("");
+}
+
+/**
+ * Data for the Entity Core overview tab.
+ */
+export interface EntityCoreOverviewData {
+  connected: boolean;
+  stats: {
+    totalNodes: number;
+    totalEdges: number;
+    nodesByType: Record<string, number>;
+    edgesByType: Record<string, number>;
+    vectorSearchAvailable: boolean;
+  } | null;
+  pendingIdentity: number;
+  pendingMemories: number;
+  lastSyncTime: string | null;
+}
+
+/**
+ * Render the Entity Core overview tab.
+ */
+export function renderEntityCoreOverview(data: EntityCoreOverviewData): string {
+  const oobTabs = renderEntityCoreTabActiveState("overview");
+
+  if (!data.connected) {
+    return `${oobTabs}
+<div class="ec-overview">
+  <div class="ec-disconnected">
+    <div class="ec-status ec-status--disconnected">
+      <span class="ec-status-dot"></span>
+      <span>Disconnected</span>
+    </div>
+    <p>Entity-core is not connected. Enable MCP in your environment with
+      <code>PSYCHEROS_MCP_ENABLED=true</code> to manage identity, memories, and knowledge graph.</p>
+    <a class="btn btn--primary"
+      hx-get="/fragments/settings/connections"
+      hx-target="#chat"
+      hx-swap="innerHTML">
+      Open Connections Settings
+    </a>
+  </div>
+</div>`;
+  }
+
+  const stats = data.stats;
+  const nodeCount = stats?.totalNodes ?? 0;
+  const edgeCount = stats?.totalEdges ?? 0;
+  const vecStatus = stats?.vectorSearchAvailable ? "active" : "off";
+  const lastSync = data.lastSyncTime
+    ? new Date(data.lastSyncTime).toLocaleString()
+    : "Never";
+
+  const topNodeTypes = stats?.nodesByType
+    ? Object.entries(stats.nodesByType)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([type, count]) => `${type}: ${count}`)
+        .join(", ")
+    : "";
+
+  return `${oobTabs}
+<div class="ec-overview">
+  <div class="ec-status ec-status--connected">
+    <span class="ec-status-dot"></span>
+    <span>Connected</span>
+  </div>
+
+  <div class="ec-stats-grid">
+    <div class="ec-stat-card">
+      <span class="ec-stat-value">${nodeCount}</span>
+      <span class="ec-stat-label">Graph Nodes</span>
+    </div>
+    <div class="ec-stat-card">
+      <span class="ec-stat-value">${edgeCount}</span>
+      <span class="ec-stat-label">Graph Edges</span>
+    </div>
+    <div class="ec-stat-card">
+      <span class="ec-stat-value ec-stat-value--${vecStatus}">${vecStatus}</span>
+      <span class="ec-stat-label">Vector Search</span>
+    </div>
+    <div class="ec-stat-card">
+      <span class="ec-stat-value">${data.pendingIdentity + data.pendingMemories}</span>
+      <span class="ec-stat-label">Pending Changes</span>
+    </div>
+  </div>
+
+  ${topNodeTypes ? `<div class="ec-detail">
+    <span class="ec-detail-label">Top node types:</span>
+    <span class="ec-detail-value">${escapeHtml(topNodeTypes)}</span>
+  </div>` : ""}
+
+  <div class="ec-detail">
+    <span class="ec-detail-label">Last synced:</span>
+    <span class="ec-detail-value">${escapeHtml(lastSync)}</span>
+  </div>
+
+  <div class="ec-actions">
+    <button
+      class="btn btn--primary btn--sm"
+      id="ec-sync-btn"
+      onclick="this.textContent='Syncing...'; this.disabled=true; fetch('/api/entity-core/sync', {method:'POST'}).then(r=>r.json()).then(d=>{ this.textContent=d.success?'Synced':'Failed'; setTimeout(()=>{this.textContent='Sync Now'; this.disabled=false;}, 1500); }).catch(()=>{this.textContent='Error'; this.disabled=false;})"
+    >Sync Now</button>
+  </div>
+</div>`;
+}
+
+/**
+ * Render the Entity Core knowledge graph tab.
+ * Reuses the graph content from renderGraphView but without the standalone wrapper.
+ */
+export function renderEntityCoreGraph(stats: {
+  totalNodes: number;
+  totalEdges: number;
+  nodesByType: Record<string, number>;
+  edgesByType: Record<string, number>;
+  vectorSearchAvailable: boolean;
+} | null): string {
+  const oobTabs = renderEntityCoreTabActiveState("graph");
+  const nodeCount = stats?.totalNodes ?? 0;
+  const edgeCount = stats?.totalEdges ?? 0;
+  const vectorStatus = stats?.vectorSearchAvailable ? "active" : "off";
+
+  return `${oobTabs}
+<div class="gv">
+  <div class="gv-header">
+    <div class="gv-header-left">
+      <div class="gv-title-block">
+        <h2 class="gv-title">Knowledge Graph</h2>
+        <div class="gv-stats">
+          <span><strong>${nodeCount}</strong> nodes</span>
+          <span class="gv-stats-sep">&middot;</span>
+          <span><strong>${edgeCount}</strong> edges</span>
+          <span class="gv-stats-sep">&middot;</span>
+          <span>vec: ${vectorStatus}</span>
+        </div>
+      </div>
+    </div>
+    <div class="gv-header-actions">
+      <button id="graph-refresh" class="btn btn--ghost btn--sm" title="Refresh">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="gv-toolbar">
+    <div class="gv-toolbar-controls">
+      <button id="graph-zoom-fit" class="btn btn--ghost btn--sm" title="Fit to view">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+        </svg>
+      </button>
+      <button id="graph-zoom-in" class="btn btn--ghost btn--sm" title="Zoom in">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+      <button id="graph-zoom-out" class="btn btn--ghost btn--sm" title="Zoom out">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+    </div>
+    <input type="text" id="graph-search" placeholder="Search..." class="gv-search" />
+    <select id="graph-filter-type" class="gv-filter">
+      <option value="">All types</option>
+    </select>
+  </div>
+
+  <div id="graph-container" class="gv-canvas">
+    <div class="gv-loading">
+      <div class="gv-spinner"></div>
+    </div>
+  </div>
+
+  <div id="graph-node-panel" class="gv-panel">
+    <div class="gv-panel-header">
+      <h3 id="panel-node-label">Node</h3>
+      <button id="panel-close" class="btn btn--ghost btn--sm">&times;</button>
+    </div>
+    <div class="gv-panel-body" id="panel-content"></div>
+  </div>
+
+  <div id="graph-create-modal" class="gv-modal">
+    <div class="gv-modal-box">
+      <h3>Create Node</h3>
+      <form id="create-node-form">
+        <div class="gv-field">
+          <label for="node-type">Type</label>
+          <select id="node-type" name="type" required>
+            <option value="person">Person</option>
+            <option value="emotion">Emotion</option>
+            <option value="topic" selected>Topic</option>
+            <option value="preference">Preference</option>
+            <option value="place">Place</option>
+            <option value="goal">Goal</option>
+            <option value="health">Health</option>
+            <option value="boundary">Boundary</option>
+            <option value="tradition">Tradition</option>
+            <option value="insight">Insight</option>
+          </select>
+        </div>
+        <div class="gv-field">
+          <label for="node-label">Label</label>
+          <input type="text" id="node-label" name="label" required placeholder="e.g. hiking, Tyler, anxiety" />
+        </div>
+        <div class="gv-field">
+          <label for="node-description">Description</label>
+          <textarea id="node-description" name="description" rows="2" placeholder="Optional..."></textarea>
+        </div>
+        <div class="gv-field gv-field-range">
+          <label for="node-confidence">Confidence</label>
+          <div class="gv-range-row">
+            <input type="range" id="node-confidence" name="confidence" min="0" max="1" step="0.1" value="0.5" />
+            <span id="confidence-value" class="gv-range-val">0.5</span>
+          </div>
+        </div>
+        <div class="gv-modal-actions">
+          <button type="button" class="btn btn--ghost" id="cancel-create">Cancel</button>
+          <button type="submit" class="btn btn--primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="graph-edit-modal" class="gv-modal">
+    <div class="gv-modal-box">
+      <h3>Edit Node</h3>
+      <form id="edit-node-form">
+        <input type="hidden" id="edit-node-id" />
+        <div class="gv-field">
+          <label for="edit-node-label">Label</label>
+          <input type="text" id="edit-node-label" required />
+        </div>
+        <div class="gv-field">
+          <label for="edit-node-description">Description</label>
+          <textarea id="edit-node-description" rows="2"></textarea>
+        </div>
+        <div class="gv-field gv-field-range">
+          <label for="edit-node-confidence">Confidence</label>
+          <div class="gv-range-row">
+            <input type="range" id="edit-node-confidence" min="0" max="1" step="0.1" value="0.5" />
+            <span id="edit-confidence-value" class="gv-range-val">0.5</span>
+          </div>
+        </div>
+        <div class="gv-modal-actions">
+          <button type="button" class="btn btn--ghost" id="cancel-edit">Cancel</button>
+          <button type="submit" class="btn btn--primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="gv-actions">
+    <button id="graph-create-node" class="btn btn--ghost gv-action-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      <span>Add Node</span>
+    </button>
+    <button id="graph-create-edge" class="btn btn--ghost gv-action-btn" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+      <span>Connect</span>
+    </button>
+    <button id="graph-delete" class="btn btn--ghost gv-action-btn gv-action-danger" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+      </svg>
+      <span>Delete</span>
+    </button>
+  </div>
+</div>
+
+<script src="/js/graph-view.js"></script>`;
+}
+
+/**
+ * Render the Entity Core maintenance tab.
+ * Contains consolidation status, batch populate graph, and embed memories sections.
+ */
+export function renderEntityCoreMaintenance(mcpAvailable: boolean): string {
+  const oobTabs = renderEntityCoreTabActiveState("maintenance");
+
+  const status: ConsolidationStatus = {
+    weekly: mcpAvailable,
+    monthly: mcpAvailable,
+    yearly: mcpAvailable,
+  };
+
+  const anyNeeded = status.weekly || status.monthly || status.yearly;
+
+  const consolidationRows = ([
+    { label: "Weekly", needed: status.weekly },
+    { label: "Monthly", needed: status.monthly },
+    { label: "Yearly", needed: status.yearly },
+  ] as const).map(({ label, needed }) => `
+    <div class="consolidation-row">
+      <span class="consolidation-row-label">${label}</span>
+      <span class="consolidation-row-status ${needed ? "consolidation-needed" : "consolidation-up-to-date"}">${needed ? "Needs catch-up" : "Up to date"}</span>
+    </div>
+  `).join("");
+
+  let consolidationActionHtml = "";
+  if (anyNeeded) {
+    consolidationActionHtml = `<button
+      class="btn btn--primary btn--sm"
+      id="ec-run-consolidation-btn"
+      hx-post="/api/entity-core/consolidation/run"
+      hx-target="#ec-consolidation-content"
+      hx-swap="outerHTML"
+    >Run Catch-up</button>`;
+  } else {
+    consolidationActionHtml = `<div class="consolidation-all-clear">All consolidation levels are up to date.</div>`;
+  }
+
+  const mcpRequiredHtml = mcpAvailable ? "" : `
+  <div class="ec-disconnected">
+    <p>These operations require an entity-core connection. Enable MCP with
+      <code>PSYCHEROS_MCP_ENABLED=true</code>.</p>
+  </div>`;
+
+  return `${oobTabs}
+<div class="ec-maintenance">
+
+  ${mcpRequiredHtml}
+
+  <div class="ec-maintenance-section">
+    <h3 class="admin-section-title">Memory Consolidation</h3>
+    <p class="admin-action-desc">
+      Merge daily and weekly memories into weekly, monthly, and yearly summaries
+      via entity-core. Uses LLM to preserve key details.
+    </p>
+    <div id="ec-consolidation-content">
+      <div class="consolidation-section">
+        <div class="consolidation-status-list">
+          ${consolidationRows}
+        </div>
+        <div class="consolidation-actions">
+          ${consolidationActionHtml}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ec-maintenance-section">
+    <h3 class="admin-section-title">Batch Populate Knowledge Graph</h3>
+    <p class="admin-action-desc">
+      Runs <code>entity-core/scripts/batch-populate-graph.ts</code> to backfill
+      the knowledge graph from existing memory files. Extracts entities and
+      relationships via LLM, with semantic dedup to prevent duplicate nodes.
+    </p>
+    <div class="admin-action-form">
+      <div class="admin-action-fields">
+        <label class="admin-action-label" for="ec-batch-days">Days</label>
+        <input id="ec-batch-days" type="number" min="1" max="3650" value="30" class="admin-input" />
+      </div>
+      <div class="admin-action-fields">
+        <label class="admin-action-label" for="ec-batch-granularity">Granularity</label>
+        <select id="ec-batch-granularity" class="admin-select">
+          <option value="daily" selected>daily</option>
+          <option value="weekly">weekly</option>
+          <option value="monthly">monthly</option>
+          <option value="yearly">yearly</option>
+          <option value="significant">significant</option>
+          <option value="all">all</option>
+        </select>
+      </div>
+      <div class="admin-action-fields">
+        <label class="admin-action-label">
+          <input id="ec-batch-dry-run" type="checkbox" class="admin-checkbox" />
+          Dry run
+        </label>
+      </div>
+      <div class="admin-action-fields">
+        <label class="admin-action-label">
+          <input id="ec-batch-verbose" type="checkbox" class="admin-checkbox" />
+          Verbose
+        </label>
+      </div>
+      <button id="ec-batch-run-btn" class="admin-action-btn" onclick="window.ecRunBatchPopulate()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        Run Script
+      </button>
+    </div>
+    <div class="admin-section" id="ec-batch-output-section" style="display:none">
+      <h3 class="admin-section-title">Output</h3>
+      <div class="admin-action-output" id="ec-batch-output"></div>
+    </div>
+  </div>
+
+  <div class="ec-maintenance-section">
+    <h3 class="admin-section-title">Embed Existing Memories</h3>
+    <p class="admin-action-desc">
+      Runs <code>entity-core/scripts/embed-existing-memories.ts</code> to backfill
+      vector embeddings for existing memory nodes in the knowledge graph.
+    </p>
+    <div class="admin-action-form">
+      <div class="admin-action-fields">
+        <label class="admin-action-label">
+          <input id="ec-embed-dry-run" type="checkbox" class="admin-checkbox" />
+          Dry run
+        </label>
+      </div>
+      <div class="admin-action-fields">
+        <label class="admin-action-label">
+          <input id="ec-embed-verbose" type="checkbox" class="admin-checkbox" />
+          Verbose
+        </label>
+      </div>
+      <button id="ec-embed-run-btn" class="admin-action-btn" onclick="window.ecRunEmbedMemories()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        Run Script
+      </button>
+    </div>
+    <div class="admin-section" id="ec-embed-output-section" style="display:none">
+      <h3 class="admin-section-title">Output</h3>
+      <div class="admin-action-output" id="ec-embed-output"></div>
+    </div>
+  </div>
+
+</div>`;
+}
+
+/**
+ * Render consolidation running state for Entity Core context.
+ */
+export function renderECConsolidationRunning(): string {
+  const oobTabs = renderEntityCoreTabActiveState("maintenance");
+  return `${oobTabs}
+<div id="ec-consolidation-content">
+  <div class="consolidation-section">
+    <h3 class="admin-section-title">Memory Consolidation</h3>
+    <div class="consolidation-running">
+      <span class="consolidation-spinner"></span>
+      Running catch-up consolidation...
+    </div>
+    <div id="ec-consolidation-results"></div>
+  </div>
+</div>`;
+}
+
+/**
+ * Render consolidation complete state for Entity Core context.
+ */
+export function renderECConsolidationComplete(results: { granularity: string; success: boolean; error?: string }[]): string {
+  const oobTabs = renderEntityCoreTabActiveState("maintenance");
+
+  const successCount = results.filter((r) => r.success).length;
+  const failCount = results.filter((r) => !r.success).length;
+
+  const summaryParts: string[] = [];
+  if (successCount > 0) summaryParts.push(`${successCount} succeeded`);
+  if (failCount > 0) summaryParts.push(`${failCount} failed`);
+
+  const itemsHtml = results.map((r) => {
+    const cls = r.success ? "consolidation-result-success" : "consolidation-result-failure";
+    const text = r.success
+      ? `${r.granularity}: created`
+      : `${r.granularity}: ${escapeHtml(r.error || "failed")}`;
+    return `<div class="consolidation-result-item ${cls}">${escapeHtml(text)}</div>`;
+  }).join("");
+
+  return `${oobTabs}
+<div id="ec-consolidation-content">
+  <div class="consolidation-section">
+    <h3 class="admin-section-title">Memory Consolidation</h3>
+    <div class="consolidation-summary">${summaryParts.join(", ")}</div>
+    ${itemsHtml ? `<div class="consolidation-results-list">${itemsHtml}</div>` : ""}
+    <div class="consolidation-actions">
+      <button
+        class="btn btn--ghost btn--sm"
+        hx-get="/fragments/settings/entity-core/maintenance"
+        hx-target="#settings-content"
+        hx-swap="innerHTML"
+      >Refresh Status</button>
+    </div>
+  </div>
+</div>`;
+}
+
+/**
+ * Render the Entity Core snapshots tab.
+ * Adapted from renderSnapshotsView for Entity Core tab context.
+ */
+export function renderEntityCoreSnapshots(
+  snapshots: Array<{
+    id: string;
+    category: string;
+    filename: string;
+    timestamp: string;
+    date: string;
+    reason: string;
+    source?: string;
+  }>
+): string {
+  const oobTabs = renderEntityCoreTabActiveState("snapshots");
+
+  const grouped: Record<string, typeof snapshots> = {};
+  for (const snapshot of snapshots) {
+    if (!grouped[snapshot.date]) {
+      grouped[snapshot.date] = [];
+    }
+    grouped[snapshot.date].push(snapshot);
+  }
+
+  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+
+  let contentHtml = "";
+
+  if (sortedDates.length === 0) {
+    contentHtml = `<div class="snapshots-empty">
+      <p>No snapshots available. Snapshots are created automatically on the scheduled hour (default 3 AM) and before major changes.</p>
+      <button
+        class="btn btn--primary"
+        hx-post="/api/snapshots/create"
+        hx-target="#settings-content"
+        hx-swap="innerHTML"
+      >Create Manual Snapshot</button>
+    </div>`;
+  } else {
+    contentHtml = `<div class="snapshots-header">
+      <button
+        class="btn btn--primary btn--sm"
+        hx-post="/api/snapshots/create"
+        hx-target="#settings-content"
+        hx-swap="innerHTML"
+      >Create Manual Snapshot</button>
+    </div>`;
+
+    for (const date of sortedDates) {
+      const dateSnapshots = grouped[date];
+      const formattedDate = formatSnapshotDate(date);
+
+      contentHtml += `<div class="snapshot-group">
+        <h3 class="snapshot-group-date">${escapeHtml(formattedDate)}</h3>`;
+
+      for (const snapshot of dateSnapshots) {
+        const formattedTime = formatTime(snapshot.timestamp);
+        const encodedSnapshotId = encodeURIComponent(snapshot.id);
+        const snapshotSource = snapshot.source || "entity-core";
+
+        contentHtml += `
+          <div class="snapshot-item"
+            hx-get="/fragments/entity-core/snapshots/${encodedSnapshotId}"
+            hx-target="#settings-content"
+            hx-swap="innerHTML"
+          >
+            <span class="snapshot-category">${escapeHtml(snapshot.category)}</span>
+            <span class="snapshot-filename">${escapeHtml(snapshot.filename.replace(/\.md$/, ""))}</span>
+            <span class="snapshot-time">${formattedTime}</span>
+            <span class="snapshot-reason">${escapeHtml(snapshot.reason)}</span>
+            <span class="snapshot-source">${escapeHtml(snapshotSource)}</span>
+          </div>
+        `;
+      }
+
+      contentHtml += `</div>`;
+    }
+  }
+
+  return `${oobTabs}
+<div class="ec-snapshots">
+  ${contentHtml}
+</div>`;
+}
+
+/**
+ * Render a snapshot preview for Entity Core context.
+ */
+export function renderEntityCoreSnapshotPreview(
+  category: string,
+  filename: string,
+  content: string,
+  snapshotId: string
+): string {
+  const oobTabs = renderEntityCoreTabActiveState("snapshots");
+  const displayName = filename.replace(/\.md$/, "").replace(/_/g, " ");
+  const categoryLabel = category.charAt(0).toUpperCase() + category.slice(1);
+
+  const lines = content.split("\n");
+  let contentStart = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].trim() === "" && i > 2) {
+      contentStart = i + 1;
+      break;
+    }
+  }
+  const actualContent = lines.slice(contentStart).join("\n");
+
+  const previewHtml = `<div class="snapshot-preview">
+  <div class="snapshot-preview-header">
+    <button
+      class="btn btn--ghost btn--sm"
+      hx-get="/fragments/settings/entity-core/snapshots"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+    >Back to Snapshots</button>
+    <span class="snapshot-preview-filename">${escapeHtml(categoryLabel)} / ${escapeHtml(displayName)}</span>
+  </div>
+  <div class="snapshot-preview-content">
+    <pre>${escapeHtml(actualContent)}</pre>
+  </div>
+  <div class="snapshot-preview-actions">
+    <button
+      class="btn btn--danger"
+      hx-post="/api/snapshots/${encodeURIComponent(snapshotId)}/restore"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-confirm="Are you sure you want to restore this snapshot? This will replace the current ${escapeHtml(categoryLabel)} / ${escapeHtml(displayName)} file."
+    >Restore Snapshot</button>
+  </div>
+</div>`;
+
+  return `${oobTabs}
+<div class="ec-snapshots">
+  ${previewHtml}
+</div>`;
 }
 
 // =============================================================================
