@@ -77,6 +77,7 @@ Semantic search over conversation history.
 2. **Tiered Search**: First searches current conversation; if no good matches (score < 0.5), expands to all conversations
 3. **Relevance Filtering**: Only messages above minimum similarity score (0.3) are included
 4. **Historical Context**: Helps the entity remember what was discussed previously
+5. **Thread Tagging**: Each retrieved message includes a trailing `[chat:id]` tag matching the daily memory convention, so the entity can identify which conversation a message originated from
 
 One-time migration for existing messages:
 ```bash
