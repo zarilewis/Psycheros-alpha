@@ -159,6 +159,7 @@ import {
   handleAdminJobRowsFragment,
   handleAdminJobTriggerAPI,
   handleAdminBatchPopulate,
+  handleAdminAddInstanceSuffix,
 } from "./admin-routes.ts";
 import { setServerStartTime } from "./diagnostics.ts";
 
@@ -1159,6 +1160,12 @@ export class Server {
     if (method === "POST" && path === "/api/admin/actions/batch-populate") {
       const body = await request.json().catch(() => ({}));
       return await handleAdminBatchPopulate(ctx, body);
+    }
+
+    // POST /api/admin/actions/add-instance-suffix - Add instance suffix to memory files
+    if (method === "POST" && path === "/api/admin/actions/add-instance-suffix") {
+      const body = await request.json().catch(() => ({}));
+      return await handleAdminAddInstanceSuffix(ctx, body);
     }
 
     // ========================================

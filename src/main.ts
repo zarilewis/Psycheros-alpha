@@ -92,7 +92,7 @@ if (mcpEnabled) {
   const entityCoreRoot = Deno.env.get("PSYCHEROS_ENTITY_CORE_PATH") || join(config.projectRoot, "..", "entity-core");
   const mcpArgsStr = Deno.env.get("PSYCHEROS_MCP_ARGS") || `run -A --unstable-cron ${entityCoreRoot}/src/mod.ts`;
   const mcpArgs = mcpArgsStr.split(" ");
-  const mcpInstance = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
+  const mcpInstance = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros";
   const entityCoreDataDir = Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${entityCoreRoot}/data`;
 
   console.log(`MCP enabled: connecting to entity-core as ${mcpInstance}`);

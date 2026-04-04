@@ -144,7 +144,7 @@ export class MCPClient {
       });
 
       this.client = new Client({
-        name: "psycheros-harness",
+        name: "psycheros",
         version: "0.1.0",
       });
 

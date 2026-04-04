@@ -106,7 +106,7 @@ export const createSignificantMemoryTool: Tool = {
     }
 
     // Build file path — slug + instance, no date in filename
-    const instanceId = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
+    const instanceId = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros";
     const slug = slugify(title);
     const fileName = `${slug}_${instanceId}.md`;
     const filePath = join(ctx.config.projectRoot, "memories", "significant", fileName);

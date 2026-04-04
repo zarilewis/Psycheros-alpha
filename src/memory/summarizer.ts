@@ -51,10 +51,10 @@ I write my memories as bullet points. I start each point with "- ".`;
 
 /**
  * Get the instance ID for memory tagging.
- * Falls back to "psycheros-harness" if not configured.
+ * Falls back to "psycheros" if not configured.
  */
 function getInstanceId(): string {
-  return Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
+  return Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros";
 }
 
 /**
@@ -131,7 +131,7 @@ function collectConversationsForDate(
 }
 
 /**
- * Generate a daily memory summary using the worker LLM.
+ * Generate a daily memory summary using the main LLM.
  */
 async function generateDailySummary(
   conversations: ConversationForSummary[],
@@ -268,6 +268,6 @@ export async function summarizeDay(
 
     return memoryFile;
   } finally {
-    // Worker client doesn't need explicit cleanup
+    // Client doesn't need explicit cleanup
   }
 }

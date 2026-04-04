@@ -216,6 +216,52 @@
     btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run Script';
   };
 
+  /**
+   * Add instance suffix to old memory files via the admin API.
+   * Shows output in the #admin-action-output container.
+   */
+  window.adminRunAddInstanceSuffix = async function () {
+    var btn = document.getElementById("admin-suffix-run-btn");
+    var outputSection = document.getElementById("admin-action-output-section");
+    var outputEl = document.getElementById("admin-action-output");
+
+    if (!btn || !outputEl) return;
+
+    var instanceId = document.getElementById("admin-suffix-instance")?.value || "";
+    var scopes = document.getElementById("admin-suffix-scopes")?.value || "both";
+    var apply = document.getElementById("admin-suffix-apply")?.checked || false;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="admin-action-spinner"></span> Running...';
+
+    if (outputSection) outputSection.style.display = "";
+    outputEl.textContent = "Scanning memory directories...\n";
+
+    try {
+      var body = { scopes: scopes, apply: apply };
+      if (instanceId.trim()) body.instanceId = instanceId.trim();
+
+      var res = await fetch("/api/admin/actions/add-instance-suffix", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      var data = await res.json();
+
+      var header = data.success
+        ? "Done — " + (data.renamed || 0) + " renamed, " + data.total + " found"
+        : "Completed with " + (data.errors || 0) + " error(s)";
+      outputEl.innerHTML = "<div class=\"admin-action-output-header\">" + escapeHtmlForOutput(header) + "</div>"
+        + "<pre class=\"admin-action-output-pre\">" + escapeHtmlForOutput(data.output) + "</pre>";
+    } catch (err) {
+      outputEl.innerHTML = "<div class=\"admin-action-output-header admin-action-error\">Request failed: " + escapeHtmlForOutput(err.message) + "</div>";
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> Run';
+  };
+
   function escapeHtmlForOutput(str) {
     var div = document.createElement("div");
     div.appendChild(document.createTextNode(str));

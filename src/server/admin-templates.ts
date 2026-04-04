@@ -560,5 +560,43 @@ export function renderAdminActions(): string {
     <div class="admin-action-output" id="admin-action-output"></div>
   </div>
 
+  <div class="admin-section">
+    <h3 class="admin-section-title">Add Instance Suffix to Memory Files</h3>
+    <p class="admin-action-desc">
+      Retroactively appends the instance ID to memory filenames that lack one
+      (e.g. <code>2026-04-01.md</code> becomes <code>2026-04-01_psycheros.md</code>).
+      Handles both Psycheros and entity-core memory directories. Files that
+      already have an underscore suffix are skipped to prevent double-suffixing.
+      Use Dry Run first to preview, then Apply to rename.
+    </p>
+    <div class="admin-action-form">
+      <div class="admin-action-fields">
+        <label class="admin-action-label" for="admin-suffix-instance">Instance ID</label>
+        <input id="admin-suffix-instance" type="text" class="admin-input"
+          placeholder="psycheros" />
+      </div>
+      <div class="admin-action-fields">
+        <label class="admin-action-label" for="admin-suffix-scopes">Scope</label>
+        <select id="admin-suffix-scopes" class="admin-select">
+          <option value="both" selected>Psycheros + entity-core</option>
+          <option value="psycheros">Psycheros only</option>
+          <option value="entity-core">entity-core only</option>
+        </select>
+      </div>
+      <div class="admin-action-fields">
+        <label class="admin-action-label">
+          <input id="admin-suffix-apply" type="checkbox" class="admin-checkbox" />
+          Apply
+        </label>
+      </div>
+      <button id="admin-suffix-run-btn" class="admin-action-btn" onclick="window.adminRunAddInstanceSuffix()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="5 3 19 12 5 21 5 3"/>
+        </svg>
+        Run
+      </button>
+    </div>
+  </div>
+
 </div>`;
 }

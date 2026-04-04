@@ -9,7 +9,7 @@ All Psycheros configuration is via environment variables. Copy `.env.example` to
 | `ZAI_API_KEY` | Yes | — | Z.ai API key |
 | `ZAI_BASE_URL` | No | Z.ai endpoint | API endpoint URL |
 | `ZAI_MODEL` | No | `glm-4.7` | Main model for chat |
-| `ZAI_WORKER_MODEL` | No | `GLM-4.5-Air` | Lightweight model for background tasks (summarization, title generation) |
+| `ZAI_WORKER_MODEL` | No | `GLM-4.5-Air` | Lightweight model for background tasks (title generation) |
 | `PSYCHEROS_PORT` | No | `3000` | Server port |
 | `PSYCHEROS_HOST` | No | `0.0.0.0` | Server hostname |
 | `PSYCHEROS_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
@@ -92,7 +92,7 @@ PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,appe
 | `PSYCHEROS_MCP_ENABLED` | `true` | Enable connection to entity-core (set to `false` to disable) |
 | `PSYCHEROS_MCP_COMMAND` | `deno` | Command to spawn entity-core |
 | `PSYCHEROS_MCP_ARGS` | `run -A --unstable-cron <path>/entity-core/src/mod.ts` | Arguments for entity-core |
-| `PSYCHEROS_MCP_INSTANCE` | `psycheros-harness` | Instance ID for this embodiment |
+| `PSYCHEROS_MCP_INSTANCE` | `psycheros` | Instance ID for this embodiment |
 | `ENTITY_CORE_LLM_API_KEY` | — | Override API key for entity-core's LLM (memory-to-graph extraction). Falls back to `ZAI_API_KEY` |
 | `ENTITY_CORE_LLM_BASE_URL` | — | Override LLM endpoint for entity-core. Falls back to `ZAI_BASE_URL` |
 | `ENTITY_CORE_LLM_MODEL` | — | Override model for entity-core extraction. Falls back to `ZAI_MODEL` |

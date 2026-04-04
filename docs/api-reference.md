@@ -236,6 +236,7 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/api/admin/jobs/rows` | HTML partial of job table rows |
 | `POST` | `/api/admin/jobs/:id/trigger` | Manually trigger a scheduled job |
 | `POST` | `/api/admin/actions/batch-populate` | Run batch-populate-graph script (`{ days, granularity, dryRun, verbose }`) |
+| `POST` | `/api/admin/actions/add-instance-suffix` | Add instance suffix to old memory files (`{ instanceId, apply, scopes }`) |
 
 ### Pulse
 

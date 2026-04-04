@@ -1922,7 +1922,7 @@ export async function handleCreateSignificantMemory(
       ? slugify(title)
       : slugify(content.trim().split("\n")[0].replace(/^[-*#>\s]+/, ""));
 
-    const instanceId = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
+    const instanceId = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros";
     const fileName = `${slug}_${instanceId}.md`;
     const formattedContent = `# ${title || content.trim().split("\n")[0]}
 

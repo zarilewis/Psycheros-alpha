@@ -7,6 +7,7 @@
  * @module
  */
 
+import { join } from "@std/path";
 import type { RouteContext } from "./routes.ts";
 import { queryLogs, getLogComponents, getLogLevelCounts, type LogLevel } from "./logger.ts";
 import { collectDiagnostics } from "./diagnostics.ts";
@@ -196,4 +197,162 @@ export async function handleAdminBatchPopulate(_ctx: RouteContext, body: Record<
       output: `Failed to spawn script: ${error instanceof Error ? error.message : String(error)}`,
     }), { headers: JSON_HEADERS });
   }
+}
+
+// ===== Instance Suffix Migration =====
+
+const DAILY_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+interface RenameCandidate {
+  oldName: string;
+  newName: string;
+  dir: string;
+  scope: string;
+}
+
+/**
+ * POST /api/admin/actions/add-instance-suffix — Add instance suffix to old memory files.
+ * Accepts JSON body with { instanceId, apply, scopes }.
+ * - instanceId: suffix to append (defaults to PSYCHEROS_MCP_INSTANCE or "psycheros")
+ * - apply: boolean, actually rename files (default false = dry run)
+ * - scopes: "psycheros" | "entity-core" | "both" (default "both")
+ */
+export async function handleAdminAddInstanceSuffix(ctx: RouteContext, body: Record<string, unknown>): Promise<Response> {
+  const instanceId = typeof body.instanceId === "string" && body.instanceId.trim()
+    ? body.instanceId.trim()
+    : Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros";
+  const apply = body.apply === true;
+  const scopes = typeof body.scopes === "string" ? body.scopes : "both";
+
+  const lines: string[] = [];
+  lines.push(`Instance suffix: ${instanceId}`);
+  lines.push(`Mode: ${apply ? "APPLY" : "DRY RUN"}`);
+  lines.push(`Scopes: ${scopes}`);
+  lines.push("");
+
+  const candidates: RenameCandidate[] = [];
+  const errors: string[] = [];
+
+  const psycherosMemories = join(ctx.projectRoot, "memories");
+
+  // Scan Psycheros memories
+  if (scopes === "psycheros" || scopes === "both") {
+    lines.push("[Psycheros memories]");
+    for (const granularity of ["daily", "significant"] as const) {
+      await collectUnsuffixed(join(psycherosMemories, granularity), granularity, instanceId, "psycheros", candidates, errors);
+    }
+  }
+
+  // Scan entity-core memories
+  if (scopes === "entity-core" || scopes === "both") {
+    const entityCoreDataDir = Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR");
+    if (entityCoreDataDir) {
+      lines.push("[entity-core memories]");
+      for (const granularity of ["daily", "significant"] as const) {
+        await collectUnsuffixed(join(entityCoreDataDir, "memories", granularity), granularity, instanceId, "entity-core", candidates, errors);
+      }
+    } else {
+      lines.push("[entity-core memories] skipped — PSYCHEROS_ENTITY_CORE_DATA_DIR not set");
+    }
+  }
+
+  lines.push("");
+  lines.push(`Found ${candidates.length} file${candidates.length === 1 ? "" : "s"} to rename.`);
+
+  if (candidates.length === 0 && errors.length === 0) {
+    lines.push("All memory files already have instance suffixes.");
+  }
+
+  // Apply renames if requested
+  let renamed = 0;
+  if (apply && candidates.length > 0) {
+    lines.push("");
+    lines.push("Renaming...");
+    for (const c of candidates) {
+      try {
+        await Deno.rename(join(c.dir, c.oldName), join(c.dir, c.newName));
+        lines.push(`  [OK] ${c.scope}: ${c.oldName} → ${c.newName}`);
+        renamed++;
+      } catch (error) {
+        lines.push(`  [FAIL] ${c.scope}: ${c.oldName} — ${error instanceof Error ? error.message : String(error)}`);
+        errors.push(`${c.scope}/${c.oldName}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+    lines.push(`Renamed ${renamed} of ${candidates.length} files.`);
+  } else if (candidates.length > 0) {
+    // Show preview
+    for (const c of candidates) {
+      lines.push(`  ${c.scope}: ${c.oldName} → ${c.newName}`);
+    }
+    lines.push("");
+    lines.push("Run with Apply checked to rename these files.");
+  }
+
+  if (errors.length > 0) {
+    lines.push("");
+    lines.push(`Errors: ${errors.length}`);
+    for (const err of errors) {
+      lines.push(`  ${err}`);
+    }
+  }
+
+  const success = errors.length === 0;
+
+  return new Response(JSON.stringify({
+    success,
+    output: lines.join("\n"),
+    total: candidates.length,
+    renamed,
+    errors: errors.length,
+  }), { headers: JSON_HEADERS });
+}
+
+/**
+ * Scan a directory for memory files missing an instance suffix.
+ */
+async function collectUnsuffixed(
+  dir: string,
+  granularity: "daily" | "significant",
+  instanceId: string,
+  scope: string,
+  candidates: RenameCandidate[],
+  errors: string[],
+): Promise<void> {
+  try {
+    for await (const entry of Deno.readDir(dir)) {
+      if (!entry.isFile || !entry.name.endsWith(".md")) continue;
+
+      const stem = entry.name.replace(/\.md$/, "");
+
+      // Skip if already has an instance suffix
+      if (hasSuffix(stem, granularity)) continue;
+
+      const newName = `${stem}_${instanceId}.md`;
+      candidates.push({ oldName: entry.name, newName, dir, scope });
+    }
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) {
+      errors.push(`${scope}/${granularity}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+
+/**
+ * Check if a filename stem already carries an instance suffix.
+ *
+ * Daily:    "2026-04-01"        → no suffix (plain date)
+ *           "2026-04-01_foo"    → has suffix
+ *           "2026-04-01_bar"    → has suffix (even if old id like "psycheros-harness")
+ *
+ * Significant: "my-memory"     → no suffix
+ *              "my-memory_foo" → has suffix
+ */
+function hasSuffix(stem: string, granularity: "daily" | "significant"): boolean {
+  if (granularity === "daily") {
+    if (DAILY_DATE_RE.test(stem)) return false;           // bare date
+    if (/^\d{4}-\d{2}-\d{2}_/.test(stem)) return true;  // date_instance
+    return true; // doesn't look like a daily file at all
+  }
+  // Significant: any underscore means it already has a suffix
+  return stem.includes("_");
 }
