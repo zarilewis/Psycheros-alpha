@@ -237,27 +237,41 @@ Output includes exit code and full script stdout/stderr. The script runs as a su
 
 **Source files:** `src/server/logger.ts`, `src/server/diagnostics.ts`, `src/server/admin-routes.ts`, `src/server/admin-templates.ts`, `web/js/admin.js`, `web/css/admin.css`
 
-## Knowledge Graph Visualization
+## Knowledge Graph Editor
 
-Interactive graph viewer for the knowledge graph stored in entity-core. Requires MCP connection (`PSYCHEROS_MCP_ENABLED=true`).
+Mobile-first card list editor with an optional network graph toggle for the knowledge graph stored in entity-core. Requires MCP connection (`PSYCHEROS_MCP_ENABLED=true`).
 
 Access via Settings → Entity Core → Knowledge Graph tab.
 
-**Features:**
-- Create/delete nodes (person, emotion, event, topic, preference, place, goal, health, boundary, tradition, insight)
-- Create edges between selected nodes
-- Search nodes by label/description
+**List View (default):**
+- Card list with type badges, labels, and connection counts
+- Expand a card to see description, connections list, and Edit/Connect/Delete actions
+- Virtual scrolling for smooth performance with large graphs
+- Search nodes by label/description (instant client-side filtering)
 - Filter by node type
-- Zoom/fit controls
-- Node details panel showing connections
+- "Add Node" toolbar button opens a create modal
 
-Uses vis-network library. Client-side JS in `web/js/graph-view.js`, dynamically loaded when the graph fragment is displayed.
+**Network View (optional toggle):**
+- vis-network graph visualization, lazy-loaded on first toggle
+- Node details slide-in panel with connections and actions
+- Zoom/fit controls
+- Search and type filter highlight matching nodes
+
+**Editing:**
+- Create/edit nodes (label, description, type)
+- Connect nodes via modal with searchable node pickers and relationship type suggestions
+- Edit modal shows existing connections with individual delete buttons
+- Delete nodes uses a confirmation modal (no browser `prompt()` or `confirm()`)
+
+**Source files:** `web/js/graph-view.js` (dynamically loaded), `web/css/graph.css`
 
 **API Endpoints:**
-- `GET /api/graph` — full graph data
+- `GET /api/graph` — full graph data (nodes, edges, stats)
 - `POST /api/graph/nodes` — create node
-- `POST /api/graph/edges` — create edge
+- `PUT /api/graph/nodes/:id` — update node
 - `DELETE /api/graph/nodes/:id` — delete node
+- `POST /api/graph/edges` — create edge
+- `PUT /api/graph/edges/:id` — update edge
 - `DELETE /api/graph/edges/:id` — delete edge
 
 ## Data Vault

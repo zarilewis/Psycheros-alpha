@@ -46,7 +46,6 @@ import {
   renderLorebooksView,
   renderLorebookDetailView,
   renderEntryEditor,
-  renderGraphView,
   renderAppearanceSettings,
   renderLLMSettings,
   renderSettingsHub,
@@ -3287,32 +3286,6 @@ export function handleLorebookEntryEditFragment(
 // =============================================================================
 // Knowledge Graph Routes
 // =============================================================================
-
-/**
- * Handle GET /graph - Knowledge Graph visualization page
- *
- * @param ctx - Route context
- * @returns HTTP Response with graph visualization HTML
- */
-export async function handleGraphView(ctx: RouteContext): Promise<Response> {
-  // Graph data is in entity-core - require MCP connection
-  if (!ctx.mcpClient) {
-    return new Response(
-      `<div class="error">Knowledge Graph requires entity-core connection. Please enable MCP.</div>`,
-      {
-        status: 503,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      }
-    );
-  }
-
-  // Get initial stats
-  const stats = await ctx.mcpClient.getGraphStats();
-  const html = renderGraphView(stats);
-  return new Response(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
-}
 
 /**
  * Handle GET /api/graph/data - Get full graph data for visualization

@@ -417,14 +417,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Scroll to bottom when chat content is swapped via HTMX (sidebar clicks)
   document.body.addEventListener('htmx:afterSwap', (e) => {
-    if (e.detail.target?.id === 'chat') {
+    const targetId = e.detail.target?.id;
+    if (targetId === 'chat') {
       AutoScroll.reinit();
       requestAnimationFrame(() => AutoScroll.jumpToBottom());
+    }
 
-      // Initialize graph view if present
-      if (document.getElementById('graph-container')) {
-        loadGraphView();
-      }
+    // Initialize graph view if present in chat or settings-content
+    if ((targetId === 'chat' || targetId === 'settings-content') && document.getElementById('graph-container')) {
+      loadGraphView();
     }
   });
 });
@@ -2955,19 +2956,6 @@ let graphViewLoaded = false;
 async function loadGraphView() {
   console.log('[Psycheros] Loading graph view...');
 
-  // Load vis-network if not already loaded
-  if (typeof vis === 'undefined') {
-    console.log('[Psycheros] Loading vis-network...');
-    await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://unpkg.com/vis-network/standalone/umd/vis-network.min.js';
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    });
-    console.log('[Psycheros] vis-network loaded');
-  }
-
   // Load graph-view.js if not already loaded
   if (typeof initGraph === 'undefined') {
     console.log('[Psycheros] Loading graph-view.js...');
@@ -2976,6 +2964,7 @@ async function loadGraphView() {
       script.src = '/js/graph-view.js?v=' + Date.now();
       script.onload = () => {
         console.log('[Psycheros] graph-view.js loaded, initGraph type:', typeof initGraph);
+        if (typeof initGraph === 'function') initGraph();
         resolve();
       };
       script.onerror = reject;

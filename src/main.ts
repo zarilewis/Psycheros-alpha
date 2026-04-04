@@ -90,7 +90,7 @@ const mcpEnabled = Deno.env.get("PSYCHEROS_MCP_ENABLED") !== "false";
 if (mcpEnabled) {
   const mcpCommand = Deno.env.get("PSYCHEROS_MCP_COMMAND") || "/home/zari/.deno/bin/deno";
   const entityCoreRoot = Deno.env.get("PSYCHEROS_ENTITY_CORE_PATH") || join(config.projectRoot, "..", "entity-core");
-  const mcpArgsStr = Deno.env.get("PSYCHEROS_MCP_ARGS") || `run -A ${entityCoreRoot}/src/mod.ts`;
+  const mcpArgsStr = Deno.env.get("PSYCHEROS_MCP_ARGS") || `run -A --unstable-cron ${entityCoreRoot}/src/mod.ts`;
   const mcpArgs = mcpArgsStr.split(" ");
   const mcpInstance = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros-harness";
   const entityCoreDataDir = Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${entityCoreRoot}/data`;

@@ -75,7 +75,6 @@ import {
   handleLorebooksFragment,
   handleLorebookDetailFragment,
   handleLorebookEntryEditFragment,
-  handleGraphView,
   handleGetGraphData,
   handleEntityCoreFragment,
   handleEntityCoreOverview,
@@ -1397,11 +1396,6 @@ export class Server {
     // ========================================
     // Knowledge Graph Fragment Routes
     // ========================================
-
-    // GET /fragments/settings/graph - Graph visualization fragment
-    if (path === "/fragments/settings/graph") {
-      return await handleGraphView(ctx);
-    }
 
     // ========================================
     // Entity Core Fragment Routes

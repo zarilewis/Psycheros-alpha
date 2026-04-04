@@ -2156,188 +2156,6 @@ export function renderEntryEditor(entry: LorebookEntry): string {
 // Knowledge Graph Templates
 // =============================================================================
 
-/**
- * Render the Knowledge Graph visualization view.
- */
-export function renderGraphView(stats: {
-  totalNodes: number;
-  totalEdges: number;
-  nodesByType: Record<string, number>;
-  edgesByType: Record<string, number>;
-  vectorSearchAvailable: boolean;
-} | null): string {
-  const nodeCount = stats?.totalNodes ?? 0;
-  const edgeCount = stats?.totalEdges ?? 0;
-  const vectorStatus = stats?.vectorSearchAvailable ? "active" : "off";
-
-  return `
-<div class="gv">
-  <!-- Header -->
-  <div class="gv-header">
-    <div class="gv-header-left">
-      ${renderSettingsBackButton()}
-      <div class="gv-title-block">
-        <h2 class="gv-title">Knowledge Graph</h2>
-        <div class="gv-stats">
-          <span><strong>${nodeCount}</strong> nodes</span>
-          <span class="gv-stats-sep">&middot;</span>
-          <span><strong>${edgeCount}</strong> edges</span>
-          <span class="gv-stats-sep">&middot;</span>
-          <span>vec: ${vectorStatus}</span>
-        </div>
-      </div>
-    </div>
-    <div class="gv-header-actions">
-      <button id="graph-refresh" class="btn btn--ghost btn--sm" title="Refresh">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
-          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-        </svg>
-      </button>
-    </div>
-  </div>
-
-  <!-- Toolbar -->
-  <div class="gv-toolbar">
-    <div class="gv-toolbar-controls">
-      <button id="graph-zoom-fit" class="btn btn--ghost btn--sm" title="Fit to view">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
-        </svg>
-      </button>
-      <button id="graph-zoom-in" class="btn btn--ghost btn--sm" title="Zoom in">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-      </button>
-      <button id="graph-zoom-out" class="btn btn--ghost btn--sm" title="Zoom out">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-      </button>
-    </div>
-    <input type="text" id="graph-search" placeholder="Search..." class="gv-search" />
-    <select id="graph-filter-type" class="gv-filter">
-      <option value="">All types</option>
-    </select>
-  </div>
-
-  <!-- Graph Canvas -->
-  <div id="graph-container" class="gv-canvas">
-    <div class="gv-loading">
-      <div class="gv-spinner"></div>
-    </div>
-  </div>
-
-  <!-- Node Detail Panel (slides from right) -->
-  <div id="graph-node-panel" class="gv-panel">
-    <div class="gv-panel-header">
-      <h3 id="panel-node-label">Node</h3>
-      <button id="panel-close" class="btn btn--ghost btn--sm">&times;</button>
-    </div>
-    <div class="gv-panel-body" id="panel-content"></div>
-  </div>
-
-  <!-- Create Node Modal -->
-  <div id="graph-create-modal" class="gv-modal">
-    <div class="gv-modal-box">
-      <h3>Create Node</h3>
-      <form id="create-node-form">
-        <div class="gv-field">
-          <label for="node-type">Type</label>
-          <select id="node-type" name="type" required>
-            <option value="person">Person</option>
-            <option value="emotion">Emotion</option>
-            <option value="topic" selected>Topic</option>
-            <option value="preference">Preference</option>
-            <option value="place">Place</option>
-            <option value="goal">Goal</option>
-            <option value="health">Health</option>
-            <option value="boundary">Boundary</option>
-            <option value="tradition">Tradition</option>
-            <option value="insight">Insight</option>
-          </select>
-        </div>
-        <div class="gv-field">
-          <label for="node-label">Label</label>
-          <input type="text" id="node-label" name="label" required placeholder="e.g. hiking, Tyler, anxiety" />
-        </div>
-        <div class="gv-field">
-          <label for="node-description">Description</label>
-          <textarea id="node-description" name="description" rows="2" placeholder="Optional..."></textarea>
-        </div>
-        <div class="gv-field gv-field-range">
-          <label for="node-confidence">Confidence</label>
-          <div class="gv-range-row">
-            <input type="range" id="node-confidence" name="confidence" min="0" max="1" step="0.1" value="0.5" />
-            <span id="confidence-value" class="gv-range-val">0.5</span>
-          </div>
-        </div>
-        <div class="gv-modal-actions">
-          <button type="button" class="btn btn--ghost" id="cancel-create">Cancel</button>
-          <button type="submit" class="btn btn--primary">Create</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Edit Node Modal -->
-  <div id="graph-edit-modal" class="gv-modal">
-    <div class="gv-modal-box">
-      <h3>Edit Node</h3>
-      <form id="edit-node-form">
-        <input type="hidden" id="edit-node-id" />
-        <div class="gv-field">
-          <label for="edit-node-label">Label</label>
-          <input type="text" id="edit-node-label" required />
-        </div>
-        <div class="gv-field">
-          <label for="edit-node-description">Description</label>
-          <textarea id="edit-node-description" rows="2"></textarea>
-        </div>
-        <div class="gv-field gv-field-range">
-          <label for="edit-node-confidence">Confidence</label>
-          <div class="gv-range-row">
-            <input type="range" id="edit-node-confidence" min="0" max="1" step="0.1" value="0.5" />
-            <span id="edit-confidence-value" class="gv-range-val">0.5</span>
-          </div>
-        </div>
-        <div class="gv-modal-actions">
-          <button type="button" class="btn btn--ghost" id="cancel-edit">Cancel</button>
-          <button type="submit" class="btn btn--primary">Save</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Bottom Action Bar -->
-  <div class="gv-actions">
-    <button id="graph-create-node" class="btn btn--ghost gv-action-btn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-      <span>Add Node</span>
-    </button>
-    <button id="graph-create-edge" class="btn btn--ghost gv-action-btn" disabled>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-      </svg>
-      <span>Connect</span>
-    </button>
-    <button id="graph-delete" class="btn btn--ghost gv-action-btn gv-action-danger" disabled>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-      </svg>
-      <span>Delete</span>
-    </button>
-  </div>
-</div>
-
-<!-- Graph styles in graph.css -->
-`;
-}
-
 // =============================================================================
 // Entity Core Templates
 // =============================================================================
@@ -2513,7 +2331,7 @@ export function renderEntityCoreOverview(data: EntityCoreOverviewData): string {
 
 /**
  * Render the Entity Core knowledge graph tab.
- * Reuses the graph content from renderGraphView but without the standalone wrapper.
+ * Renders the knowledge graph list/network editor for the Entity Core settings tab.
  */
 export function renderEntityCoreGraph(stats: {
   totalNodes: number;
@@ -2525,7 +2343,6 @@ export function renderEntityCoreGraph(stats: {
   const oobTabs = renderEntityCoreTabActiveState("graph");
   const nodeCount = stats?.totalNodes ?? 0;
   const edgeCount = stats?.totalEdges ?? 0;
-  const vectorStatus = stats?.vectorSearchAvailable ? "active" : "off";
 
   return `${oobTabs}
 <div class="gv">
@@ -2537,12 +2354,14 @@ export function renderEntityCoreGraph(stats: {
           <span><strong>${nodeCount}</strong> nodes</span>
           <span class="gv-stats-sep">&middot;</span>
           <span><strong>${edgeCount}</strong> edges</span>
-          <span class="gv-stats-sep">&middot;</span>
-          <span>vec: ${vectorStatus}</span>
         </div>
       </div>
     </div>
     <div class="gv-header-actions">
+      <div class="gv-view-toggle" id="gv-view-toggle">
+        <button class="gv-view-toggle-btn active" data-view="list">List</button>
+        <button class="gv-view-toggle-btn" data-view="graph">Network</button>
+      </div>
       <button id="graph-refresh" class="btn btn--ghost btn--sm" title="Refresh">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
@@ -2553,43 +2372,36 @@ export function renderEntityCoreGraph(stats: {
   </div>
 
   <div class="gv-toolbar">
-    <div class="gv-toolbar-controls">
-      <button id="graph-zoom-fit" class="btn btn--ghost btn--sm" title="Fit to view">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
-        </svg>
-      </button>
-      <button id="graph-zoom-in" class="btn btn--ghost btn--sm" title="Zoom in">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-      </button>
-      <button id="graph-zoom-out" class="btn btn--ghost btn--sm" title="Zoom out">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="5" y1="12" x2="19" y2="12"/>
-        </svg>
-      </button>
-    </div>
-    <input type="text" id="graph-search" placeholder="Search..." class="gv-search" />
+    <input type="text" id="graph-search" placeholder="Search nodes..." class="gv-search" />
     <select id="graph-filter-type" class="gv-filter">
       <option value="">All types</option>
     </select>
+    <button id="gv-add-node" class="btn btn--ghost btn--sm" title="Add Node">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      <span>Add Node</span>
+    </button>
   </div>
 
-  <div id="graph-container" class="gv-canvas">
-    <div class="gv-loading">
-      <div class="gv-spinner"></div>
+  <div id="gv-list-view" class="gv-list-view">
+    <div class="gv-loading"><div class="gv-spinner"></div></div>
+  </div>
+
+  <div id="gv-graph-view" class="gv-hidden">
+    <div id="graph-container" class="gv-canvas">
+      <div class="gv-loading"><div class="gv-spinner"></div></div>
+    </div>
+    <div id="graph-node-panel" class="gv-panel">
+      <div class="gv-panel-header">
+        <h3 id="panel-node-label">Node</h3>
+        <button id="panel-close" class="btn btn--ghost btn--sm">&times;</button>
+      </div>
+      <div class="gv-panel-body" id="panel-content"></div>
     </div>
   </div>
 
-  <div id="graph-node-panel" class="gv-panel">
-    <div class="gv-panel-header">
-      <h3 id="panel-node-label">Node</h3>
-      <button id="panel-close" class="btn btn--ghost btn--sm">&times;</button>
-    </div>
-    <div class="gv-panel-body" id="panel-content"></div>
-  </div>
-
+  <!-- Create Node Modal -->
   <div id="graph-create-modal" class="gv-modal">
     <div class="gv-modal-box">
       <h3>Create Node</h3>
@@ -2617,13 +2429,6 @@ export function renderEntityCoreGraph(stats: {
           <label for="node-description">Description</label>
           <textarea id="node-description" name="description" rows="2" placeholder="Optional..."></textarea>
         </div>
-        <div class="gv-field gv-field-range">
-          <label for="node-confidence">Confidence</label>
-          <div class="gv-range-row">
-            <input type="range" id="node-confidence" name="confidence" min="0" max="1" step="0.1" value="0.5" />
-            <span id="confidence-value" class="gv-range-val">0.5</span>
-          </div>
-        </div>
         <div class="gv-modal-actions">
           <button type="button" class="btn btn--ghost" id="cancel-create">Cancel</button>
           <button type="submit" class="btn btn--primary">Create</button>
@@ -2632,8 +2437,9 @@ export function renderEntityCoreGraph(stats: {
     </div>
   </div>
 
+  <!-- Edit Node Modal -->
   <div id="graph-edit-modal" class="gv-modal">
-    <div class="gv-modal-box">
+    <div class="gv-modal-box gv-modal-box--wide">
       <h3>Edit Node</h3>
       <form id="edit-node-form">
         <input type="hidden" id="edit-node-id" />
@@ -2645,12 +2451,10 @@ export function renderEntityCoreGraph(stats: {
           <label for="edit-node-description">Description</label>
           <textarea id="edit-node-description" rows="2"></textarea>
         </div>
-        <div class="gv-field gv-field-range">
-          <label for="edit-node-confidence">Confidence</label>
-          <div class="gv-range-row">
-            <input type="range" id="edit-node-confidence" min="0" max="1" step="0.1" value="0.5" />
-            <span id="edit-confidence-value" class="gv-range-val">0.5</span>
-          </div>
+        <div class="gv-field" id="edit-connections-field" style="display:none">
+          <label>Connections</label>
+          <div id="edit-connections-list" class="gv-edit-conns"></div>
+          <button type="button" class="btn btn--ghost btn--sm" id="edit-add-conn">+ Add Connection</button>
         </div>
         <div class="gv-modal-actions">
           <button type="button" class="btn btn--ghost" id="cancel-edit">Cancel</button>
@@ -2660,30 +2464,66 @@ export function renderEntityCoreGraph(stats: {
     </div>
   </div>
 
-  <div class="gv-actions">
-    <button id="graph-create-node" class="btn btn--ghost gv-action-btn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
-      <span>Add Node</span>
-    </button>
-    <button id="graph-create-edge" class="btn btn--ghost gv-action-btn" disabled>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-      </svg>
-      <span>Connect</span>
-    </button>
-    <button id="graph-delete" class="btn btn--ghost gv-action-btn gv-action-danger" disabled>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-      </svg>
-      <span>Delete</span>
-    </button>
+  <!-- Edge Creation Modal -->
+  <div id="graph-edge-modal" class="gv-modal">
+    <div class="gv-modal-box">
+      <h3>Connect Nodes</h3>
+      <form id="edge-create-form">
+        <div class="gv-field">
+          <label>From</label>
+          <div class="gv-node-picker" id="edge-from-picker">
+            <input type="text" class="gv-node-search-input" placeholder="Search nodes..." autocomplete="off" />
+            <div class="gv-node-search-results" id="edge-from-results"></div>
+            <input type="hidden" id="edge-from" name="fromId" required />
+          </div>
+        </div>
+        <div class="gv-field">
+          <label>To</label>
+          <div class="gv-node-picker" id="edge-to-picker">
+            <input type="text" class="gv-node-search-input" placeholder="Search nodes..." autocomplete="off" />
+            <div class="gv-node-search-results" id="edge-to-results"></div>
+            <input type="hidden" id="edge-to" name="toId" required />
+          </div>
+        </div>
+        <div class="gv-field">
+          <label for="edge-type">Relationship</label>
+          <input type="text" id="edge-type" name="type" list="edge-type-suggestions" required placeholder="e.g. loves, works_with, values" />
+          <datalist id="edge-type-suggestions">
+            <option value="loves"><option value="close_to"><option value="friend_of">
+            <option value="works_with"><option value="values"><option value="believes_in">
+            <option value="respects"><option value="worried_about"><option value="proud_of">
+            <option value="interested_in"><option value="skilled_at"><option value="family_of">
+            <option value="nostalgic_for"><option value="frustrated_with"><option value="reminds_of">
+            <option value="caused"><option value="led_to"><option value="part_of">
+            <option value="associated_with"><option value="similar_to"><option value="dislikes">
+          </datalist>
+        </div>
+        <div class="gv-field">
+          <label for="edge-evidence">Evidence (optional)</label>
+          <textarea id="edge-evidence" name="evidence" rows="2" placeholder="Why this connection?"></textarea>
+        </div>
+        <div class="gv-modal-actions">
+          <button type="button" class="btn btn--ghost" id="cancel-edge">Cancel</button>
+          <button type="submit" class="btn btn--primary">Connect</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="graph-delete-modal" class="gv-modal">
+    <div class="gv-modal-box gv-delete-confirm">
+      <h3>Delete Node</h3>
+      <p id="delete-confirm-msg" class="gv-delete-msg">Are you sure?</p>
+      <div class="gv-modal-actions">
+        <button type="button" class="btn btn--ghost" id="cancel-delete">Cancel</button>
+        <button type="button" class="btn btn--primary gv-delete-btn-confirm" id="confirm-delete">Delete</button>
+      </div>
+    </div>
   </div>
 </div>
 
-<script src="/js/graph-view.js"></script>`;
+`;
 }
 
 /**
