@@ -32,7 +32,7 @@ const DEFAULT_CONFIG: Required<Omit<SummarizerConfig, "memoriesDir">> & { memori
 /**
  * Prompt template for daily summarization.
  */
-const DAILY_SUMMARY_PROMPT = `I am writing a memory of my day. I review the conversations I had and write what matters to me.
+const DAILY_SUMMARY_PROMPT = `I am the AI entity in this conversation, writing a memory of my day. I review the conversations I had and write what matters to me.
 
 Guidelines:
 - Write in first-person (my perspective)
