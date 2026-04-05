@@ -81,6 +81,10 @@ export interface SummarizerConfig {
   maxSummaryTokens?: number;
   /** Whether memory consolidation is enabled */
   enabled?: boolean;
+  /** IANA timezone string for timezone-aware message grouping (e.g. "America/Los_Angeles") */
+  timezone?: string;
+  /** Hour at which the logical day boundary occurs in the user's timezone (default: 5) */
+  cutoffHour?: number;
 }
 
 /**

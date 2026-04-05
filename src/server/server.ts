@@ -13,7 +13,9 @@ import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSet
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import type { MemoryIndexer } from "../rag/indexer.ts";
 import { catchUpSummarization, repairOrphanedSummaries } from "../memory/mod.ts";
+import { DEFAULT_CUTOFF_HOUR } from "../memory/date-utils.ts";
 import { initTracker, registerJob, registerTrigger, tracked } from "./cron-tracker.ts";
+import { localTimeToUtcCron, getDisplayTimezone } from "../pulse/timezone.ts";
 
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
@@ -511,6 +513,13 @@ export class Server {
           }
         : undefined;
 
+      // Memory timezone config: use display timezone for local-timezone-aware
+      // message grouping and cron scheduling. Falls back to PSYCHEROS_MEMORY_HOUR at UTC.
+      const memoryTz = getDisplayTimezone();
+      const memoryConfig = memoryTz
+        ? { timezone: memoryTz, cutoffHour: DEFAULT_CUTOFF_HOUR }
+        : undefined;
+
       // Repair orphaned DB records then catch up on missed summarizations.
       // Repair must complete first so cleared records become eligible for regeneration.
       (async () => {
@@ -520,19 +529,29 @@ export class Server {
           console.error("[Memory] Integrity check failed:", error instanceof Error ? error.message : String(error));
         }
         try {
-          await catchUpSummarization(this.db, this.config.projectRoot, syncMemoryToMCP);
+          await catchUpSummarization(this.db, this.config.projectRoot, syncMemoryToMCP, memoryConfig);
         } catch (error) {
           console.error("[Memory] Startup catch-up failed:", error instanceof Error ? error.message : String(error));
         }
       })();
 
-      // Set up daily cron job at configured hour (default 4 AM)
-      const memoryHour = parseInt(Deno.env.get("PSYCHEROS_MEMORY_HOUR") || "4");
-      const cronPattern = `0 ${memoryHour} * * *`;
+      // Set up daily cron job
+      let cronPattern: string;
+      if (memoryTz) {
+        // Convert 5 AM local to UTC for the cron expression
+        const { utcHour, utcMin } = localTimeToUtcCron(DEFAULT_CUTOFF_HOUR, 0, memoryTz);
+        cronPattern = `${utcMin} ${utcHour} * * *`;
+        console.log(`[Memory] Timezone-aware scheduling: daily summary at ${DEFAULT_CUTOFF_HOUR}:00 ${memoryTz} (${utcHour}:${String(utcMin).padStart(2, "0")} UTC)`);
+      } else {
+        // Fallback: use PSYCHEROS_MEMORY_HOUR at UTC (default 4 AM)
+        const memoryHour = parseInt(Deno.env.get("PSYCHEROS_MEMORY_HOUR") || "4");
+        cronPattern = `0 ${memoryHour} * * *`;
+        console.log(`[Memory] No timezone configured, using UTC fallback: daily summary at ${memoryHour}:00 UTC`);
+      }
 
       // Shared handler for daily summarization (used by both cron and manual trigger)
       const dailySummarizationHandler = async (): Promise<string> => {
-        const count = await catchUpSummarization(this.db, this.config.projectRoot, syncMemoryToMCP);
+        const count = await catchUpSummarization(this.db, this.config.projectRoot, syncMemoryToMCP, memoryConfig);
         return count > 0 ? `Summarized ${count} day(s)` : "No unsummarized dates found";
       };
 

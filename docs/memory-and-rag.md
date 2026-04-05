@@ -6,7 +6,7 @@ Psycheros implements a hierarchical memory system where the entity writes their 
 
 Memories are written in the entity's voice (first-person), referring to the user by their actual name and preferred pronouns. All summarization LLM calls receive the entity's full identity context (base instructions, self, user, relationship, and custom files) as a system message, so memories reflect the entity's personality and knowledge of the user. They are organized hierarchically and consolidated over time.
 
-Daily summarization runs locally in Psycheros (triggered by day-change detection). Weekly, monthly, and yearly consolidation runs in [entity-core](https://github.com/zarilewis/entity-core) via its own cron jobs, independently of whether any Psycheros instance is connected. Consolidation and catch-up can be triggered from the Entity Core card (Settings → Entity Core → Maintenance).
+Daily summarization runs locally in Psycheros (triggered by day-change detection). When `PSYCHEROS_DISPLAY_TZ` is configured, the cron fires at 5 AM in the user's local timezone and messages are grouped by logical local date (a 5 AM cutoff means messages from 5 AM today to 4:59 AM tomorrow are the same "day"). Without a configured timezone, it falls back to `PSYCHEROS_MEMORY_HOUR` at UTC (default: 4 AM). Weekly, monthly, and yearly consolidation runs in [entity-core](https://github.com/zarilewis/entity-core) via its own cron jobs, independently of whether any Psycheros instance is connected. Consolidation and catch-up can be triggered from the Entity Core card (Settings → Entity Core → Maintenance).
 
 ```
 memories/
@@ -36,14 +36,14 @@ memories/
 
 ### Trigger
 
-On first message of a new day (detected by date change), the previous day's conversations are summarized into a daily memory.
+On first message of a new day (detected by date change), the previous day's conversations are summarized into a daily memory. The cron fires at 5 AM in the user's local timezone (when `PSYCHEROS_DISPLAY_TZ` is set), or at `PSYCHEROS_MEMORY_HOUR` UTC (default: 4 AM) as a fallback.
 
 ### Consolidation Schedule
 
-- **Daily summarization**: Psycheros `PSYCHEROS_MEMORY_HOUR` (default: 4 AM) — runs locally
-- **Weekly**: entity-core cron (Sunday 5 AM) — runs in entity-core
-- **Monthly**: entity-core cron (1st of month 5 AM) — runs in entity-core
-- **Yearly**: entity-core cron (January 1st 5 AM) — runs in entity-core
+- **Daily summarization**: Psycheros cron at 5 AM local time (or `PSYCHEROS_MEMORY_HOUR` UTC fallback) — runs locally
+- **Weekly**: entity-core cron (Sunday 5 AM UTC) — runs in entity-core
+- **Monthly**: entity-core cron (1st of month 5 AM UTC) — runs in entity-core
+- **Yearly**: entity-core cron (January 1st 5 AM UTC) — runs in entity-core
 
 Weekly, monthly, and yearly consolidation run independently in entity-core regardless of whether Psycheros is connected. Entity-core uses the `memory_consolidate` MCP tool and `Deno.cron` jobs to manage this.
 
@@ -154,6 +154,7 @@ Eager RAG over user-uploaded and entity-created reference documents. Documents a
 | File | Purpose |
 |------|---------|
 | `src/memory/mod.ts` | Hierarchical memory system (daily only) |
+| `src/memory/date-utils.ts` | Timezone-aware logical date helpers for message grouping |
 | `src/memory/types.ts` | Memory types with instance tagging |
 | `src/memory/summarizer.ts` | Daily summarization with identity context |
 | `src/memory/trigger.ts` | Day-change detection, catch-up, orphan repair |

@@ -19,6 +19,7 @@ import type {
 import { getDateFormatInfo } from "./types.ts";
 import { writeMemoryFile, formatMemoryContent, extractChatIds, type OnMemoryCreated } from "./file-writer.ts";
 import { buildIdentitySystemMessage } from "../entity/context.ts";
+import { getTimezoneModifier } from "./date-utils.ts";
 
 /**
  * Default summarizer configuration.
@@ -27,6 +28,8 @@ const DEFAULT_CONFIG: Required<Omit<SummarizerConfig, "memoriesDir">> & { memori
   memoriesDir: "memories",
   maxSummaryTokens: 500,
   enabled: true,
+  timezone: "",
+  cutoffHour: 5,
 };
 
 /**
@@ -98,9 +101,10 @@ function formatConversationsForPrompt(conversations: ConversationForSummary[]): 
  */
 function collectConversationsForDate(
   db: DBClient,
-  date: Date
+  date: Date,
+  modifier?: string,
 ): ConversationForSummary[] {
-  const messages = db.getMessagesByDate(date);
+  const messages = db.getMessagesByDate(date, modifier);
 
   // Group by conversation ID
   const conversationMap = new Map<string, MessageWithContext[]>();
@@ -203,6 +207,9 @@ export async function summarizeDay(
 
   const dateStr = date.toISOString().split("T")[0];
 
+  // Compute timezone modifier for logical date grouping
+  const modifier = cfg.timezone ? getTimezoneModifier(cfg.timezone, cfg.cutoffHour) : undefined;
+
   // Check if we've already created a memory summary for this date (more reliable than chat-level check)
   const existingSummary = db.getMemorySummary(dateStr, "daily");
   if (existingSummary) {
@@ -211,7 +218,7 @@ export async function summarizeDay(
   }
 
   // Also check if all chats are already marked as summarized (secondary check for consistency)
-  const existingChatIds = db.getConversationIdsByDate(dateStr);
+  const existingChatIds = db.getConversationIdsByDate(dateStr, modifier);
   const allSummarized = existingChatIds.every((chatId) => db.isChatSummarized(chatId, dateStr));
 
   if (allSummarized && existingChatIds.length > 0) {
@@ -220,7 +227,7 @@ export async function summarizeDay(
   }
 
   // Collect conversations
-  const conversations = collectConversationsForDate(db, date);
+  const conversations = collectConversationsForDate(db, date, modifier);
 
   if (conversations.length === 0) {
     console.log(`[Memory] No conversations on ${dateStr}, skipping`);

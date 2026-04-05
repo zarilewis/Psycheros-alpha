@@ -720,9 +720,12 @@ export class DBClient {
    * Retrieves all messages for a specific date.
    *
    * @param date - The date to query (Date object or ISO date string YYYY-MM-DD)
+   * @param modifier - Optional SQLite datetime() modifier string for timezone-aware
+   *                   logical date grouping (e.g. '-13 hours' for PST with 5 AM cutoff).
+   *                   When provided, uses date(datetime(created_at, modifier)) instead of date(created_at).
    * @returns Array of messages with conversation IDs, ordered by creation time
    */
-  getMessagesByDate(date: Date | string): Array<Message & { conversationId: string }> {
+  getMessagesByDate(date: Date | string, modifier?: string): Array<Message & { conversationId: string }> {
     // Normalize date to YYYY-MM-DD format
     let dateStr: string;
     if (typeof date === "string") {
@@ -731,16 +734,21 @@ export class DBClient {
       dateStr = date.toISOString().split("T")[0];
     }
 
+    const dateExpr = modifier
+      ? `date(datetime(created_at, ?))`
+      : `date(created_at)`;
     const stmt = this.db.prepare(
       `SELECT id, conversation_id, role, content, reasoning_content,
               tool_call_id, tool_calls, created_at, edited_at,
               pulse_id, pulse_name
        FROM messages
-       WHERE date(created_at) = ?
+       WHERE ${dateExpr} = ?
        ORDER BY created_at ASC`
     );
 
-    const rows = stmt.all<MessageRow>(dateStr);
+    const rows = modifier
+      ? stmt.all<MessageRow>(modifier, dateStr)
+      : stmt.all<MessageRow>(dateStr);
     stmt.finalize();
 
     return rows.map((row) => ({
@@ -770,9 +778,10 @@ export class DBClient {
    * Gets all unique conversation IDs that had messages on a specific date.
    *
    * @param date - The date to query (Date object or ISO date string YYYY-MM-DD)
+   * @param modifier - Optional SQLite datetime() modifier for timezone-aware logical dates
    * @returns Array of conversation IDs
    */
-  getConversationIdsByDate(date: Date | string): string[] {
+  getConversationIdsByDate(date: Date | string, modifier?: string): string[] {
     // Normalize date to YYYY-MM-DD format
     let dateStr: string;
     if (typeof date === "string") {
@@ -781,11 +790,16 @@ export class DBClient {
       dateStr = date.toISOString().split("T")[0];
     }
 
+    const dateExpr = modifier
+      ? `date(datetime(created_at, ?))`
+      : `date(created_at)`;
     const stmt = this.db.prepare(
-      `SELECT DISTINCT conversation_id FROM messages WHERE date(created_at) = ?`
+      `SELECT DISTINCT conversation_id FROM messages WHERE ${dateExpr} = ?`
     );
 
-    const rows = stmt.all<{ conversation_id: string }>(dateStr);
+    const rows = modifier
+      ? stmt.all<{ conversation_id: string }>(modifier, dateStr)
+      : stmt.all<{ conversation_id: string }>(dateStr);
     stmt.finalize();
 
     return rows.map((row) => row.conversation_id);
@@ -795,20 +809,38 @@ export class DBClient {
    * Gets all dates that have messages but no memory summary.
    * Used by the catch-up summarization to find missed days.
    *
+   * @param modifier - Optional SQLite datetime() modifier for timezone-aware logical dates.
+   *                   When provided, both the date extraction and the JOIN key use the modifier.
    * @returns Array of dates in YYYY-MM-DD format, oldest first
    */
-  getUnsummarizedDates(): string[] {
-    const stmt = this.db.prepare(
-      `SELECT DISTINCT DATE(m.created_at) as date
-       FROM messages m
-       LEFT JOIN summarized_chats sc
-         ON sc.chat_id = m.conversation_id
-         AND sc.message_date = DATE(m.created_at)
-       WHERE sc.message_date IS NULL
-       ORDER BY date ASC`
-    );
+  getUnsummarizedDates(modifier?: string): string[] {
+    let stmt;
+    let rows: Array<{ date: string }>;
 
-    const rows = stmt.all<{ date: string }>();
+    if (modifier) {
+      stmt = this.db.prepare(
+        `SELECT DISTINCT DATE(datetime(m.created_at, ?)) as date
+         FROM messages m
+         LEFT JOIN summarized_chats sc
+           ON sc.chat_id = m.conversation_id
+           AND sc.message_date = DATE(datetime(m.created_at, ?))
+         WHERE sc.message_date IS NULL
+         ORDER BY date ASC`
+      );
+      rows = stmt.all<{ date: string }>(modifier, modifier);
+    } else {
+      stmt = this.db.prepare(
+        `SELECT DISTINCT DATE(m.created_at) as date
+         FROM messages m
+         LEFT JOIN summarized_chats sc
+           ON sc.chat_id = m.conversation_id
+           AND sc.message_date = DATE(m.created_at)
+         WHERE sc.message_date IS NULL
+         ORDER BY date ASC`
+      );
+      rows = stmt.all<{ date: string }>();
+    }
+
     stmt.finalize();
 
     return rows.map((row) => row.date);

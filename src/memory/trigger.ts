@@ -8,7 +8,9 @@
 
 import type { DBClient } from "../db/mod.ts";
 import type { OnMemoryCreated } from "./file-writer.ts";
+import type { SummarizerConfig } from "./types.ts";
 import { summarizeDay } from "./summarizer.ts";
+import { getTimezoneModifier, getLogicalDateNow, DEFAULT_CUTOFF_HOUR } from "./date-utils.ts";
 
 /**
  * Configuration for memory triggers.
@@ -61,18 +63,27 @@ export function repairOrphanedSummaries(
  *
  * @param db - Database client
  * @param projectRoot - Root directory of the project
+ * @param onCreated - Optional callback fired after memory creation
+ * @param config - Optional summarizer config (timezone/cutoffHour for logical date grouping)
  * @returns Number of days summarized
  */
 export async function catchUpSummarization(
   db: DBClient,
   projectRoot: string,
   onCreated?: OnMemoryCreated,
+  config?: Partial<SummarizerConfig>,
 ): Promise<number> {
-  // Get all dates with messages that haven't been summarized
-  const unsummarizedDates = db.getUnsummarizedDates();
+  const tz = config?.timezone || "";
+  const cutoffHour = config?.cutoffHour ?? DEFAULT_CUTOFF_HOUR;
+  const modifier = tz ? getTimezoneModifier(tz, cutoffHour) : undefined;
 
-  // Get today's date in UTC to skip it (still in progress)
-  const today = new Date().toISOString().split("T")[0];
+  // Get all dates with messages that haven't been summarized
+  const unsummarizedDates = db.getUnsummarizedDates(modifier);
+
+  // Determine the current logical date to skip it (still in progress)
+  const today = tz
+    ? getLogicalDateNow(tz, cutoffHour)
+    : new Date().toISOString().split("T")[0];
 
   let summarized = 0;
   for (const date of unsummarizedDates) {
@@ -80,7 +91,7 @@ export async function catchUpSummarization(
     if (date === today) continue;
 
     console.log(`[Memory] Catching up on ${date}...`);
-    const memoryFile = await summarizeDay(new Date(date), db, projectRoot, undefined, onCreated);
+    const memoryFile = await summarizeDay(new Date(date), db, projectRoot, config, onCreated);
 
     if (memoryFile) {
       summarized++;

@@ -14,7 +14,7 @@ All Psycheros configuration is via environment variables. Copy `.env.example` to
 | `PSYCHEROS_HOST` | No | `0.0.0.0` | Server hostname |
 | `PSYCHEROS_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
 | `PSYCHEROS_TOOLS` | No | (none) | Comma-separated list of enabled tools |
-| `PSYCHEROS_MEMORY_HOUR` | No | `4` | Hour to run daily summarization (0-23) |
+| `PSYCHEROS_MEMORY_HOUR` | No | `4` | Fallback UTC hour for daily summarization (0-23). Only used when `PSYCHEROS_DISPLAY_TZ` is not set. |
 | `PSYCHEROS_SNAPSHOT_HOUR` | No | `3` | Hour to run daily identity snapshots (0-23) |
 | `PSYCHEROS_SNAPSHOT_RETENTION_DAYS` | No | `30` | Days to retain snapshots before cleanup |
 | `PSYCHEROS_WEB_SEARCH` | No | `disabled` | Web search provider: `disabled`, `tavily`, or `brave` |
