@@ -38,7 +38,7 @@ XML tags are used so the LLM treats timestamps as structural metadata. These tag
 
 **Display timestamps**: Shown in `.msg-header` as `msg-timestamp` elements. Time-only for today ("3:42 PM"), date + time for older messages ("Mar 14, 3:42 PM"). Server-side via `formatMessageTime()` in `templates.ts`, client-side via `formatChatTimestamp()` in `psycheros.js`.
 
-**Timezone**: Configurable via General Settings UI. The selected timezone propagates to all three timestamp formatters (server-side message headers, client-side streaming, entity temporal XML). Empty selection falls back to the `TZ` environment variable, then UTC for entity context and the browser's local timezone for display.
+**Timezone**: Configurable via General Settings UI. The selected timezone propagates to all server-side date/time formatting — message headers, snapshot dates, memory metadata, vault document dates, knowledge graph sync times, and daily memory summarization. Client-side streaming timestamps and the entity's temporal XML are also included. Empty selection falls back to the `TZ` environment variable, then the browser's local timezone for display.
 
 Implemented in `src/entity/loop.ts` via `formatMessageTimestamp()`. XML stripping in `src/server/markdown.ts` and `web/js/psycheros.js`.
 
@@ -114,7 +114,8 @@ Customizable display names and timezone for the chat interface. Access via Setti
 ### Timezone
 
 - **Display Timezone** — dropdown of ~40 common IANA timezones grouped by region, with "(System Default)" option
-- Affects all message timestamps: server-rendered, client-streamed, and entity temporal XML
+- Affects all server-rendered date/time display: message timestamps, snapshot dates (Today/Yesterday labels), memory metadata, vault document dates, knowledge graph sync times, and daily memory summarization schedule
+- Also affects client-streamed timestamps and entity temporal XML
 - Empty selection uses the system/browser default
 
 Settings are loaded on page init from the server and cached in `globalThis.PsycherosSettings` for instant access during streaming. Saving updates the in-memory cache immediately so new messages reflect the change without a page reload.

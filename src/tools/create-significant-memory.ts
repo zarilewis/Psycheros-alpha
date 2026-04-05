@@ -30,7 +30,13 @@ function formatSignificantMemory(
   title: string,
   content: string,
 ): string {
-  const dateStr = new Date().toISOString().split("T")[0];
+  const tz = Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ");
+  const dateStr = new Intl.DateTimeFormat("sv-SE", {
+    timeZone: tz || undefined,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
 
   return `# ${title}
 

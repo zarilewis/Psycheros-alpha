@@ -8,6 +8,11 @@
  */
 
 import type { Conversation, Message, ToolCall, ToolResult, TurnMetrics } from "../types.ts";
+
+/** Get the user's configured display timezone for Intl formatting. */
+function getDisplayTZ(): string | undefined {
+  return Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ") || undefined;
+}
 import type { Lorebook, LorebookEntry } from "../lorebook/mod.ts";
 import type { LLMSettings } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
@@ -66,7 +71,7 @@ function hasStringCommand(obj: unknown): obj is { command: string } {
  * Respects the TZ environment variable for display formatting.
  */
 function formatMessageTime(date: Date): string {
-  const timeZone = Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ") || undefined; // undefined = system default
+  const timeZone = getDisplayTZ();
   const now = new Date();
   const isToday = date.toLocaleDateString("en-US", { timeZone }) ===
     now.toLocaleDateString("en-US", { timeZone });
@@ -92,21 +97,38 @@ function formatMessageTime(date: Date): string {
 
 /**
  * Format a date for display.
+ * Uses the configured display timezone for both formatting and today/yesterday checks.
  */
 function formatDate(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  const now = new Date();
-  const diff = now.getTime() - d.getTime();
+  const tz = getDisplayTZ();
 
-  if (diff < 86400000) {
-    // Less than a day
-    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  } else if (diff < 604800000) {
-    // Less than a week
-    return d.toLocaleDateString([], { weekday: "short" });
-  } else {
-    return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  // Compare dates in the display timezone, not UTC
+  const todayStr = new Date().toLocaleDateString("en-US", { timeZone: tz });
+  const dateStr = d.toLocaleDateString("en-US", { timeZone: tz });
+
+  if (dateStr === todayStr) {
+    return d.toLocaleTimeString([], { timeZone: tz, hour: "2-digit", minute: "2-digit" });
   }
+
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toLocaleDateString("en-US", { timeZone: tz });
+
+  if (dateStr === yesterdayStr) {
+    return "Yesterday";
+  }
+
+  // Use sv-SE locale for sortable YYYY-MM-DD comparison
+  const fmt = (dt: Date) => new Intl.DateTimeFormat("sv-SE", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(dt);
+  const weekAgo = new Date();
+  weekAgo.setDate(weekAgo.getDate() - 7);
+
+  if (fmt(d) >= fmt(weekAgo)) {
+    return d.toLocaleDateString([], { timeZone: tz, weekday: "short" });
+  }
+
+  return d.toLocaleDateString([], { timeZone: tz, month: "short", day: "numeric" });
 }
 
 // =============================================================================
@@ -1544,24 +1566,34 @@ export function renderSnapshotPreview(
 
 /**
  * Format a date string for snapshot display.
+ * Compares dates in the display timezone for correct Today/Yesterday labels.
  */
 function formatSnapshotDate(dateStr: string): string {
-  const today = new Date().toISOString().split("T")[0];
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0];
+  const tz = getDisplayTZ();
+  const date = new Date(dateStr);
 
-  if (dateStr === today) {
+  const todayStr = new Date().toLocaleDateString("en-US", { timeZone: tz });
+  const dateStrDisplay = date.toLocaleDateString("en-US", { timeZone: tz });
+
+  if (dateStrDisplay === todayStr) {
     return "Today";
-  } else if (dateStr === yesterday) {
-    return "Yesterday";
-  } else {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString(undefined, {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
   }
+
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toLocaleDateString("en-US", { timeZone: tz });
+
+  if (dateStrDisplay === yesterdayStr) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString(undefined, {
+    timeZone: tz,
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 /**
@@ -1572,6 +1604,7 @@ function formatTime(timestamp: string): string {
   const isoTimestamp = timestamp.replace(/T(\d+)-(\d+)-(\d+)-(\d+)Z$/, 'T$1:$2:$3.$4Z');
   const date = new Date(isoTimestamp);
   return date.toLocaleTimeString(undefined, {
+    timeZone: getDisplayTZ(),
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -1751,10 +1784,10 @@ export function renderMemoryEditor(
       parts.push(`Source: ${escapeHtml(metadata.sourceInstance)}`);
     }
     if (metadata.createdAt) {
-      parts.push(`Created: ${escapeHtml(new Date(metadata.createdAt).toLocaleString())}`);
+      parts.push(`Created: ${escapeHtml(new Date(metadata.createdAt).toLocaleString([], { timeZone: getDisplayTZ() }))}`);
     }
     if (metadata.updatedAt) {
-      parts.push(`Updated: ${escapeHtml(new Date(metadata.updatedAt).toLocaleString())}`);
+      parts.push(`Updated: ${escapeHtml(new Date(metadata.updatedAt).toLocaleString([], { timeZone: getDisplayTZ() }))}`);
     }
     if (metadata.version && metadata.version > 1) {
       parts.push(`Version: ${metadata.version}`);
@@ -2272,7 +2305,7 @@ export function renderEntityCoreOverview(data: EntityCoreOverviewData): string {
   const edgeCount = stats?.totalEdges ?? 0;
   const vecStatus = stats?.vectorSearchAvailable ? "active" : "off";
   const lastSync = data.lastSyncTime
-    ? new Date(data.lastSyncTime).toLocaleString()
+    ? new Date(data.lastSyncTime).toLocaleString([], { timeZone: getDisplayTZ() })
     : "Never";
 
   const topNodeTypes = stats?.nodesByType

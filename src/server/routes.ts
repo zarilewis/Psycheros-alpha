@@ -4760,7 +4760,7 @@ function renderVaultView(
         : `<span class="vault-scope-badge vault-scope-badge--chat">Chat</span>`;
       const sourceLabel = d.source === "entity" ? "entity" : "upload";
       const sizeKB = (d.fileSize / 1024).toFixed(1);
-      const date = new Date(d.updatedAt).toLocaleDateString();
+      const date = new Date(d.updatedAt).toLocaleDateString([], { timeZone: Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ") || undefined });
 
       return `<div class="vault-card" hx-target="#chat" hx-swap="innerHTML">
         <div class="vault-card-header">
