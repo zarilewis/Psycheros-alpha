@@ -54,7 +54,8 @@ During streaming, the Send button transforms into a Stop button with two-tap con
 **Behavior:**
 - Partial assistant response is **not persisted** when stopped
 - User message **is persisted** (saved before streaming begins)
-- Switching conversations mid-stream also aborts generation
+- Switching conversations mid-stream no longer aborts generation — the response continues in the background and is fully persisted to the database. When you switch back, the completed message is visible.
+- The explicit Stop button (double-tap) still aborts generation and prevents persistence as before.
 
 Implemented in `web/js/psycheros.js`: `requestStopGeneration()`, `stopGeneration()`. CSS in `web/css/components.css`.
 

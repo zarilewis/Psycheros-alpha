@@ -6,7 +6,7 @@ Two SSE channels serve different purposes:
 
 ### Per-Request Stream (`POST /api/chat`)
 
-Opened per chat request, closes when the response is complete.
+Opened per chat request, closes when the response is complete. If the user switches conversations mid-stream, the client stops rendering but continues draining the stream so the server finishes processing and persists the full response. The explicit Stop button (double-tap) still aborts and prevents persistence.
 
 Event flow: `message_id (user) → context → thinking → content → tool_call → tool_result → metrics → done → message_id (assistant)`
 

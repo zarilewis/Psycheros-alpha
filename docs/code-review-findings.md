@@ -131,6 +131,7 @@ Full code review covering code quality, error handling, input validation, SQLite
 - Background upload generates safe filenames server-side
 - Background delete handler regex blocks traversal after URL decoding
 - Prepared statements wrapped in try/finally for guaranteed finalization
+- Tool execution serialized across concurrent turns via promise mutex in `ToolRegistry.executeAll()`, preventing race conditions on shared resources (identity files, knowledge graph, memories) when multiple turns run simultaneously (e.g., background stream + new conversation, Pulse + user chat)
 
 See also: [security-audit.md](security-audit.md) for the full security assessment.
 

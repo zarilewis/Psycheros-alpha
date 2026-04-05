@@ -11,6 +11,7 @@ let currentConversationId = null;
 let isStreaming = false;
 const pendingToolCalls = new Map();
 let currentAbortController = null;
+let streamingConversationId = null; // The conversation currently being streamed (may differ from currentConversationId)
 let persistentSSE = null;
 
 // General settings (display names)
@@ -708,13 +709,13 @@ async function newConversation() {
 }
 
 function selectConversation(id) {
-  // Abort any in-progress stream
-  if (currentAbortController) {
-    currentAbortController.abort();
-    currentAbortController = null;
-  }
+  // Don't abort in-progress generation — let it continue in the background
+  // so the full response is persisted on the server. We just detach the
+  // UI state from the old conversation's stream.
+  // streamingConversationId retains the old value so sendMessage knows it's orphaned.
 
-  // Reset state
+  // Detach from the old stream without aborting it
+  currentAbortController = null;
   isStreaming = false;
   pendingToolCalls.clear();
   currentConversationId = id;
@@ -955,6 +956,7 @@ async function sendMessage() {
   sendBtn.disabled = false; // Enable so user can click stop
 
   isStreaming = true;
+  streamingConversationId = currentConversationId;
 
   // Remove empty state if present
   document.getElementById('empty-state')?.remove();
@@ -998,6 +1000,8 @@ async function sendMessage() {
   // Create abort controller
   currentAbortController = new AbortController();
 
+  let orphaned = false; // Set to true when user switches away from this conversation
+
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
@@ -1022,6 +1026,15 @@ async function sendMessage() {
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+
+      // Check if the user switched conversations — if so, stop rendering
+      // but keep draining the reader so the server finishes and persists the response
+      if (!orphaned && streamingConversationId !== currentConversationId) {
+        orphaned = true;
+        console.log(`Stream orphaned: switched from ${streamingConversationId} to ${currentConversationId}, draining in background`);
+      }
+
+      if (orphaned) continue; // Skip rendering, just drain the stream
 
       buffer += decoder.decode(value, { stream: true });
 
@@ -1058,7 +1071,21 @@ async function sendMessage() {
         }
       }
     }
+
+    // If the stream was orphaned (user switched conversations), skip all
+    // UI cleanup here — selectConversation already reset the UI for the
+    // new conversation. The server finished persisting the response.
+    if (orphaned) {
+      streamingConversationId = null;
+      return;
+    }
   } catch (error) {
+    // If orphaned, ignore errors — the user has already moved on
+    if (streamingConversationId !== currentConversationId) {
+      streamingConversationId = null;
+      return;
+    }
+
     if (error.name === 'AbortError') {
       console.log('Request aborted by user');
       // Freeze whatever content was streaming with a clean render
@@ -1082,6 +1109,18 @@ async function sendMessage() {
     }
 
   } finally {
+    // If the stream was orphaned (user switched conversations while this was
+    // streaming), skip UI cleanup — selectConversation already handled it.
+    // Just clean up the render timer and state bookkeeping.
+    if (orphaned) {
+      if (_renderTimer) {
+        clearTimeout(_renderTimer);
+        _renderTimer = null;
+      }
+      streamingConversationId = null;
+      return;
+    }
+
     // Kill any pending debounced render
     if (_renderTimer) {
       clearTimeout(_renderTimer);
@@ -1101,6 +1140,7 @@ async function sendMessage() {
     pendingToolCalls.clear();
     currentAbortController = null;
     currentSegmentRaw = ""; // Reset markdown buffer
+    streamingConversationId = null;
 
     // Re-enable input
     if (input) input.disabled = false;

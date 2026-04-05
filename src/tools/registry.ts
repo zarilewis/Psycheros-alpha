@@ -119,6 +119,18 @@ export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
 
   /**
+   * Mutex that serializes tool execution across concurrent turns.
+   *
+   * Prevents race conditions when multiple turns (e.g., background stream +
+   * new conversation, or Pulse + user chat) execute tools that modify shared
+   * resources like identity files, the knowledge graph, or memory files.
+   *
+   * Pattern: replace the promise BEFORE awaiting to avoid the microtask race
+   * where two callers both pass `await` before either sets the new promise.
+   */
+  private toolLock: Promise<void> = Promise.resolve();
+
+  /**
    * Register a tool in the registry.
    *
    * @param tool - The tool to register
@@ -213,19 +225,37 @@ export class ToolRegistry {
   }
 
   /**
-   * Execute multiple tool calls in parallel.
+   * Execute multiple tool calls in parallel, serialized across concurrent turns.
+   *
+   * Acquires a mutex lock before executing any tools, ensuring that shared
+   * resources (identity files, knowledge graph, memories) are never modified
+   * by two turns simultaneously. Tools within a single call still run in
+   * parallel via Promise.all.
    *
    * @param toolCalls - Array of tool calls to execute
    * @param baseContext - The execution context (toolCallId added per-call)
    * @returns Array of tool results in the same order as input
    */
-  executeAll(
+  async executeAll(
     toolCalls: ToolCall[],
     baseContext: Omit<ToolContext, "toolCallId">
   ): Promise<ToolResult[]> {
-    return Promise.all(
-      toolCalls.map((toolCall) => this.execute(toolCall, baseContext))
-    );
+    // Acquire lock: replace the promise before awaiting to prevent the
+    // microtask race where two callers both pass `await` on the same promise.
+    let release!: () => void;
+    const myTurn = new Promise<void>((resolve) => { release = resolve; });
+    const previous = this.toolLock;
+    this.toolLock = myTurn;
+
+    await previous;
+
+    try {
+      return await Promise.all(
+        toolCalls.map((toolCall) => this.execute(toolCall, baseContext))
+      );
+    } finally {
+      release();
+    }
   }
 }
 
