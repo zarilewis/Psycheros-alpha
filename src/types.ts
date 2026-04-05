@@ -96,9 +96,10 @@ export interface UIUpdate {
  * - status: Status updates (e.g., "processing", "complete")
  * - metrics: Streaming performance metrics for the turn
  * - done: Stream completion signal
+ * - message_id: Message ID assignment for streaming-created DOM elements
  */
 export interface SSEEvent {
-  type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "metrics" | "context" | "done";
+  type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "metrics" | "context" | "done" | "message_id";
   data: string;
 }
 

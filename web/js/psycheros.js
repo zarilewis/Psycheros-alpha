@@ -278,6 +278,27 @@ function initPersistentSSE() {
     }
   });
 
+  persistentSSE.addEventListener('message_id', (event) => {
+    try {
+      const { role, id } = JSON.parse(event.data);
+      const messages = document.getElementById('messages');
+      if (!messages) return;
+      if (role === 'user') {
+        // Find the last user or pulse message without a data-message-id
+        const userMsgs = messages.querySelectorAll('.msg--user:not([data-message-id]), .msg--pulse:not([data-message-id])');
+        const lastUserMsg = userMsgs[userMsgs.length - 1];
+        if (lastUserMsg) addMessageEditCapability(lastUserMsg, id);
+      } else if (role === 'assistant') {
+        // pulseAssistantEl is nulled after done, so query the DOM
+        const asstMsgs = messages.querySelectorAll('.msg--assistant:not([data-message-id])');
+        const lastAsstMsg = asstMsgs[asstMsgs.length - 1];
+        if (lastAsstMsg) addMessageEditCapability(lastAsstMsg, id);
+      }
+    } catch (e) {
+      console.error('Failed to handle persistent message_id:', e);
+    }
+  });
+
   persistentSSE.addEventListener('pulse_complete', (event) => {
     try {
       const { conversationId } = JSON.parse(event.data);
@@ -1103,6 +1124,25 @@ async function sendMessage() {
 // =============================================================================
 
 /**
+ * Attach data-message-id and edit button to a streaming-created message element.
+ * This mirrors what the server templates do for server-rendered messages.
+ */
+function addMessageEditCapability(element, messageId) {
+  if (!element || !messageId) return;
+  element.setAttribute('data-message-id', messageId);
+  // Don't add duplicate edit buttons
+  if (element.querySelector('.msg-edit-btn')) return;
+  const header = element.querySelector('.msg-header');
+  if (!header) return;
+  const btn = document.createElement('button');
+  btn.className = 'msg-edit-btn';
+  btn.title = 'Edit message';
+  btn.onclick = () => Psycheros.startMessageEdit(messageId);
+  btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  header.appendChild(btn);
+}
+
+/**
  * Strip XML tags emitted by the LLM that shouldn't be displayed.
  * Removes <t>timestamp</t> tags entirely (tag + content), and cleans
  * up any resulting whitespace debris.
@@ -1367,6 +1407,26 @@ function handleSSEEvent(eventType, data, messageEl, state) {
       const header = messageEl.querySelector('.msg-header');
       header?.querySelector('.streaming')?.remove();
       AutoScroll.streamEnd();
+      break;
+    }
+
+    case 'message_id': {
+      try {
+        const { role, id } = JSON.parse(data);
+        if (role === 'user') {
+          // Find the last user message without a data-message-id
+          const messages = document.getElementById('messages');
+          if (messages) {
+            const userMsgs = messages.querySelectorAll('.msg--user:not([data-message-id])');
+            const lastUserMsg = userMsgs[userMsgs.length - 1];
+            if (lastUserMsg) addMessageEditCapability(lastUserMsg, id);
+          }
+        } else if (role === 'assistant') {
+          addMessageEditCapability(messageEl, id);
+        }
+      } catch (e) {
+        console.error('Failed to handle message_id:', e);
+      }
       break;
     }
   }

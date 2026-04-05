@@ -367,7 +367,7 @@ When `PSYCHEROS_DISPLAY_TZ` (or `TZ`) is set, daily/weekly/monthly and one-shot 
 **Visible Mode Behavior:**
 - The Pulse prompt message appears in real-time with the entity's accent color border and Pulse icon
 - The entity perceives Pulse messages as system-initiated via a `[System — Pulse "name"]` prefix, not as user messages
-- Responses stream via the persistent SSE channel (content, thinking, tool_call, tool_result, done events)
+- Responses stream via the persistent SSE channel (content, thinking, tool_call, tool_result, done, message_id events)
 - Input is disabled during Pulse streaming; the stop button appears (double-tap to confirm)
 - Chat auto-scrolls as Pulse content arrives
 - Pulse message metadata (pulse_id, pulse_name) is stored on messages for traceability

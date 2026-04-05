@@ -965,12 +965,21 @@ function renderPulseMessage(msg: Message): string {
   const timeEl = timeStr ? `<span class="msg-timestamp">${escapeHtml(timeStr)}</span>` : "";
   const pulseName = escapeHtml(msg.pulseName || "Pulse");
   const icon = pulseIconSvg(14);
+  const editBtn = msg.id
+    ? `<button class="msg-edit-btn" onclick="Psycheros.startMessageEdit('${escapeHtml(msg.id)}')" title="Edit message">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>`
+    : "";
 
   return `<div class="msg msg--pulse" ${dataAttr}>
   <div class="msg-header">
     <span class="pulse-header-icon">${icon}</span>
     <span>${pulseName}</span>
     ${timeEl}
+    ${editBtn}
   </div>
   <div class="msg-content" data-raw-content="${escapeHtml(msg.content)}">${renderMarkdown(msg.content)}</div>
 </div>`;

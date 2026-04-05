@@ -8,9 +8,9 @@ Two SSE channels serve different purposes:
 
 Opened per chat request, closes when the response is complete.
 
-Event flow: `context → thinking → content → tool_call → tool_result → metrics → done`
+Event flow: `message_id (user) → context → thinking → content → tool_call → tool_result → metrics → done → message_id (assistant)`
 
-Also emits `dom_update` events for UI changes triggered by tool execution, and `status` events for retry notifications and errors.
+Also emits `dom_update` events for UI changes triggered by tool execution, and `status` events for retry notifications and errors. The `message_id` event assigns database IDs to streaming-created DOM elements, enabling edit buttons without a page refresh.
 
 ### Persistent Channel (`GET /api/events`)
 

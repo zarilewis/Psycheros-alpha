@@ -113,7 +113,8 @@ export type EntityYield =
   | { type: "dom_update"; update: UIUpdate }
   | { type: "status"; status: { message?: string; error?: string; retry?: { attempt: number; maxAttempts: number } } }
   | { type: "metrics"; metrics: TurnMetrics }
-  | { type: "context"; context: LLMContextSnapshot };
+  | { type: "context"; context: LLMContextSnapshot }
+  | { type: "message_id"; role: "user" | "assistant"; id: string };
 
 /**
  * Represents a single turn in the conversation.
@@ -341,6 +342,9 @@ export class EntityTurn {
         pulseId: options?.pulseId,
         pulseName: options?.pulseName,
       }, userMessageId);
+
+      // Yield user message ID so the frontend can attach edit capability
+      yield { type: "message_id", role: "user", id: userMessageId };
 
       // Index the user message for chat RAG (non-blocking, non-fatal)
       if (this.config.chatRAG && userMessageId) {
@@ -585,8 +589,11 @@ export class EntityTurn {
         );
       }
 
-      // If no tool calls, we're done
+      // If no tool calls, we're done — yield assistant message ID for edit capability
       if (toolCalls.length === 0) {
+        if (messageId) {
+          yield { type: "message_id", role: "assistant", id: messageId };
+        }
         return;
       }
 
@@ -677,10 +684,14 @@ export class EntityTurn {
     yield { type: "content", content: warningMessage };
 
     // Persist this system-generated message so the context is clear
+    const maxIterMsgId = crypto.randomUUID();
     this.db.addMessage(conversationId, {
       role: "assistant",
       content: warningMessage,
-    });
+    }, maxIterMsgId);
+
+    // Yield message ID for the warning message so the frontend can attach edit capability
+    yield { type: "message_id", role: "assistant", id: maxIterMsgId };
 
     console.warn(
       `EntityTurn: Hit max tool iterations (${this.maxToolIterations}). ` +

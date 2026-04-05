@@ -1097,6 +1097,12 @@ function convertToSSEEvent(chunk: EntityYield): SSEEvent {
         type: "done",
         data: chunk.finishReason,
       };
+
+    case "message_id":
+      return {
+        type: "message_id",
+        data: JSON.stringify({ role: chunk.role, id: chunk.id }),
+      };
   }
 }
 

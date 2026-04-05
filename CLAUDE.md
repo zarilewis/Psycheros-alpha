@@ -90,8 +90,8 @@ Psycheros supports third-party integrations for out-of-band notifications. Curre
 3. Background: call `getBroadcaster().broadcastUpdates()` directly
 
 **SSE channels**:
-- `POST /api/chat` — per-request stream (context, thinking, content, tool calls, metrics, done)
-- `GET /api/events` — persistent channel (dom_update events, Pulse streaming: content, thinking, tool_call, tool_result, done)
+- `POST /api/chat` — per-request stream (message_id, context, thinking, content, tool calls, metrics, done)
+- `GET /api/events` — persistent channel (dom_update events, Pulse streaming: content, thinking, tool_call, tool_result, done, message_id)
 
 **User data protection**:
 - `identity/`, `memories/`, `.snapshots/`, `data/vault/` are **runtime-only directories** — gitignored, never committed
