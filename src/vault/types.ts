@@ -66,6 +66,7 @@ export interface VaultListOptions {
 export interface VaultCreateOptions {
   scope: VaultScope;
   conversationId?: string;
+  title?: string;
 }
 
 /** Options for searching the vault */

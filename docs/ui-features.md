@@ -283,9 +283,11 @@ Document storage and search system accessible via Settings → Data Vault in the
 - Upload documents (.md, .txt, .pdf, .docx, .xlsx up to 10MB)
 - Set scope: global (all conversations) or per-chat (single conversation)
 - Document cards showing title, file type, scope, chunk count, size, source (upload/entity), date
-- Edit entity-created documents inline (uploaded docs require re-upload)
+- View/Edit documents with a rendered markdown view mode (default) and textarea edit mode
+- Cancel button to discard edits and return to the vault list
 - Delete documents with confirmation
 - Entity can also create/edit vault documents via `vault_write` tool
+- Descriptive file naming: `vault_{date}_{slug}.md` with automatic conflict resolution
 
 **API Endpoints:**
 - `GET /api/vault` — list documents

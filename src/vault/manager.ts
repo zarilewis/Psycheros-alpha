@@ -61,6 +61,50 @@ interface VaultVectorSearchRow {
 }
 
 /**
+ * Generate a descriptive filename for a vault document.
+ * Pattern: vault_{YYYY-MM-DD}_{slug}.{ext}
+ * If a conflict exists, appends -N suffix.
+ */
+function generateVaultFilename(
+  title: string,
+  ext: string,
+  vaultDir: string
+): string {
+  const date = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+
+  // Slugify: lowercase, replace non-alphanumeric with dashes, collapse, trim, truncate
+  let slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+
+  // Fallback if title produced no valid slug
+  if (!slug) {
+    slug = Math.random().toString(36).substring(2, 8);
+  }
+
+  const base = `vault_${date}_${slug}`;
+
+  // Check for conflicts on disk
+  try {
+    const existing = [...Deno.readDirSync(vaultDir)]
+      .map((e) => e.name);
+
+    const filename = `${base}.${ext}`;
+    if (!existing.includes(filename)) return filename;
+
+    // Append numeric suffix until unique
+    let n = 2;
+    while (existing.includes(`${base}-${n}.${ext}`)) n++;
+    return `${base}-${n}.${ext}`;
+  } catch {
+    // Directory may not exist yet or other IO error — just return base name
+    return `${base}.${ext}`;
+  }
+}
+
+/**
  * Hash content using SHA-256.
  */
 async function hashContent(content: string): Promise<string> {
@@ -156,10 +200,9 @@ export class VaultManager {
     const vaultDir = this.getVaultDir(opts);
     await Deno.mkdir(vaultDir, { recursive: true });
 
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
     const ext = file.name.split(".").pop()?.toLowerCase() || fileType;
-    const filename = `vault-${timestamp}-${randomSuffix}.${ext}`;
+    const title = (opts.title || file.name.replace(/\.[^.]+$/, "")).trim();
+    const filename = generateVaultFilename(title, ext, vaultDir);
     const filePath = join(vaultDir, filename);
 
     // Write file to disk
@@ -169,7 +212,7 @@ export class VaultManager {
     // Extract text and process
     const text = await extractText(filePath, fileType);
     return await this.processNewDocument({
-      title: file.name.replace(/\.[^.]+$/, ""),
+      title,
       filename,
       fileType,
       filePath,
@@ -192,9 +235,7 @@ export class VaultManager {
     const vaultDir = this.getVaultDir(opts);
     await Deno.mkdir(vaultDir, { recursive: true });
 
-    const timestamp = Date.now();
-    const randomSuffix = Math.random().toString(36).substring(2, 8);
-    const filename = `vault-${timestamp}-${randomSuffix}.md`;
+    const filename = generateVaultFilename(title.trim(), "md", vaultDir);
     const filePath = join(vaultDir, filename);
 
     await Deno.writeTextFile(filePath, content);

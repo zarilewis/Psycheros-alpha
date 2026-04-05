@@ -76,6 +76,7 @@ import {
   saveSubscription,
   deleteSubscription as deletePushSubscription,
 } from "../push/mod.ts";
+import { renderMarkdown } from "./markdown.ts";
 
 /**
  * Context passed to route handlers containing dependencies.
@@ -4601,12 +4602,10 @@ export async function handleUploadVault(
     const scope = (formData.get("scope") as "global" | "chat") || "global";
     const conversationId = formData.get("conversation_id") as string | undefined;
 
-    // Use _title for context (e.g., future logging) - suppress unused warning
-    void _title;
-
     const doc = await ctx.vaultManager.createFromUpload(file, {
       scope,
       conversationId,
+      title: typeof _title === "string" ? _title : undefined,
     });
 
     if (isHtmx) {
@@ -4784,8 +4783,8 @@ function renderVaultView(
         </div>
         <div class="vault-card-actions">
           <a class="btn btn--sm" hx-get="/fragments/settings/vault/${d.id}">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-            Edit
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            View/Edit
           </a>
           <button class="btn btn--sm btn--danger"
             hx-delete="/api/vault/${d.id}"
@@ -4878,6 +4877,7 @@ async function renderVaultDetailView(ctx: RouteContext, id: string): Promise<str
 
   const isEditable = doc.source === "entity";
   let contentText = "";
+  let loadError = "";
   try {
     if (isEditable || doc.fileType === "md" || doc.fileType === "txt") {
       contentText = Deno.readTextFileSync(doc.filePath);
@@ -4886,9 +4886,16 @@ async function renderVaultDetailView(ctx: RouteContext, id: string): Promise<str
       const { extractText } = await import("../vault/processor.ts");
       contentText = await extractText(doc.filePath, doc.fileType);
     }
-  } catch {
-    // File may not exist or extraction failed
+  } catch (err) {
+    console.error(`[Vault] Failed to load content for "${doc.title}":`, err);
+    loadError = "Could not load file content. The file may not exist or may be corrupted.";
   }
+
+  const renderedContent = contentText ? renderMarkdown(contentText) : "";
+  const canView = doc.fileType === "md" || doc.fileType === "txt" || isEditable;
+  const showLoadError = loadError
+    ? `<div class="settings-status visible error" style="margin-bottom:var(--sp-3)">${escapeHtml(loadError)}</div>`
+    : "";
 
   return `<div class="settings-view">
   <div class="settings-header">
@@ -4911,24 +4918,36 @@ async function renderVaultDetailView(ctx: RouteContext, id: string): Promise<str
     </div>
   </div>
   <div class="settings-content">
+    ${showLoadError}
     <div class="settings-editor">
       <div class="settings-editor-header">
         <span class="settings-editor-filename">${escapeHtml(doc.filename)}</span>
+        ${canView ? `
+        <div class="vault-view-toggle" style="margin-left:auto;display:flex;gap:var(--sp-1)">
+          <button type="button" class="btn btn--sm vault-toggle-btn vault-toggle-btn--active" onclick="this.classList.add('vault-toggle-btn--active');this.nextElementSibling.classList.remove('vault-toggle-btn--active');document.getElementById('vault-view-mode').style.display='';document.getElementById('vault-edit-mode').style.display='none'">View</button>
+          <button type="button" class="btn btn--sm vault-toggle-btn" onclick="this.classList.add('vault-toggle-btn--active');this.previousElementSibling.classList.remove('vault-toggle-btn--active');document.getElementById('vault-edit-mode').style.display='';document.getElementById('vault-view-mode').style.display='none'">Edit</button>
+        </div>` : ""}
       </div>
-      <form hx-put="/api/vault/${doc.id}" hx-target="#vault-editor-status" hx-swap="innerHTML">
-        <div class="form-group" style="margin-bottom:var(--sp-3)">
-          <label>Title</label>
-          <input type="text" name="title" value="${escapeHtml(doc.title)}" />
-        </div>
-        <div class="form-group">
-          <label>Content</label>
-          <textarea name="content" class="settings-textarea" rows="20">${escapeHtml(contentText)}</textarea>
-        </div>
-        <div class="settings-editor-actions">
-          <button type="submit" class="btn btn--primary">Save Changes</button>
-        </div>
-        <div id="vault-editor-status" class="settings-editor-status"></div>
-      </form>
+      <div id="vault-view-mode" class="vault-view-content" style="${canView ? '' : 'display:none'}">
+        ${contentText ? `<div class="assistant-text">${renderedContent}</div>` : '<div class="vault-empty">No content to display.</div>'}
+      </div>
+      <div id="vault-edit-mode" class="vault-edit-content" style="display:none">
+        <form hx-put="/api/vault/${doc.id}" hx-target="#vault-editor-status" hx-swap="innerHTML">
+          <div class="form-group" style="margin-bottom:var(--sp-3)">
+            <label>Title</label>
+            <input type="text" name="title" value="${escapeHtml(doc.title)}" />
+          </div>
+          <div class="form-group">
+            <label>Content</label>
+            <textarea name="content" class="settings-textarea" rows="20">${escapeHtml(contentText)}</textarea>
+          </div>
+          <div class="settings-editor-actions">
+            <button type="submit" class="btn btn--primary">Save Changes</button>
+            <a class="btn btn--ghost" hx-get="/fragments/settings/vault" hx-target="#chat" hx-swap="innerHTML">Cancel</a>
+          </div>
+          <div id="vault-editor-status" class="settings-editor-status"></div>
+        </form>
+      </div>
     </div>
   </div>
 </div>`;

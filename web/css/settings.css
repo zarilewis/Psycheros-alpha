@@ -300,7 +300,6 @@
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--c-accent);
-  text-transform: capitalize;
 }
 
 .settings-editor-tokens {
@@ -1376,6 +1375,22 @@
 .vault-card-actions {
   display: flex;
   gap: var(--sp-2);
+}
+
+.vault-toggle-btn--active {
+  background-color: var(--c-accent-subtle);
+  color: var(--c-accent);
+  border-color: var(--c-accent);
+}
+
+.vault-view-content {
+  padding: var(--sp-4);
+  min-height: 200px;
+  background-color: var(--c-bg);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-sm);
+  overflow-y: auto;
+  max-height: 70vh;
 }
 
 /* ==========================================================================
