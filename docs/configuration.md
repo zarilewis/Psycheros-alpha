@@ -66,6 +66,7 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 | `delete_pulse` | Delete a Pulse and its triggers |
 | `send_notification` | Send a push notification to the user's device |
 | `send_discord_dm` | Send a Discord DM to the user (auto-enabled when bot token is configured) |
+| `control_device` | Control a smart home device — on/off/status (auto-enabled when devices are configured) |
 
 **Example configurations:**
 ```bash

@@ -46,7 +46,9 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/tools/custom-loader.ts` | Dynamic loader for user-written tools in `custom-tools/` |
 | `src/tools/web-search.ts` | Web search tool (Tavily / Brave) |
 | `src/tools/send-discord-dm.ts` | Discord DM tool (sends DMs via Discord bot API) |
+| `src/tools/control-device.ts` | Home automation tool (smart plug control via Shelly API) |
 | `src/llm/discord-settings.ts` | Discord settings type, load/save, token masking |
+| `src/llm/home-settings.ts` | Home automation settings type, load/save (device list) |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
 | `src/tools/identity-custom.ts` | Custom identity file tool (create, append, prepend, update_section, replace) |
 | `src/memory/mod.ts` | Hierarchical memory system (daily summarization only; weekly/monthly/yearly consolidation moved to entity-core) |
@@ -65,9 +67,15 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 
 ## External Connections
 
-Psycheros supports third-party integrations for out-of-band notifications. Currently supported:
+Psycheros supports third-party integrations organized under two tabs in Settings > External Connections:
 
-- **Discord DM** — Entity sends DMs via a Discord bot. Configured via Settings > External Connections or env vars (`DISCORD_BOT_TOKEN`, `DISCORD_DEFAULT_CHANNEL_ID`). Auto-enables the `send_discord_dm` tool when configured. Settings persist to `.psycheros/discord-settings.json`.
+### Channels
+
+- **Discord DM** — Entity sends DMs via a Discord bot. Configured via Settings > External Connections > Channels or env vars (`DISCORD_BOT_TOKEN`, `DISCORD_DEFAULT_CHANNEL_ID`). Auto-enables the `send_discord_dm` tool when configured. Settings persist to `.psycheros/discord-settings.json`.
+
+### Home
+
+- **Smart Devices** — Entity controls smart plugs (Shelly Plug) via local HTTP API. Configured via Settings > External Connections > Home. Auto-enables the `control_device` tool when at least one device is enabled. Settings persist to `.psycheros/home-settings.json`.
 
 ## Core Patterns
 

@@ -25,3 +25,7 @@ export { loadWebSearchSettings, saveWebSearchSettings, getDefaultWebSearchSettin
 // Re-export Discord settings
 export type { DiscordSettings } from "./discord-settings.ts";
 export { loadDiscordSettings, saveDiscordSettings, getDefaultDiscordSettings, maskDiscordSettings } from "./discord-settings.ts";
+
+// Re-export Home settings
+export type { HomeSettings, HomeDevice } from "./home-settings.ts";
+export { loadHomeSettings, saveHomeSettings, getDefaultHomeSettings } from "./home-settings.ts";

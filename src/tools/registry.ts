@@ -52,6 +52,8 @@ import { createPulseTool, triggerPulseTool, deletePulseTool } from "./pulse-tool
 import { sendNotificationTool } from "./send-notification.ts";
 // Discord DM tool
 import { sendDiscordDmTool } from "./send-discord-dm.ts";
+// Home automation tool
+import { controlDeviceTool } from "./control-device.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -105,6 +107,8 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   send_notification: sendNotificationTool,
   // Discord DM tool
   send_discord_dm: sendDiscordDmTool,
+  // Home automation tool
+  control_device: controlDeviceTool,
 };
 
 /**

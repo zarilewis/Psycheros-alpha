@@ -265,6 +265,45 @@ Settings are persisted to `.psycheros/discord-settings.json` (gitignored). The t
 | `src/tools/send-discord-dm.ts` | `send_discord_dm` tool implementation |
 | `src/llm/discord-settings.ts` | Settings type, load/save, token masking |
 
+## Home Automation Tool
+
+The entity can control smart home devices such as smart plugs. Currently supports Shelly Plug devices via their local HTTP API. The entity turns devices on/off or checks their power status by name.
+
+| Tool | Description |
+|------|-------------|
+| `control_device` | Turn a smart device on/off or check its power status by device name |
+
+**Parameters:** `device` (required, name of the configured device), `action` (required, one of `"on"`, `"off"`, `"status"`).
+
+**Setup:** Configure via Settings > External Connections > Home in the web UI. Add devices with a name, type (currently "Shelly Plug"), and IP address/hostname. Settings are persisted to `.psycheros/home-settings.json` (gitignored). The tool is auto-enabled when at least one device is enabled.
+
+**Device settings shape:**
+```json
+{
+  "devices": [
+    {
+      "name": "Coffee Maker",
+      "type": "shelly-plug",
+      "address": "192.168.1.100",
+      "enabled": true
+    }
+  ]
+}
+```
+
+**Data flow:** Entity calls `control_device("Coffee Maker", "on")` → server looks up device by name → dispatches to the Shelly handler → sends `GET http://{address}/relay/0?turn=on` → returns power state from Shelly JSON response.
+
+**Error handling:** The tool returns clear messages for device not found (lists available devices), disabled devices, unknown device types, network timeouts (5s), and HTTP errors.
+
+**Extensibility:** The `type` field in device settings routes to protocol-specific handlers. Adding a new device type (e.g., Kasa, Home Assistant) requires only adding a new handler function — the tool interface stays the same.
+
+### Related Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/tools/control-device.ts` | `control_device` tool implementation with Shelly Plug handler |
+| `src/llm/home-settings.ts` | Settings type, load/save |
+
 ## Identity File Structure (Core Prompts)
 
 Identity files are versioned markdown stored in the `identity/` directory:

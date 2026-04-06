@@ -3545,7 +3545,14 @@ function renderToolItem(tool: { name: string; description: string; enabled: bool
 </div>`;
 }
 
-export function renderConnectionsSettings(settings: DiscordSettings): string {
+/**
+ * Render External Connections page with tabbed navigation.
+ * Tabs: Channels (Discord, etc.) and Home (smart devices).
+ */
+export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings): string {
+  const channelsContent = renderChannelsTab(discordSettings);
+  const homeContent = renderHomeTab(homeSettings);
+
   return `<div class="settings-view">
   <div class="settings-header">
     <div class="settings-header-row">
@@ -3558,10 +3565,97 @@ export function renderConnectionsSettings(settings: DiscordSettings): string {
   </div>
   <div class="settings-content" id="settings-content">
 
-    <!-- Discord Section -->
+    <nav class="connections-nav">
+      <button class="connections-nav-tab active" data-tab="channels" onclick="switchConnectionsTab('channels')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+        </svg>
+        Channels
+      </button>
+      <button class="connections-nav-tab" data-tab="home" onclick="switchConnectionsTab('home')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        Home
+      </button>
+    </nav>
+
+    <div id="connections-tab-channels" class="connections-tab-panel">${channelsContent}</div>
+    <div id="connections-tab-home" class="connections-tab-panel" style="display:none;">${homeContent}</div>
+
+  </div>
+
+  <style>
+    .connections-nav { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4); border-bottom: 1px solid var(--c-border); padding-bottom: var(--sp-2); }
+    .connections-nav-tab { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); background: none; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--c-fg-muted); font-size: var(--font-size-sm); cursor: pointer; transition: color var(--transition), background var(--transition), border-color var(--transition); }
+    .connections-nav-tab:hover { color: var(--c-fg); background: var(--c-bg-hover); }
+    .connections-nav-tab:active { transform: scale(0.98); }
+    .connections-nav-tab.active { color: var(--c-accent); background: var(--c-accent-subtle); border-color: var(--c-accent); }
+  </style>
+
+<script>
+function switchConnectionsTab(tab) {
+  document.querySelectorAll('.connections-nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.connections-tab-panel').forEach(p => p.style.display = p.id === 'connections-tab-' + tab ? '' : 'none');
+}
+</script>
+</div>`;
+}
+
+/**
+ * Render the Channels tab content (card grid for messaging/social integrations).
+ */
+function renderChannelsTab(settings: DiscordSettings): string {
+  return `<div class="settings-hub-grid">
+
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/connections/discord"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Discord</span>
+          <span class="settings-hub-card-desc">${settings.enabled ? "Configured" : "Not configured"}</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+
+      <p class="settings-note">More channels can be added here in the future.</p>
+    </div>`;
+}
+
+/**
+ * Render the Home tab content (device management).
+ * Reuses the same HTML as renderHomeSettings but without page chrome.
+ */
+function renderHomeTab(settings: import("../llm/home-settings.ts").HomeSettings): string {
+  return renderHomeSettingsContent(settings);
+}
+
+/**
+ * Render Discord connection settings sub-page.
+ */
+export function renderConnectionsDiscordSettings(settings: DiscordSettings): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Discord</h1>
+        <p class="settings-desc">Send DMs to your Discord account when the entity needs your attention</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
     <section class="theme-section">
-      <h3 class="theme-section-title">Discord</h3>
-      <p class="theme-section-desc">Send DMs to your Discord account when the entity needs your attention</p>
       <div class="llm-fields">
         <div class="llm-field">
           <label class="toggle-label" for="discord-enabled">
@@ -3585,7 +3679,6 @@ export function renderConnectionsSettings(settings: DiscordSettings): string {
       </div>
     </section>
 
-    <!-- Actions -->
     <div class="llm-actions">
       <div class="llm-actions-left">
         <button class="btn btn--primary" onclick="saveDiscordSettings(event)">Save Settings</button>
@@ -3593,10 +3686,7 @@ export function renderConnectionsSettings(settings: DiscordSettings): string {
       <button class="btn btn--ghost" onclick="resetDiscordDefaults(event)">Reset to Defaults</button>
     </div>
 
-    <!-- Status -->
     <div id="discord-status" class="llm-status" style="display:none;"></div>
-
-    <p class="settings-note">More integrations can be added here in the future.</p>
 
   </div>
 </div>
@@ -3679,7 +3769,7 @@ async function resetDiscordDefaults(event) {
     const resp = await fetch('/api/discord-settings/reset', { method: 'POST' });
     const data = await resp.json();
     if (data.success) {
-      htmx.ajax('GET', '/fragments/settings/connections', { target: '#chat', swap: 'innerHTML' });
+      htmx.ajax('GET', '/fragments/settings/connections/discord', { target: '#chat', swap: 'innerHTML' });
     } else {
       showDiscordStatus('error', 'Failed to reset: ' + (data.error || 'Unknown error'));
       btn.disabled = false;
@@ -3695,8 +3785,251 @@ async function resetDiscordDefaults(event) {
     btn.classList.add('btn--ghost');
   }
 }
-</script>
-`;
+</script>`;
+}
+
+/**
+ * Render Home Automation settings sub-page (standalone, with page chrome).
+ */
+export function renderHomeSettings(settings: import("../llm/home-settings.ts").HomeSettings): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Home</h1>
+        <p class="settings-desc">Configure smart home devices the entity can control</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+    ${renderHomeSettingsContent(settings)}
+  </div>
+</div>`;
+}
+
+/**
+ * Render the inner Home tab/device management content (no page chrome).
+ * Reused by both the tabbed view and the standalone sub-page.
+ */
+function renderHomeSettingsContent(settings: import("../llm/home-settings.ts").HomeSettings): string {
+  const deviceRows = (settings.devices || []).map((d, i) => `
+    <div class="home-device-row" data-index="${i}">
+      <div class="home-device-info">
+        <span class="home-device-name">${escapeHtml(d.name)}</span>
+        <span class="home-device-meta">${escapeHtml(d.type)} &middot; ${escapeHtml(d.address)}</span>
+      </div>
+      <div class="home-device-actions">
+        <label class="toggle">
+          <input type="checkbox" class="home-device-enabled" data-index="${i}" ${d.enabled ? "checked" : ""}>
+          <span class="toggle-slider"></span>
+        </label>
+        <button class="btn btn--ghost btn--sm home-test-btn" data-index="${i}" title="Test connection">Test</button>
+        <button class="btn btn--ghost btn--sm home-delete-btn" data-index="${i}" title="Remove device">Remove</button>
+      </div>
+    </div>
+  `).join("");
+
+  const hasDevices = (settings.devices || []).length > 0;
+
+  return `
+    ${hasDevices ? `
+    <div id="home-device-list" class="home-device-list">
+      ${deviceRows}
+    </div>
+    ` : `
+    <div id="home-device-list" class="home-device-list" style="display:none;"></div>
+    <p id="home-empty-msg" class="settings-note">No devices configured. Add one below to get started.</p>
+    `}
+
+    <section class="theme-section">
+      <h3 class="theme-section-title">Add Device</h3>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="home-device-name">Device Name</label>
+          <input type="text" id="home-device-name" class="input-field llm-input" placeholder="e.g. Coffee Maker">
+        </div>
+        <div class="llm-field">
+          <label for="home-device-type">Device Type</label>
+          <select id="home-device-type" class="input-field llm-input">
+            <option value="shelly-plug">Shelly Plug</option>
+          </select>
+        </div>
+        <div class="llm-field">
+          <label for="home-device-address">Address</label>
+          <input type="text" id="home-device-address" class="input-field llm-input" placeholder="e.g. 192.168.1.100">
+          <span class="field-hint">IP address or hostname of the device on your local network</span>
+        </div>
+      </div>
+      <div class="llm-actions">
+        <button class="btn btn--primary" onclick="addHomeDevice(event)">Add Device</button>
+      </div>
+    </section>
+
+    <div class="llm-actions" id="home-save-section" style="${hasDevices ? "" : "display:none;"}">
+      <button class="btn btn--primary" onclick="saveHomeSettings(event)">Save Settings</button>
+    </div>
+
+    <div id="home-status" class="llm-status" style="display:none;"></div>
+
+  <style>
+    .home-device-list { display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+    .home-device-row { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-3); border-radius: 8px; border: 1px solid var(--c-border); background: var(--c-bg); }
+    .home-device-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .home-device-name { font-weight: 600; font-size: 14px; color: var(--c-fg); }
+    .home-device-meta { font-size: 12px; color: var(--c-fg-dim); }
+    .home-device-actions { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; }
+    .btn--sm { padding: 4px 10px; font-size: 12px; }
+  </style>
+
+<script>
+let homeDevices = ${JSON.stringify(settings.devices || [])};
+
+function renderHomeDevices() {
+  const list = document.getElementById('home-device-list');
+  const emptyMsg = document.getElementById('home-empty-msg');
+  const saveSection = document.getElementById('home-save-section');
+  if (!list) return;
+
+  if (homeDevices.length === 0) {
+    list.style.display = 'none';
+    if (emptyMsg) emptyMsg.style.display = '';
+    if (saveSection) saveSection.style.display = 'none';
+    return;
+  }
+
+  list.style.display = '';
+  if (emptyMsg) emptyMsg.style.display = 'none';
+  if (saveSection) saveSection.style.display = '';
+
+  list.innerHTML = homeDevices.map((d, i) => \`
+    <div class="home-device-row" data-index="\${i}">
+      <div class="home-device-info">
+        <span class="home-device-name">\${escapeHtml(d.name)}</span>
+        <span class="home-device-meta">\${escapeHtml(d.type)} &middot; \${escapeHtml(d.address)}</span>
+      </div>
+      <div class="home-device-actions">
+        <label class="toggle">
+          <input type="checkbox" class="home-device-enabled" data-index="\${i}" \${d.enabled ? 'checked' : ''} onchange="toggleHomeDevice(\${i}, this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+        <button class="btn btn--ghost btn--sm home-test-btn" data-index="\${i}" onclick="testHomeDevice(\${i}, event)" title="Test connection">Test</button>
+        <button class="btn btn--ghost btn--sm home-delete-btn" data-index="\${i}" onclick="deleteHomeDevice(\${i}, event)" title="Remove device">Remove</button>
+      </div>
+    </div>
+  \`).join('');
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function showHomeStatus(type, message) {
+  const el = document.getElementById('home-status');
+  if (!el) return;
+  el.style.display = 'block';
+  el.className = 'llm-status ' + type;
+  el.textContent = message;
+}
+
+function addHomeDevice(event) {
+  const name = document.getElementById('home-device-name')?.value.trim();
+  const type = document.getElementById('home-device-type')?.value;
+  const address = document.getElementById('home-device-address')?.value.trim();
+
+  if (!name || !address) {
+    showHomeStatus('error', 'Device name and address are required.');
+    return;
+  }
+
+  homeDevices.push({ name, type: type || 'shelly-plug', address, enabled: true });
+  document.getElementById('home-device-name').value = '';
+  document.getElementById('home-device-address').value = '';
+  renderHomeDevices();
+  showHomeStatus('loading', 'Device added locally. Click Save Settings to persist.');
+}
+
+function toggleHomeDevice(index, enabled) {
+  if (homeDevices[index]) {
+    homeDevices[index].enabled = enabled;
+  }
+}
+
+function deleteHomeDevice(index, event) {
+  const btn = event.currentTarget;
+  if (btn.dataset.pending === 'true') {
+    homeDevices.splice(index, 1);
+    renderHomeDevices();
+    showHomeStatus('loading', 'Device removed locally. Click Save Settings to persist.');
+    return;
+  }
+  btn.dataset.pending = 'true';
+  btn.textContent = 'Confirm?';
+  btn.classList.add('btn--danger');
+  btn.classList.remove('btn--ghost');
+  setTimeout(() => {
+    if (btn.dataset.pending === 'true') {
+      btn.dataset.pending = 'false';
+      btn.textContent = 'Remove';
+      btn.classList.remove('btn--danger');
+      btn.classList.add('btn--ghost');
+    }
+  }, 3000);
+}
+
+async function testHomeDevice(index, event) {
+  const btn = event.currentTarget;
+  const device = homeDevices[index];
+  if (!device) return;
+
+  btn.disabled = true;
+  btn.textContent = 'Testing...';
+  showHomeStatus('loading', 'Testing connection to ' + device.address + '...');
+
+  try {
+    const resp = await fetch('http://' + device.address + '/relay/0', { signal: AbortSignal.timeout(5000) });
+    if (resp.ok) {
+      const data = await resp.json();
+      showHomeStatus('success', device.name + ' at ' + device.address + ': power is ' + (data.ison ? 'on' : 'off'));
+    } else {
+      showHomeStatus('error', 'Device responded with status ' + resp.status);
+    }
+  } catch (e) {
+    showHomeStatus('error', 'Could not reach ' + device.address + ': ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Test';
+  }
+}
+
+async function saveHomeSettings(event) {
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  showHomeStatus('loading', 'Saving settings...');
+
+  try {
+    const resp = await fetch('/api/home-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ devices: homeDevices }),
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showHomeStatus('success', 'Settings saved. The control_device tool is now available.');
+    } else {
+      showHomeStatus('error', 'Failed to save: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    showHomeStatus('error', 'Failed to save: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Settings';
+  }
+}
+</script>`;
 }
 
 export function renderToolsSettings(

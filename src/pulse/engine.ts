@@ -11,6 +11,7 @@ import type { DBClient } from "../db/mod.ts";
 import type { LLMClient } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/web-search-settings.ts";
 import type { DiscordSettings } from "../llm/discord-settings.ts";
+import type { HomeSettings } from "../llm/home-settings.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { Retriever } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
@@ -82,6 +83,8 @@ export interface PulseEngineConfig {
   webSearchSettings?: () => WebSearchSettings | undefined;
   /** Getter for Discord settings (read fresh each pulse execution) */
   discordSettings?: () => DiscordSettings | undefined;
+  /** Getter for Home settings (read fresh each pulse execution) */
+  homeSettings?: () => HomeSettings | undefined;
 }
 
 /**
@@ -566,6 +569,7 @@ export class PulseEngine {
         vaultManager: this.config.vaultManager,
         webSearchSettings: this.config.webSearchSettings?.(),
         discordSettings: this.config.discordSettings?.(),
+        homeSettings: this.config.homeSettings?.(),
       };
 
       const turn = new EntityTurn(this.llm, this.db, this.tools, entityConfig);

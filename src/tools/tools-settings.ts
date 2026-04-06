@@ -107,6 +107,12 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     description: "Send push notifications to the user's device",
     toolNames: ["send_notification", "send_discord_dm"],
   },
+  {
+    id: "home-automation",
+    name: "Home Automation",
+    description: "Control smart home devices",
+    toolNames: ["control_device"],
+  },
 ];
 
 // =============================================================================

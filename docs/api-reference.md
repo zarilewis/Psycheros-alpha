@@ -182,6 +182,15 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 
 Settings stored in `.psycheros/discord-settings.json`. Shape: `{ "enabled": boolean, "botToken": string, "defaultChannelId": string }`.
 
+### Home Settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/home-settings` | Get current home device settings |
+| `POST` | `/api/home-settings` | Save home device settings and hot-reload tool registry |
+
+Settings stored in `.psycheros/home-settings.json`. Shape: `{ "devices": Array<{ name: string, type: string, address: string, enabled: boolean }> }`. The `control_device` tool is auto-enabled when any device has `enabled: true`.
+
 ### Tools Settings
 
 | Method | Path | Description |
@@ -216,7 +225,9 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/admin/logs` | Log viewer HTML fragment |
 | `GET` | `/fragments/admin/jobs` | Scheduled jobs dashboard HTML fragment |
 | `GET` | `/fragments/admin/actions` | Actions panel HTML fragment |
-| `GET` | `/fragments/settings/connections` | External connections settings fragment |
+| `GET` | `/fragments/settings/connections` | External connections hub (Channels + Home tabs) |
+| `GET` | `/fragments/settings/connections/discord` | Discord connection settings fragment |
+| `GET` | `/fragments/settings/connections/home` | Home automation settings fragment |
 | `GET` | `/fragments/settings/tools` | Tools settings UI fragment |
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
 | `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
@@ -281,3 +292,5 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `src/pulse/templates.ts` | Pulse settings UI rendering |
 | `src/push/mod.ts` | VAPID key management, subscription CRUD, push sending |
 | `src/llm/discord-settings.ts` | Discord settings type, persistence, token masking |
+| `src/llm/home-settings.ts` | Home automation settings type, persistence |
+| `src/tools/control-device.ts` | Home automation tool (Shelly Plug local HTTP API) |

@@ -12,7 +12,7 @@ import type { SSEEvent, TurnMetrics } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, LLMSettings } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
-import type { DiscordSettings } from "../llm/mod.ts";
+import type { DiscordSettings, HomeSettings } from "../llm/mod.ts";
 import { maskApiKey, getDefaultSettings, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { ToolsSettings } from "../tools/mod.ts";
@@ -52,6 +52,8 @@ import {
   renderGeneralSettings,
   renderWebSearchSettings,
   renderConnectionsSettings,
+  renderConnectionsDiscordSettings,
+  renderHomeSettings,
   renderToolsSettings,
   renderEntityCoreHub,
   renderEntityCoreOverview,
@@ -120,6 +122,10 @@ export interface RouteContext {
   getDiscordSettings: () => DiscordSettings;
   /** Update Discord settings and hot-reload tool registry */
   updateDiscordSettings: (settings: DiscordSettings) => Promise<void>;
+  /** Get current Home settings */
+  getHomeSettings: () => HomeSettings;
+  /** Update Home settings and hot-reload tool registry */
+  updateHomeSettings: (settings: HomeSettings) => Promise<void>;
   /** Get current tools settings */
   getToolSettings: () => ToolsSettings;
   /** Update tools settings and hot-reload tool registry */
@@ -925,6 +931,7 @@ export async function handleChat(
             vaultManager: ctx.vaultManager,
             webSearchSettings: ctx.getWebSearchSettings(),
             discordSettings: ctx.getDiscordSettings(),
+            homeSettings: ctx.getHomeSettings(),
           }
         );
 
@@ -4234,15 +4241,96 @@ export async function handleResetDiscordSettings(
 }
 
 /**
- * Handle GET /fragments/settings/connections - External connections settings UI fragment.
+ * Handle GET /fragments/settings/connections - External connections hub fragment.
  */
 export function handleConnectionsSettingsFragment(ctx: RouteContext): Response {
-  const html = renderConnectionsSettings(maskDiscordSettings(ctx.getDiscordSettings()));
+  const html = renderConnectionsSettings(
+    maskDiscordSettings(ctx.getDiscordSettings()),
+    ctx.getHomeSettings(),
+  );
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
     },
   });
+}
+
+/**
+ * Handle GET /fragments/settings/connections/discord - Discord settings fragment.
+ */
+export function handleConnectionsDiscordFragment(ctx: RouteContext): Response {
+  const html = renderConnectionsDiscordSettings(maskDiscordSettings(ctx.getDiscordSettings()));
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/connections/home - Home automation settings fragment.
+ */
+export function handleConnectionsHomeFragment(ctx: RouteContext): Response {
+  const html = renderHomeSettings(ctx.getHomeSettings());
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+// =============================================================================
+// Home Settings API Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/home-settings - Return current home settings.
+ */
+export function handleGetHomeSettings(ctx: RouteContext): Response {
+  const settings = ctx.getHomeSettings();
+  return new Response(JSON.stringify(settings), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/home-settings - Save home settings.
+ */
+export async function handleSaveHomeSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<HomeSettings>;
+
+    if (!body.devices || !Array.isArray(body.devices)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid settings: 'devices' array is required" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const updated: HomeSettings = { devices: body.devices };
+    await ctx.updateHomeSettings(updated);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (_error) {
+    return new Response(
+      JSON.stringify({ error: "Failed to save settings" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
 }
 
 // =============================================================================

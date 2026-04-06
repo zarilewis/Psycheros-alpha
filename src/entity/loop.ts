@@ -26,6 +26,7 @@
 import type { LLMClient, StreamChunk, ChatMessage } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/web-search-settings.ts";
 import type { DiscordSettings } from "../llm/discord-settings.ts";
+import type { HomeSettings } from "../llm/home-settings.ts";
 import { LLMError } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
@@ -95,6 +96,8 @@ export interface EntityConfig {
   webSearchSettings?: WebSearchSettings;
   /** Optional Discord settings */
   discordSettings?: DiscordSettings;
+  /** Optional Home automation settings */
+  homeSettings?: HomeSettings;
 }
 
 /**

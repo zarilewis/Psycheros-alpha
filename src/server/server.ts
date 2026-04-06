@@ -8,7 +8,7 @@
  */
 
 import { DBClient } from "../db/mod.ts";
-import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSettings, type DiscordSettings, loadSettings, saveSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings } from "../llm/mod.ts";
+import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSettings, type DiscordSettings, type HomeSettings, loadSettings, saveSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSettings, getEnabledToolNames, loadCustomTools, ToolRegistry, type ToolsSettings } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import type { MemoryIndexer } from "../rag/indexer.ts";
@@ -120,6 +120,10 @@ import {
   handleGetDiscordSettings,
   handleSaveDiscordSettings,
   handleConnectionsSettingsFragment,
+  handleConnectionsDiscordFragment,
+  handleConnectionsHomeFragment,
+  handleGetHomeSettings,
+  handleSaveHomeSettings,
   handleGetToolsSettings,
   handleSaveToolsSettings,
   handleToolsSettingsFragment,
@@ -226,6 +230,7 @@ export class Server {
   private llmSettings: LLMSettings;
   private webSearchSettings: WebSearchSettings;
   private discordSettings: DiscordSettings;
+  private homeSettings: HomeSettings;
   private toolSettings: ToolsSettings;
   private customTools: Record<string, import("../tools/types.ts").Tool>;
   private pulseEngine: PulseEngine | null = null;
@@ -273,6 +278,9 @@ export class Server {
       enabled: false,
     };
 
+    // Initialize Home settings (will be reloaded from settings in init())
+    this.homeSettings = { devices: [] };
+
     // Initialize tool settings (will be reloaded from settings in init())
     this.toolSettings = { toolOverrides: {} };
 
@@ -317,6 +325,7 @@ export class Server {
     this.llmSettings = await loadSettings(this.config.projectRoot);
     this.webSearchSettings = await loadWebSearchSettings(this.config.projectRoot);
     this.discordSettings = await loadDiscordSettings(this.config.projectRoot);
+    this.homeSettings = await loadHomeSettings(this.config.projectRoot);
     this.toolSettings = await loadToolsSettings(this.config.projectRoot);
     this.customTools = await loadCustomTools(this.config.projectRoot);
     this.reloadLLMClient();
@@ -383,6 +392,22 @@ export class Server {
   }
 
   /**
+   * Get the current Home settings.
+   */
+  getHomeSettings(): HomeSettings {
+    return this.homeSettings;
+  }
+
+  /**
+   * Update Home settings, persist to disk, and reload tool registry.
+   */
+  async updateHomeSettings(settings: HomeSettings): Promise<void> {
+    this.homeSettings = settings;
+    await saveHomeSettings(this.config.projectRoot, settings);
+    this.reloadToolRegistry();
+  }
+
+  /**
    * Get the current tools settings.
    */
   getToolSettings(): ToolsSettings {
@@ -436,6 +461,9 @@ export class Server {
     }
     if (this.discordSettings.enabled && this.discordSettings.botToken) {
       autoEnabled.push("send_discord_dm");
+    }
+    if (this.homeSettings.devices.some((d) => d.enabled)) {
+      autoEnabled.push("control_device");
     }
 
     // Resolve the final enabled list
@@ -603,6 +631,7 @@ export class Server {
         vaultManager: this.vaultManager,
         webSearchSettings: () => this.webSearchSettings,
         discordSettings: () => this.discordSettings,
+        homeSettings: () => this.homeSettings,
       }
     );
     this.pulseEngine.start();
@@ -668,6 +697,8 @@ export class Server {
       updateWebSearchSettings: (settings) => this.updateWebSearchSettings(settings),
       getDiscordSettings: () => this.discordSettings,
       updateDiscordSettings: (settings) => this.updateDiscordSettings(settings),
+      getHomeSettings: () => this.homeSettings,
+      updateHomeSettings: (settings) => this.updateHomeSettings(settings),
       getToolSettings: () => this.toolSettings,
       updateToolSettings: (settings) => this.updateToolSettings(settings),
       customTools: this.customTools,
@@ -1127,6 +1158,20 @@ export class Server {
     }
 
     // ========================================
+    // Home Settings API Routes
+    // ========================================
+
+    // GET /api/home-settings - Get current home settings
+    if (method === "GET" && path === "/api/home-settings") {
+      return handleGetHomeSettings(ctx);
+    }
+
+    // POST /api/home-settings - Save home settings
+    if (method === "POST" && path === "/api/home-settings") {
+      return await handleSaveHomeSettings(ctx, request);
+    }
+
+    // ========================================
     // Tools Settings API Routes
     // ========================================
 
@@ -1522,9 +1567,19 @@ export class Server {
       return handleWebSearchSettingsFragment(ctx);
     }
 
-    // GET /fragments/settings/connections - External connections settings fragment
+    // GET /fragments/settings/connections - External connections hub fragment
     if (path === "/fragments/settings/connections") {
       return handleConnectionsSettingsFragment(ctx);
+    }
+
+    // GET /fragments/settings/connections/discord - Discord connection settings fragment
+    if (path === "/fragments/settings/connections/discord") {
+      return handleConnectionsDiscordFragment(ctx);
+    }
+
+    // GET /fragments/settings/connections/home - Home automation settings fragment
+    if (path === "/fragments/settings/connections/home") {
+      return handleConnectionsHomeFragment(ctx);
     }
 
     // GET /fragments/settings/tools - Tools settings UI fragment
