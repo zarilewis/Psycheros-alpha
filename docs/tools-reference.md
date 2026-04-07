@@ -116,6 +116,8 @@ The entity can create, list, and search documents stored in the Data Vault for p
 | Tool | Description |
 |------|-------------|
 | `vault_write` | Create or update a vault document with title, content, and scope (global/chat) |
+| `vault_read` | Read the full content of a vault document by title and scope |
+| `vault_append` | Append content to a vault document, or create it if it doesn't exist |
 | `vault_list` | List vault documents, optionally filtered by scope |
 | `vault_search` | Search vault for relevant content by query |
 
@@ -123,7 +125,7 @@ The entity can create, list, and search documents stored in the Data Vault for p
 
 | File | Purpose |
 |------|---------|
-| `src/tools/vault-tools.ts` | 3 vault document management tools |
+| `src/tools/vault-tools.ts` | 5 vault document management tools |
 | `src/vault/manager.ts` | VaultManager — CRUD, chunking, embedding, search |
 
 ## Pulse Tools

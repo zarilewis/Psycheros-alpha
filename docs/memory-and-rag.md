@@ -138,6 +138,8 @@ Eager RAG over user-uploaded and entity-created reference documents. Documents a
 | Tool | Description |
 |------|-------------|
 | `vault_write` | Create or update a vault document (global or per-chat scope) |
+| `vault_read` | Read the full content of a vault document by title |
+| `vault_append` | Append content to a vault document (creates if it doesn't exist) |
 | `vault_list` | List vault documents (filterable by scope) |
 | `vault_search` | Search vault for relevant content |
 
