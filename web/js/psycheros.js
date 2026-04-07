@@ -349,6 +349,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // Initialize persistent SSE connection for background updates
   initPersistentSSE();
 
+  // Reconnect SSE and reload conversation when returning to the app (mobile PWA).
+  // Mobile browsers drop EventSource connections when the app is backgrounded,
+  // so Pulse messages fired while away are missed. This listener ensures the
+  // connection is re-established and any missed messages are fetched on return.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      initPersistentSSE();
+
+      if (currentConversationId) {
+        loadConversationFromUrl(currentConversationId);
+      }
+    }
+  });
+
   // Load general settings (display names)
   fetch('/api/general-settings')
     .then(r => r.json())
