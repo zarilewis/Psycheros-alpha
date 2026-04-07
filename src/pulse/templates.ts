@@ -222,6 +222,12 @@ export function renderPulseHubCard(): string {
 export function renderPulseSettings(pulses: PulseRow[]): string {
   return `<div class="settings-view">
   <div class="settings-header">
+    <a class="settings-back-btn" onclick="htmx.ajax('GET', '/fragments/settings', {target: '#chat', swap: 'innerHTML'})">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6"/>
+      </svg>
+      <span>Settings</span>
+    </a>
     <div class="settings-tabs" style="padding: 0; border: none;">
       <button class="settings-tab active" id="pulse-tab-prompts"
         onclick="Psycheros.switchTab('pulse', 'prompts')">Prompts</button>
