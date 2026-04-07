@@ -358,7 +358,20 @@ document.addEventListener('DOMContentLoaded', () => {
       initPersistentSSE();
 
       if (currentConversationId) {
-        loadConversationFromUrl(currentConversationId);
+        // Preserve unsent message text across the reload
+        const input = document.getElementById('message-input');
+        const unsentText = input?.value || '';
+        loadConversationFromUrl(currentConversationId).then(() => {
+          if (unsentText) {
+            const restored = document.getElementById('message-input');
+            if (restored) {
+              restored.value = unsentText;
+              // Restore textarea auto-resize
+              restored.style.height = 'auto';
+              restored.style.height = restored.scrollHeight + 'px';
+            }
+          }
+        });
       }
     }
   });
