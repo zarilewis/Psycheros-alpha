@@ -166,3 +166,10 @@ See also: [security-audit.md](security-audit.md) for the full security assessmen
 - **Problem**: Pulse responses stream via the persistent SSE channel. If the EventSource connection drops during the inactivity wait (common on WSL2), all streaming events are lost. The user sees no response until manually refreshing.
 - **Location**: `src/pulse/engine.ts` — `executePulse()`; `web/js/psycheros.js` — persistent SSE handlers
 - **Fix**: Added `pulse_complete` event broadcast after Pulse execution (success or error). Client-side handler detects if streaming was missed (`pulseAssistantEl === null`) and reloads the conversation from the server.
+
+## Memory System Bug Fixes
+
+### Significant memories not indexed into RAG or synced to MCP (High — functionality)
+- **Problem**: When the entity created a significant memory via the `create_significant_memory` tool, the file was written to disk but never indexed into RAG or synced to entity-core. The web UI path correctly called `reindexFile()` and `createMemory()` after writing, but the tool path only wrote the file. Significant memories were invisible to RAG search until the next server restart.
+- **Location**: `src/tools/create-significant-memory.ts` — `execute()`; `src/entity/loop.ts` — `EntityConfig`
+- **Fix**: Added `memoryIndexer` to `EntityConfig` (threaded from server through routes and pulse engine). The tool now calls `memoryIndexer.reindexFile()` and `mcpClient.createMemory()` after writing, both with non-fatal error handling. Existing significant memories on disk are unaffected — `indexAll()` on startup already indexes them.

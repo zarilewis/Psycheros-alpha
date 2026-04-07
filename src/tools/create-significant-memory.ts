@@ -131,6 +131,27 @@ export const createSignificantMemoryTool: Tool = {
 
       console.log(`[Memory] Created significant memory: ${fileName}`);
 
+      // Reindex the file in RAG so it's immediately searchable
+      if (ctx.config.memoryIndexer) {
+        try {
+          await ctx.config.memoryIndexer.reindexFile(`significant/${fileName}`);
+        } catch (error) {
+          console.error("[Memory] RAG reindex failed (non-fatal):", error instanceof Error ? error.message : String(error));
+        }
+      }
+
+      // Sync to entity-core via MCP
+      if (ctx.config.mcpClient?.isConnected()) {
+        try {
+          const dateStr = formattedContent.match(/Date: (\d{4}-\d{2}-\d{2})/)?.[1];
+          if (dateStr) {
+            await ctx.config.mcpClient.createMemory("significant", dateStr, formattedContent);
+          }
+        } catch (error) {
+          console.error("[Memory] MCP sync failed (non-fatal):", error instanceof Error ? error.message : String(error));
+        }
+      }
+
       return {
         toolCallId: ctx.toolCallId,
         content: `Created significant memory "${title.trim()}" saved to memories/significant/${fileName}`,

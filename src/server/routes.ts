@@ -927,6 +927,7 @@ export async function handleChat(
             ragRetriever: ctx.ragRetriever,
             chatRAG: ctx.chatRAG,
             mcpClient: ctx.mcpClient,
+            memoryIndexer: ctx.memoryIndexer,
             lorebookManager: ctx.lorebookManager,
             vaultManager: ctx.vaultManager,
             webSearchSettings: ctx.getWebSearchSettings(),

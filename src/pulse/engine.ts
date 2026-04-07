@@ -13,7 +13,7 @@ import type { WebSearchSettings } from "../llm/web-search-settings.ts";
 import type { DiscordSettings } from "../llm/discord-settings.ts";
 import type { HomeSettings } from "../llm/home-settings.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
-import type { Retriever } from "../rag/mod.ts";
+import type { Retriever, Indexer } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
@@ -77,6 +77,7 @@ export interface PulseEngineConfig {
   ragRetriever?: Retriever;
   chatRAG?: ConversationRAG;
   mcpClient?: MCPClient;
+  memoryIndexer?: Indexer;
   lorebookManager?: LorebookManager;
   vaultManager?: VaultManager;
   /** Getter for web search settings (read fresh each pulse execution) */
@@ -565,6 +566,7 @@ export class PulseEngine {
         ragRetriever: this.config.ragRetriever,
         chatRAG: this.config.chatRAG,
         mcpClient: this.config.mcpClient,
+        memoryIndexer: this.config.memoryIndexer,
         lorebookManager: this.config.lorebookManager,
         vaultManager: this.config.vaultManager,
         webSearchSettings: this.config.webSearchSettings?.(),

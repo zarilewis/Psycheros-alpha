@@ -107,6 +107,8 @@ export interface Indexer {
   needsReindex(filePath: string): Promise<boolean>;
   /** Remove indexed data for a file */
   removeFile(filePath: string): void;
+  /** Reindex a single file (efficient — only processes the one changed file) */
+  reindexFile(relativePath: string): Promise<void>;
 }
 
 /**

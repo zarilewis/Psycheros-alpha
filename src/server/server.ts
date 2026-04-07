@@ -627,6 +627,7 @@ export class Server {
         ragRetriever: this.ragRetriever ?? undefined,
         chatRAG: this.chatRAG ?? undefined,
         mcpClient: this.mcpClient ?? undefined,
+        memoryIndexer: this.memoryIndexer ?? undefined,
         lorebookManager: this.lorebookManager,
         vaultManager: this.vaultManager,
         webSearchSettings: () => this.webSearchSettings,

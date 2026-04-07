@@ -31,7 +31,7 @@ import { LLMError } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
 import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics, LLMContextSnapshot } from "../types.ts";
-import type { Retriever } from "../rag/mod.ts";
+import type { Retriever, Indexer } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
@@ -88,6 +88,8 @@ export interface EntityConfig {
   chatRAG?: ConversationRAG;
   /** Optional MCP client for syncing with entity-core */
   mcpClient?: MCPClient;
+  /** Optional memory indexer for RAG reindexing after writes */
+  memoryIndexer?: Indexer;
   /** Optional lorebook manager for world info/triggered content */
   lorebookManager?: LorebookManager;
   /** Optional vault manager for document storage and eager RAG */
