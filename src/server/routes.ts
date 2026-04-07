@@ -1933,19 +1933,37 @@ export async function handleCreateSignificantMemory(
     }
 
     // Derive slug from title, or auto-generate from first line of content
+    const displayTitle = title || content.trim().split("\n")[0];
     const slug = (title && title.trim().length > 0)
       ? slugify(title)
       : slugify(content.trim().split("\n")[0].replace(/^[-*#>\s]+/, ""));
 
-    const instanceId = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros";
-    const fileName = `${slug}_${instanceId}.md`;
-    const formattedContent = `# ${title || content.trim().split("\n")[0]}
+    if (!slug) {
+      return new Response(renderSaveError("Could not generate filename from title"), {
+        status: 400,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Generate filename: {date}_{slug}.md with conflict resolution
+    const significantDir = `${ctx.projectRoot}/memories/significant`;
+    const base = `${date}_${slug}`;
+    let fileName = `${base}.md`;
+    try {
+      const existing = [...Deno.readDirSync(significantDir)]
+        .map((e) => e.name);
+      if (existing.includes(fileName)) {
+        let n = 2;
+        while (existing.includes(`${base}-${n}.md`)) n++;
+        fileName = `${base}-${n}.md`;
+      }
+    } catch {
+      // Directory may not exist yet
+    }
+
+    const formattedContent = `# ${displayTitle}
 
 ${content.trim()}
-
-<!--
-Date: ${date}
--->
 `;
 
     // Write local file using writeMemoryFile (handles DB tracking for non-significant;

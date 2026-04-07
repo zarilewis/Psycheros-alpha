@@ -24,12 +24,14 @@ function slugify(title: string): string {
 }
 
 /**
- * Format a significant memory file.
+ * Generate a filename for a significant memory.
+ * Pattern: {YYYY-MM-DD}_{slug}.md
+ * If a conflict exists, appends -N suffix.
  */
-function formatSignificantMemory(
+async function generateSignificantFilename(
   title: string,
-  content: string,
-): string {
+  significantDir: string,
+): Promise<string> {
   const tz = Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ");
   const dateStr = new Intl.DateTimeFormat("sv-SE", {
     timeZone: tz || undefined,
@@ -38,13 +40,51 @@ function formatSignificantMemory(
     day: "2-digit",
   }).format(new Date());
 
+  let slug = slugify(title);
+  if (!slug) {
+    slug = Math.random().toString(36).substring(2, 8);
+  }
+
+  const base = `${dateStr}_${slug}`;
+
+  try {
+    const existing = [...Deno.readDirSync(significantDir)]
+      .map((e) => e.name);
+
+    const filename = `${base}.md`;
+    if (!existing.includes(filename)) return filename;
+
+    let n = 2;
+    while (existing.includes(`${base}-${n}.md`)) n++;
+    return `${base}-${n}.md`;
+  } catch {
+    return `${base}.md`;
+  }
+}
+
+/**
+ * Get the current date string for MCP sync.
+ */
+function getCurrentDate(): string {
+  const tz = Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ");
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: tz || undefined,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
+/**
+ * Format a significant memory file.
+ */
+function formatSignificantMemory(
+  title: string,
+  content: string,
+): string {
   return `# ${title}
 
 ${content}
-
-<!--
-Date: ${dateStr}
--->
 `;
 }
 
@@ -111,15 +151,13 @@ export const createSignificantMemoryTool: Tool = {
       };
     }
 
-    // Build file path — slug + instance, no date in filename
-    const instanceId = Deno.env.get("PSYCHEROS_MCP_INSTANCE") || "psycheros";
-    const slug = slugify(title);
-    const fileName = `${slug}_${instanceId}.md`;
-    const filePath = join(ctx.config.projectRoot, "memories", "significant", fileName);
+    // Build file path — {date}_{slug}.md
+    const dirPath = join(ctx.config.projectRoot, "memories", "significant");
+    const fileName = await generateSignificantFilename(title.trim(), dirPath);
+    const filePath = join(dirPath, fileName);
 
     try {
       // Ensure directory exists
-      const dirPath = join(ctx.config.projectRoot, "memories", "significant");
       await Deno.mkdir(dirPath, { recursive: true });
 
       // Format and write the memory
@@ -143,10 +181,7 @@ export const createSignificantMemoryTool: Tool = {
       // Sync to entity-core via MCP
       if (ctx.config.mcpClient?.isConnected()) {
         try {
-          const dateStr = formattedContent.match(/Date: (\d{4}-\d{2}-\d{2})/)?.[1];
-          if (dateStr) {
-            await ctx.config.mcpClient.createMemory("significant", dateStr, formattedContent);
-          }
+          await ctx.config.mcpClient.createMemory("significant", getCurrentDate(), formattedContent);
         } catch (error) {
           console.error("[Memory] MCP sync failed (non-fatal):", error instanceof Error ? error.message : String(error));
         }
