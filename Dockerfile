@@ -52,7 +52,7 @@ RUN cd /app/Psycheros && timeout 10s deno run -A --unstable-cron src/main.ts || 
 # it to /app/entity-core/data/memories so both systems share one physical copy.
 RUN mkdir -p \
     /app/Psycheros/.snapshots \
-    /app/Psycheros/.psycheros \
+    /app/Psycheros/.psycheros/backgrounds \
     /app/entity-core/data
 
 EXPOSE 3000

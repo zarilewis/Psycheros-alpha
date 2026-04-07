@@ -3686,7 +3686,7 @@ export function handleAppearanceSettingsFragment(_ctx: RouteContext): Response {
  * @returns HTTP Response with JSON array of backgrounds
  */
 export async function handleListBackgrounds(ctx: RouteContext): Promise<Response> {
-  const backgroundsDir = `${ctx.projectRoot}/web/backgrounds`;
+  const backgroundsDir = `${ctx.projectRoot}/.psycheros/backgrounds`;
   const backgrounds: Array<{ filename: string; url: string }> = [];
 
   try {
@@ -3768,8 +3768,8 @@ export async function handleUploadBackground(
       );
     }
 
-    // Ensure backgrounds directory exists (inside web/ for static serving)
-    const backgroundsDir = `${ctx.projectRoot}/web/backgrounds`;
+    // Ensure backgrounds directory exists (inside .psycheros/ for persistence across container rebuilds)
+    const backgroundsDir = `${ctx.projectRoot}/.psycheros/backgrounds`;
     await Deno.mkdir(backgroundsDir, { recursive: true });
 
     // Generate unique filename
@@ -3853,7 +3853,7 @@ export async function handleDeleteBackground(
   }
 
   try {
-    const filePath = `${ctx.projectRoot}/web/backgrounds/${decodedFilename}`;
+    const filePath = `${ctx.projectRoot}/.psycheros/backgrounds/${decodedFilename}`;
     await Deno.remove(filePath);
 
     return new Response(
@@ -3889,6 +3889,60 @@ export async function handleDeleteBackground(
         },
       }
     );
+  }
+}
+
+/**
+ * Handle GET /backgrounds/:filename - Serve an uploaded background image.
+ *
+ * Files are stored in .psycheros/backgrounds/ (outside web/) for persistence
+ * across Docker container rebuilds.
+ *
+ * @param ctx - Route context
+ * @param filename - The filename to serve
+ * @returns HTTP Response with file content or 404
+ */
+export async function handleServeBackground(
+  ctx: RouteContext,
+  filename: string
+): Promise<Response> {
+  // Sanitize filename
+  const decodedFilename = decodeURIComponent(filename);
+  if (!/^[a-zA-Z0-9_.-]+$/.test(decodedFilename)) {
+    return new Response("Forbidden", {
+      status: 403,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  // Only allow image files
+  if (!/\.(jpg|jpeg|png|gif|webp)$/i.test(decodedFilename)) {
+    return new Response("Forbidden", {
+      status: 403,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  const filePath = `${ctx.projectRoot}/.psycheros/backgrounds/${decodedFilename}`;
+
+  try {
+    const content = await Deno.readFile(filePath);
+    const mimeType = getMimeType(filePath);
+
+    return new Response(content, {
+      headers: {
+        "Content-Type": mimeType,
+        "Cache-Control": "no-cache",
+      },
+    });
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      return new Response("Not Found", {
+        status: 404,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+    throw error;
   }
 }
 

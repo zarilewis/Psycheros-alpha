@@ -14,8 +14,6 @@ deno.lock
 /memories/
 /backgrounds/
 /custom-tools/
-web/backgrounds/*
-!web/backgrounds/.gitkeep
 .psycheros/
 /.snapshots/
 

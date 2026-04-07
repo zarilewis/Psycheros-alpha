@@ -106,6 +106,7 @@ import {
   handleListBackgrounds,
   handleUploadBackground,
   handleDeleteBackground,
+  handleServeBackground,
   handleListVault,
   handleUploadVault,
   handleGetVault,
@@ -1650,7 +1651,7 @@ export class Server {
     // GET /backgrounds/:filename - Serve background image files
     if (path.startsWith("/backgrounds/")) {
       const filename = path.replace("/backgrounds/", "");
-      return await handleStaticFile(ctx, `/backgrounds/${filename}`);
+      return await handleServeBackground(ctx, filename);
     }
 
     // Serve static files from web/ directory
