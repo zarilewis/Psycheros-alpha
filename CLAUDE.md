@@ -89,7 +89,7 @@ Psycheros supports third-party integrations organized under two tabs in Settings
 
 **Adding a custom tool** (no core code changes needed):
 1. Create `custom-tools/my-tool.js` exporting a default `Tool` object
-2. Restart the server — it appears in Settings > Tools under Custom Tools
+2. Or use the **Import Tool** button on Settings > Tools > Custom tab to upload from the UI
 3. Toggle it on to enable
 
 **State changes** (for reactive UI):

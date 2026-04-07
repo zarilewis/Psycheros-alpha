@@ -164,13 +164,13 @@ Theme preferences persist server-side in `.psycheros/appearance-settings.json`. 
 Manage which tools are available to the entity. Access via Settings > Tools in the sidebar.
 
 **Features:**
-- Tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory)
+- Two tabs: **Built-in** and **Custom** — visually separates shipped tools from user-written ones
+- Built-in tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory)
 - Toggle switches for each individual tool — changes take effect immediately (hot-reload)
 - Per-category "Enable All" / "Disable All" buttons
 - Global "Enable All" / "Disable All" buttons
 - Expandable detail panel on each tool showing full description and JSON Schema parameters
-- Custom Tools section at the bottom showing any user-written tools loaded from `custom-tools/`
-- Message when no custom tools are loaded, with instructions
+- Custom tab includes an **Import Tool** button to upload `.js` files directly from the UI
 
 **Settings Priority:**
 1. User overrides (saved toggles) take precedence
@@ -180,14 +180,15 @@ Manage which tools are available to the entity. Access via Settings > Tools in t
 **Persistence:** Settings stored in `.psycheros/tools-settings.json`. Only tools the user has explicitly toggled are stored (as `toolOverrides`). Defaults to empty (no overrides), meaning the env var controls initial behavior until the user makes changes via the UI.
 
 **Custom Tools:**
-- Place `.js` files in the `custom-tools/` directory at the project root
+- Place `.js` files in the `custom-tools/` directory at the project root, or use the **Import Tool** button on the Custom tab to upload from the UI
 - Each file exports a default `Tool` object with `definition` and `execute` properties
-- Custom tools are loaded on server startup and appear in the Custom Tools section
+- Imported files are saved to `custom-tools/` and the registry hot-reloads — no server restart needed
 - Toggle them on to enable — no core code changes needed
 
 **API Endpoints:**
 - `GET /api/tools-settings` — get all tools, categories, and current overrides
 - `POST /api/tools-settings` — save overrides and hot-reload (`{ "toolOverrides": { "shell": true } }`)
+- `POST /api/custom-tools/upload` — upload a `.js` custom tool file (multipart/form-data, field `tool`, max 100KB)
 - `GET /fragments/settings/tools` — render Tools settings page fragment
 
 **Source files:** `src/tools/tools-settings.ts`, `src/tools/custom-loader.ts`, `src/server/templates.ts`, `src/server/routes.ts`, `web/css/settings.css`

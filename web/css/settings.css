@@ -1754,7 +1754,7 @@
   gap: var(--sp-3);
   padding: var(--sp-2) var(--sp-3);
   border-radius: var(--radius-sm);
-  background: var(--c-surface);
+  background: var(--c-bg-raised);
   border: 1px solid var(--c-border);
   position: relative;
 }
@@ -1809,7 +1809,7 @@
   z-index: 10;
   margin-top: 4px;
   padding: var(--sp-3);
-  background: var(--c-surface);
+  background: var(--c-bg-raised);
   border: 1px solid var(--c-border);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-md);

@@ -4058,7 +4058,7 @@ export function renderToolsSettings(
 
   // Build custom tools section
   const customNames = Object.keys(customTools);
-  let customSection: string;
+  let customToolsListHtml: string;
   if (customNames.length > 0) {
     const customToolsHtml = customNames.map((name) => {
       const tool = customTools[name];
@@ -4070,11 +4070,15 @@ export function renderToolsSettings(
         enabled,
       });
     }).join("\n");
-    customSection = `<section class="tools-category" id="cat-custom">
+    customToolsListHtml = `<section class="tools-category" id="cat-custom">
   <div class="tools-category-header">
     <div>
       <h3 class="tools-category-title">Custom Tools</h3>
       <p class="tools-category-desc">User-written tools loaded from custom-tools/</p>
+    </div>
+    <div class="tools-category-actions">
+      <button class="btn btn--ghost btn--xs" onclick="toggleCategoryTools('custom', true)">Enable All</button>
+      <button class="btn btn--ghost btn--xs" onclick="toggleCategoryTools('custom', false)">Disable All</button>
     </div>
   </div>
   <div class="tools-list">
@@ -4082,11 +4086,11 @@ export function renderToolsSettings(
   </div>
 </section>`;
   } else {
-    customSection = `<section class="tools-category" id="cat-custom">
+    customToolsListHtml = `<section class="tools-category" id="cat-custom">
   <div class="tools-category-header">
     <div>
       <h3 class="tools-category-title">Custom Tools</h3>
-      <p class="tools-category-desc">No custom tools loaded. Place .js files in the custom-tools/ directory.</p>
+      <p class="tools-category-desc">No custom tools loaded yet.</p>
     </div>
   </div>
 </section>`;
@@ -4121,14 +4125,58 @@ export function renderToolsSettings(
       <button class="btn btn--primary" onclick="saveToolsSettings(event)">Save Settings</button>
     </div>
 
-    ${categorySections}
-    ${customSection}
+    <!-- Tabs -->
+    <nav class="tools-nav">
+      <button class="tools-nav-tab active" data-tab="builtin" onclick="switchToolsTab('builtin')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+        </svg>
+        Built-in
+      </button>
+      <button class="tools-nav-tab" data-tab="custom" onclick="switchToolsTab('custom')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 3v18M3 12h18"/>
+        </svg>
+        Custom
+      </button>
+    </nav>
+
+    <div id="tools-tab-builtin" class="tools-tab-panel">
+      ${categorySections}
+    </div>
+
+    <div id="tools-tab-custom" class="tools-tab-panel" style="display:none;">
+      <!-- Import -->
+      <div class="tools-import">
+        <input type="file" id="custom-tool-file" accept=".js" style="display:none" onchange="importCustomTool(this)">
+        <button class="btn btn--ghost btn--xs" onclick="document.getElementById('custom-tool-file').click()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Import Tool
+        </button>
+        <span class="tools-import-hint">Upload a .js file to add a custom tool</span>
+      </div>
+
+      ${customToolsListHtml}
+    </div>
 
     <!-- Status -->
     <div id="tools-status" class="llm-status" style="display:none;"></div>
 
   </div>
-</div>
+
+  <style>
+    .tools-nav { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4); border-bottom: 1px solid var(--c-border); padding-bottom: var(--sp-2); }
+    .tools-nav-tab { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); background: none; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--c-fg-muted); font-size: var(--font-size-sm); cursor: pointer; transition: color var(--transition), background var(--transition), border-color var(--transition); }
+    .tools-nav-tab:hover { color: var(--c-fg); background: var(--c-bg-hover); }
+    .tools-nav-tab:active { transform: scale(0.98); }
+    .tools-nav-tab.active { color: var(--c-accent); background: var(--c-accent-subtle); border-color: var(--c-accent); }
+    .tools-import { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); padding: var(--sp-3); border-radius: var(--radius-sm); border: 1px dashed var(--c-border); }
+    .tools-import-hint { font-size: var(--font-size-xs); color: var(--c-fg-muted); }
+  </style>
 
 <script>
 // Tool parameters data embedded for detail view
@@ -4140,6 +4188,11 @@ function showToolsStatus(type, message) {
   el.style.display = 'block';
   el.className = 'llm-status ' + type;
   el.textContent = message;
+}
+
+function switchToolsTab(tab) {
+  document.querySelectorAll('.tools-nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.tools-tab-panel').forEach(p => p.style.display = p.id === 'tools-tab-' + tab ? '' : 'none');
 }
 
 function toggleToolDetail(name) {
@@ -4180,6 +4233,28 @@ function gatherOverrides() {
   return overrides;
 }
 
+async function importCustomTool(input) {
+  const file = input.files[0];
+  if (!file) return;
+  showToolsStatus('loading', 'Importing ' + file.name + '...');
+
+  try {
+    const formData = new FormData();
+    formData.append('tool', file);
+    const resp = await fetch('/api/custom-tools/upload', { method: 'POST', body: formData });
+    const data = await resp.json();
+    if (data.success) {
+      showToolsStatus('success', 'Imported tool: ' + data.toolName + '. Reloading...');
+      setTimeout(() => { location.reload(); }, 1000);
+    } else {
+      showToolsStatus('error', 'Import failed: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    showToolsStatus('error', 'Import failed: ' + e.message);
+  }
+  input.value = '';
+}
+
 async function saveToolsSettings(event) {
   const btn = event.currentTarget;
   btn.disabled = true;
@@ -4207,7 +4282,7 @@ async function saveToolsSettings(event) {
   }
 }
 </script>
-`;
+</div>`;
 }
 
 // =============================================================================

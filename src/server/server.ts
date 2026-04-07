@@ -128,6 +128,7 @@ import {
   handleGetToolsSettings,
   handleSaveToolsSettings,
   handleToolsSettingsFragment,
+  handleUploadCustomTool,
   handlePushSubscribe,
   handlePushUnsubscribe,
   handlePushVapidKey,
@@ -1185,6 +1186,11 @@ export class Server {
     // POST /api/tools-settings - Save tools settings
     if (method === "POST" && path === "/api/tools-settings") {
       return await handleSaveToolsSettings(ctx, request);
+    }
+
+    // POST /api/custom-tools/upload - Upload a custom tool .js file
+    if (method === "POST" && path === "/api/custom-tools/upload") {
+      return await handleUploadCustomTool(ctx, request);
     }
 
     // ========================================

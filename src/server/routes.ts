@@ -16,7 +16,7 @@ import type { DiscordSettings, HomeSettings } from "../llm/mod.ts";
 import { maskApiKey, getDefaultSettings, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { ToolsSettings } from "../tools/mod.ts";
-import { AVAILABLE_TOOLS, TOOL_CATEGORIES } from "../tools/mod.ts";
+import { AVAILABLE_TOOLS, TOOL_CATEGORIES, loadCustomTools } from "../tools/mod.ts";
 import type { Retriever, RAGConfig } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
@@ -4546,6 +4546,64 @@ export function handleToolsSettingsFragment(ctx: RouteContext): Response {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
     },
+  });
+}
+
+/**
+ * Handle POST /api/custom-tools/upload - Upload a custom tool .js file.
+ */
+export async function handleUploadCustomTool(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const formData = await request.formData();
+    const file = formData.get("tool");
+
+    if (!file || !(file instanceof File)) {
+      return jsonResp({ success: false, error: "No file provided" }, 400);
+    }
+
+    if (!file.name.endsWith(".js")) {
+      return jsonResp({ success: false, error: "Only .js files are accepted" }, 400);
+    }
+
+    if (file.size > 100 * 1024) {
+      return jsonResp({ success: false, error: "File too large (max 100KB)" }, 400);
+    }
+
+    const customDir = `${ctx.projectRoot}/custom-tools`;
+    try {
+      await Deno.mkdir(customDir, { recursive: true });
+    } catch {
+      // directory may already exist
+    }
+
+    const destPath = `${customDir}/${file.name}`;
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await Deno.writeFile(destPath, bytes);
+
+    // Reload custom tools to pick up the new file
+    const newTools = await loadCustomTools(ctx.projectRoot);
+    ctx.customTools = newTools;
+
+    // Detect the tool name from the newly loaded tools
+    const toolName = Object.keys(newTools).length > 0
+      ? Object.keys(newTools)[Object.keys(newTools).length - 1]
+      : file.name;
+
+    return jsonResp({ success: true, toolName });
+  } catch (error) {
+    console.error("[Routes] handleUploadCustomTool error:", error);
+    const msg = error instanceof Error ? error.message : "Upload failed";
+    return jsonResp({ success: false, error: msg }, 500);
+  }
+}
+
+function jsonResp(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json" },
   });
 }
 

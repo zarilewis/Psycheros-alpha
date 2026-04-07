@@ -31,12 +31,13 @@ Invalid custom tool files are logged as warnings and skipped.
 Accessible via Settings > Tools in the sidebar. Provides a web interface for managing tool enable/disable state.
 
 **Features:**
-- Tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory, Notification)
+- Two tabs: **Built-in** (shipped with Psycheros) and **Custom** (user-written)
+- Built-in tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory, Notification)
 - Toggle switches for each individual tool
 - Per-category "Enable All" / "Disable All" buttons
 - Global "Enable All" / "Disable All" buttons
 - Expandable detail view showing full description and parameters schema
-- Custom Tools section showing user-loaded tools from `custom-tools/`
+- Custom tab includes an **Import Tool** button to upload `.js` files directly
 - Save persists to `.psycheros/tools-settings.json` and hot-reloads the tool registry
 
 **Priority order for resolving enabled state:**
@@ -47,6 +48,7 @@ Accessible via Settings > Tools in the sidebar. Provides a web interface for man
 **API Endpoints:**
 - `GET /api/tools-settings` — get all tools metadata, categories, and current overrides
 - `POST /api/tools-settings` — save overrides and hot-reload (`{ "toolOverrides": { "shell": true, ... } }`)
+- `POST /api/custom-tools/upload` — upload a `.js` custom tool file (multipart/form-data, field `tool`, max 100KB); writes to `custom-tools/`, hot-reloads registry
 - `GET /fragments/settings/tools` — render Tools settings UI fragment
 
 **Related Source Files:**
