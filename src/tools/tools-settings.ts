@@ -81,7 +81,7 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     id: "vault",
     name: "Data Vault",
     description: "Document storage and retrieval",
-    toolNames: ["vault_write", "vault_list", "vault_search"],
+    toolNames: ["vault_write", "vault_read", "vault_append", "vault_list", "vault_search"],
   },
   {
     id: "web-search",

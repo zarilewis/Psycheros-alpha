@@ -41,6 +41,8 @@ import {
 // Vault tools
 import {
   vaultWriteTool,
+  vaultReadTool,
+  vaultAppendTool,
   vaultListTool,
   vaultSearchTool,
 } from "./vault-tools.ts";
@@ -95,6 +97,8 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   graph_write_batch: graphWriteBatchTool,
   // Vault tools (entity document management)
   vault_write: vaultWriteTool,
+  vault_read: vaultReadTool,
+  vault_append: vaultAppendTool,
   vault_list: vaultListTool,
   vault_search: vaultSearchTool,
   // Web search tool (Tavily / Brave)

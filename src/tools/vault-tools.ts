@@ -1,7 +1,7 @@
 /**
  * Vault Entity Tools
  *
- * Tools that allow the entity to create, list, and search vault documents.
+ * Tools that allow the entity to create, read, append, list, and search vault documents.
  * The entity can write persistent reference documents and search them.
  */
 
@@ -295,6 +295,208 @@ export const vaultSearchTool: Tool = {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("[Vault] vault_search failed:", errorMessage);
+      return {
+        toolCallId: ctx.toolCallId,
+        content: `Error: ${errorMessage}`,
+        isError: true,
+      };
+    }
+  },
+};
+
+/**
+ * The vault_read tool allows the entity to read the full content of a vault document.
+ *
+ * I use this to inspect the complete content of a document, rather than relying
+ * on search results which only return relevant chunks.
+ */
+export const vaultReadTool: Tool = {
+  definition: {
+    type: "function",
+    function: {
+      name: "vault_read",
+      description:
+        "Read the full content of a document in my Data Vault. I use this to inspect a document's complete contents rather than relying on search results which only return relevant chunks.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description:
+              "The title of the document to read",
+          },
+          scope: {
+            type: "string",
+            enum: ["global", "chat"],
+            description:
+              "Document scope: 'global' or 'chat'. Default: 'chat'",
+          },
+        },
+        required: ["title"],
+      },
+    },
+  },
+
+  execute: async (
+    args: Record<string, unknown>,
+    ctx: ToolContext
+  ): Promise<ToolResult> => {
+    const vaultManager = getVaultManager(ctx);
+    if (!vaultManager) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: "Error: Data Vault is not available",
+        isError: true,
+      };
+    }
+
+    const title = args.title;
+    const scope = (args.scope as "global" | "chat") || "chat";
+
+    if (typeof title !== "string" || title.trim().length === 0) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: "Error: 'title' is required and must be non-empty",
+        isError: true,
+      };
+    }
+
+    try {
+      const existing = vaultManager.listDocuments({ scope }).find(
+        (d) => d.title === title.trim()
+      );
+
+      if (!existing) {
+        return {
+          toolCallId: ctx.toolCallId,
+          content: `Document "${title.trim()}" not found in ${scope} scope.`,
+          isError: true,
+        };
+      }
+
+      const content = await Deno.readTextFile(existing.filePath);
+
+      return {
+        toolCallId: ctx.toolCallId,
+        content: `"${existing.title}" (${existing.scope}, ${existing.chunkCount} chunks):\n\n${content}`,
+        isError: false,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("[Vault] vault_read failed:", errorMessage);
+      return {
+        toolCallId: ctx.toolCallId,
+        content: `Error: ${errorMessage}`,
+        isError: true,
+      };
+    }
+  },
+};
+
+/**
+ * The vault_append tool allows the entity to append content to an existing vault document.
+ *
+ * I use this to incrementally add content to a document (e.g., adding notes to a running log)
+ * without having to rewrite the entire file. If the document doesn't exist, it creates it.
+ */
+export const vaultAppendTool: Tool = {
+  definition: {
+    type: "function",
+    function: {
+      name: "vault_append",
+      description:
+        "Append content to a document in my Data Vault. If the document doesn't exist, it creates it. I use this to incrementally add content (e.g., notes to a running log) without rewriting the entire file.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description:
+              "The title of the document to append to (or create)",
+          },
+          content: {
+            type: "string",
+            description:
+              "The content to append",
+          },
+          scope: {
+            type: "string",
+            enum: ["global", "chat"],
+            description:
+              "Document scope: 'global' (available in all chats) or 'chat' (only this conversation). Default: 'chat'",
+          },
+        },
+        required: ["title", "content"],
+      },
+    },
+  },
+
+  execute: async (
+    args: Record<string, unknown>,
+    ctx: ToolContext
+  ): Promise<ToolResult> => {
+    const vaultManager = getVaultManager(ctx);
+    if (!vaultManager) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: "Error: Data Vault is not available",
+        isError: true,
+      };
+    }
+
+    const title = args.title;
+    const content = args.content;
+    const scope = (args.scope as "global" | "chat") || "chat";
+
+    if (typeof title !== "string" || title.trim().length === 0) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: "Error: 'title' is required and must be non-empty",
+        isError: true,
+      };
+    }
+
+    if (typeof content !== "string" || content.trim().length === 0) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: "Error: 'content' is required and must be non-empty",
+        isError: true,
+      };
+    }
+
+    try {
+      const existing = vaultManager.listDocuments({ scope }).find(
+        (d) => d.title === title.trim()
+      );
+
+      if (!existing) {
+        // Create new document
+        const result = await vaultManager.createFromContent(title.trim(), content.trim(), {
+          scope,
+          conversationId: scope === "chat" ? ctx.conversationId : undefined,
+        });
+        return {
+          toolCallId: ctx.toolCallId,
+          content: `Created vault document "${title.trim()}" (${result.chunkCount} chunks, ${scope} scope)`,
+          isError: false,
+        };
+      }
+
+      // Read current content, append, and update
+      const currentContent = await Deno.readTextFile(existing.filePath);
+      const combined = `${currentContent}\n\n${content.trim()}`;
+      const result = await vaultManager.updateDocument(existing.id, {
+        content: combined,
+      });
+
+      return {
+        toolCallId: ctx.toolCallId,
+        content: `Appended to vault document "${title.trim()}" (${result?.chunkCount ?? 0} chunks)`,
+        isError: false,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("[Vault] vault_append failed:", errorMessage);
       return {
         toolCallId: ctx.toolCallId,
         content: `Error: ${errorMessage}`,
