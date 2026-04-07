@@ -1749,26 +1749,43 @@ export async function handleMemoriesEditorFragment(
     });
   }
 
-  // Sanitize date to prevent path traversal
-  const sanitizedDate = date.replace(/[^0-9W\-]/g, "");
-  if (!DATE_REGEX.test(sanitizedDate)) {
-    return new Response("Invalid date format", {
-      status: 400,
-      headers: { "Content-Type": "text/plain" },
-    });
+  // Significant memories use slug-based filenames (e.g., 2026-04-06_first-conversation.md)
+  // Other granularities use date-based filenames (e.g., 2026-04-06.md)
+  let filePath: string;
+  if (granularity === "significant") {
+    const filename = `${date}.md`;
+    if (!isValidFilename(filename)) {
+      return new Response("Invalid filename", {
+        status: 400,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+    filePath = `significant/${filename}`;
+  } else {
+    // Sanitize date to prevent path traversal
+    const sanitizedDate = date.replace(/[^0-9W\-]/g, "");
+    if (!DATE_REGEX.test(sanitizedDate)) {
+      return new Response("Invalid date format", {
+        status: 400,
+        headers: { "Content-Type": "text/plain" },
+      });
+    }
+    filePath = `${granularity}/${sanitizedDate}.md`;
+    date = sanitizedDate;
   }
-
-  const filePath = `${granularity}/${sanitizedDate}.md`;
 
   try {
     let content: string | null = null;
     let metadata: { sourceInstance?: string; createdAt?: string; updatedAt?: string; version?: number; editedBy?: string } | undefined;
 
+    // For MCP lookup, significant memories use the date portion of the filename
+    const mcpDate = granularity === "significant" ? date.split("_")[0] : date;
+
     // Try MCP first for richer metadata
     if (ctx.mcpClient?.isConnected()) {
       const entry = await ctx.mcpClient.readMemory(
         granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
-        sanitizedDate,
+        mcpDate,
       );
       if (entry) {
         content = entry.content;
@@ -1795,7 +1812,7 @@ export async function handleMemoriesEditorFragment(
 
     const html = renderMemoryEditor(
       granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
-      sanitizedDate,
+      date,
       content,
       metadata,
     );
@@ -1828,13 +1845,30 @@ export async function handleSaveMemory(
     });
   }
 
-  // Sanitize date
-  const sanitizedDate = date.replace(/[^0-9W\-]/g, "");
-  if (!DATE_REGEX.test(sanitizedDate)) {
-    return new Response(renderSaveError("Invalid date format"), {
-      status: 400,
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
+  // Significant memories use slug-based filenames (e.g., 2026-04-06_first-conversation.md)
+  let filePath: string;
+  let mcpDate: string;
+  if (granularity === "significant") {
+    const filename = `${date}.md`;
+    if (!isValidFilename(filename)) {
+      return new Response(renderSaveError("Invalid filename"), {
+        status: 400,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+    filePath = `significant/${filename}`;
+    mcpDate = date.split("_")[0];
+  } else {
+    // Sanitize date
+    const sanitizedDate = date.replace(/[^0-9W\-]/g, "");
+    if (!DATE_REGEX.test(sanitizedDate)) {
+      return new Response(renderSaveError("Invalid date format"), {
+        status: 400,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+    filePath = `${granularity}/${sanitizedDate}.md`;
+    mcpDate = sanitizedDate;
   }
 
   try {
@@ -1850,7 +1884,6 @@ export async function handleSaveMemory(
     }
 
     // Write local file
-    const filePath = `${granularity}/${sanitizedDate}.md`;
     const fullPath = `${ctx.projectRoot}/memories/${filePath}`;
 
     // Ensure directory exists
@@ -1862,7 +1895,7 @@ export async function handleSaveMemory(
       try {
         await ctx.mcpClient.updateMemory(
           granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
-          sanitizedDate,
+          mcpDate,
           content,
         );
       } catch (error) {
