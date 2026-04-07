@@ -11,7 +11,7 @@
 // =============================================================================
 
 /** Maximum length for conversation titles */
-export const MAX_TITLE_LENGTH = 200;
+export const MAX_TITLE_LENGTH = 50;
 
 // =============================================================================
 // Request Body Limits

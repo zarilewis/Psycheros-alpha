@@ -2315,6 +2315,7 @@ function startTitleEdit(convId) {
   input.type = 'text';
   input.className = 'conv-title-edit';
   input.value = currentTitle;
+  input.maxLength = 50;
   input.dataset.originalTitle = currentTitle;
   input.dataset.convId = convId;
 
