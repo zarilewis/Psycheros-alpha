@@ -1638,6 +1638,7 @@ export class MCPClient {
    * Update a graph node via MCP.
    */
   async updateGraphNode(id: string, input: {
+    type?: string;
     label?: string;
     description?: string;
     properties?: Record<string, unknown>;
@@ -1669,6 +1670,7 @@ export class MCPClient {
         name: "graph_node_update",
         arguments: {
           id,
+          type: input.type,
           label: input.label,
           description: input.description,
           properties: input.properties,

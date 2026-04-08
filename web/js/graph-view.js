@@ -791,6 +791,7 @@ function openEditModal(nodeId) {
   const modal = document.getElementById('graph-edit-modal');
   if (!modal) return;
   document.getElementById('edit-node-id').value = node.id;
+  document.getElementById('edit-node-type').value = node.type;
   document.getElementById('edit-node-label').value = node.label;
   document.getElementById('edit-node-description').value = node.description || '';
   renderEditConnections(node.id);
@@ -907,6 +908,7 @@ function setupEventListeners() {
     e.preventDefault();
     const nodeId = document.getElementById('edit-node-id').value;
     const data = {
+      type: document.getElementById('edit-node-type').value,
       label: document.getElementById('edit-node-label').value,
       description: document.getElementById('edit-node-description').value,
     };

@@ -2486,6 +2486,21 @@ export function renderEntityCoreGraph(stats: {
       <form id="edit-node-form">
         <input type="hidden" id="edit-node-id" />
         <div class="gv-field">
+          <label for="edit-node-type">Type</label>
+          <select id="edit-node-type" name="type" required>
+            <option value="person">Person</option>
+            <option value="emotion">Emotion</option>
+            <option value="topic">Topic</option>
+            <option value="preference">Preference</option>
+            <option value="place">Place</option>
+            <option value="goal">Goal</option>
+            <option value="health">Health</option>
+            <option value="boundary">Boundary</option>
+            <option value="tradition">Tradition</option>
+            <option value="insight">Insight</option>
+          </select>
+        </div>
+        <div class="gv-field">
           <label for="edit-node-label">Label</label>
           <input type="text" id="edit-node-label" required />
         </div>
