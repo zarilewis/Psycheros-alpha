@@ -161,6 +161,7 @@ function initPersistentSSE() {
   let pulseContent = null;
   let pulseSegmentRaw = '';
   let pulseThinking = null;
+  let pulseStreamed = false;
 
   persistentSSE.addEventListener('content', (event) => {
     try {
@@ -173,6 +174,7 @@ function initPersistentSSE() {
 
         // Disable input and show stop button
         enterPulseStreamingMode();
+        pulseStreamed = true;
 
         pulseAssistantEl = document.createElement('div');
         pulseAssistantEl.className = 'msg msg--assistant';
@@ -265,7 +267,8 @@ function initPersistentSSE() {
         setSegmentRaw: (text) => pulseSegmentRaw = text,
         appendSegmentRaw: (text) => pulseSegmentRaw += text,
       });
-      // Reset pulse streaming state
+      // Reset pulse streaming state (keep pulseStreamed so pulse_complete
+      // knows we received the stream and doesn't unnecessarily reload)
       pulseAssistantEl = null;
       pulseContent = null;
       pulseSegmentRaw = '';
@@ -303,10 +306,11 @@ function initPersistentSSE() {
   persistentSSE.addEventListener('pulse_complete', (event) => {
     try {
       const { conversationId } = JSON.parse(event.data);
-      if (!pulseAssistantEl && conversationId === currentConversationId) {
-        // Streaming was missed — reload the conversation to show the response
+      if (!pulseStreamed && !pulseAssistantEl && conversationId === currentConversationId) {
+        // Streaming was missed entirely — reload the conversation to show the response
         loadConversationFromUrl(conversationId);
       }
+      pulseStreamed = false;
     } catch (e) {
       console.error('Failed to handle pulse_complete:', e);
     }
