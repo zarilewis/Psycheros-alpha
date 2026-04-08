@@ -81,6 +81,7 @@ let filteredNodes = [];
 let connectionCounts = new Map();
 let initialized = false;
 let deleteTargetNodeId = null;
+let eventListenersAbort = null;
 
 const CARD_HEIGHT_EST = 56;
 const VISIBLE_BUFFER = 10;
@@ -559,15 +560,15 @@ function openEdgeModalFromNode(nodeId) {
   openEdgeModal(nodeId, '');
 }
 
-function setupEdgeModalListeners() {
+function setupEdgeModalListeners(opts) {
   const modal = document.getElementById('graph-edge-modal');
   const form = document.getElementById('edge-create-form');
   const cancelBtn = document.getElementById('cancel-edge');
 
-  cancelBtn?.addEventListener('click', () => modal?.classList.remove('gv-modal-open'));
+  cancelBtn?.addEventListener('click', () => modal?.classList.remove('gv-modal-open'), opts);
   modal?.addEventListener('click', (e) => {
     if (e.target.id === 'graph-edge-modal') modal.classList.remove('gv-modal-open');
-  });
+  }, opts);
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -599,12 +600,12 @@ function setupEdgeModalListeners() {
     } catch (error) {
       showToast('Error: ' + error.message);
     }
-  });
+  }, opts);
 }
 
 // ─── Searchable Node Picker ────────────────────────────────────────────────
 
-function setupNodePickers() {
+function setupNodePickers(opts) {
   document.querySelectorAll('.gv-node-picker').forEach(picker => {
     const input = picker.querySelector('.gv-node-search-input');
     const results = picker.querySelector('.gv-node-search-results');
@@ -637,11 +638,11 @@ function setupNodePickers() {
         </div>`;
       }).join('');
       results.classList.add('gv-node-search-results--open');
-    });
+    }, opts);
 
     input.addEventListener('focus', () => {
       if (input.value.length > 0) input.dispatchEvent(new Event('input'));
-    });
+    }, opts);
 
     results.addEventListener('click', (e) => {
       const item = e.target.closest('.gv-node-search-item');
@@ -654,7 +655,7 @@ function setupNodePickers() {
       hidden.value = node.id;
       results.innerHTML = '';
       results.classList.remove('gv-node-search-results--open');
-    });
+    }, opts);
 
     // Clear hidden when user edits text after selecting
     input.addEventListener('input', () => {
@@ -662,7 +663,7 @@ function setupNodePickers() {
         input.dataset.nodeId = '';
         hidden.value = '';
       }
-    });
+    }, opts);
   });
 
   // Close pickers on outside click
@@ -672,7 +673,7 @@ function setupNodePickers() {
         r.classList.remove('gv-node-search-results--open');
       });
     }
-  });
+  }, opts);
 }
 
 // ─── Edit Connections ───────────────────────────────────────────────────────
@@ -744,7 +745,7 @@ function renderDeleteConfirmModal(nodeId) {
   if (modal) modal.classList.add('gv-modal-open');
 }
 
-function setupDeleteModalListeners() {
+function setupDeleteModalListeners(opts) {
   const modal = document.getElementById('graph-delete-modal');
   const cancelBtn = document.getElementById('cancel-delete');
   const confirmBtn = document.getElementById('confirm-delete');
@@ -752,13 +753,13 @@ function setupDeleteModalListeners() {
   cancelBtn?.addEventListener('click', () => {
     modal?.classList.remove('gv-modal-open');
     deleteTargetNodeId = null;
-  });
+  }, opts);
   modal?.addEventListener('click', (e) => {
     if (e.target.id === 'graph-delete-modal') {
       modal.classList.remove('gv-modal-open');
       deleteTargetNodeId = null;
     }
-  });
+  }, opts);
   confirmBtn?.addEventListener('click', async () => {
     if (!deleteTargetNodeId) return;
     const nodeId = deleteTargetNodeId;
@@ -779,7 +780,7 @@ function setupDeleteModalListeners() {
     } catch (err) {
       showToast('Delete failed: ' + err.message);
     }
-  });
+  }, opts);
 }
 
 // ─── Edit Modal ──────────────────────────────────────────────────────────────
@@ -801,11 +802,16 @@ function openEditModal(nodeId) {
 let searchDebounce = null;
 
 function setupEventListeners() {
+  // Tear down any previously attached listeners
+  if (eventListenersAbort) eventListenersAbort.abort();
+  eventListenersAbort = new AbortController();
+  const opts = { signal: eventListenersAbort.signal };
+
   // View toggle
   document.getElementById('gv-view-toggle')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.gv-view-toggle-btn');
     if (btn) toggleView(btn.dataset.view);
-  });
+  }, opts);
 
   // Search — debounced, filters list view
   document.getElementById('graph-search')?.addEventListener('input', () => {
@@ -823,7 +829,7 @@ function setupEventListeners() {
         }
       }
     }, 200);
-  });
+  }, opts);
 
   // Type filter
   document.getElementById('graph-filter-type')?.addEventListener('change', () => {
@@ -836,26 +842,26 @@ function setupEventListeners() {
       network.selectNodes(ids);
       if (ids.length > 0) network.focus(ids[0], { animation: true });
     }
-  });
+  }, opts);
 
   // Refresh
-  document.getElementById('graph-refresh')?.addEventListener('click', () => loadGraphData());
+  document.getElementById('graph-refresh')?.addEventListener('click', () => loadGraphData(), opts);
 
   // Add node button
   document.getElementById('gv-add-node')?.addEventListener('click', () => {
     document.getElementById('graph-create-modal')?.classList.add('gv-modal-open');
-  });
+  }, opts);
 
   // Close panel (graph view)
-  document.getElementById('panel-close')?.addEventListener('click', hideNodePanel);
+  document.getElementById('panel-close')?.addEventListener('click', hideNodePanel, opts);
 
   // ─── Create Modal ──────────────────────────────────────────────────────
   document.getElementById('cancel-create')?.addEventListener('click', () => {
     document.getElementById('graph-create-modal')?.classList.remove('gv-modal-open');
-  });
+  }, opts);
   document.getElementById('graph-create-modal')?.addEventListener('click', (e) => {
     if (e.target.id === 'graph-create-modal') e.target.classList.remove('gv-modal-open');
-  });
+  }, opts);
 
   document.getElementById('create-node-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -883,19 +889,19 @@ function setupEventListeners() {
     } catch (error) {
       showToast('Error: ' + error.message);
     }
-  });
+  }, opts);
 
   // ─── Edit Modal ────────────────────────────────────────────────────────
   document.getElementById('cancel-edit')?.addEventListener('click', () => {
     document.getElementById('graph-edit-modal')?.classList.remove('gv-modal-open');
-  });
+  }, opts);
   document.getElementById('graph-edit-modal')?.addEventListener('click', (e) => {
     if (e.target.id === 'graph-edit-modal') e.target.classList.remove('gv-modal-open');
-  });
+  }, opts);
   document.getElementById('edit-add-conn')?.addEventListener('click', () => {
     const nodeId = document.getElementById('edit-node-id').value;
     if (nodeId) openEdgeModal(nodeId, '');
-  });
+  }, opts);
 
   document.getElementById('edit-node-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -921,14 +927,14 @@ function setupEventListeners() {
     } catch (error) {
       showToast('Error: ' + error.message);
     }
-  });
+  }, opts);
 
   // ─── Edge Modal ────────────────────────────────────────────────────────
-  setupEdgeModalListeners();
-  setupNodePickers();
+  setupEdgeModalListeners(opts);
+  setupNodePickers(opts);
 
   // ─── Delete Modal ──────────────────────────────────────────────────────
-  setupDeleteModalListeners();
+  setupDeleteModalListeners(opts);
 }
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
