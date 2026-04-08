@@ -6,7 +6,7 @@
  * pull in the full dependency tree (push, MCP, etc.).
  */
 
-import { assertEquals } from "jsr:@std/assert";
+import { assertEquals } from "@std/assert";
 
 // ---------------------------------------------------------------------------
 // Reproduce the mutex pattern from ToolRegistry
@@ -38,7 +38,7 @@ class MutexLock {
 Deno.test("single call runs immediately", async () => {
   const mutex = new MutexLock();
   let ran = false;
-  await mutex.withLock(async () => { ran = true; });
+  await mutex.withLock(() => Promise.resolve(ran = true));
   assertEquals(ran, true);
 });
 
@@ -89,14 +89,10 @@ Deno.test("error still releases the lock", async () => {
   let secondRan = false;
 
   // First call throws — should still release
-  const first = mutex.withLock(async () => {
-    throw new Error("boom");
-  });
+  const first = mutex.withLock(() => Promise.reject(new Error("boom")));
 
   // Second call should succeed despite first failing
-  const second = mutex.withLock(async () => {
-    secondRan = true;
-  });
+  const second = mutex.withLock(() => Promise.resolve(secondRan = true));
 
   const firstResult = await first.then(
     () => "resolved",
@@ -152,8 +148,8 @@ Deno.test("lock is fair — later callers always wait", async () => {
 
   // After a small delay, two more callers arrive
   await new Promise((r) => setTimeout(r, 10));
-  const waiterA = mutex.withLock(async () => { log.push("A"); });
-  const waiterB = mutex.withLock(async () => { log.push("B"); });
+  const waiterA = mutex.withLock(() => Promise.resolve(log.push("A")));
+  const waiterB = mutex.withLock(() => Promise.resolve(log.push("B")));
 
   await Promise.all([blocker, waiterA, waiterB]);
 

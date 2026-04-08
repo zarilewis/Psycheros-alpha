@@ -2295,7 +2295,7 @@ let consolidationRunning = false;
  * Consolidation status is now managed by entity-core. If MCP is connected, show
  * the UI with a catch-up button that delegates to entity-core.
  */
-export async function handleConsolidationFragment(ctx: RouteContext): Promise<Response> {
+export function handleConsolidationFragment(ctx: RouteContext): Response {
   try {
     // Consolidation runs in entity-core; if MCP is available, show the UI.
     // Since we can't check entity-core's consolidation status without calling it,
@@ -2322,7 +2322,7 @@ export async function handleConsolidationFragment(ctx: RouteContext): Promise<Re
  * Handle POST /api/memories/consolidation/run - Run catch-up consolidation.
  * Delegates to entity-core via MCP.
  */
-export async function handleConsolidationRun(ctx: RouteContext): Promise<Response> {
+export function handleConsolidationRun(ctx: RouteContext): Response {
   if (!ctx.mcpClient) {
     return new Response(renderSaveError("Consolidation requires MCP connection to entity-core"), {
       status: 400,
@@ -5645,7 +5645,7 @@ export async function handleEntityCoreSnapshotPreview(ctx: RouteContext, snapsho
  */
 let ecConsolidationRunning = false;
 
-export async function handleEntityCoreConsolidationRun(ctx: RouteContext): Promise<Response> {
+export function handleEntityCoreConsolidationRun(ctx: RouteContext): Response {
   if (!ctx.mcpClient) {
     return new Response(renderSaveError("Consolidation requires MCP connection to entity-core"), {
       status: 400,

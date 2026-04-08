@@ -28,10 +28,10 @@ function slugify(title: string): string {
  * Pattern: {YYYY-MM-DD}_{slug}.md
  * If a conflict exists, appends -N suffix.
  */
-async function generateSignificantFilename(
+function generateSignificantFilename(
   title: string,
   significantDir: string,
-): Promise<string> {
+): string {
   const tz = Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ");
   const dateStr = new Intl.DateTimeFormat("sv-SE", {
     timeZone: tz || undefined,
@@ -153,7 +153,7 @@ export const createSignificantMemoryTool: Tool = {
 
     // Build file path — {date}_{slug}.md
     const dirPath = join(ctx.config.projectRoot, "memories", "significant");
-    const fileName = await generateSignificantFilename(title.trim(), dirPath);
+    const fileName = generateSignificantFilename(title.trim(), dirPath);
     const filePath = join(dirPath, fileName);
 
     try {
