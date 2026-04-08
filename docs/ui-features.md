@@ -59,6 +59,21 @@ During streaming, the Send button transforms into a Stop button with two-tap con
 
 Implemented in `web/js/psycheros.js`: `requestStopGeneration()`, `stopGeneration()`. CSS in `web/css/components.css`.
 
+## Retry Failed Turn
+
+When a chat turn fails (rate limit, network error, upstream outage) and no assistant content was produced, a "Retry" button appears in the assistant bubble below the error message.
+
+**Behavior:**
+- Clicking Retry re-attempts the LLM call using the already-persisted user message — no duplicate is created in conversation history
+- The error content is cleared and replaced with the new streaming response in the same bubble
+- Stop button is available during retry, with the same double-tap confirmation
+- If the retry also fails with no content, a new Retry button appears again
+- Retry is not offered if the turn produced any assistant content, thinking, or tool calls (partial results are preserved)
+
+**API:** `POST /api/chat/retry` with body `{ "conversationId": "..." }`
+
+Implemented in `web/js/psycheros.js`: `retryFailedTurn()`. Server handler in `src/server/routes.ts`: `handleChatRetry()`. CSS in `web/css/components.css`: `.retry-btn`.
+
 ## Auto-Scroll
 
 Smart proximity-based scroll latching replaces the naive "always scroll to bottom" approach. Matches standard chat app conventions.

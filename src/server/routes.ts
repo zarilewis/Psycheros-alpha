@@ -839,6 +839,14 @@ interface ChatRequestBody {
 }
 
 /**
+ * Chat retry request body schema.
+ * Re-attempts the last failed turn without re-persisting the user message.
+ */
+interface RetryChatRequestBody {
+  conversationId: string;
+}
+
+/**
  * Handle POST /api/chat - Send message and stream response via SSE
  *
  * This is the main endpoint for chat interactions. It:
@@ -1016,6 +1024,160 @@ export async function handleChat(
   });
 
   // Pipe through the SSE encoder and return the response
+  const encodedStream = stream.pipeThrough(createSSEEncoder());
+  return createSSEResponse(encodedStream);
+}
+
+/**
+ * Handle POST /api/chat/retry - Retry a failed turn without re-persisting the user message
+ *
+ * When a turn fails (e.g. rate limit), the user message is already in the DB.
+ * This endpoint re-attempts the LLM call using the already-persisted user message
+ * without creating a duplicate.
+ */
+export async function handleChatRetry(
+  ctx: RouteContext,
+  request: Request
+): Promise<Response> {
+  let body: RetryChatRequestBody;
+  try {
+    body = await request.json();
+    if (!body.conversationId || typeof body.conversationId !== "string") {
+      throw new Error("Missing or invalid conversationId");
+    }
+  } catch (error) {
+    console.error("[Routes] handleChatRetry parse error:", error);
+    return new Response(
+      JSON.stringify({ error: "Invalid request body" }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const conversation = ctx.db.getConversation(body.conversationId);
+  if (!conversation) {
+    return new Response(
+      JSON.stringify({ error: "Conversation not found" }),
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  // Retrieve the last user message from the conversation
+  const allMessages = ctx.db.getMessages(body.conversationId);
+  const lastUserMessage = [...allMessages].reverse().find((m) => m.role === "user");
+
+  if (!lastUserMessage) {
+    return new Response(
+      JSON.stringify({ error: "No user message found to retry" }),
+      {
+        status: 400,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
+  }
+
+  const userMessage = lastUserMessage.content;
+
+  const abortController = new AbortController();
+  const { signal } = abortController;
+
+  const stream = new ReadableStream<SSEEvent>({
+    async start(controller) {
+      try {
+        if (ctx.pulseEngine) {
+          ctx.pulseEngine.updateLastUserMessage();
+        }
+
+        const turn = new EntityTurn(
+          ctx.llm,
+          ctx.db,
+          ctx.tools,
+          {
+            projectRoot: ctx.projectRoot,
+            ragRetriever: ctx.ragRetriever,
+            chatRAG: ctx.chatRAG,
+            mcpClient: ctx.mcpClient,
+            memoryIndexer: ctx.memoryIndexer,
+            lorebookManager: ctx.lorebookManager,
+            vaultManager: ctx.vaultManager,
+            webSearchSettings: ctx.getWebSearchSettings(),
+            discordSettings: ctx.getDiscordSettings(),
+            homeSettings: ctx.getHomeSettings(),
+          }
+        );
+
+        // Process with retry mode: skip user message persistence
+        for await (const chunk of turn.process(body.conversationId, userMessage, { retry: true })) {
+          if (signal.aborted) break;
+          controller.enqueue(convertToSSEEvent(chunk));
+        }
+      } catch (error) {
+        if (signal.aborted) return;
+
+        const errorCode = (error as { code?: string })?.code || "UNKNOWN";
+        const statusCode = (error as { statusCode?: number })?.statusCode;
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error(
+          `[Routes] Chat retry streaming error — code=${errorCode}` +
+          (statusCode ? `, http=${statusCode}` : "") +
+          `: ${errorMsg}`,
+        );
+
+        let userMessage: string;
+        switch (errorCode) {
+          case "CONNECT_TIMEOUT":
+            userMessage = "The AI service is unreachable or failed to respond. It may be temporarily unavailable — please try again.";
+            break;
+          case "STREAM_STALL_TIMEOUT":
+            userMessage = "The AI response stalled mid-stream. The service may be overloaded — please try again.";
+            break;
+          case "NETWORK_ERROR":
+            userMessage = "Could not reach the AI service. Please check your connection and try again.";
+            break;
+          case "MALFORMED_STREAM":
+            userMessage = "Received corrupted data from the AI service. Please try again.";
+            break;
+          default:
+            if (statusCode && statusCode >= 500) {
+              userMessage = `The AI service returned an error (HTTP ${statusCode}). Please try again later.`;
+            } else if (statusCode === 429) {
+              userMessage = "Rate limited by the AI service. Please wait a moment and try again.";
+            } else if (statusCode === 401 || statusCode === 403) {
+              userMessage = "Authentication error with the AI service. Check your API key configuration.";
+            } else {
+              userMessage = "An error occurred while processing your message.";
+            }
+            break;
+        }
+
+        controller.enqueue({
+          type: "status",
+          data: JSON.stringify({ error: userMessage, errorCode }),
+        });
+        controller.enqueue({ type: "done", data: "error" });
+      } finally {
+        controller.close();
+      }
+    },
+    cancel() {
+      abortController.abort();
+    },
+  });
+
   const encodedStream = stream.pipeThrough(createSSEEncoder());
   return createSSEResponse(encodedStream);
 }

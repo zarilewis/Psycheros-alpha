@@ -27,6 +27,7 @@ import { MAX_REQUEST_BODY_SIZE, MAX_UPLOAD_BODY_SIZE } from "../constants.ts";
 import {
   handleBatchDeleteConversations,
   handleChat,
+  handleChatRetry,
   handleChatFragment,
   handleConversationListFragment,
   handleConversationView,
@@ -783,6 +784,11 @@ export class Server {
     method: string,
     path: string
   ): Promise<Response> {
+    // POST /api/chat/retry - Retry a failed turn without re-persisting user message
+    if (method === "POST" && path === "/api/chat/retry") {
+      return await handleChatRetry(ctx, request);
+    }
+
     // POST /api/chat - Stream chat response
     if (method === "POST" && path === "/api/chat") {
       return await handleChat(ctx, request);

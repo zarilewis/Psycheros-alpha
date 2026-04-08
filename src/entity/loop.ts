@@ -72,6 +72,8 @@ export interface ProcessOptions {
   pulseId?: string;
   /** If this turn was triggered by a Pulse, the Pulse's display name */
   pulseName?: string;
+  /** When true, skip user message persistence (it's already in the DB from the failed turn) */
+  retry?: boolean;
 }
 
 /**
@@ -330,46 +332,59 @@ export class EntityTurn {
     // Get conversation history from DB
     const history = this.db.getMessages(conversationId);
 
-    // Persist the user message
-    // Note: This must succeed before we proceed, as it's the foundation of the turn
-    // Store the message ID for chat RAG indexing
     // For Pulse messages, prefix the content so the entity perceives it as system-initiated
     const displayContent = options?.pulseId && options?.pulseName
       ? `[System — Pulse "${options.pulseName}"] ${userMessage}`
       : userMessage;
     let userMessageId: string | undefined;
-    try {
-      // Generate ID upfront so we can use it for chat RAG indexing
-      userMessageId = crypto.randomUUID();
-      this.db.addMessage(conversationId, {
-        role: "user",
-        content: displayContent,
-        pulseId: options?.pulseId,
-        pulseName: options?.pulseName,
-      }, userMessageId);
 
-      // Yield user message ID so the frontend can attach edit capability
-      yield { type: "message_id", role: "user", id: userMessageId };
+    if (!options?.retry) {
+      // Persist the user message
+      // Note: This must succeed before we proceed, as it's the foundation of the turn
+      // Store the message ID for chat RAG indexing
+      try {
+        // Generate ID upfront so we can use it for chat RAG indexing
+        userMessageId = crypto.randomUUID();
+        this.db.addMessage(conversationId, {
+          role: "user",
+          content: displayContent,
+          pulseId: options?.pulseId,
+          pulseName: options?.pulseName,
+        }, userMessageId);
 
-      // Index the user message for chat RAG (non-blocking, non-fatal)
-      if (this.config.chatRAG && userMessageId) {
-        this.config.chatRAG.indexMessage(
-          userMessageId,
-          conversationId,
-          "user",
-          displayContent
-        ).catch((error) => {
-          console.warn("[ChatRAG] Failed to index user message:", error);
-        });
+        // Yield user message ID so the frontend can attach edit capability
+        yield { type: "message_id", role: "user", id: userMessageId };
+
+        // Index the user message for chat RAG (non-blocking, non-fatal)
+        if (this.config.chatRAG && userMessageId) {
+          this.config.chatRAG.indexMessage(
+            userMessageId,
+            conversationId,
+            "user",
+            displayContent
+          ).catch((error) => {
+            console.warn("[ChatRAG] Failed to index user message:", error);
+          });
+        }
+      } catch (error) {
+        // User message persistence is critical - rethrow with context
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to persist user message: ${message}`);
       }
-    } catch (error) {
-      // User message persistence is critical - rethrow with context
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to persist user message: ${message}`);
+    } else {
+      // On retry, the user message is already persisted from the failed turn.
+      // Look up its ID so the frontend can still manage it (e.g., edit capability).
+      const lastUserMsg = [...history].reverse().find((m) => m.role === "user");
+      userMessageId = lastUserMsg?.id;
+      if (userMessageId) {
+        yield { type: "message_id", role: "user", id: userMessageId };
+      }
+      console.log("[EntityTurn] Retry mode: skipping user message persistence");
     }
 
     // Build the messages array for the LLM
-    const messages = this.buildMessages(systemMessage, history, displayContent);
+    // On retry, history already contains the user message — don't append it again
+    const messages = this.buildMessages(systemMessage, history, displayContent, !options?.retry);
 
     // Get tool definitions
     const toolDefinitions = this.tools().getDefinitions();
@@ -713,12 +728,14 @@ export class EntityTurn {
    * @param systemMessage - The system message with Psycheros identity content
    * @param history - Previous messages from the database
    * @param userMessage - The new user message
+   * @param appendUserMessage - Whether to append the user message at the end (false on retry)
    * @returns Array of ChatMessage for the LLM
    */
   private buildMessages(
     systemMessage: string,
     history: Message[],
     userMessage: string,
+    appendUserMessage: boolean = true,
   ): ChatMessage[] {
     const messages: ChatMessage[] = [];
 
@@ -754,12 +771,14 @@ export class EntityTurn {
       messages.push(chatMsg);
     }
 
-    // Add the new user message with timestamp
-    const now = formatMessageTimestamp(new Date());
-    messages.push({
-      role: "user",
-      content: `${now} ${userMessage}`,
-    });
+    // Add the new user message with timestamp (skip on retry — it's already in history)
+    if (appendUserMessage) {
+      const now = formatMessageTimestamp(new Date());
+      messages.push({
+        role: "user",
+        content: `${now} ${userMessage}`,
+      });
+    }
 
     return messages;
   }

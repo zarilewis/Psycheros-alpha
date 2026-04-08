@@ -1021,6 +1021,7 @@ async function sendMessage() {
     </div>
     <div class="msg-content"></div>
   `;
+  assistantEl.dataset.conversationId = currentConversationId;
   messages?.appendChild(assistantEl);
   AutoScroll.streamStart();
 
@@ -1177,6 +1178,163 @@ async function sendMessage() {
     if (input) input.disabled = false;
 
     // Restore send button from stop button
+    if (sendBtn) {
+      sendBtn.textContent = 'Send';
+      sendBtn.onclick = Psycheros.sendMessage;
+      sendBtn.classList.remove('stop-btn', 'stop-confirm');
+      sendBtn.classList.add('send-btn');
+      sendBtn.disabled = false;
+    }
+
+    isStreaming = false;
+    input?.focus();
+  }
+}
+
+// =============================================================================
+// Retry Failed Turn
+// =============================================================================
+
+/**
+ * Retry a failed turn. Reuses the already-persisted user message so no
+ * duplicate is created in the conversation history.
+ *
+ * @param {HTMLElement} failedAssistantEl - The assistant message element containing the error
+ */
+async function retryFailedTurn(failedAssistantEl) {
+  if (isStreaming) return;
+
+  const conversationId = failedAssistantEl.dataset.conversationId;
+  if (!conversationId) {
+    showToast('Cannot retry: missing conversation context');
+    return;
+  }
+
+  const input = document.getElementById('message-input');
+  const sendBtn = document.getElementById('send-btn');
+  const contentContainer = failedAssistantEl.querySelector('.msg-content');
+
+  // Clear the error content and retry button from the failed bubble
+  contentContainer.innerHTML = '';
+
+  // Re-add streaming indicator to header
+  const header = failedAssistantEl.querySelector('.msg-header');
+  if (header) {
+    const existingStreaming = header.querySelector('.streaming');
+    if (!existingStreaming) {
+      const streamingDots = document.createElement('div');
+      streamingDots.className = 'streaming';
+      streamingDots.innerHTML = '<span></span><span></span><span></span>';
+      header.appendChild(streamingDots);
+    }
+  }
+
+  // Enter streaming state
+  isStreaming = true;
+  streamingConversationId = conversationId;
+  input && (input.disabled = true);
+  stopConfirmed = false;
+  sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Stop';
+  sendBtn.onclick = Psycheros.requestStopGeneration;
+  sendBtn.classList.add('stop-btn');
+  sendBtn.classList.remove('send-btn', 'stop-confirm');
+  sendBtn.disabled = false;
+
+  AutoScroll.streamStart();
+
+  let currentThinking = null;
+  let currentContent = null;
+  let currentSegmentRaw = '';
+
+  currentAbortController = new AbortController();
+
+  try {
+    const response = await fetch('/api/chat/retry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversationId }),
+      signal: currentAbortController.signal
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let currentEventType = 'content';
+    let dataLines = [];
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          currentEventType = line.slice(7).trim();
+          continue;
+        }
+        if (line.startsWith('data: ')) {
+          dataLines.push(line.slice(6));
+          continue;
+        }
+        if (line === '' && dataLines.length > 0) {
+          const data = dataLines.join('\n');
+          handleSSEEvent(currentEventType, data, failedAssistantEl, {
+            getThinking: () => currentThinking,
+            setThinking: (el) => currentThinking = el,
+            getContent: () => currentContent,
+            setContent: (el) => currentContent = el,
+            getSegmentRaw: () => currentSegmentRaw,
+            setSegmentRaw: (text) => currentSegmentRaw = text,
+            appendSegmentRaw: (text) => currentSegmentRaw += text,
+          });
+          currentEventType = 'content';
+          dataLines = [];
+        }
+      }
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      if (currentContent && currentSegmentRaw) {
+        renderFinalContent(currentContent, currentSegmentRaw);
+      }
+      const stoppedEl = document.createElement('div');
+      stoppedEl.className = 'stopped-indicator';
+      stoppedEl.textContent = '[Stopped]';
+      contentContainer?.appendChild(stoppedEl);
+    } else {
+      console.error('Retry stream error:', error);
+      showToast('Retry failed: ' + error.message);
+      const errorEl = document.createElement('div');
+      errorEl.style.color = 'var(--c-error)';
+      errorEl.textContent = 'Error: ' + error.message;
+      contentContainer?.appendChild(errorEl);
+    }
+  } finally {
+    if (_renderTimer) {
+      clearTimeout(_renderTimer);
+      _renderTimer = null;
+    }
+
+    failedAssistantEl.querySelector('.streaming')?.remove();
+    failedAssistantEl.querySelectorAll('.typing-cursor').forEach(el => el.remove());
+    failedAssistantEl.querySelectorAll('.streaming-active').forEach(el => {
+      el.classList.remove('streaming-active');
+    });
+
+    pendingToolCalls.clear();
+    currentAbortController = null;
+    currentSegmentRaw = '';
+    streamingConversationId = null;
+
+    if (input) input.disabled = false;
     if (sendBtn) {
       sendBtn.textContent = 'Send';
       sendBtn.onclick = Psycheros.sendMessage;
@@ -1420,6 +1578,20 @@ function handleSSEEvent(eventType, data, messageEl, state) {
           errorEl.style.color = 'var(--c-error)';
           errorEl.textContent = status.error;
           contentContainer.appendChild(errorEl);
+
+          // Show retry button if no assistant content was produced this turn
+          const hasAssistantContent = contentContainer.querySelector('.assistant-text')
+            || contentContainer.querySelector('.thinking')
+            || contentContainer.querySelector('.tool');
+          if (!hasAssistantContent && messageEl.dataset.conversationId) {
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'retry-btn';
+            retryBtn.textContent = 'Retry';
+            retryBtn.type = 'button';
+            retryBtn.onclick = () => retryFailedTurn(messageEl);
+            contentContainer.appendChild(retryBtn);
+          }
+
           showToast(status.error);
         }
       } catch {
@@ -3359,6 +3531,7 @@ globalThis.Psycheros = {
   autoResize,
   handleKeyDown,
   sendMessage,
+  retryFailedTurn,
   requestStopGeneration,
   stopGeneration,
   requestStopPulseGeneration,

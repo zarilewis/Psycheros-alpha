@@ -99,6 +99,7 @@ Psycheros supports third-party integrations organized under two tabs in Settings
 
 **SSE channels**:
 - `POST /api/chat` — per-request stream (message_id, context, thinking, content, tool calls, metrics, done). Client drains stream on conversation switch so server persists full response; explicit Stop still aborts.
+- `POST /api/chat/retry` — same SSE format, re-attempts last user message without re-persisting it. Used by the Retry button shown when a turn fails with no assistant content.
 - `GET /api/events` — persistent channel (dom_update events, Pulse streaming: content, thinking, tool_call, tool_result, done, message_id)
 
 **Tool execution concurrency**: `ToolRegistry.executeAll()` uses a promise mutex to serialize tool execution across concurrent turns, preventing race conditions on shared resources (identity files, knowledge graph, memories).
@@ -116,8 +117,8 @@ Psycheros supports third-party integrations organized under two tabs in Settings
 | [docs/configuration.md](docs/configuration.md) | All env vars, available tools, RAG/MCP settings, migration commands |
 | [docs/tools-reference.md](docs/tools-reference.md) | Tool system, identity tiers, MCP fallback, core prompt file structure |
 | [docs/memory-and-rag.md](docs/memory-and-rag.md) | Memory hierarchy, consolidation, 4 RAG systems (memory, chat, lorebook, vault), vector search |
-| [docs/ui-features.md](docs/ui-features.md) | Context viewer, stop generation, message editing, appearance, graph viz |
-| [docs/api-reference.md](docs/api-reference.md) | Full API endpoints (67+ routes), dual SSE architecture |
+| [docs/ui-features.md](docs/ui-features.md) | Context viewer, stop generation, retry failed turn, message editing, appearance, graph viz |
+| [docs/api-reference.md](docs/api-reference.md) | Full API endpoints, dual SSE architecture, retry stream |
 | [docs/code-review-findings.md](docs/code-review-findings.md) | Code review bugs fixed, architectural decisions |
 | [docs/security-audit.md](docs/security-audit.md) | Security audit findings, threat model, accepted risks |
 | [docs/deployment/docker-strategy.md](docs/deployment/docker-strategy.md) | Dockerfile design, volumes, env vars, Deno caching |

@@ -12,6 +12,10 @@ Event flow: `message_id (user) → context → thinking → content → tool_cal
 
 Also emits `dom_update` events for UI changes triggered by tool execution, and `status` events for retry notifications and errors. The `message_id` event assigns database IDs to streaming-created DOM elements, enabling edit buttons without a page refresh.
 
+### Retry Stream (`POST /api/chat/retry`)
+
+Same SSE format as `POST /api/chat`, but re-attempts the last user message without re-persisting it. Used by the Retry button shown when a turn fails with no assistant content. The server retrieves the last user message from the database and passes `{ retry: true }` to the entity loop, which skips user message insertion and avoids double-appending the message to the LLM context.
+
 ### Persistent Channel (`GET /api/events`)
 
 Opened on page load, stays open indefinitely. Server can push events at any time.
@@ -37,6 +41,7 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/api/chat` | Send message, stream response (SSE) |
+| `POST` | `/api/chat/retry` | Retry failed turn without re-persisting user message (SSE) |
 
 ### Conversations
 
