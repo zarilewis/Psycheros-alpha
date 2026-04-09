@@ -4,6 +4,21 @@
  */
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Focus the message input only on non-touch (desktop) devices.
+ * On touch devices, programmatic focus triggers the on-screen keyboard,
+ * which is jarring after message streaming completes or on navigation.
+ */
+function focusInputWhenReady() {
+  if (!('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
+    document.getElementById('message-input')?.focus();
+  }
+}
+
+// =============================================================================
 // State
 // =============================================================================
 
@@ -651,7 +666,7 @@ async function loadConversationFromUrl(conversationId) {
     }, 500);
 
     // Focus input
-    document.getElementById('message-input')?.focus();
+    focusInputWhenReady();
 
   } catch (error) {
     console.error('Failed to load conversation:', error);
@@ -731,7 +746,7 @@ async function newConversation() {
     }
 
     // Focus input
-    document.getElementById('message-input')?.focus();
+    focusInputWhenReady();
 
   } catch (error) {
     console.error('Failed to create conversation:', error);
@@ -904,7 +919,7 @@ function exitPulseStreamingMode() {
     sendBtn.disabled = false;
   }
 
-  input?.focus();
+  focusInputWhenReady();
 }
 
 /**
@@ -1187,7 +1202,7 @@ async function sendMessage() {
     }
 
     isStreaming = false;
-    input?.focus();
+    focusInputWhenReady();
   }
 }
 
@@ -1344,7 +1359,7 @@ async function retryFailedTurn(failedAssistantEl) {
     }
 
     isStreaming = false;
-    input?.focus();
+    focusInputWhenReady();
   }
 }
 
