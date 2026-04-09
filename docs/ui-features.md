@@ -99,8 +99,8 @@ Both user and assistant messages can be edited after they're sent.
 - Edit button (pencil icon) appears on hover
 - Inline editing with textarea replacing message content
 - Save/Cancel buttons for confirming or discarding changes
-- Edited messages marked with `[edited]` tag
-- `edited_at` timestamp stored in database
+- Edited messages shown with (edited) indicator in the UI
+- `edited_at` timestamp stored in database (not passed to entity)
 - ChatRAG re-indexing: edited messages are automatically re-indexed for semantic search
 
 **API:** `PUT /api/messages/:id` with body `{ "content": "...", "conversationId": "..." }`
