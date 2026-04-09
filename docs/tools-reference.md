@@ -67,27 +67,17 @@ See [configuration.md](configuration.md) for the full list of available tools.
 
 The entity can read and write to its knowledge graph. Write tools auto-generate vector embeddings for semantic search.
 
-### Read Tools (6)
+### Query Tool (omni read)
 
 | Tool | Description |
 |------|-------------|
-| `graph_search_nodes` | Semantic search for nodes by query, type, limit |
-| `graph_get_node` | Get a specific node by ID |
-| `graph_get_edges` | Query relationships by source/target/type |
-| `graph_traverse` | Walk the graph from a starting node |
-| `graph_get_subgraph` | Extract full neighborhood around a node |
-| `graph_stats` | Get node/edge counts and vector search status |
+| `graph_query` | Unified read tool with `query_type` discriminator: `search` (semantic node search), `get_node` (by ID), `get_edges` (relationships), `traverse` (walk from a node), `subgraph` (full neighborhood), `stats` (counts) |
 
-### Write Tools (7)
+### Mutate Tool (omni write)
 
 | Tool | Description |
 |------|-------------|
-| `graph_create_node` | Create a node with duplicate prevention and auto-embedding |
-| `graph_create_edge` | Create a relationship between two nodes (supports IDs or labels) |
-| `graph_update_node` | Update label, description, or confidence (re-embeds) |
-| `graph_update_edge` | Update weight, evidence, or validity |
-| `graph_delete_node` | Soft-delete a node and its connected edges |
-| `graph_delete_edge` | Remove a relationship |
+| `graph_mutate` | Unified write tool with `operation` discriminator: `create_node`, `create_edge`, `update_node`, `update_edge`, `delete_node`, `delete_edge` |
 | `graph_write_batch` | Batch create nodes and edges (edges can reference existing nodes by label) |
 
 ## Web Search Tool
@@ -111,40 +101,34 @@ Settings are persisted to `.psycheros/web-search-settings.json` (gitignored).
 | `src/tools/web-search.ts` | `web_search` tool with Tavily and Brave providers |
 | `src/llm/web-search-settings.ts` | Settings type, load/save, API key masking |
 
-## Data Vault Tools
+## Data Vault Tool
 
-The entity can create, list, and search documents stored in the Data Vault for persistent reference.
+The entity can create, read, append, list, and search documents stored in the Data Vault for persistent reference.
 
 | Tool | Description |
 |------|-------------|
-| `vault_write` | Create or update a vault document with title, content, and scope (global/chat) |
-| `vault_read` | Read the full content of a vault document by title and scope |
-| `vault_append` | Append content to a vault document, or create it if it doesn't exist |
-| `vault_list` | List vault documents, optionally filtered by scope |
-| `vault_search` | Search vault for relevant content by query |
+| `vault` | Unified vault tool with `operation` discriminator: `write` (create/update), `read` (full content), `append` (add content, creates if missing), `list` (all documents), `search` (find relevant content) |
 
 ### Related Source Files
 
 | File | Purpose |
 |------|---------|
-| `src/tools/vault-tools.ts` | 5 vault document management tools |
+| `src/tools/vault-tools.ts` | `vault` — unified vault document management tool |
 | `src/vault/manager.ts` | VaultManager — CRUD, chunking, embedding, search |
 
-## Pulse Tools
+## Pulse Tool
 
 The entity can create, trigger, and delete autonomous scheduled prompts (Pulses). Entity-created Pulses default to silent mode and auto-delete after execution. When a visible-mode Pulse fires, the entity perceives the prompt as system-initiated via a `[System — Pulse "name"]` prefix rather than a user message.
 
 | Tool | Description |
 |------|-------------|
-| `create_pulse` | Create a new Pulse with name, prompt, schedule, and optional chain configuration |
-| `trigger_pulse` | Manually fire an existing Pulse by ID |
-| `delete_pulse` | Delete a Pulse and its associated triggers |
+| `pulse` | Unified Pulse tool with `operation` discriminator: `create` (schedule a new Pulse), `trigger` (fire immediately), `delete` (remove permanently) |
 
 ### Related Source Files
 
 | File | Purpose |
 |------|---------|
-| `src/tools/pulse-tools.ts` | 3 entity-facing Pulse tools |
+| `src/tools/pulse-tools.ts` | `pulse` — unified Pulse management tool |
 | `src/pulse/engine.ts` | PulseEngine — scheduling, execution, chain handling |
 | `src/pulse/routes.ts` | CRUD API, trigger endpoints, webhook receiver |
 | `src/pulse/templates.ts` | Settings UI — hub card, editor, execution log |
@@ -154,22 +138,20 @@ The entity can create, trigger, and delete autonomous scheduled prompts (Pulses)
 
 | File | Purpose |
 |------|---------|
-| `src/tools/graph-read.ts` | 6 read-only graph query tools |
-| `src/tools/graph-write.ts` | 7 graph write tools with auto-embedding |
+| `src/tools/graph-read.ts` | `graph_query` — unified read tool for graph queries |
+| `src/tools/graph-write.ts` | `graph_mutate` + `graph_write_batch` — graph write tools with auto-embedding |
 
 ## Identity Tools
 
 The entity can modify its identity files through two tiers of tools, plus a custom file tool.
 
-### Tier 1: Casual Tools (Append-Only)
+### Tier 1: Casual Tool (Append-Only)
 
 Safe for everyday use — can only add content, never modify or delete existing content.
 
 | Tool | Description |
 |------|-------------|
-| `append_to_self` | Add new self-knowledge (who I am, how I work) |
-| `append_to_user` | Add new user knowledge (preferences, patterns, life) |
-| `append_to_relationship` | Add relationship understanding (dynamics, history) |
+| `identity_append` | Add new knowledge to identity files via `category` param (`self`, `user`, `relationship`) |
 
 ### Tier 2: Maintenance Tools (Full Suite)
 
@@ -211,7 +193,7 @@ Changes preserve XML tag structure in identity files. Content is added cleanly w
 |------|---------|
 | `src/tools/registry.ts` | Tool registration and default registry |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
-| `src/tools/identity-casual.ts` | Tier 1 append-only identity tools |
+| `src/tools/identity-casual.ts` | `identity_append` — Tier 1 append-only identity tool |
 | `src/tools/identity-maintain.ts` | Tier 2 maintenance identity tools |
 | `src/tools/identity-custom.ts` | Custom identity file tool (create, append, replace) |
 

@@ -5176,7 +5176,7 @@ function renderVaultView(
     : "";
 
   const docCards = docs.length === 0
-    ? `<div class="vault-empty">No documents in the Data Vault. Upload a file or the entity can create documents using vault_write.</div>`
+    ? `<div class="vault-empty">No documents in the Data Vault. Upload a file or the entity can create documents using vault.</div>`
     : docs.map((d) => {
       const scopeBadge = d.scope === "global"
         ? `<span class="vault-scope-badge vault-scope-badge--global">Global</span>`

@@ -1,448 +1,353 @@
 /**
- * Graph Read Tools
+ * Graph Query Tool (Omni)
  *
- * Read-only tools for querying the knowledge graph.
- * The entity uses these to search and traverse, and get context from the graph
- * but cannot modify it.
+ * Unified read-only tool for querying the knowledge graph.
+ * Replaces the previous 6 separate read tools with a single tool
+ * using a query_type discriminator.
  */
 
 import type { ToolResult } from "../types.ts";
 import type { Tool, ToolContext } from "./types.ts";
 
 // =============================================================================
-// Tool Definitions
+// Tool Definition
 // =============================================================================
 
-const graphSearchNodesDef: Tool["definition"] = {
-  type: "function",
-  function: {
-    name: "graph_search_nodes",
-    description:
-      "Search my knowledge graph for relevant nodes. I use this to find people, topics, emotions, and other concepts I've learned about. Returns nodes with their types, labels, descriptions, and relevance scores.",
-    parameters: {
-      type: "object",
-      properties: {
-        query: {
-          type: "string",
-          description: "The search query (e.g., 'work stress', 'hobbies', 'family')",
+export const graphQueryTool: Tool = {
+  definition: {
+    type: "function",
+    function: {
+      name: "graph_query",
+      description:
+        "Query my knowledge graph to search, inspect, and traverse nodes and relationships. Use this to find people, topics, emotions, and how they connect.",
+      parameters: {
+        type: "object",
+        properties: {
+          query_type: {
+            type: "string",
+            enum: ["search", "get_node", "get_edges", "traverse", "subgraph", "stats"],
+            description:
+              "Type of query. 'search' for semantic node search, 'get_node' by ID, 'get_edges' for relationships, 'traverse' to walk from a node, 'subgraph' for full neighborhood, 'stats' for counts.",
+          },
+          // search params
+          query: {
+            type: "string",
+            description: "For 'search': the search text (e.g., 'work stress', 'hobbies', 'family')",
+          },
+          type: {
+            type: "string",
+            description: "For 'search': optional filter by node type (person, emotion, topic, preference, place, goal, health, boundary, tradition, insight)",
+          },
+          limit: {
+            type: "number",
+            description: "For 'search': max results (default: 10)",
+          },
+          // get_node / traverse / subgraph params
+          node_id: {
+            type: "string",
+            description: "For 'get_node', 'traverse', 'subgraph': the node ID",
+          },
+          // get_edges params
+          from_id: {
+            type: "string",
+            description: "For 'get_edges': filter by source node ID",
+          },
+          to_id: {
+            type: "string",
+            description: "For 'get_edges': filter by target node ID",
+          },
+          edge_type: {
+            type: "string",
+            description: "For 'get_edges': filter by relationship type",
+          },
+          // traverse params
+          direction: {
+            type: "string",
+            enum: ["out", "in", "both"],
+            description: "For 'traverse': direction (default: both)",
+          },
+          max_depth: {
+            type: "number",
+            description: "For 'traverse': max depth (default: 2, max: 5)",
+          },
+          edge_types: {
+            type: "array",
+            items: { type: "string" },
+            description: "For 'traverse': optional filter by edge types to follow",
+          },
         },
-        type: {
-          type: "string",
-          description: "Optional filter by node type (person, emotion, topic, preference, place, goal, health, boundary, tradition, insight)",
-        },
-        limit: {
-          type: "number",
-          description: "Maximum number of results (default: 10)",
-        },
+        required: ["query_type"],
       },
-      required: ["query"],
     },
   },
-};
 
-const graphGetNodeDef: Tool["definition"] = {
-  type: "function",
-  function: {
-    name: "graph_get_node",
-    description:
-      "Get a specific node from my knowledge graph by its ID. Returns full node details including type, label, description, and confidence.",
-    parameters: {
-      type: "object",
-      properties: {
-        id: {
-          type: "string",
-          description: "The node ID to retrieve",
-        },
-      },
-      required: ["id"],
-    },
-  },
-};
+  execute: async (
+    args: Record<string, unknown>,
+    ctx: ToolContext
+  ): Promise<ToolResult> => {
+    const queryType = args.query_type as string;
 
-const graphGetEdgesDef: Tool["definition"] = {
-  type: "function",
-  function: {
-    name: "graph_get_edges",
-    description:
-      "Get relationships (edges) from my knowledge graph. Can filter by source/target nodes or relationship type. Returns edges with their types, weights, and evidence.",
-    parameters: {
-      type: "object",
-      properties: {
-        fromId: {
-          type: "string",
-          description: "Optional filter by source node ID",
-        },
-        toId: {
-          type: "string",
-          description: "Optional filter by target node ID",
-        },
-        type: {
-          type: "string",
-          description: "Optional filter by relationship type (loves, works_at, values, close_to, mentions, etc. — any natural language string)",
-        },
-      },
-      required: [],
-    },
-  },
-};
+    if (!queryType) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: "Error: 'query_type' is required. Use one of: search, get_node, get_edges, traverse, subgraph, stats.",
+        isError: true,
+      };
+    }
 
-const graphTraverseDef: Tool["definition"] = {
-  type: "function",
-  function: {
-    name: "graph_traverse",
-    description:
-      "Traverse my knowledge graph starting from a node. I use this to find related concepts and understand how things connect. Returns connected nodes with their relationship paths.",
-    parameters: {
-      type: "object",
-      properties: {
-        startNodeId: {
-          type: "string",
-          description: "The node ID to start traversal from",
-        },
-        direction: {
-          type: "string",
-          enum: ["out", "in", "both"],
-          description: "Direction to traverse: out (from node), in (to node), or both (default: both)",
-        },
-        maxDepth: {
-          type: "number",
-          description: "Maximum depth to traverse (default: 2, max: 5)",
-        },
-        edgeTypes: {
-          type: "array",
-          items: { type: "string" },
-          description: "Optional filter by edge types to follow",
-        },
-      },
-      required: ["startNodeId"],
-    },
-  },
-};
+    if (!ctx.config.mcpClient) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: "I cannot query my knowledge graph - MCP connection to entity-core is not available.",
+        isError: true,
+      };
+    }
 
-const graphGetSubgraphDef: Tool["definition"] = {
-  type: "function",
-  function: {
-    name: "graph_get_subgraph",
-    description:
-      "Extract a subgraph centered on a node. I use this to get the full context around a concept, including all connected nodes and edges.",
-    parameters: {
-      type: "object",
-      properties: {
-        nodeId: {
-          type: "string",
-          description: "The node ID to center the subgraph on",
-        },
-      },
-      required: ["nodeId"],
-    },
-  },
-};
-
-const graphStatsDef: Tool["definition"] = {
-  type: "function",
-  function: {
-    name: "graph_stats",
-    description:
-      "Get statistics about my knowledge graph. Returns total nodes, edges, breakdown by type, and vector search availability.",
-    parameters: {
-      type: "object",
-      properties: {},
-      required: [],
-    },
+    try {
+      switch (queryType) {
+        case "search":
+          return await executeSearch(args, ctx);
+        case "get_node":
+          return await executeGetNode(args, ctx);
+        case "get_edges":
+          return await executeGetEdges(args, ctx);
+        case "traverse":
+          return await executeTraverse(args, ctx);
+        case "subgraph":
+          return await executeSubgraph(args, ctx);
+        case "stats":
+          return await executeStats(args, ctx);
+        default:
+          return {
+            toolCallId: ctx.toolCallId,
+            content: `Error: Unknown query_type '${queryType}'. Use one of: search, get_node, get_edges, traverse, subgraph, stats.`,
+            isError: true,
+          };
+      }
+    } catch (error) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: `Failed to query knowledge graph: ${error instanceof Error ? error.message : String(error)}`,
+        isError: true,
+      };
+    }
   },
 };
 
 // =============================================================================
-// Tool Implementations
+// Query Implementations
 // =============================================================================
 
-interface GraphSearchNodesArgs {
-  query: string;
-  type?: string;
-  limit?: number;
-}
-
-async function executeGraphSearchNodes(
+async function executeSearch(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { query, type, limit = 10 } = args as unknown as GraphSearchNodesArgs;
+  const query = args.query as string;
+  const type = args.type as string | undefined;
+  const limit = (args.limit as number) ?? 10;
 
-  if (!ctx.config.mcpClient) {
+  if (!query) {
     return {
       toolCallId: ctx.toolCallId,
-      content: "I cannot search my knowledge graph - MCP connection to entity-core is not available.",
+      content: "Error: 'query' is required for search queries.",
       isError: true,
     };
   }
 
-  try {
-    const results = await ctx.config.mcpClient.searchGraphNodes(query, type, limit);
+  const results = await ctx.config.mcpClient!.searchGraphNodes(query, type, limit);
 
-    if (results.length === 0) {
-      return {
-        toolCallId: ctx.toolCallId,
-        content: `I searched my knowledge graph for "${query}" but found no matching nodes.`,
-        isError: false,
-      };
-    }
-
-    const formatted = results.map((r) => {
-      const relevance = Math.round(r.score * 100);
-      return `- **${r.label}** (${r.type}) [${relevance}% relevant]\n  ${r.description || "No description"}`;
-    }).join("\n\n");
-
+  if (results.length === 0) {
     return {
       toolCallId: ctx.toolCallId,
-      content: `I found ${results.length} nodes matching "${query}":\n\n${formatted}`,
+      content: `I searched my knowledge graph for "${query}" but found no matching nodes.`,
       isError: false,
     };
-  } catch (error) {
-    return {
-      toolCallId: ctx.toolCallId,
-      content: `Failed to search knowledge graph: ${error instanceof Error ? error.message : String(error)}`,
-      isError: true,
-    };
   }
+
+  const formatted = results.map((r) => {
+    const relevance = Math.round(r.score * 100);
+    return `- **${r.label}** (${r.type}) [${relevance}% relevant]\n  ${r.description || "No description"}`;
+  }).join("\n\n");
+
+  return {
+    toolCallId: ctx.toolCallId,
+    content: `I found ${results.length} nodes matching "${query}":\n\n${formatted}`,
+    isError: false,
+  };
 }
 
-interface GraphGetNodeArgs {
-  id: string;
-}
-
-async function executeGraphGetNode(
+async function executeGetNode(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { id } = args as unknown as GraphGetNodeArgs;
+  const id = args.node_id as string;
 
-  if (!ctx.config.mcpClient) {
+  if (!id) {
     return {
       toolCallId: ctx.toolCallId,
-      content: "I cannot get node from my knowledge graph - MCP connection to entity-core is not available.",
+      content: "Error: 'node_id' is required for get_node queries.",
       isError: true,
     };
   }
 
-  try {
-    const node = await ctx.config.mcpClient.getGraphNode(id);
+  const node = await ctx.config.mcpClient!.getGraphNode(id);
 
-    if (!node) {
-      return {
-        toolCallId: ctx.toolCallId,
-        content: `I could not find a node with ID "${id}" in my knowledge graph.`,
-        isError: false,
-      };
-    }
-
-    const confidence = Math.round(node.confidence * 100);
+  if (!node) {
     return {
       toolCallId: ctx.toolCallId,
-      content: `**${node.label}** (${node.type}) [${confidence}% confidence]\n\n${node.description || "No description"}`,
+      content: `I could not find a node with ID "${id}" in my knowledge graph.`,
       isError: false,
     };
-  } catch (error) {
-    return {
-      toolCallId: ctx.toolCallId,
-      content: `Failed to get node: ${error instanceof Error ? error.message : String(error)}`,
-      isError: true,
-    };
   }
+
+  const confidence = Math.round(node.confidence * 100);
+  return {
+    toolCallId: ctx.toolCallId,
+    content: `**${node.label}** (${node.type}) [${confidence}% confidence]\n\n${node.description || "No description"}`,
+    isError: false,
+  };
 }
 
-interface GraphGetEdgesArgs {
-  fromId?: string;
-  toId?: string;
-  type?: string;
-}
-
-async function executeGraphGetEdges(
+async function executeGetEdges(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { fromId, toId, type } = args as GraphGetEdgesArgs;
+  const fromId = args.from_id as string | undefined;
+  const toId = args.to_id as string | undefined;
+  const type = args.edge_type as string | undefined;
 
-  if (!ctx.config.mcpClient) {
+  const edges = await ctx.config.mcpClient!.getGraphEdges({ fromId, toId, type });
+
+  if (edges.length === 0) {
     return {
       toolCallId: ctx.toolCallId,
-      content: "I cannot get edges from my knowledge graph - MCP connection to entity-core is not available.",
-      isError: true,
-    };
-  }
-
-  try {
-    const edges = await ctx.config.mcpClient.getGraphEdges({ fromId, toId, type });
-
-    if (edges.length === 0) {
-      return {
-        toolCallId: ctx.toolCallId,
-        content: "I found no relationships matching those criteria.",
-        isError: false,
-      };
-    }
-
-    const formatted = edges.map((e) => {
-      const weight = Math.round(e.weight * 100);
-      const relType = e.type;
-      return `- ${e.fromId} --[${relType}]--> ${e.toId} [${weight}%]`;
-    }).join("\n");
-
-    return {
-      toolCallId: ctx.toolCallId,
-      content: `I found ${edges.length} relationships:\n\n${formatted}`,
+      content: "I found no relationships matching those criteria.",
       isError: false,
     };
-  } catch (error) {
-    return {
-      toolCallId: ctx.toolCallId,
-      content: `Failed to get edges: ${error instanceof Error ? error.message : String(error)}`,
-      isError: true,
-    };
   }
+
+  const formatted = edges.map((e) => {
+    const weight = Math.round(e.weight * 100);
+    const relType = e.type;
+    return `- ${e.fromId} --[${relType}]--> ${e.toId} [${weight}%]`;
+  }).join("\n");
+
+  return {
+    toolCallId: ctx.toolCallId,
+    content: `I found ${edges.length} relationships:\n\n${formatted}`,
+    isError: false,
+  };
 }
 
-interface GraphTraverseArgs {
-  startNodeId: string;
-  direction?: "out" | "in" | "both";
-  maxDepth?: number;
-  edgeTypes?: string[];
-}
-
-async function executeGraphTraverse(
+async function executeTraverse(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { startNodeId, direction = "both", maxDepth = 2, edgeTypes } = args as unknown as GraphTraverseArgs;
+  const startNodeId = args.node_id as string;
+  const direction = (args.direction as "out" | "in" | "both") ?? "both";
+  const maxDepth = (args.max_depth as number) ?? 2;
+  const edgeTypes = args.edge_types as string[] | undefined;
 
-  if (!ctx.config.mcpClient) {
+  if (!startNodeId) {
     return {
       toolCallId: ctx.toolCallId,
-      content: "I cannot traverse my knowledge graph - MCP connection to entity-core is not available.",
+      content: "Error: 'node_id' is required for traverse queries.",
       isError: true,
     };
   }
 
-  try {
-    const result = await ctx.config.mcpClient.traverseGraph(startNodeId, direction, maxDepth, edgeTypes);
+  const result = await ctx.config.mcpClient!.traverseGraph(startNodeId, direction, maxDepth, edgeTypes);
 
-    if (result.results.length === 0) {
-      return {
-        toolCallId: ctx.toolCallId,
-        content: `I found no connected nodes starting from "${startNodeId}".`,
-        isError: false,
-      };
-    }
-
-    const formatted = result.results.map((r) => {
-      const depth = "  ".repeat(r.depth);
-      return `${depth}- **${r.node.label}** (${r.node.type}) at depth ${r.depth}`;
-    }).join("\n");
-
-    const startLabel = result.startNode?.label || startNodeId;
+  if (result.results.length === 0) {
     return {
       toolCallId: ctx.toolCallId,
-      content: `Starting from **${startLabel}**, I found ${result.results.length} connected nodes:\n\n${formatted}`,
+      content: `I found no connected nodes starting from "${startNodeId}".`,
       isError: false,
     };
-  } catch (error) {
-    return {
-      toolCallId: ctx.toolCallId,
-      content: `Failed to traverse graph: ${error instanceof Error ? error.message : String(error)}`,
-      isError: true,
-    };
   }
+
+  const formatted = result.results.map((r) => {
+    const depth = "  ".repeat(r.depth);
+    return `${depth}- **${r.node.label}** (${r.node.type}) at depth ${r.depth}`;
+  }).join("\n");
+
+  const startLabel = result.startNode?.label || startNodeId;
+  return {
+    toolCallId: ctx.toolCallId,
+    content: `Starting from **${startLabel}**, I found ${result.results.length} connected nodes:\n\n${formatted}`,
+    isError: false,
+  };
 }
 
-interface GraphGetSubgraphArgs {
-  nodeId: string;
-}
-
-async function executeGraphGetSubgraph(
+async function executeSubgraph(
   args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  const { nodeId } = args as unknown as GraphGetSubgraphArgs;
+  const nodeId = args.node_id as string;
 
-  if (!ctx.config.mcpClient) {
+  if (!nodeId) {
     return {
       toolCallId: ctx.toolCallId,
-      content: "I cannot get subgraph from my knowledge graph - MCP connection to entity-core is not available.",
+      content: "Error: 'node_id' is required for subgraph queries.",
       isError: true,
     };
   }
 
-  try {
-    const subgraph = await ctx.config.mcpClient.getGraphSubgraph(nodeId);
+  const subgraph = await ctx.config.mcpClient!.getGraphSubgraph(nodeId);
 
-    if (!subgraph.nodes || subgraph.nodes.length === 0) {
-      return {
-        toolCallId: ctx.toolCallId,
-        content: `I could not find a subgraph around node "${nodeId}".`,
-        isError: false,
-      };
-    }
-
-    const nodesFormatted = subgraph.nodes.map((n) => {
-      return `- **${n.label}** (${n.type})`;
-    }).join("\n");
-
-    const edgesFormatted = subgraph.edges && subgraph.edges.length > 0
-      ? "\n\nRelationships:\n" + subgraph.edges.map((e) => {
-          const relType = e.type;
-          const fromNode = subgraph.nodes.find((n) => n.id === e.fromId);
-          const toNode = subgraph.nodes.find((n) => n.id === e.toId);
-          return `- **${fromNode?.label || e.fromId}** → *${relType}* → **${toNode?.label || e.toId}**`;
-        }).join("\n")
-      : "";
-
+  if (!subgraph.nodes || subgraph.nodes.length === 0) {
     return {
       toolCallId: ctx.toolCallId,
-      content: `Subgraph with ${subgraph.nodes.length} nodes:\n\n${nodesFormatted}${edgesFormatted}`,
+      content: `I could not find a subgraph around node "${nodeId}".`,
       isError: false,
     };
-  } catch (error) {
-    return {
-      toolCallId: ctx.toolCallId,
-      content: `Failed to get subgraph: ${error instanceof Error ? error.message : String(error)}`,
-      isError: true,
-    };
   }
+
+  const nodesFormatted = subgraph.nodes.map((n) => {
+    return `- **${n.label}** (${n.type})`;
+  }).join("\n");
+
+  const edgesFormatted = subgraph.edges && subgraph.edges.length > 0
+    ? "\n\nRelationships:\n" + subgraph.edges.map((e) => {
+        const relType = e.type;
+        const fromNode = subgraph.nodes.find((n) => n.id === e.fromId);
+        const toNode = subgraph.nodes.find((n) => n.id === e.toId);
+        return `- **${fromNode?.label || e.fromId}** → *${relType}* → **${toNode?.label || e.toId}**`;
+      }).join("\n")
+    : "";
+
+  return {
+    toolCallId: ctx.toolCallId,
+    content: `Subgraph with ${subgraph.nodes.length} nodes:\n\n${nodesFormatted}${edgesFormatted}`,
+    isError: false,
+  };
 }
 
-async function executeGraphStats(
+async function executeStats(
   _args: Record<string, unknown>,
   ctx: ToolContext
 ): Promise<ToolResult> {
-  if (!ctx.config.mcpClient) {
+  const stats = await ctx.config.mcpClient!.getGraphStats();
+
+  if (!stats) {
     return {
       toolCallId: ctx.toolCallId,
-      content: "I cannot get graph stats - MCP connection to entity-core is not available.",
-      isError: true,
+      content: "I could not retrieve graph statistics.",
+      isError: false,
     };
   }
 
-  try {
-    const stats = await ctx.config.mcpClient.getGraphStats();
+  const byType = Object.entries(stats.nodesByType || {})
+    .map(([type, count]) => `- ${type}: ${count}`)
+    .join("\n");
 
-    if (!stats) {
-      return {
-        toolCallId: ctx.toolCallId,
-        content: "I could not retrieve graph statistics.",
-        isError: false,
-      };
-    }
+  const byEdge = Object.entries(stats.edgesByType || {})
+    .map(([type, count]) => `- ${type}: ${count}`)
+    .join("\n");
 
-    const byType = Object.entries(stats.nodesByType || {})
-      .map(([type, count]) => `- ${type}: ${count}`)
-      .join("\n");
-
-    const byEdge = Object.entries(stats.edgesByType || {})
-      .map(([type, count]) => `- ${type}: ${count}`)
-      .join("\n");
-
-    return {
-      toolCallId: ctx.toolCallId,
-      content: `**Knowledge Graph Statistics**
+  return {
+    toolCallId: ctx.toolCallId,
+    content: `**Knowledge Graph Statistics**
 
 Total nodes: ${stats.totalNodes || 0}
 Total edges: ${stats.totalEdges || 0}
@@ -454,57 +359,6 @@ Edges by type:
 ${byEdge || "- No edges yet"}
 
 Vector search: ${stats.vectorSearchAvailable ? "Available" : "Not available"}`,
-      isError: false,
-    };
-  } catch (error) {
-    return {
-      toolCallId: ctx.toolCallId,
-      content: `Failed to get graph stats: ${error instanceof Error ? error.message : String(error)}`,
-      isError: true,
-    };
-  }
+    isError: false,
+  };
 }
-
-// =============================================================================
-// Tool Exports
-// =============================================================================
-
-export const graphSearchNodesTool: Tool = {
-  definition: graphSearchNodesDef,
-  execute: executeGraphSearchNodes,
-};
-
-export const graphGetNodeTool: Tool = {
-  definition: graphGetNodeDef,
-  execute: executeGraphGetNode,
-};
-
-export const graphGetEdgesTool: Tool = {
-  definition: graphGetEdgesDef,
-  execute: executeGraphGetEdges,
-};
-
-export const graphTraverseTool: Tool = {
-  definition: graphTraverseDef,
-  execute: executeGraphTraverse,
-};
-
-export const graphGetSubgraphTool: Tool = {
-  definition: graphGetSubgraphDef,
-  execute: executeGraphGetSubgraph,
-};
-
-export const graphStatsTool: Tool = {
-  definition: graphStatsDef,
-  execute: executeGraphStats,
-};
-
-// All graph read tools
-export const graphReadTools: Tool[] = [
-  graphSearchNodesTool,
-  graphGetNodeTool,
-  graphGetEdgesTool,
-  graphTraverseTool,
-  graphGetSubgraphTool,
-  graphStatsTool,
-];

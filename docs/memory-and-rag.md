@@ -118,7 +118,7 @@ Eager RAG over user-uploaded and entity-created reference documents. Documents a
 
 **Document storage:**
 - Users upload via Settings → Data Vault UI or `POST /api/vault` (supports .md, .txt, .pdf, .docx, .xlsx)
-- Entity creates/updates via `vault_write` tool (saved as markdown)
+- Entity creates/updates via `vault` tool (saved as markdown)
 - Files stored at `data/vault/documents/{global|chat-{convId}}/`
 - Content extracted, chunked (512 tokens), embedded (all-MiniLM-L6-v2, 384 dims)
 
@@ -137,11 +137,7 @@ Eager RAG over user-uploaded and entity-created reference documents. Documents a
 **Entity tools:**
 | Tool | Description |
 |------|-------------|
-| `vault_write` | Create or update a vault document (global or per-chat scope) |
-| `vault_read` | Read the full content of a vault document by title |
-| `vault_append` | Append content to a vault document (creates if it doesn't exist) |
-| `vault_list` | List vault documents (filterable by scope) |
-| `vault_search` | Search vault for relevant content |
+| `vault` | Manage vault documents (write, read, append, list, search) |
 
 ### Vector Search Backend
 
@@ -173,4 +169,4 @@ Eager RAG over user-uploaded and entity-created reference documents. Documents a
 | `src/vault/processor.ts` | Text extraction from .md/.txt/.pdf/.docx/.xlsx |
 | `src/vault/retriever.ts` | Vault context formatting for system message |
 | `src/vault/types.ts` | Vault type definitions |
-| `src/tools/vault-tools.ts` | vault_write, vault_list, vault_search tools |
+| `src/tools/vault-tools.ts` | `vault` — unified vault document management tool |

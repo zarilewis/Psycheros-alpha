@@ -303,7 +303,7 @@ Document storage and search system accessible via Settings → Data Vault in the
 - View/Edit documents with a rendered markdown view mode (default) and textarea edit mode
 - Cancel button to discard edits and return to the vault list
 - Delete documents with confirmation
-- Entity can also create/edit vault documents via `vault_write` tool
+- Entity can also create/edit vault documents via `vault` tool
 - Descriptive file naming: `vault_{date}_{slug}.md` with automatic conflict resolution
 
 **API Endpoints:**
@@ -398,7 +398,7 @@ When `PSYCHEROS_DISPLAY_TZ` (or `TZ`) is set, daily/weekly/monthly and one-shot 
 - Errors in chained Pulses don't prevent sibling chains
 
 **Entity-Created Pulses:**
-- Entity can create, trigger, and delete Pulses via tools (`create_pulse`, `trigger_pulse`, `delete_pulse`)
+- Entity can create, trigger, and delete Pulses via the `pulse` tool
 - Entity-created Pulses default to silent mode and auto-delete after successful execution
 
 **Execution Log:**

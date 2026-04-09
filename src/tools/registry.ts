@@ -13,43 +13,19 @@ import { getMetricsTool } from "./get_metrics.ts";
 import { createSignificantMemoryTool } from "./create-significant-memory.ts";
 import { syncMcpTool } from "./sync-mcp.ts";
 // Identity tools
-import { appendToSelfTool } from "./identity-casual.ts";
-import { appendToUserTool } from "./identity-casual.ts";
-import { appendToRelationshipTool } from "./identity-casual.ts";
+import { identityAppendTool } from "./identity-casual.ts";
 import { maintainIdentityTool } from "./identity-maintain.ts";
 import { listIdentitySnapshotsTool } from "./identity-maintain.ts";
 import { customFileTool } from "./identity-custom.ts";
-// Graph read tools
-import {
-  graphSearchNodesTool,
-  graphGetNodeTool,
-  graphGetEdgesTool,
-  graphTraverseTool,
-  graphGetSubgraphTool,
-  graphStatsTool,
-} from "./graph-read.ts";
-// Graph write tools
-import {
-  graphCreateNodeTool,
-  graphCreateEdgeTool,
-  graphUpdateNodeTool,
-  graphUpdateEdgeTool,
-  graphDeleteNodeTool,
-  graphDeleteEdgeTool,
-  graphWriteBatchTool,
-} from "./graph-write.ts";
+// Graph tools
+import { graphQueryTool } from "./graph-read.ts";
+import { graphMutateTool, graphWriteBatchTool } from "./graph-write.ts";
 // Vault tools
-import {
-  vaultWriteTool,
-  vaultReadTool,
-  vaultAppendTool,
-  vaultListTool,
-  vaultSearchTool,
-} from "./vault-tools.ts";
+import { vaultTool } from "./vault-tools.ts";
 // Web search tool
 import { webSearchTool } from "./web-search.ts";
 // Pulse tools
-import { createPulseTool, triggerPulseTool, deletePulseTool } from "./pulse-tools.ts";
+import { pulseTool } from "./pulse-tools.ts";
 // Push notification tool
 import { sendNotificationTool } from "./send-notification.ts";
 // Discord DM tool
@@ -71,42 +47,23 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   get_metrics: getMetricsTool,
   create_significant_memory: createSignificantMemoryTool,
   sync_mcp: syncMcpTool,
-  // Tier 1: Casual identity tools (append-only, safe for everyday use)
-  append_to_self: appendToSelfTool,
-  append_to_user: appendToUserTool,
-  append_to_relationship: appendToRelationshipTool,
+  // Tier 1: Casual identity tool (append-only, safe for everyday use)
+  identity_append: identityAppendTool,
   // Tier 2: Maintenance tools (full suite for intentional reorganization)
   maintain_identity: maintainIdentityTool,
   list_identity_snapshots: listIdentitySnapshotsTool,
   // Custom identity file tool
   custom_file: customFileTool,
-  // Graph read tools (query the knowledge graph)
-  graph_search_nodes: graphSearchNodesTool,
-  graph_get_node: graphGetNodeTool,
-  graph_get_edges: graphGetEdgesTool,
-  graph_traverse: graphTraverseTool,
-  graph_get_subgraph: graphGetSubgraphTool,
-  graph_stats: graphStatsTool,
-  // Graph write tools (build and maintain the knowledge graph)
-  graph_create_node: graphCreateNodeTool,
-  graph_create_edge: graphCreateEdgeTool,
-  graph_update_node: graphUpdateNodeTool,
-  graph_update_edge: graphUpdateEdgeTool,
-  graph_delete_node: graphDeleteNodeTool,
-  graph_delete_edge: graphDeleteEdgeTool,
+  // Graph tools (query, build, and maintain the knowledge graph)
+  graph_query: graphQueryTool,
+  graph_mutate: graphMutateTool,
   graph_write_batch: graphWriteBatchTool,
   // Vault tools (entity document management)
-  vault_write: vaultWriteTool,
-  vault_read: vaultReadTool,
-  vault_append: vaultAppendTool,
-  vault_list: vaultListTool,
-  vault_search: vaultSearchTool,
+  vault: vaultTool,
   // Web search tool (Tavily / Brave)
   web_search: webSearchTool,
   // Pulse tools (autonomous entity prompts)
-  create_pulse: createPulseTool,
-  trigger_pulse: triggerPulseTool,
-  delete_pulse: deletePulseTool,
+  pulse: pulseTool,
   // Push notification tool
   send_notification: sendNotificationTool,
   // Discord DM tool

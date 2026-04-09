@@ -38,32 +38,16 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 | `get_metrics` | Retrieve streaming performance metrics |
 | `create_significant_memory` | Create permanent memory files |
 | `sync_mcp` | Sync with entity-core |
-| `append_to_self` | Add knowledge about entity (Tier 1 — append-only) |
-| `append_to_user` | Add knowledge about user (Tier 1) |
-| `append_to_relationship` | Add relationship understanding (Tier 1) |
+| `identity_append` | Add knowledge to identity files (Tier 1 — append-only) |
 | `maintain_identity` | Full identity file maintenance (Tier 2 — includes replace) |
 | `list_identity_snapshots` | View available backups (Tier 2) |
 | `custom_file` | Create and modify custom identity files (create, append, prepend, update_section, replace) |
-| `graph_search_nodes` | Search knowledge graph for relevant nodes |
-| `graph_get_node` | Get a specific node by ID |
-| `graph_get_edges` | Get relationships from the graph |
-| `graph_traverse` | Traverse graph from a starting node |
-| `graph_get_subgraph` | Extract a subgraph centered on a node |
-| `graph_stats` | Get knowledge graph statistics |
-| `graph_create_node` | Create a node (with auto-embedding and duplicate prevention) |
-| `graph_create_edge` | Create a relationship between two nodes (supports IDs or labels) |
-| `graph_update_node` | Update a node's label, description, or confidence |
-| `graph_update_edge` | Update an edge's weight, evidence, or validity |
-| `graph_delete_node` | Soft-delete a node and its connected edges |
-| `graph_delete_edge` | Remove a relationship from the graph |
+| `graph_query` | Query knowledge graph (search, get_node, get_edges, traverse, subgraph, stats) |
+| `graph_mutate` | Mutate knowledge graph (create_node, create_edge, update_node, update_edge, delete_node, delete_edge) |
 | `graph_write_batch` | Batch create multiple nodes and edges |
-| `vault_write` | Create or update a vault document (global or per-chat scope) |
-| `vault_list` | List vault documents (filterable by scope) |
-| `vault_search` | Search vault for relevant content |
+| `vault` | Manage vault documents (write, read, append, list, search) |
 | `web_search` | Search the web via Tavily or Brave (auto-enabled when web search provider is set) |
-| `create_pulse` | Create an autonomous scheduled prompt |
-| `trigger_pulse` | Manually trigger an existing Pulse |
-| `delete_pulse` | Delete a Pulse and its triggers |
+| `pulse` | Manage Pulses (create, trigger, delete) |
 | `send_notification` | Send a push notification to the user's device |
 | `send_discord_dm` | Send a Discord DM to the user (auto-enabled when bot token is configured) |
 | `control_device` | Control a smart home device — on/off/status (auto-enabled when devices are configured) |
@@ -71,10 +55,10 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 **Example configurations:**
 ```bash
 # Tier 1 identity tools only (safe for everyday use)
-PSYCHEROS_TOOLS=append_to_self,append_to_user,append_to_relationship
+PSYCHEROS_TOOLS=identity_append
 
 # All tools except shell
-PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,append_to_self,append_to_user,append_to_relationship,maintain_identity,list_identity_snapshots,graph_search_nodes,graph_get_node,graph_get_edges,graph_traverse,graph_get_subgraph,graph_stats,graph_create_node,graph_create_edge,graph_update_node,graph_update_edge,graph_delete_node,graph_delete_edge,graph_write_batch,vault_write,vault_list,vault_search
+PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,identity_append,maintain_identity,list_identity_snapshots,graph_query,graph_mutate,graph_write_batch,vault,pulse
 ```
 
 ## RAG Settings
