@@ -55,6 +55,10 @@ export interface BuildGraphContextOptions {
   includeRelated?: boolean;
   /** Maximum traversal depth when including related nodes */
   traversalDepth?: number;
+  /** Maximum related nodes to keep per primary node */
+  maxRelatedPerNode?: number;
+  /** Minimum similarity score for related nodes (0-1) */
+  relatedMinScore?: number;
 }
 
 /**
@@ -70,8 +74,28 @@ export interface GraphContextResult {
 }
 
 /**
+ * Compute cosine similarity between two L2-normalized vectors.
+ * Since both vectors are already normalized, this is just the dot product.
+ */
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0;
+  const len = Math.min(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    dot += a[i] * b[i];
+  }
+  return dot;
+}
+
+/**
  * Build a knowledge graph context section from a query.
  * Searches for relevant nodes and optionally traverses to find connected concepts.
+ *
+ * Related nodes are scored against the original query using local embeddings.
+ * Only related nodes above `relatedMinScore` are included, up to `maxRelatedPerNode`
+ * per primary node. This prevents irrelevant neighbors from flooding the context.
+ *
+ * Falls back to including all related nodes (current behavior) if the local
+ * embedder is unavailable.
  *
  * @param query - The search query
  * @param mcpClient - The MCP client for entity-core connection
@@ -88,6 +112,8 @@ export async function buildGraphContext(
     minScore = 0.3,
     includeRelated = true,
     traversalDepth = 1,
+    maxRelatedPerNode = 5,
+    relatedMinScore = 0.2,
   } = options;
 
   const emptyResult = { context: "", nodeCount: 0, edgeCount: 0 };
@@ -123,29 +149,95 @@ export async function buildGraphContext(
 
     // Optionally traverse to find related nodes
     if (includeRelated) {
+      // Try to load the local embedder for relevance scoring.
+      // If unavailable, fall back to including all related nodes.
+      let queryEmbedding: number[] | null = null;
+      let embedderAvailable = false;
+      try {
+        const { getEmbedder } = await import("./embedder.ts");
+        const embedder = getEmbedder();
+        if (embedder.isReady() || query.trim()) {
+          queryEmbedding = await embedder.embed(query);
+          embedderAvailable = true;
+        }
+      } catch {
+        // Embedder not available — fall back to unfiltered traversal
+      }
+
       for (const node of searchResults.slice(0, 3)) { // Limit traversal to top 3
         const subgraph = await mcpClient.getGraphSubgraph(node.id, traversalDepth);
 
-        // Add related nodes
-        for (const relatedNode of subgraph.nodes) {
-          if (!nodesById.has(relatedNode.id)) {
-            nodesById.set(relatedNode.id, {
-              id: relatedNode.id,
-              type: relatedNode.type,
-              label: relatedNode.label,
-              description: relatedNode.description || "",
+        if (embedderAvailable && queryEmbedding) {
+          // Score each related node against the query
+          const scored: Array<{ id: string; label: string; type: string; description: string; score: number }> = [];
+          for (const relatedNode of subgraph.nodes) {
+            if (nodesById.has(relatedNode.id)) continue;
+            const text = `${relatedNode.label} ${relatedNode.description || ""}`.trim();
+            if (!text) continue;
+            try {
+              const { getEmbedder } = await import("./embedder.ts");
+              const nodeEmbedding = await getEmbedder().embed(text);
+              const score = cosineSimilarity(queryEmbedding!, nodeEmbedding);
+              scored.push({
+                id: relatedNode.id,
+                label: relatedNode.label,
+                type: relatedNode.type,
+                description: relatedNode.description || "",
+                score,
+              });
+            } catch {
+              // Skip nodes that fail to embed
+            }
+          }
+
+          // Keep only relevant nodes, sorted by score
+          scored.sort((a, b) => b.score - a.score);
+          const included = scored
+            .filter(s => s.score >= relatedMinScore)
+            .slice(0, maxRelatedPerNode);
+
+          for (const entry of included) {
+            nodesById.set(entry.id, {
+              id: entry.id,
+              type: entry.type,
+              label: entry.label,
+              description: entry.description,
               confidence: 0.5,
               createdAt: "",
               updatedAt: "",
-              score: 0, // Related nodes don't have search scores
+              score: entry.score,
             });
           }
-        }
 
-        // Add edges
-        for (const edge of subgraph.edges) {
-          if (!allEdges.find(e => e.id === edge.id)) {
-            allEdges.push(edge);
+          // Only add edges where both endpoints are included
+          for (const edge of subgraph.edges) {
+            if (nodesById.has(edge.fromId) && nodesById.has(edge.toId)) {
+              if (!allEdges.find(e => e.id === edge.id)) {
+                allEdges.push(edge);
+              }
+            }
+          }
+        } else {
+          // Fallback: include all related nodes (no scoring)
+          for (const relatedNode of subgraph.nodes) {
+            if (!nodesById.has(relatedNode.id)) {
+              nodesById.set(relatedNode.id, {
+                id: relatedNode.id,
+                type: relatedNode.type,
+                label: relatedNode.label,
+                description: relatedNode.description || "",
+                confidence: 0.5,
+                createdAt: "",
+                updatedAt: "",
+                score: 0,
+              });
+            }
+          }
+
+          for (const edge of subgraph.edges) {
+            if (!allEdges.find(e => e.id === edge.id)) {
+              allEdges.push(edge);
+            }
           }
         }
       }
