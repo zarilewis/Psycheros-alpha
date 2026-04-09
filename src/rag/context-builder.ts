@@ -164,10 +164,15 @@ export async function buildGraphContext(
         // Embedder not available — fall back to unfiltered traversal
       }
 
+      // Relevance scoring only applies at depth > 1 (deeper hops).
+      // First-hop neighbors are always included because they provide
+      // essential relationship context for the primary nodes.
+      const scoreRelated = traversalDepth > 1 && embedderAvailable && !!queryEmbedding;
+
       for (const node of searchResults.slice(0, 3)) { // Limit traversal to top 3
         const subgraph = await mcpClient.getGraphSubgraph(node.id, traversalDepth);
 
-        if (embedderAvailable && queryEmbedding) {
+        if (scoreRelated) {
           // Score each related node against the query
           const scored: Array<{ id: string; label: string; type: string; description: string; score: number }> = [];
           for (const relatedNode of subgraph.nodes) {
@@ -218,7 +223,7 @@ export async function buildGraphContext(
             }
           }
         } else {
-          // Fallback: include all related nodes (no scoring)
+          // Unfiltered traversal (depth 1 or no embedder): include all related nodes
           for (const relatedNode of subgraph.nodes) {
             if (!nodesById.has(relatedNode.id)) {
               nodesById.set(relatedNode.id, {
