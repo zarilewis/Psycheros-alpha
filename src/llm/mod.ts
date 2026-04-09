@@ -29,3 +29,7 @@ export { loadDiscordSettings, saveDiscordSettings, getDefaultDiscordSettings, ma
 // Re-export Home settings
 export type { HomeSettings, HomeDevice } from "./home-settings.ts";
 export { loadHomeSettings, saveHomeSettings, getDefaultHomeSettings } from "./home-settings.ts";
+
+// Re-export Image Gen settings
+export type { ImageGenSettings, ImageGenConfig, ImageGenProvider, ImageGenProviderSettings, CommonImageGenParams } from "./image-gen-settings.ts";
+export { loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings, maskImageGenSettings } from "./image-gen-settings.ts";

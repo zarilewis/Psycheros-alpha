@@ -713,6 +713,25 @@ function runMigrations(db: Database): void {
     `);
     console.log("[DB] Created push_subscriptions table");
   }
+
+  // Migration: Add anchor_images table if missing
+  const hasAnchorImages = db
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'anchor_images'")
+    .get();
+
+  if (!hasAnchorImages) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS anchor_images (
+        id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
+        filename TEXT NOT NULL,
+        file_size INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+    `);
+    console.log("[DB] Created anchor_images table");
+  }
 }
 
 /**

@@ -65,7 +65,8 @@ src/
 │   ├── client.ts     # Streaming client, tool calls, thinking content
 │   ├── settings.ts   # LLM settings persistence
 │   ├── web-search-settings.ts  # Web search settings persistence
-│   └── discord-settings.ts     # Discord settings persistence
+│   ├── discord-settings.ts     # Discord settings persistence
+│   └── image-gen-settings.ts   # Image generator config persistence
 │   └── types.ts
 ├── db/               # SQLite persistence
 │   ├── mod.ts
@@ -80,6 +81,7 @@ src/
 │   ├── shell.ts
 │   ├── web-search.ts # Web search (Tavily / Brave)
 │   ├── send-discord-dm.ts # Discord DM notifications
+│   ├── generate-image.ts  # Image generation (OpenRouter, Gemini)
 │   ├── identity-helpers.ts  # XML parsing, MCP fallback
 │   ├── identity-casual.ts   # Tier 1: append-only
 │   └── identity-maintain.ts # Tier 2: maintenance

@@ -8,7 +8,7 @@
  */
 
 import { DBClient } from "../db/mod.ts";
-import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSettings, type DiscordSettings, type HomeSettings, loadSettings, saveSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings } from "../llm/mod.ts";
+import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSettings, type DiscordSettings, type HomeSettings, type ImageGenSettings, loadSettings, saveSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings, loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSettings, getEnabledToolNames, loadCustomTools, ToolRegistry, type ToolsSettings } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import type { MemoryIndexer } from "../rag/indexer.ts";
@@ -124,8 +124,19 @@ import {
   handleConnectionsSettingsFragment,
   handleConnectionsDiscordFragment,
   handleConnectionsHomeFragment,
+  handleConnectionsImageGenFragment,
+  handleConnectionsImageGenSlotFragment,
+  handleConnectionsImageGenAnchorsFragment,
   handleGetHomeSettings,
   handleSaveHomeSettings,
+  handleGetImageGenSettings,
+  handleSaveImageGenSettings,
+  handleListAnchorImages,
+  handleUploadAnchorImage,
+  handleUpdateAnchorImage,
+  handleDeleteAnchorImage,
+  handleUploadChatAttachment,
+  handleServeImageFile,
   handleGetToolsSettings,
   handleSaveToolsSettings,
   handleToolsSettingsFragment,
@@ -234,6 +245,7 @@ export class Server {
   private webSearchSettings: WebSearchSettings;
   private discordSettings: DiscordSettings;
   private homeSettings: HomeSettings;
+  private imageGenSettings: ImageGenSettings;
   private toolSettings: ToolsSettings;
   private customTools: Record<string, import("../tools/types.ts").Tool>;
   private pulseEngine: PulseEngine | null = null;
@@ -284,6 +296,9 @@ export class Server {
     // Initialize Home settings (will be reloaded from settings in init())
     this.homeSettings = { devices: [] };
 
+    // Initialize Image Gen settings (will be reloaded from settings in init())
+    this.imageGenSettings = getDefaultImageGenSettings();
+
     // Initialize tool settings (will be reloaded from settings in init())
     this.toolSettings = { toolOverrides: {} };
 
@@ -329,6 +344,7 @@ export class Server {
     this.webSearchSettings = await loadWebSearchSettings(this.config.projectRoot);
     this.discordSettings = await loadDiscordSettings(this.config.projectRoot);
     this.homeSettings = await loadHomeSettings(this.config.projectRoot);
+    this.imageGenSettings = await loadImageGenSettings(this.config.projectRoot);
     this.toolSettings = await loadToolsSettings(this.config.projectRoot);
     this.customTools = await loadCustomTools(this.config.projectRoot);
     this.reloadLLMClient();
@@ -411,6 +427,22 @@ export class Server {
   }
 
   /**
+   * Get the current image gen settings.
+   */
+  getImageGenSettings(): ImageGenSettings {
+    return this.imageGenSettings;
+  }
+
+  /**
+   * Update image gen settings, persist to disk, and reload tool registry.
+   */
+  async updateImageGenSettings(settings: ImageGenSettings): Promise<void> {
+    this.imageGenSettings = settings;
+    await saveImageGenSettings(this.config.projectRoot, settings);
+    this.reloadToolRegistry();
+  }
+
+  /**
    * Get the current tools settings.
    */
   getToolSettings(): ToolsSettings {
@@ -468,6 +500,9 @@ export class Server {
     if (this.homeSettings.devices.some((d) => d.enabled)) {
       autoEnabled.push("control_device");
     }
+    if (this.imageGenSettings.generators.some((g) => g.enabled)) {
+      autoEnabled.push("generate_image");
+    }
 
     // Resolve the final enabled list
     const enabledNames = getEnabledToolNames(
@@ -508,6 +543,16 @@ export class Server {
       try {
         const identityDir = join(this.config.projectRoot, "identity", dir);
         await Deno.mkdir(identityDir, { recursive: true });
+      } catch {
+        // Directory already exists, ignore
+      }
+    }
+
+    // Ensure image generation directories exist
+    const imageDirs = [".psycheros/generated-images", ".psycheros/anchors", ".psycheros/chat-attachments"];
+    for (const dir of imageDirs) {
+      try {
+        await Deno.mkdir(join(this.config.projectRoot, dir), { recursive: true });
       } catch {
         // Directory already exists, ignore
       }
@@ -703,6 +748,8 @@ export class Server {
       updateDiscordSettings: (settings) => this.updateDiscordSettings(settings),
       getHomeSettings: () => this.homeSettings,
       updateHomeSettings: (settings) => this.updateHomeSettings(settings),
+      getImageGenSettings: () => this.imageGenSettings,
+      updateImageGenSettings: (settings) => this.updateImageGenSettings(settings),
       getToolSettings: () => this.toolSettings,
       updateToolSettings: (settings) => this.updateToolSettings(settings),
       customTools: this.customTools,
@@ -1181,6 +1228,53 @@ export class Server {
     }
 
     // ========================================
+    // Image Gen Settings API Routes
+    // ========================================
+
+    // GET /api/image-gen-settings - Get current image gen settings
+    if (method === "GET" && path === "/api/image-gen-settings") {
+      return handleGetImageGenSettings(ctx);
+    }
+
+    // POST /api/image-gen-settings - Save image gen settings
+    if (method === "POST" && path === "/api/image-gen-settings") {
+      return await handleSaveImageGenSettings(ctx, request);
+    }
+
+    // POST /api/image-gen-settings/reset - Reset to defaults
+    if (method === "POST" && path === "/api/image-gen-settings/reset") {
+      const { handleResetImageGenSettings } = await import("./routes.ts");
+      return await handleResetImageGenSettings(ctx);
+    }
+
+    // GET /api/anchor-images - List anchor images
+    if (method === "GET" && path === "/api/anchor-images") {
+      return handleListAnchorImages(ctx);
+    }
+
+    // POST /api/anchor-images - Upload anchor image
+    if (method === "POST" && path === "/api/anchor-images") {
+      return await handleUploadAnchorImage(ctx, request);
+    }
+
+    // PATCH /api/anchor-images/:id - Update anchor image
+    const anchorUpdateMatch = path.match(/^\/api\/anchor-images\/([^/]+)$/);
+    if (method === "PATCH" && anchorUpdateMatch) {
+      return await handleUpdateAnchorImage(ctx, anchorUpdateMatch[1], request);
+    }
+
+    // DELETE /api/anchor-images/:id - Delete anchor image
+    const anchorDeleteMatch = path.match(/^\/api\/anchor-images\/([^/]+)$/);
+    if (method === "DELETE" && anchorDeleteMatch) {
+      return await handleDeleteAnchorImage(ctx, anchorDeleteMatch[1]);
+    }
+
+    // GET /api/chat-attachments - Upload chat attachment
+    if (method === "POST" && path === "/api/chat-attachments") {
+      return await handleUploadChatAttachment(ctx, request);
+    }
+
+    // ========================================
     // Tools Settings API Routes
     // ========================================
 
@@ -1594,6 +1688,42 @@ export class Server {
     // GET /fragments/settings/connections/home - Home automation settings fragment
     if (path === "/fragments/settings/connections/home") {
       return handleConnectionsHomeFragment(ctx);
+    }
+
+    // GET /fragments/settings/connections/image-gen - Image gen hub fragment
+    if (path === "/fragments/settings/connections/image-gen") {
+      return handleConnectionsImageGenFragment(ctx);
+    }
+
+    // GET /fragments/settings/connections/image-gen/new - Create new generator slot
+    if (path === "/fragments/settings/connections/image-gen/new") {
+      return handleConnectionsImageGenSlotFragment(ctx, crypto.randomUUID());
+    }
+
+    // GET /fragments/settings/connections/image-gen/anchors - Anchor images management
+    if (path === "/fragments/settings/connections/image-gen/anchors") {
+      return handleConnectionsImageGenAnchorsFragment(ctx);
+    }
+
+    // GET /fragments/settings/connections/image-gen/:id - Image gen slot settings fragment
+    const imageGenSlotMatch = path.match(/^\/fragments\/settings\/connections\/image-gen\/([^/]+)$/);
+    if (imageGenSlotMatch) {
+      return handleConnectionsImageGenSlotFragment(ctx, imageGenSlotMatch[1]);
+    }
+
+    // Serve generated images from .psycheros/generated-images/
+    if (path.startsWith("/generated-images/")) {
+      return handleServeImageFile(ctx, path);
+    }
+
+    // Serve anchor images from .psycheros/anchors/
+    if (path.startsWith("/anchors/")) {
+      return handleServeImageFile(ctx, path);
+    }
+
+    // Serve chat attachments from .psycheros/chat-attachments/
+    if (path.startsWith("/chat-attachments/")) {
+      return handleServeImageFile(ctx, path);
     }
 
     // GET /fragments/settings/tools - Tools settings UI fragment

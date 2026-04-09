@@ -180,7 +180,7 @@ Manage which tools are available to the entity. Access via Settings > Tools in t
 
 **Features:**
 - Two tabs: **Built-in** and **Custom** — visually separates shipped tools from user-written ones
-- Built-in tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory)
+- Built-in tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory, Image Generation)
 - Toggle switches for each individual tool — changes take effect immediately (hot-reload)
 - Per-category "Enable All" / "Disable All" buttons
 - Global "Enable All" / "Disable All" buttons
@@ -207,6 +207,37 @@ Manage which tools are available to the entity. Access via Settings > Tools in t
 - `GET /fragments/settings/tools` — render Tools settings page fragment
 
 **Source files:** `src/tools/tools-settings.ts`, `src/tools/custom-loader.ts`, `src/server/templates.ts`, `src/server/routes.ts`, `web/css/settings.css`
+
+## Inline Image Display
+
+Generated images render inline in chat messages. The entity uses the `generate_image` tool and images appear directly in the conversation as the tool result is processed.
+
+**Features:**
+- Images display inline with a subtle container and generator name metadata
+- Images persist across conversation switches via `[IMAGE:...]` markers stored in the assistant message content
+- Lazy loading (`loading="lazy"`) for performance
+- Server-side rendered in `renderAssistantMessage()` for persisted messages, client-side rendered during SSE streaming
+
+**SSE event:** `image_generated` with JSON payload `{ imagePath, prompt, generatorName }`.
+
+Implemented in `web/js/psycheros.js` (SSE handler), `src/server/templates.ts` (server-side rendering), `web/css/components.css` (`.generated-image-container`, `.generated-image`, `.generated-image-meta`).
+
+## Chat Image Attachments
+
+Users can attach images to chat messages for the entity to reference in generation or conversation.
+
+**Features:**
+- Clip icon button next to the chat input
+- File picker accepts images (JPEG, PNG, GIF, WebP)
+- Thumbnail preview shown below the input after selecting a file
+- Remove button to cancel the attachment before sending
+- On send, the attachment is uploaded and its ID is included in the chat request
+- The user message is prefixed with `[USER_IMAGE: /chat-attachments/filename]` so the entity is aware of the image
+- The entity can use `user_image_path` in `generate_image` to incorporate the attached image
+
+**API:** `POST /api/chat-attachments` (multipart upload), returns `{ id, filename, url }`. Files stored in `.psycheros/chat-attachments/`.
+
+Implemented in `web/js/psycheros.js` (`handleAttachment()`, `removeAttachment()`), `src/server/routes.ts` (`handleUploadChatAttachment`), `web/css/components.css` (`.attach-btn`, `.attachment-preview`, `.attachment-thumb`, `.attachment-remove`).
 
 ## System Admin Panel
 

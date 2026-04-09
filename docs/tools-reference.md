@@ -32,7 +32,7 @@ Accessible via Settings > Tools in the sidebar. Provides a web interface for man
 
 **Features:**
 - Two tabs: **Built-in** (shipped with Psycheros) and **Custom** (user-written)
-- Built-in tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory, Notification)
+- Built-in tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory, Notification, Image Generation)
 - Toggle switches for each individual tool
 - Per-category "Enable All" / "Disable All" buttons
 - Global "Enable All" / "Disable All" buttons
@@ -289,6 +289,42 @@ The entity can control smart home devices such as smart plugs. Currently support
 |------|---------|
 | `src/tools/control-device.ts` | `control_device` tool implementation with Shelly Plug handler |
 | `src/llm/home-settings.ts` | Settings type, load/save |
+
+## Image Generation Tool
+
+The entity can generate images using configured provider slots (OpenRouter or Google Gemini). Multiple generators can be configured with different models and settings. Anchor images provide style/character reference, and users can attach images to chat messages for the entity to use in generation.
+
+| Tool | Description |
+|------|-------------|
+| `generate_image` | Generate an image using a configured provider |
+
+**Parameters:** `generator_id` (required, ID of the configured generator), `prompt` (required, text description of the desired image), `negative_prompt` (optional, things to avoid), `anchor_ids` (optional, array of anchor image IDs to use as style reference), `user_image_path` (optional, path to a user-attached chat image).
+
+**Setup:** Configure via Settings > External Connections > Image Gen. Each generator has a name, description, provider (OpenRouter or Gemini), and provider-specific settings. Settings are persisted to `.psycheros/image-gen-settings.json` (gitignored). The tool is auto-enabled when at least one generator has `enabled: true`.
+
+**Supported Providers:**
+
+| Provider | Models | Notes |
+|----------|--------|-------|
+| OpenRouter | Any image-capable model on OpenRouter | Requires API key and base URL; model-specific endpoints |
+| Gemini | `gemini-2.0-flash-preview-image-generation`, `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview` | Requires Google API key; supports aspect ratio selection |
+
+**Anchor Images:** Reference images stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table. The entity sees available anchor IDs in its system context and can reference them by ID for style/character consistency.
+
+**Chat Attachments:** Users can attach images to messages via a clip icon button in the chat input. Attachments are uploaded to `.psycheros/chat-attachments/` and prefixed to the user message as `[USER_IMAGE: /chat-attachments/filename]` so the entity is aware of them.
+
+**Image Persistence:** Generated images are saved to `.psycheros/generated-images/` and displayed inline in chat. Images persist across conversation switches via `[IMAGE:...]` markers appended to the assistant message content in the database.
+
+**Data flow:** Entity calls `generate_image` → server reads generator config → dispatches to provider (OpenRouter or Gemini API) → saves image to disk → returns `[IMAGE:...]` marker → entity loop yields `image_generated` SSE event → frontend renders inline image.
+
+**Error handling:** The tool returns clear messages for provider errors, missing generators, disabled generators, and image read failures.
+
+### Related Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/tools/generate-image.ts` | `generate_image` tool with OpenRouter and Gemini providers |
+| `src/llm/image-gen-settings.ts` | Settings type, load/save, API key masking |
 
 ## Identity File Structure (Core Prompts)
 

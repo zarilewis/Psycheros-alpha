@@ -8,7 +8,7 @@ Two SSE channels serve different purposes:
 
 Opened per chat request, closes when the response is complete. If the user switches conversations mid-stream, the client stops rendering but continues draining the stream so the server finishes processing and persists the full response. The explicit Stop button (double-tap) still aborts and prevents persistence.
 
-Event flow: `message_id (user) → context → thinking → content → tool_call → tool_result → metrics → done → message_id (assistant)`
+Event flow: `message_id (user) → context → thinking → content → tool_call → tool_result → image_generated → metrics → done → message_id (assistant)`
 
 Also emits `dom_update` events for UI changes triggered by tool execution, and `status` events for retry notifications and errors. The `message_id` event assigns database IDs to streaming-created DOM elements, enabling edit buttons without a page refresh.
 
@@ -196,6 +196,43 @@ Settings stored in `.psycheros/discord-settings.json`. Shape: `{ "enabled": bool
 
 Settings stored in `.psycheros/home-settings.json`. Shape: `{ "devices": Array<{ name: string, type: string, address: string, enabled: boolean }> }`. The `control_device` tool is auto-enabled when any device has `enabled: true`.
 
+### Image Gen Settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/image-gen-settings` | Get current image generator settings (API keys masked) |
+| `POST` | `/api/image-gen-settings` | Save image generator settings and hot-reload tool registry |
+| `POST` | `/api/image-gen-settings/reset` | Reset to defaults (empty generators list) |
+
+Settings stored in `.psycheros/image-gen-settings.json`. Shape: `{ "generators": Array<ImageGenConfig> }` where each config has id, name, description, enabled, nsfw, provider (openrouter/gemini), and provider-specific settings (API keys, model, etc.). The `generate_image` tool is auto-enabled when any generator has `enabled: true`.
+
+### Anchor Images
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/anchor-images` | List all anchor images (metadata from DB) |
+| `POST` | `/api/anchor-images` | Upload anchor image (multipart: image file, label, description) |
+| `PATCH` | `/api/anchor-images/:id` | Update anchor image label/description |
+| `DELETE` | `/api/anchor-images/:id` | Delete anchor image (file + DB row) |
+
+Anchor images are stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table. Used as style/character references by the `generate_image` tool.
+
+### Chat Attachments
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/chat-attachments` | Upload image attachment for chat (multipart: attachment file) |
+| `GET` | `/chat-attachments/:filename` | Serve chat attachment image file |
+
+Attachments are stored in `.psycheros/chat-attachments/`. The chat request body includes an optional `attachmentId` field; if provided, the attachment is prefixed to the user message as `[USER_IMAGE: /chat-attachments/filename]`.
+
+### Generated Images
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/generated-images/:filename` | Serve a generated image file |
+| `GET` | `/anchors/:filename` | Serve an anchor image file |
+
 ### Tools Settings
 
 | Method | Path | Description |
@@ -233,9 +270,12 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/admin/logs` | Log viewer HTML fragment |
 | `GET` | `/fragments/admin/jobs` | Scheduled jobs dashboard HTML fragment |
 | `GET` | `/fragments/admin/actions` | Actions panel HTML fragment |
-| `GET` | `/fragments/settings/connections` | External connections hub (Channels + Home tabs) |
+| `GET` | `/fragments/settings/connections` | External connections hub (Channels + Home + Image Gen tabs) |
 | `GET` | `/fragments/settings/connections/discord` | Discord connection settings fragment |
 | `GET` | `/fragments/settings/connections/home` | Home automation settings fragment |
+| `GET` | `/fragments/settings/connections/image-gen/new` | New image generator config fragment |
+| `GET` | `/fragments/settings/connections/image-gen/anchors` | Anchor images management fragment |
+| `GET` | `/fragments/settings/connections/image-gen/:id` | Edit image generator config fragment |
 | `GET` | `/fragments/settings/tools` | Tools settings UI fragment |
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
 | `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
@@ -302,3 +342,5 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `src/llm/discord-settings.ts` | Discord settings type, persistence, token masking |
 | `src/llm/home-settings.ts` | Home automation settings type, persistence |
 | `src/tools/control-device.ts` | Home automation tool (Shelly Plug local HTTP API) |
+| `src/llm/image-gen-settings.ts` | Image generator config type, persistence, API key masking |
+| `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini) |

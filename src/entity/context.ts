@@ -416,6 +416,7 @@ export function buildSystemMessage(
   lorebookContent?: string,
   graphContent?: string,
   vaultContent?: string,
+  imageGenContent?: string,
 ): string {
   // Build sections — base instructions always first
   const sections: string[] = [];
@@ -480,6 +481,15 @@ ${chatHistoryContent}`);
   // Add graph context if present
   if (graphContent && graphContent.trim()) {
     sections.push(graphContent);
+  }
+
+  // Add image generator descriptions if present
+  if (imageGenContent && imageGenContent.trim()) {
+    sections.push(`---
+
+My available image generators:
+
+${imageGenContent}`);
   }
 
   return sections.join("\n");

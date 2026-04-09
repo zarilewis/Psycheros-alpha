@@ -13,7 +13,8 @@ import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, LLMSettings } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
 import type { DiscordSettings, HomeSettings } from "../llm/mod.ts";
-import { maskApiKey, getDefaultSettings, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings } from "../llm/mod.ts";
+import type { ImageGenSettings } from "../llm/mod.ts";
+import { maskApiKey, getDefaultSettings, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings, getDefaultImageGenSettings, maskImageGenSettings } from "../llm/mod.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { ToolsSettings } from "../tools/mod.ts";
 import { AVAILABLE_TOOLS, TOOL_CATEGORIES, loadCustomTools } from "../tools/mod.ts";
@@ -54,6 +55,9 @@ import {
   renderConnectionsSettings,
   renderConnectionsDiscordSettings,
   renderHomeSettings,
+  renderImageGenTab,
+  renderImageGenSlotSettings,
+  renderImageGenAnchors,
   renderToolsSettings,
   renderEntityCoreHub,
   renderEntityCoreOverview,
@@ -126,6 +130,10 @@ export interface RouteContext {
   getHomeSettings: () => HomeSettings;
   /** Update Home settings and hot-reload tool registry */
   updateHomeSettings: (settings: HomeSettings) => Promise<void>;
+  /** Get current image gen settings */
+  getImageGenSettings: () => ImageGenSettings;
+  /** Update image gen settings and hot-reload tool registry */
+  updateImageGenSettings: (settings: ImageGenSettings) => Promise<void>;
   /** Get current tools settings */
   getToolSettings: () => ToolsSettings;
   /** Update tools settings and hot-reload tool registry */
@@ -836,6 +844,7 @@ export async function handleBatchDeleteConversations(
 interface ChatRequestBody {
   conversationId: string;
   message: string;
+  attachmentId?: string;
 }
 
 /**
@@ -915,9 +924,15 @@ export async function handleChat(
   const stream = new ReadableStream<SSEEvent>({
     async start(controller) {
       try {
+        // Prefix user message with attachment reference if provided
+        let userMessage = body.message;
+        if (body.attachmentId) {
+          userMessage = `[USER_IMAGE: /chat-attachments/${body.attachmentId}] ${userMessage}`;
+        }
+
         // Start auto-title generation in parallel (runs concurrently with main response)
         const titlePromise = isFirstMessage
-          ? generateAndSetTitle(body.conversationId, body.message, ctx.db)
+          ? generateAndSetTitle(body.conversationId, userMessage, ctx.db)
           : null;
 
         // Update pulse engine's last user message timestamp (for inactivity triggers)
@@ -941,11 +956,12 @@ export async function handleChat(
             webSearchSettings: ctx.getWebSearchSettings(),
             discordSettings: ctx.getDiscordSettings(),
             homeSettings: ctx.getHomeSettings(),
+            imageGenSettings: ctx.getImageGenSettings(),
           }
         );
 
         // Process the message and stream chunks
-        for await (const chunk of turn.process(body.conversationId, body.message)) {
+        for await (const chunk of turn.process(body.conversationId, userMessage)) {
           if (signal.aborted) {
             console.log("Client disconnected, stopping stream");
             break;
@@ -1117,6 +1133,7 @@ export async function handleChatRetry(
             webSearchSettings: ctx.getWebSearchSettings(),
             discordSettings: ctx.getDiscordSettings(),
             homeSettings: ctx.getHomeSettings(),
+            imageGenSettings: ctx.getImageGenSettings(),
           }
         );
 
@@ -1273,6 +1290,16 @@ function convertToSSEEvent(chunk: EntityYield): SSEEvent {
       return {
         type: "message_id",
         data: JSON.stringify({ role: chunk.role, id: chunk.id }),
+      };
+
+    case "image_generated":
+      return {
+        type: "image_generated",
+        data: JSON.stringify({
+          imagePath: chunk.imagePath,
+          prompt: chunk.prompt,
+          generatorName: chunk.generatorName,
+        }),
       };
   }
 }
@@ -4515,6 +4542,7 @@ export function handleConnectionsSettingsFragment(ctx: RouteContext): Response {
   const html = renderConnectionsSettings(
     maskDiscordSettings(ctx.getDiscordSettings()),
     ctx.getHomeSettings(),
+    maskImageGenSettings(ctx.getImageGenSettings()),
   );
   return new Response(html, {
     headers: {
@@ -4599,6 +4627,341 @@ export async function handleSaveHomeSettings(
       },
     );
   }
+}
+
+// =============================================================================
+// Image Gen Settings API Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/image-gen-settings - Return masked image gen settings.
+ */
+export function handleGetImageGenSettings(ctx: RouteContext): Response {
+  const settings = maskImageGenSettings(ctx.getImageGenSettings());
+  return new Response(JSON.stringify(settings), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/image-gen-settings - Save image gen settings.
+ */
+export async function handleSaveImageGenSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as ImageGenSettings;
+
+    if (!body.generators || !Array.isArray(body.generators)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid settings: 'generators' array is required" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    await ctx.updateImageGenSettings(body);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] Failed to save image gen settings:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save image gen settings" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
+}
+
+/**
+ * Handle POST /api/image-gen-settings/reset - Reset to defaults.
+ */
+export function handleResetImageGenSettings(ctx: RouteContext): Response {
+  const defaults = getDefaultImageGenSettings();
+  ctx.updateImageGenSettings(defaults);
+  return new Response(JSON.stringify({ success: true }), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+// =============================================================================
+// Anchor Images API Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/anchor-images - List all anchor images.
+ */
+export function handleListAnchorImages(ctx: RouteContext): Response {
+  const rows = ctx.db.getRawDb()
+    .prepare("SELECT * FROM anchor_images ORDER BY created_at DESC")
+    .all<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>();
+  return new Response(JSON.stringify(rows), {
+    headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
+}
+
+/**
+ * Handle POST /api/anchor-images - Upload a new anchor image.
+ */
+export async function handleUploadAnchorImage(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+    const label = formData.get("label") as string || "Unnamed Anchor";
+    const description = formData.get("description") as string || "";
+
+    if (!file) {
+      return new Response(
+        JSON.stringify({ error: "No file provided" }),
+        { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+      );
+    }
+
+    const id = crypto.randomUUID();
+    const ext = file.name.split(".").pop() || "png";
+    const filename = `${id}.${ext}`;
+    const anchorsDir = `${ctx.projectRoot}/.psycheros/anchors`;
+    await Deno.mkdir(anchorsDir, { recursive: true });
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await Deno.writeFile(`${anchorsDir}/${filename}`, bytes);
+
+    ctx.db.getRawDb().prepare(
+      "INSERT INTO anchor_images (id, label, description, filename, file_size, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    ).run(id, label, description, filename, bytes.length, new Date().toISOString());
+
+    return new Response(
+      JSON.stringify({ id, label, description, filename, file_size: bytes.length }),
+      { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  } catch (error) {
+    console.error("[Routes] Failed to upload anchor image:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to upload anchor image" }),
+      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  }
+}
+
+/**
+ * Handle PATCH /api/anchor-images/:id - Update anchor image label/description.
+ */
+export async function handleUpdateAnchorImage(
+  ctx: RouteContext,
+  id: string,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as { label?: string; description?: string };
+    const row = ctx.db.getRawDb().prepare("SELECT id FROM anchor_images WHERE id = ?").get<{ id: string }>(id);
+    if (!row) {
+      return new Response(
+        JSON.stringify({ error: "Anchor image not found" }),
+        { status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+      );
+    }
+
+    if (body.label !== undefined) {
+      ctx.db.getRawDb().prepare("UPDATE anchor_images SET label = ? WHERE id = ?").run(body.label, id);
+    }
+    if (body.description !== undefined) {
+      ctx.db.getRawDb().prepare("UPDATE anchor_images SET description = ? WHERE id = ?").run(body.description, id);
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (error) {
+    console.error("[Routes] Failed to update anchor image:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to update anchor image" }),
+      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  }
+}
+
+/**
+ * Handle DELETE /api/anchor-images/:id - Delete anchor image.
+ */
+export function handleDeleteAnchorImage(ctx: RouteContext, id: string): Response {
+  try {
+    const row = ctx.db.getRawDb().prepare("SELECT filename FROM anchor_images WHERE id = ?").get<{ filename: string }>(id);
+    if (!row) {
+      return new Response(
+        JSON.stringify({ error: "Anchor image not found" }),
+        { status: 404, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+      );
+    }
+
+    // Delete the file
+    try {
+      Deno.removeSync(`${ctx.projectRoot}/.psycheros/anchors/${row.filename}`);
+    } catch {
+      // File may already be deleted
+    }
+
+    ctx.db.getRawDb().prepare("DELETE FROM anchor_images WHERE id = ?").run(id);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (error) {
+    console.error("[Routes] Failed to delete anchor image:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to delete anchor image" }),
+      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  }
+}
+
+// =============================================================================
+// Image File Serving
+// =============================================================================
+
+/**
+ * Serve files from .psycheros/generated-images/, .psycheros/anchors/, and .psycheros/chat-attachments/.
+ */
+export async function handleServeImageFile(
+  ctx: RouteContext,
+  path: string,
+): Promise<Response> {
+  // Map URL paths to filesystem directories
+  let dirName: string;
+  if (path.startsWith("/generated-images/")) {
+    dirName = "generated-images";
+  } else if (path.startsWith("/anchors/")) {
+    dirName = "anchors";
+  } else if (path.startsWith("/chat-attachments/")) {
+    dirName = "chat-attachments";
+  } else {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const filename = path.slice(`/${dirName}/`.length);
+  // Prevent path traversal
+  if (filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  const filePath = `${ctx.projectRoot}/.psycheros/${dirName}/${filename}`;
+  try {
+    const data = await Deno.readFile(filePath);
+    const ext = filename.split(".").pop()?.toLowerCase();
+    const mediaType = ext === "jpg" || ext === "jpeg" ? "image/jpeg"
+      : ext === "webp" ? "image/webp"
+      : ext === "gif" ? "image/gif"
+      : "image/png";
+
+    return new Response(data, {
+      headers: {
+        "Content-Type": mediaType,
+        "Cache-Control": "public, max-age=31536000, immutable",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch {
+    return new Response("Not found", { status: 404 });
+  }
+}
+
+// =============================================================================
+// Chat Attachments API Routes
+// =============================================================================
+
+/**
+ * Handle POST /api/chat-attachments - Upload a chat attachment image.
+ */
+export async function handleUploadChatAttachment(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+
+    if (!file) {
+      return new Response(
+        JSON.stringify({ error: "No file provided" }),
+        { status: 400, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+      );
+    }
+
+    const id = crypto.randomUUID();
+    const ext = file.name.split(".").pop() || "png";
+    const filename = `${id}.${ext}`;
+    const attachmentsDir = `${ctx.projectRoot}/.psycheros/chat-attachments`;
+    await Deno.mkdir(attachmentsDir, { recursive: true });
+
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    await Deno.writeFile(`${attachmentsDir}/${filename}`, bytes);
+
+    return new Response(
+      JSON.stringify({ id, filename, url: `/chat-attachments/${filename}` }),
+      { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  } catch (error) {
+    console.error("[Routes] Failed to upload chat attachment:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to upload chat attachment" }),
+      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  }
+}
+
+// =============================================================================
+// Image Gen Fragment Routes
+// =============================================================================
+
+/**
+ * Handle GET /fragments/settings/connections/image-gen - Image gen hub fragment.
+ */
+export function handleConnectionsImageGenFragment(ctx: RouteContext): Response {
+  const html = renderImageGenTab(maskImageGenSettings(ctx.getImageGenSettings()));
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/connections/image-gen/:id - Image gen slot settings.
+ */
+export function handleConnectionsImageGenSlotFragment(ctx: RouteContext, id: string): Response {
+  const settings = ctx.getImageGenSettings();
+  const generator = settings.generators.find((g) => g.id === id);
+  const html = renderImageGenSlotSettings(generator, id);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/connections/image-gen/anchors - Anchor images management.
+ */
+export function handleConnectionsImageGenAnchorsFragment(ctx: RouteContext): Response {
+  const rows = ctx.db.getRawDb()
+    .prepare("SELECT * FROM anchor_images ORDER BY created_at DESC")
+    .all<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>();
+  const html = renderImageGenAnchors(rows);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
 }
 
 // =============================================================================

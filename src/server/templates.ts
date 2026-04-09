@@ -1043,7 +1043,20 @@ export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics, enti
 
   // Main content - render markdown for assistant messages
   if (msg.content) {
-    html += `<div class="assistant-text" data-raw-content="${escapeHtml(msg.content)}">${renderMarkdown(msg.content)}</div>`;
+    // Detect [IMAGE:...] markers and render them as actual images
+    let contentHtml = renderMarkdown(msg.content);
+    if (/\[IMAGE:\{/.test(msg.content)) {
+      contentHtml = contentHtml.replace(
+        /<p>(?:[^\[]*?)?\[IMAGE:(\{[^}]+\})\]<\/p>/g,
+        (_match, jsonStr) => {
+          try {
+            const img = JSON.parse(jsonStr);
+            return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div></div>`;
+          } catch { return _match; }
+        }
+      );
+    }
+    html += `<div class="assistant-text" data-raw-content="${escapeHtml(msg.content)}">${contentHtml}</div>`;
   }
 
   html += `</div></div>`;
@@ -1238,6 +1251,25 @@ export function renderToolResult(result: ToolResult): string {
     if (parsed !== null) {
       content = JSON.stringify(parsed, null, 2);
     }
+  }
+
+  // Detect [IMAGE:...] markers and render them inline
+  const imagePattern = /\[IMAGE:(\{[^}]+\})\]/g;
+  if (imagePattern.test(content)) {
+    content = content.replace(imagePattern, (_match, jsonStr) => {
+      try {
+        const img = JSON.parse(jsonStr);
+        return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div></div>`;
+      } catch {
+        return _match;
+      }
+    });
+    // Remove the "Image generated successfully." prefix text if present
+    content = content.replace(/^Image generated successfully\.\s*/, '');
+    return `<div class="tool-result${isError ? " error" : ""}">
+  <div class="tool-result-label">${isError ? "Error" : "Output"}</div>
+  ${content}
+</div>`;
   }
 
   return `<div class="tool-result${isError ? " error" : ""}">
@@ -3592,9 +3624,10 @@ function renderToolItem(tool: { name: string; description: string; enabled: bool
  * Render External Connections page with tabbed navigation.
  * Tabs: Channels (Discord, etc.) and Home (smart devices).
  */
-export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings): string {
+export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings, imageGenSettings?: import("../llm/image-gen-settings.ts").ImageGenSettings): string {
   const channelsContent = renderChannelsTab(discordSettings);
   const homeContent = renderHomeTab(homeSettings);
+  const imageGenContent = renderImageGenTab(imageGenSettings || { generators: [] });
 
   return `<div class="settings-view">
   <div class="settings-header">
@@ -3622,10 +3655,19 @@ export function renderConnectionsSettings(discordSettings: DiscordSettings, home
         </svg>
         Home
       </button>
+      <button class="connections-nav-tab" data-tab="image-gen" onclick="switchConnectionsTab('image-gen')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        Image Gen
+      </button>
     </nav>
 
     <div id="connections-tab-channels" class="connections-tab-panel">${channelsContent}</div>
     <div id="connections-tab-home" class="connections-tab-panel" style="display:none;">${homeContent}</div>
+    <div id="connections-tab-image-gen" class="connections-tab-panel" style="display:none;">${imageGenContent}</div>
 
   </div>
 
@@ -4642,5 +4684,353 @@ export function renderConsolidationComplete(results: { granularity: string; succ
       >Refresh Status</button>
     </div>
   </div>
+</div>`;
+}
+
+// =============================================================================
+// Image Gen Settings Templates
+// =============================================================================
+
+type ImageGenConfig = import("../llm/image-gen-settings.ts").ImageGenConfig;
+type ImageGenSettings = import("../llm/image-gen-settings.ts").ImageGenSettings;
+
+/**
+ * Render the Image Gen tab content — hub grid of generator cards.
+ */
+export function renderImageGenTab(settings: ImageGenSettings): string {
+  const cards = settings.generators.map((g) => `
+    <a class="settings-hub-card"
+      hx-get="/fragments/settings/connections/image-gen/${escapeHtml(g.id)}"
+      hx-target="#chat"
+      hx-swap="innerHTML">
+      <div class="settings-hub-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+      </div>
+      <div class="settings-hub-card-body">
+        <span class="settings-hub-card-title">${escapeHtml(g.name)}</span>
+        <span class="settings-hub-card-desc">${g.enabled ? escapeHtml(g.provider) + " — Enabled" : escapeHtml(g.provider) + " — Disabled"}</span>
+      </div>
+      <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </a>`).join("");
+
+  const addCard = `
+    <button class="settings-hub-card settings-hub-card-add"
+      hx-get="/fragments/settings/connections/image-gen/new"
+      hx-target="#chat"
+      hx-swap="innerHTML">
+      <div class="settings-hub-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </div>
+      <div class="settings-hub-card-body">
+        <span class="settings-hub-card-title">Add Generator</span>
+        <span class="settings-hub-card-desc">Configure a new image generation provider</span>
+      </div>
+    </button>`;
+
+  const anchorsLink = `
+    <a class="settings-hub-card"
+      hx-get="/fragments/settings/connections/image-gen/anchors"
+      hx-target="#chat"
+      hx-swap="innerHTML">
+      <div class="settings-hub-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </div>
+      <div class="settings-hub-card-body">
+        <span class="settings-hub-card-title">Anchor Images</span>
+        <span class="settings-hub-card-desc">Manage style and character reference images</span>
+      </div>
+      <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </a>`;
+
+  return `<div class="settings-hub-grid">
+    ${cards}
+    ${addCard}
+    ${anchorsLink}
+  </div>`;
+}
+
+/**
+ * Render a single generator config form.
+ */
+export function renderImageGenSlotSettings(generator: ImageGenConfig | undefined, id: string): string {
+  const isNew = !generator;
+  const g = generator || {
+    id,
+    name: "",
+    description: "",
+    enabled: false,
+    nsfw: false,
+    provider: "openrouter" as const,
+    settings: {
+      params: { width: 1024, height: 1024, steps: 30, negative_prompt: "" },
+    },
+  };
+  const orSettings = g.settings.openrouter;
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">${isNew ? "New Generator" : escapeHtml(g.name)}</h1>
+        <p class="settings-desc">Configure image generation provider settings</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <section class="theme-section">
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="ig-name">Name</label>
+          <input type="text" id="ig-name" class="input-field llm-input" value="${escapeHtml(g.name)}" placeholder="My Image Generator">
+        </div>
+        <div class="llm-field">
+          <label for="ig-desc">Description</label>
+          <input type="text" id="ig-desc" class="input-field llm-input" value="${escapeHtml(g.description)}" placeholder="What this generator is good for">
+        </div>
+        <div class="llm-field">
+          <label class="toggle-label">
+            <input type="checkbox" id="ig-enabled" role="switch" aria-label="Enabled" ${g.enabled ? "checked" : ""}>
+            <span class="toggle-slider"></span>
+            <span class="toggle-text">Enabled</span>
+          </label>
+        </div>
+        <div class="llm-field">
+          <label class="toggle-label">
+            <input type="checkbox" id="ig-nsfw" role="switch" aria-label="NSFW Capable" ${g.nsfw ? "checked" : ""}>
+            <span class="toggle-slider"></span>
+            <span class="toggle-text">NSFW Capable</span>
+          </label>
+        </div>
+        <div class="llm-field">
+          <label for="ig-provider">Provider</label>
+          <select id="ig-provider" class="input-field llm-input" onchange="toggleImageGenProvider()">
+            <option value="openrouter" ${g.provider === "openrouter" ? "selected" : ""}>OpenRouter</option>
+            <option value="gemini" ${g.provider === "gemini" ? "selected" : ""}>Google Gemini</option>
+            <option value="comfyui" disabled>ComfyUI (coming soon)</option>
+            <option value="native" disabled>Native (coming soon)</option>
+          </select>
+        </div>
+
+        <div id="ig-openrouter-section" style="${g.provider === "openrouter" ? "" : "display:none;"}">
+          <h3 style="margin-top:var(--sp-4);font-size:var(--font-size-sm);color:var(--c-fg-muted);">OpenRouter Settings</h3>
+          <div class="llm-field">
+            <label for="ig-or-key">API Key</label>
+            <input type="password" id="ig-or-key" class="input-field llm-input" value="${escapeHtml(orSettings?.apiKey || "")}" placeholder="sk-or-...">
+          </div>
+          <div class="llm-field">
+            <label for="ig-or-model">Model</label>
+            <input type="text" id="ig-or-model" class="input-field llm-input" value="${escapeHtml(orSettings?.model || "")}" placeholder="openai/dall-e-3">
+          </div>
+          <div class="llm-field">
+            <label for="ig-or-baseurl">Base URL</label>
+            <input type="text" id="ig-or-baseurl" class="input-field llm-input" value="${escapeHtml(orSettings?.baseUrl || "")}" placeholder="https://openrouter.ai/api (default)">
+          </div>
+        </div>
+
+        <div id="ig-gemini-section" style="${g.provider === "gemini" ? "" : "display:none;"}">
+          <h3 style="margin-top:var(--sp-4);font-size:var(--font-size-sm);color:var(--c-fg-muted);">Google Gemini Settings</h3>
+          <div class="llm-field">
+            <label for="ig-gemini-key">API Key</label>
+            <input type="password" id="ig-gemini-key" class="input-field llm-input" value="${escapeHtml(g.settings.gemini?.apiKey || "")}" placeholder="AIza...">
+          </div>
+          <div class="llm-field">
+            <label for="ig-gemini-model">Model</label>
+            <select id="ig-gemini-model" class="input-field llm-input">
+              <option value="gemini-3.1-flash-image-preview" ${(g.settings.gemini?.model || "") === "gemini-3.1-flash-image-preview" ? "selected" : ""}>gemini-3.1-flash-image-preview</option>
+              <option value="gemini-3-pro-image-preview" ${(g.settings.gemini?.model || "") === "gemini-3-pro-image-preview" ? "selected" : ""}>gemini-3-pro-image-preview</option>
+              <option value="gemini-2.5-flash-preview-05-20" ${(g.settings.gemini?.model || "") === "gemini-2.5-flash-preview-05-20" ? "selected" : ""}>gemini-2.5-flash-preview-05-20</option>
+              <option value="gemini-2.0-flash-exp-image-generation" ${(g.settings.gemini?.model || "") === "gemini-2.0-flash-exp-image-generation" ? "selected" : ""}>gemini-2.0-flash-exp-image-generation</option>
+            </select>
+          </div>
+          <p class="settings-note">Size and aspect ratio are decided per-generation by the entity based on context.</p>
+        </div>
+
+        <div class="llm-field" style="display:flex;gap:var(--sp-3);margin-top:var(--sp-4);">
+          <button class="btn btn--primary" onclick="saveImageGenSlot('${escapeHtml(id)}', ${isNew})">Save</button>
+          ${!isNew ? `<button class="btn btn--danger" onclick="deleteImageGenSlot('${escapeHtml(id)}')">Delete</button>` : ""}
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+<script>
+function toggleImageGenProvider() {
+  const provider = document.getElementById('ig-provider').value;
+  document.getElementById('ig-openrouter-section').style.display = provider === 'openrouter' ? '' : 'none';
+  document.getElementById('ig-gemini-section').style.display = provider === 'gemini' ? '' : 'none';
+}
+
+async function saveImageGenSlot(id, isNew) {
+  const provider = document.getElementById('ig-provider').value;
+  const generator = {
+    id,
+    name: document.getElementById('ig-name').value,
+    description: document.getElementById('ig-desc').value,
+    enabled: document.getElementById('ig-enabled').checked,
+    nsfw: document.getElementById('ig-nsfw').checked,
+    provider: provider,
+    settings: {
+      params: { width: 1024, height: 1024, steps: 30, negative_prompt: '' }
+    }
+  };
+  if (provider === 'openrouter') {
+    generator.settings.openrouter = {
+      apiKey: document.getElementById('ig-or-key').value,
+      model: document.getElementById('ig-or-model').value,
+      baseUrl: document.getElementById('ig-or-baseurl').value,
+    };
+  }
+  if (provider === 'gemini') {
+    generator.settings.gemini = {
+      apiKey: document.getElementById('ig-gemini-key').value,
+      model: document.getElementById('ig-gemini-model').value,
+    };
+  }
+
+  let settings;
+  if (!isNew) {
+    const resp = await fetch('/api/image-gen-settings');
+    settings = await resp.json();
+    const idx = settings.generators.findIndex(g => g.id === id);
+    if (idx >= 0) settings.generators[idx] = generator;
+    else settings.generators.push(generator);
+  } else {
+    settings = { generators: [generator] };
+  }
+
+  await fetch('/api/image-gen-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
+  htmx.ajax('GET', '/fragments/settings/connections/image-gen', '#chat');
+}
+
+async function deleteImageGenSlot(id) {
+  if (!confirm('Delete this generator?')) return;
+  const resp = await fetch('/api/image-gen-settings');
+  const settings = await resp.json();
+  settings.generators = settings.generators.filter(g => g.id !== id);
+  await fetch('/api/image-gen-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
+  htmx.ajax('GET', '/fragments/settings/connections/image-gen', '#chat');
+}
+</script>
+</div>`;
+}
+
+/**
+ * Render anchor images management page.
+ */
+export function renderImageGenAnchors(
+  anchors: Array<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>,
+): string {
+  const rows = anchors.map((a) => `
+    <div class="anchor-card" id="anchor-${escapeHtml(a.id)}">
+      <img src="/anchors/${escapeHtml(a.filename)}" class="anchor-thumb" alt="${escapeHtml(a.label)}" loading="lazy"/>
+      <div class="anchor-info">
+        <input type="text" class="input-field anchor-label" value="${escapeHtml(a.label)}" placeholder="Label" style="font-size:var(--font-size-sm);padding:var(--sp-1) var(--sp-2);margin-bottom:var(--sp-1);">
+        <input type="text" class="input-field anchor-desc" value="${escapeHtml(a.description)}" placeholder="Description" style="font-size:var(--font-size-xs);padding:var(--sp-1) var(--sp-2);color:var(--c-fg-muted);">
+        <div class="anchor-meta">${(a.file_size / 1024).toFixed(1)} KB</div>
+      </div>
+      <div class="anchor-actions">
+        <button class="btn btn--sm btn--primary" onclick="saveAnchorMeta('${escapeHtml(a.id)}')">Save</button>
+        <button class="btn btn--sm btn--danger" onclick="deleteAnchor('${escapeHtml(a.id)}')">Delete</button>
+      </div>
+    </div>`).join("");
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Anchor Images</h1>
+        <p class="settings-desc">Reference images for style and character consistency</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <section class="theme-section">
+      <div class="anchor-list" id="anchor-list">
+        ${rows || '<p class="settings-note">No anchor images yet. Upload one below.</p>'}
+      </div>
+    </section>
+
+    <section class="theme-section" style="margin-top:var(--sp-4);">
+      <h3 style="font-size:var(--font-size-sm);color:var(--c-fg-muted);">Upload Anchor Image</h3>
+      <form id="anchor-upload-form" style="display:flex;gap:var(--sp-3);align-items:end;flex-wrap:wrap;">
+        <div class="llm-field" style="flex:0 0 auto;">
+          <label>File</label>
+          <button type="button" class="btn btn--sm" onclick="document.getElementById('anchor-file').click()">Choose File</button>
+          <input type="file" id="anchor-file" accept="image/*" style="display:none;">
+          <span id="anchor-file-name" class="anchor-meta"></span>
+        </div>
+        <div class="llm-field" style="flex:1;min-width:150px;">
+          <label for="anchor-label">Label</label>
+          <input type="text" id="anchor-label" class="input-field llm-input" placeholder="Character name or style tag">
+        </div>
+        <div class="llm-field" style="flex:2;min-width:200px;">
+          <label for="anchor-upload-desc">Description</label>
+          <input type="text" id="anchor-upload-desc" class="input-field llm-input" placeholder="Brief description for context">
+        </div>
+        <button type="submit" class="btn btn--primary" style="align-self:end;">Upload</button>
+      </form>
+    </section>
+
+  </div>
+
+  <style>
+    .anchor-list { display: flex; flex-direction: column; gap: var(--sp-3); }
+    .anchor-card { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--radius-md); background: var(--c-bg); }
+    .anchor-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radius-sm); }
+    .anchor-info { flex: 1; }
+    .anchor-meta { font-size: var(--font-size-xs); color: var(--c-fg-muted); margin-top: var(--sp-1); }
+    .anchor-actions { display: flex; gap: var(--sp-2); }
+  </style>
+
+<script>
+document.getElementById('anchor-file').addEventListener('change', (e) => {
+  const name = e.target.files[0]?.name || '';
+  document.getElementById('anchor-file-name').textContent = name;
+});
+
+document.getElementById('anchor-upload-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const file = document.getElementById('anchor-file').files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('label', document.getElementById('anchor-label').value || 'Unnamed');
+  formData.append('description', document.getElementById('anchor-upload-desc').value || '');
+  await fetch('/api/anchor-images', { method: 'POST', body: formData });
+  // Reload just the anchor list within the page
+  htmx.ajax('GET', '/fragments/settings/connections/image-gen/anchors', '#chat');
+});
+
+async function saveAnchorMeta(id) {
+  const card = document.getElementById('anchor-' + id);
+  const label = card.querySelector('.anchor-label').value;
+  const description = card.querySelector('.anchor-desc').value;
+  await fetch('/api/anchor-images/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label, description }) });
+}
+
+async function deleteAnchor(id) {
+  if (!confirm('Delete this anchor image?')) return;
+  await fetch('/api/anchor-images/' + id, { method: 'DELETE' });
+  htmx.ajax('GET', '/fragments/settings/connections/image-gen/anchors', '#chat');
+}
+</script>
 </div>`;
 }

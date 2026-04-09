@@ -24,6 +24,8 @@ function focusInputWhenReady() {
 
 let currentConversationId = null;
 let isStreaming = false;
+let pendingAttachmentId = null;
+let pendingAttachmentUrl = null;
 const pendingToolCalls = new Map();
 let currentAbortController = null;
 let streamingConversationId = null; // The conversation currently being streamed (may differ from currentConversationId)
@@ -728,8 +730,17 @@ async function newConversation() {
               onkeydown="Psycheros.handleKeyDown(event)"
               oninput="Psycheros.autoResize(this)"
             ></textarea>
+            <button class="attach-btn" onclick="document.getElementById('attach-input').click()" title="Attach image">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </button>
+            <input type="file" id="attach-input" accept="image/*" style="display:none" onchange="Psycheros.handleAttachment(this)">
             <button class="send-btn" id="send-btn" onclick="Psycheros.sendMessage()">Send</button>
           </div>
+          <div id="attachment-preview" class="attachment-preview" style="display:none;"></div>
         </div>
       `;
     }
@@ -963,6 +974,39 @@ async function stopPulseGeneration() {
 // Messaging
 // =============================================================================
 
+async function handleAttachment(input) {
+  const file = input.files?.[0];
+  if (!file) return;
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const resp = await fetch('/api/chat-attachments', { method: 'POST', body: formData });
+    const data = await resp.json();
+    pendingAttachmentId = data.id;
+    pendingAttachmentUrl = data.url;
+
+    const preview = document.getElementById('attachment-preview');
+    if (preview) {
+      preview.style.display = 'flex';
+      preview.innerHTML = `
+        <img src="${escapeHtml(data.url)}" class="attachment-thumb" alt="Attachment"/>
+        <button class="attachment-remove" onclick="Psycheros.removeAttachment()">&times;</button>
+      `;
+    }
+  } catch (error) {
+    showToast('Failed to upload attachment');
+  }
+  input.value = '';
+}
+
+function removeAttachment() {
+  pendingAttachmentId = null;
+  pendingAttachmentUrl = null;
+  const preview = document.getElementById('attachment-preview');
+  if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
+}
+
 async function sendMessage() {
   const input = document.getElementById('message-input');
   const sendBtn = document.getElementById('send-btn');
@@ -992,6 +1036,12 @@ async function sendMessage() {
   input.value = '';
   input.style.height = 'auto';
   input.disabled = true;
+
+  // Clear attachment
+  pendingAttachmentId = null;
+  pendingAttachmentUrl = null;
+  const preview = document.getElementById('attachment-preview');
+  if (preview) { preview.style.display = 'none'; preview.innerHTML = ''; }
 
   // Switch send button to stop button (requires double-tap)
   stopConfirmed = false;
@@ -1055,7 +1105,8 @@ async function sendMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         conversationId: currentConversationId,
-        message: message
+        message: message,
+        attachmentId: pendingAttachmentId || undefined
       }),
       signal: currentAbortController.signal
     });
@@ -1556,6 +1607,23 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         }
       } catch (e) {
         console.error('Failed to parse tool result:', e);
+      }
+      break;
+
+    case 'image_generated':
+      try {
+        const img = JSON.parse(data);
+        const container = document.createElement('div');
+        container.className = 'generated-image-container';
+        container.innerHTML = `
+          <img src="${escapeHtml(img.imagePath)}" alt="${escapeHtml(img.prompt)}"
+               class="generated-image" loading="lazy"/>
+          <div class="generated-image-meta">${escapeHtml(img.generatorName)}</div>
+        `;
+        contentContainer.appendChild(container);
+        AutoScroll.streamTick();
+      } catch (e) {
+        console.error('Failed to parse image_generated event:', e);
       }
       break;
 
@@ -2471,8 +2539,17 @@ async function confirmDelete() {
                 onkeydown="Psycheros.handleKeyDown(event)"
                 oninput="Psycheros.autoResize(this)"
               ></textarea>
+              <button class="attach-btn" onclick="document.getElementById('attach-input').click()" title="Attach image">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+              </button>
+              <input type="file" id="attach-input" accept="image/*" style="display:none" onchange="Psycheros.handleAttachment(this)">
               <button class="send-btn" id="send-btn" onclick="Psycheros.sendMessage()">Send</button>
             </div>
+            <div id="attachment-preview" class="attachment-preview" style="display:none;"></div>
           </div>
         `;
       }
@@ -3548,6 +3625,8 @@ globalThis.Psycheros = {
   autoResize,
   handleKeyDown,
   sendMessage,
+  handleAttachment,
+  removeAttachment,
   retryFailedTurn,
   requestStopGeneration,
   stopGeneration,

@@ -32,6 +32,8 @@ import { sendNotificationTool } from "./send-notification.ts";
 import { sendDiscordDmTool } from "./send-discord-dm.ts";
 // Home automation tool
 import { controlDeviceTool } from "./control-device.ts";
+// Image generation tool
+import { generateImageTool } from "./generate-image.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -70,6 +72,8 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   send_discord_dm: sendDiscordDmTool,
   // Home automation tool
   control_device: controlDeviceTool,
+  // Image generation tool
+  generate_image: generateImageTool,
 };
 
 /**

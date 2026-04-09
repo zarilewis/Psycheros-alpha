@@ -99,7 +99,7 @@ export interface UIUpdate {
  * - message_id: Message ID assignment for streaming-created DOM elements
  */
 export interface SSEEvent {
-  type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "metrics" | "context" | "done" | "message_id";
+  type: "thinking" | "content" | "tool_call" | "tool_result" | "dom_update" | "status" | "metrics" | "context" | "done" | "message_id" | "image_generated";
   data: string;
 }
 

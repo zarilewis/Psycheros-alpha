@@ -27,6 +27,7 @@ import type { LLMClient, StreamChunk, ChatMessage } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/web-search-settings.ts";
 import type { DiscordSettings } from "../llm/discord-settings.ts";
 import type { HomeSettings } from "../llm/home-settings.ts";
+import type { ImageGenSettings } from "../llm/image-gen-settings.ts";
 import { LLMError } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
@@ -102,6 +103,8 @@ export interface EntityConfig {
   discordSettings?: DiscordSettings;
   /** Optional Home automation settings */
   homeSettings?: HomeSettings;
+  /** Optional image generation settings */
+  imageGenSettings?: ImageGenSettings;
 }
 
 /**
@@ -121,7 +124,8 @@ export type EntityYield =
   | { type: "status"; status: { message?: string; error?: string; retry?: { attempt: number; maxAttempts: number } } }
   | { type: "metrics"; metrics: TurnMetrics }
   | { type: "context"; context: LLMContextSnapshot }
-  | { type: "message_id"; role: "user" | "assistant"; id: string };
+  | { type: "message_id"; role: "user" | "assistant"; id: string }
+  | { type: "image_generated"; imagePath: string; prompt: string; generatorName: string };
 
 /**
  * Represents a single turn in the conversation.
@@ -300,6 +304,28 @@ export class EntityTurn {
 
     const baseInstructions = await loadBaseInstructions(this.config.projectRoot, this.config.mcpClient, conversationId);
 
+    // Build image generation context from enabled generators
+    let imageGenContent: string | undefined;
+    if (this.config.imageGenSettings?.generators.some(g => g.enabled)) {
+      const enabled = this.config.imageGenSettings.generators.filter(g => g.enabled);
+      imageGenContent = enabled.map(g =>
+        `- "${g.name}" (ID: ${g.id}): ${g.description} [${g.provider}${g.nsfw ? ", NSFW-capable" : ", SFW only"}]`
+      ).join("\n");
+
+      // Include available anchor images so the entity knows what IDs to use
+      const anchors = this.db.getRawDb()
+        .prepare("SELECT id, label, description FROM anchor_images ORDER BY created_at DESC")
+        .all<{ id: string; label: string; description: string }>();
+      if (anchors.length > 0) {
+        imageGenContent += "\n\nAvailable anchor images (use IDs in anchor_ids parameter):\n" +
+          anchors.map(a =>
+            `- "${a.label}" (ID: ${a.id}): ${a.description || "no description"}`
+          ).join("\n");
+      }
+
+      imageGenContent += "\n\nTo generate an image, I use the generate_image tool with the appropriate generator_id. I can include anchor_images by ID as style references, and a user_image_path if the user provided an image with their message.";
+    }
+
     // Search vault for relevant documents if manager is available
     let vaultContent: string | undefined;
     if (this.config.vaultManager) {
@@ -327,7 +353,7 @@ export class EntityTurn {
       }
     }
 
-    const systemMessage = buildSystemMessage(baseInstructions, selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent, graphContent, vaultContent);
+    const systemMessage = buildSystemMessage(baseInstructions, selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent, graphContent, vaultContent, imageGenContent);
 
     // Get conversation history from DB
     const history = this.db.getMessages(conversationId);
@@ -634,6 +660,29 @@ export class EntityTurn {
       for (const result of toolResults) {
         // Yield the tool result
         yield { type: "tool_result", result };
+
+        // Detect [IMAGE:...] markers in tool results for inline image display
+        const imageMatch = result.content.match(/\[IMAGE:(\{[^}]+\})\]/);
+        if (imageMatch) {
+          try {
+            const img = JSON.parse(imageMatch[1]);
+            yield {
+              type: "image_generated",
+              imagePath: img.path,
+              prompt: img.prompt,
+              generatorName: img.generator,
+            };
+            // Append image marker to persisted content so it survives page reload
+            if (messageId) {
+              const imgMarker = `\n\n[IMAGE:${imageMatch[1]}]`;
+              assistantContent += imgMarker;
+              this.db.getRawDb().prepare("UPDATE messages SET content = ? WHERE id = ?").run(assistantContent, messageId);
+              console.log(`[ImageGen] Persisted image marker to message ${messageId}: ${img.path}`);
+            }
+          } catch {
+            // Invalid JSON in marker — skip
+          }
+        }
 
         // Collect affected UI regions from the result
         // (State change functions return these, making the pattern unified)

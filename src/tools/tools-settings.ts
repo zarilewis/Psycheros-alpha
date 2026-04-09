@@ -101,6 +101,12 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     description: "Control smart home devices",
     toolNames: ["control_device"],
   },
+  {
+    id: "image-gen",
+    name: "Image Generation",
+    description: "Generate images using configured providers",
+    toolNames: ["generate_image"],
+  },
 ];
 
 // =============================================================================
