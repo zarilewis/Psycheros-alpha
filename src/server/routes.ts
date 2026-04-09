@@ -5084,11 +5084,15 @@ export async function handleUpdateVault(
         : vaultJson({ error: "Document not found" }, 404);
     }
 
-    return isHtmx
-      ? new Response(renderSaveSuccess(), {
-          headers: { "Content-Type": "text/html; charset=utf-8" },
-        })
-      : vaultJson(doc);
+    if (isHtmx) {
+      const viewContent = updates.content !== undefined
+        ? `<div id="vault-view-mode" hx-swap-oob="innerHTML"><div class="assistant-text">${renderMarkdown(updates.content)}</div></div>`
+        : "";
+      return new Response(renderSaveSuccess() + viewContent, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+    return vaultJson(doc);
   } catch (error) {
     console.error("[Routes] handleUpdateVault error:", error);
     const msg = error instanceof Error ? error.message : "Update failed";
