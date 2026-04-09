@@ -1579,10 +1579,12 @@ function handleSSEEvent(eventType, data, messageEl, state) {
           errorEl.textContent = status.error;
           contentContainer.appendChild(errorEl);
 
-          // Show retry button if no assistant content was produced this turn
+          // Show retry button if no assistant text content was produced this turn.
+          // Tool cards are intermediate steps in the agentic loop, not a final
+          // response — the entity may have made a tool call but gotten rate-limited
+          // before generating the actual reply.
           const hasAssistantContent = contentContainer.querySelector('.assistant-text')
-            || contentContainer.querySelector('.thinking')
-            || contentContainer.querySelector('.tool');
+            || contentContainer.querySelector('.thinking');
           if (!hasAssistantContent && messageEl.dataset.conversationId) {
             const retryBtn = document.createElement('button');
             retryBtn.className = 'retry-btn';
