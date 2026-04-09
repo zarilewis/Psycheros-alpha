@@ -27,12 +27,9 @@
 
 .logo {
   display: flex;
-  align-items: baseline;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xl);
-  font-weight: var(--font-weight-semibold);
+  align-items: center;
+  gap: var(--sp-2);
   color: var(--c-accent);
-  letter-spacing: 0.05em;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -705,6 +702,12 @@
   margin-bottom: var(--sp-3);
   letter-spacing: 0.1em;
   text-shadow: 0 0 20px var(--c-accent-glow);
+}
+
+.empty-logo {
+  color: var(--c-accent);
+  margin-bottom: var(--sp-4);
+  filter: drop-shadow(0 0 12px var(--c-accent-glow));
 }
 
 .empty-text {
