@@ -64,6 +64,31 @@ export interface ImageGenConfig {
 
 export interface ImageGenSettings {
   generators: ImageGenConfig[];
+  captioning?: CaptioningSettings;
+}
+
+// =============================================================================
+// Captioning Types
+// =============================================================================
+
+export type CaptioningProvider = "gemini" | "openrouter";
+
+export interface CaptioningGeminiSettings {
+  apiKey: string;
+  model: string;
+}
+
+export interface CaptioningOpenRouterSettings {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
+export interface CaptioningSettings {
+  enabled: boolean;
+  provider: CaptioningProvider;
+  gemini?: CaptioningGeminiSettings;
+  openrouter?: CaptioningOpenRouterSettings;
 }
 
 // =============================================================================
@@ -120,5 +145,14 @@ export function maskImageGenSettings(settings: ImageGenSettings): ImageGenSettin
           : undefined,
       },
     })),
+    captioning: settings.captioning ? {
+      ...settings.captioning,
+      gemini: settings.captioning.gemini
+        ? { ...settings.captioning.gemini, apiKey: maskApiKey(settings.captioning.gemini.apiKey || "") }
+        : undefined,
+      openrouter: settings.captioning.openrouter
+        ? { ...settings.captioning.openrouter, apiKey: maskApiKey(settings.captioning.openrouter.apiKey || "") }
+        : undefined,
+    } : undefined,
   };
 }

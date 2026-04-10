@@ -47,10 +47,11 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/tools/web-search.ts` | Web search tool (Tavily / Brave) |
 | `src/tools/send-discord-dm.ts` | Discord DM tool (sends DMs via Discord bot API) |
 | `src/tools/control-device.ts` | Home automation tool (smart plug control via Shelly API) |
-| `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini) |
+| `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini), auto-captioning |
+| `src/tools/describe-image.ts` | Image captioning tool (Gemini, OpenRouter), shared caption logic |
 | `src/llm/discord-settings.ts` | Discord settings type, load/save, token masking |
 | `src/llm/home-settings.ts` | Home automation settings type, load/save (device list) |
-| `src/llm/image-gen-settings.ts` | Image generator config type, load/save, masking |
+| `src/llm/image-gen-settings.ts` | Image generator + captioning config type, load/save, masking |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
 | `src/tools/identity-custom.ts` | Custom identity file tool (create, append, prepend, update_section, replace) |
 | `src/memory/mod.ts` | Hierarchical memory system (daily summarization only; weekly/monthly/yearly consolidation moved to entity-core) |
@@ -81,7 +82,8 @@ Psycheros supports third-party integrations organized under two tabs in Settings
 
 ### Image Gen
 
-- **Image Generation** — Entity generates images via OpenRouter or Google Gemini. Configured via Settings > External Connections > Image Gen. Supports multiple generator slots, anchor images for style/character reference, and user image attachments in chat. Auto-enables the `generate_image` tool when at least one generator is enabled. Settings persist to `.psycheros/image-gen-settings.json`. Generated images saved to `.psycheros/generated-images/`.
+- **Image Generation** — Entity generates images via OpenRouter or Google Gemini. Configured via Settings > External Connections > Image Gen. Supports multiple generator slots, anchor images for style/character reference, user image attachments, reference-based iteration (`input_image_path`), and auto-captioning of generated images. Auto-enables the `generate_image` tool when at least one generator is enabled. Settings persist to `.psycheros/image-gen-settings.json`. Generated images saved to `.psycheros/generated-images/`.
+- **Image Captioning** — Auto-captions chat attachments and generated images via a configurable vision model (Gemini or OpenRouter). Also provides the `describe_image` tool for explicit image description. Configured under Settings > External Connections > Image Gen > Captioning. Auto-enables `describe_image` when a captioning provider is configured.
 
 ## Core Patterns
 

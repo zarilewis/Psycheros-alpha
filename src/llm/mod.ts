@@ -31,5 +31,5 @@ export type { HomeSettings, HomeDevice } from "./home-settings.ts";
 export { loadHomeSettings, saveHomeSettings, getDefaultHomeSettings } from "./home-settings.ts";
 
 // Re-export Image Gen settings
-export type { ImageGenSettings, ImageGenConfig, ImageGenProvider, ImageGenProviderSettings, CommonImageGenParams } from "./image-gen-settings.ts";
+export type { ImageGenSettings, ImageGenConfig, ImageGenProvider, ImageGenProviderSettings, CommonImageGenParams, CaptioningSettings, CaptioningProvider, CaptioningGeminiSettings, CaptioningOpenRouterSettings } from "./image-gen-settings.ts";
 export { loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings, maskImageGenSettings } from "./image-gen-settings.ts";

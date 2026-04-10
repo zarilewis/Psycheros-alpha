@@ -204,7 +204,9 @@ Settings stored in `.psycheros/home-settings.json`. Shape: `{ "devices": Array<{
 | `POST` | `/api/image-gen-settings` | Save image generator settings and hot-reload tool registry |
 | `POST` | `/api/image-gen-settings/reset` | Reset to defaults (empty generators list) |
 
-Settings stored in `.psycheros/image-gen-settings.json`. Shape: `{ "generators": Array<ImageGenConfig> }` where each config has id, name, description, enabled, nsfw, provider (openrouter/gemini), and provider-specific settings (API keys, model, etc.). The `generate_image` tool is auto-enabled when any generator has `enabled: true`.
+Settings stored in `.psycheros/image-gen-settings.json`. Shape: `{ "generators": Array<ImageGenConfig>, "captioning": CaptioningSettings }` where each generator config has id, name, description, enabled, nsfw, provider (openrouter/gemini), and provider-specific settings (API keys, model, etc.). Captioning settings have `enabled`, `provider` (gemini/openrouter), and provider-specific settings (API key, model). The `generate_image` tool is auto-enabled when any generator has `enabled: true`. The `describe_image` tool is auto-enabled when captioning has a provider configured.
+
+The `POST` handler supports partial updates: if the body contains only a `captioning` field (no `generators`), only the captioning settings are merged into existing settings. This prevents the common pattern of fetching masked settings and writing them back from corrupting API keys.
 
 ### Anchor Images
 
@@ -224,7 +226,7 @@ Anchor images are stored in `.psycheros/anchors/` with metadata in the `anchor_i
 | `POST` | `/api/chat-attachments` | Upload image attachment for chat (multipart: attachment file) |
 | `GET` | `/chat-attachments/:filename` | Serve chat attachment image file |
 
-Attachments are stored in `.psycheros/chat-attachments/`. The chat request body includes an optional `attachmentId` field; if provided, the attachment is prefixed to the user message as `[USER_IMAGE: /chat-attachments/filename]`.
+Attachments are stored in `.psycheros/chat-attachments/`. The chat request body includes an optional `attachmentId` field; if provided and captioning is configured, the attachment is auto-captioned via the configured vision model and prefixed to the user message as `[USER_IMAGE: /chat-attachments/filename | Caption: description]`. If captioning fails or is not configured, falls back to `[USER_IMAGE: /chat-attachments/filename]`.
 
 ### Generated Images
 
@@ -275,6 +277,7 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/settings/connections/home` | Home automation settings fragment |
 | `GET` | `/fragments/settings/connections/image-gen/new` | New image generator config fragment |
 | `GET` | `/fragments/settings/connections/image-gen/anchors` | Anchor images management fragment |
+| `GET` | `/fragments/settings/connections/image-gen/captioning` | Image captioning settings fragment |
 | `GET` | `/fragments/settings/connections/image-gen/:id` | Edit image generator config fragment |
 | `GET` | `/fragments/settings/tools` | Tools settings UI fragment |
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
@@ -342,5 +345,6 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `src/llm/discord-settings.ts` | Discord settings type, persistence, token masking |
 | `src/llm/home-settings.ts` | Home automation settings type, persistence |
 | `src/tools/control-device.ts` | Home automation tool (Shelly Plug local HTTP API) |
-| `src/llm/image-gen-settings.ts` | Image generator config type, persistence, API key masking |
-| `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini) |
+| `src/llm/image-gen-settings.ts` | Image generator + captioning config type, persistence, API key masking |
+| `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini), auto-captioning |
+| `src/tools/describe-image.ts` | Image captioning tool (Gemini, OpenRouter), shared caption logic |

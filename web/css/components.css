@@ -1903,6 +1903,14 @@
   margin-top: var(--sp-1);
 }
 
+.generated-image-desc {
+  font-size: var(--font-size-xs);
+  color: var(--c-fg-muted);
+  margin-top: var(--sp-1);
+  line-height: 1.5;
+  opacity: 0.8;
+}
+
 /* ========================================================================== */
 /* Chat Attachment UI                                                        */
 /* ========================================================================== */

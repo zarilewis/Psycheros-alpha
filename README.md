@@ -81,7 +81,8 @@ src/
 │   ├── shell.ts
 │   ├── web-search.ts # Web search (Tavily / Brave)
 │   ├── send-discord-dm.ts # Discord DM notifications
-│   ├── generate-image.ts  # Image generation (OpenRouter, Gemini)
+│   ├── generate-image.ts  # Image generation (OpenRouter, Gemini), auto-captioning
+│   ├── describe-image.ts  # Image captioning tool (Gemini, OpenRouter)
 │   ├── identity-helpers.ts  # XML parsing, MCP fallback
 │   ├── identity-casual.ts   # Tier 1: append-only
 │   └── identity-maintain.ts # Tier 2: maintenance

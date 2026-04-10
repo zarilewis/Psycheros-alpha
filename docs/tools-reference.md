@@ -32,7 +32,7 @@ Accessible via Settings > Tools in the sidebar. Provides a web interface for man
 
 **Features:**
 - Two tabs: **Built-in** (shipped with Psycheros) and **Custom** (user-written)
-- Built-in tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory, Notification, Image Generation)
+- Built-in tools grouped by category (System, Identity, Knowledge Graph, Data Vault, Web Search, Pulse, Memory, Notification, Image Generation, Image Captioning)
 - Toggle switches for each individual tool
 - Per-category "Enable All" / "Disable All" buttons
 - Global "Enable All" / "Disable All" buttons
@@ -292,13 +292,13 @@ The entity can control smart home devices such as smart plugs. Currently support
 
 ## Image Generation Tool
 
-The entity can generate images using configured provider slots (OpenRouter or Google Gemini). Multiple generators can be configured with different models and settings. Anchor images provide style/character reference, and users can attach images to chat messages for the entity to use in generation.
+The entity can generate images using configured provider slots (OpenRouter or Google Gemini). Multiple generators can be configured with different models and settings. Anchor images provide style/character reference, users can attach images to chat messages, and the entity can iterate on previously generated images.
 
 | Tool | Description |
 |------|-------------|
-| `generate_image` | Generate an image using a configured provider |
+| `generate_image` | Generate an image or iterate on a previous one using a configured provider |
 
-**Parameters:** `generator_id` (required, ID of the configured generator), `prompt` (required, text description of the desired image), `negative_prompt` (optional, things to avoid), `anchor_ids` (optional, array of anchor image IDs to use as style reference), `user_image_path` (optional, path to a user-attached chat image).
+**Parameters:** `generator_id` (required, ID of the configured generator), `prompt` (required, text description of the desired image), `negative_prompt` (optional, things to avoid), `anchor_ids` (optional, array of anchor image IDs to use as style reference), `user_image_path` (optional, path to a user-attached chat image), `input_image_path` (optional, path to a previously generated image for reference-based iteration/modification).
 
 **Setup:** Configure via Settings > External Connections > Image Gen. Each generator has a name, description, provider (OpenRouter or Gemini), and provider-specific settings. Settings are persisted to `.psycheros/image-gen-settings.json` (gitignored). The tool is auto-enabled when at least one generator has `enabled: true`.
 
@@ -307,15 +307,17 @@ The entity can generate images using configured provider slots (OpenRouter or Go
 | Provider | Models | Notes |
 |----------|--------|-------|
 | OpenRouter | Any image-capable model on OpenRouter | Requires API key and base URL; model-specific endpoints |
-| Gemini | `gemini-2.0-flash-preview-image-generation`, `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview` | Requires Google API key; supports aspect ratio selection |
+| Gemini | `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`, `gemini-2.5-flash-image` | Requires Google API key; supports aspect ratio selection |
 
 **Anchor Images:** Reference images stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table. The entity sees available anchor IDs in its system context and can reference them by ID for style/character consistency.
 
-**Chat Attachments:** Users can attach images to messages via a clip icon button in the chat input. Attachments are uploaded to `.psycheros/chat-attachments/` and prefixed to the user message as `[USER_IMAGE: /chat-attachments/filename]` so the entity is aware of them.
+**Chat Attachments:** Users can attach images to messages via a clip icon button in the chat input. Attachments are uploaded to `.psycheros/chat-attachments/` and auto-captioned before being passed to the entity. The user message is prefixed with `[USER_IMAGE: /chat-attachments/filename | Caption: ...]`.
 
-**Image Persistence:** Generated images are saved to `.psycheros/generated-images/` and displayed inline in chat. Images persist across conversation switches via `[IMAGE:...]` markers appended to the assistant message content in the database.
+**Reference-Based Iteration:** The `input_image_path` parameter allows the entity to send a previously generated image back to the provider along with a modification prompt. The reference image is included as inline data in the API request. This enables workflows like "change the background", "make it darker", "add a character".
 
-**Data flow:** Entity calls `generate_image` → server reads generator config → dispatches to provider (OpenRouter or Gemini API) → saves image to disk → returns `[IMAGE:...]` marker → entity loop yields `image_generated` SSE event → frontend renders inline image.
+**Image Persistence:** Generated images are saved to `.psycheros/generated-images/` and displayed inline in chat. Images persist across conversation switches via `[IMAGE:...]` markers appended to the assistant message content in the database. Generated images are automatically captioned, and the description is included in the marker and displayed below the image in chat.
+
+**Data flow:** Entity calls `generate_image` → server reads generator config → dispatches to provider (OpenRouter or Gemini API) → saves image to disk → auto-captions via configured captioning provider → returns `[IMAGE:...]` marker with description → entity loop yields `image_generated` SSE event → frontend renders inline image with description.
 
 **Error handling:** The tool returns clear messages for provider errors, missing generators, disabled generators, and image read failures.
 
@@ -323,8 +325,41 @@ The entity can generate images using configured provider slots (OpenRouter or Go
 
 | File | Purpose |
 |------|---------|
-| `src/tools/generate-image.ts` | `generate_image` tool with OpenRouter and Gemini providers |
-| `src/llm/image-gen-settings.ts` | Settings type, load/save, API key masking |
+| `src/tools/generate-image.ts` | `generate_image` tool with OpenRouter and Gemini providers, auto-captioning |
+| `src/tools/describe-image.ts` | Shared captioning functions, `describe_image` tool |
+| `src/llm/image-gen-settings.ts` | Settings type (generators + captioning), load/save, API key masking |
+
+## Image Captioning
+
+Image captioning provides automatic description of images via a configurable vision model. It serves two purposes: auto-captioning chat attachments and generated images, and providing the entity with an explicit `describe_image` tool.
+
+### Auto-Captioning
+
+- **Chat attachments**: When a user sends a message with an image, the server synchronously captions it before passing to the entity. The caption is included in the user message as `[USER_IMAGE: path | Caption: description]`.
+- **Generated images**: After the `generate_image` tool saves an image, it is automatically captioned. The description is included in the `[IMAGE:...]` marker JSON and displayed below the image in chat.
+- **Failure handling**: Captioning failures are non-blocking. Chat attachments fall back to path-only (`[USER_IMAGE: path]`). Generated images still display without a description.
+
+### describe_image Tool
+
+The entity can explicitly describe any image by local path or URL.
+
+| Tool | Description |
+|------|-------------|
+| `describe_image` | Get a detailed description of an image from a local path or URL |
+
+**Parameters:** `path` (optional, local file path relative to `.psycheros/`), `url` (optional, remote image URL). One of `path` or `url` is required.
+
+**Use cases:** Examining images found via web search, reviewing previously generated images, understanding user-attached images in more detail.
+
+**Setup:** Configure via Settings > External Connections > Image Gen > Captioning. Supports Gemini and OpenRouter as captioning providers with independent model selection. The tool is auto-enabled when a captioning provider is configured.
+
+### Related Source Files
+
+| File | Purpose |
+|------|---------|
+| `src/tools/describe-image.ts` | `describe_image` tool, `captionImage()`, `fetchAndCaptionUrl()` |
+| `src/server/routes.ts` | Auto-caption flow for chat attachments |
+| `src/llm/image-gen-settings.ts` | `CaptioningSettings` type, part of `ImageGenSettings` |
 
 ## Identity File Structure (Core Prompts)
 

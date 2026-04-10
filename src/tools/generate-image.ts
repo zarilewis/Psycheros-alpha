@@ -11,6 +11,7 @@ import { join } from "@std/path";
 import type { ToolResult } from "../types.ts";
 import type { Tool, ToolContext } from "./types.ts";
 import type { ImageGenConfig } from "../llm/image-gen-settings.ts";
+import { captionImage } from "./describe-image.ts";
 
 // =============================================================================
 // Tool Definition
@@ -22,10 +23,11 @@ export const generateImageTool: Tool = {
     function: {
       name: "generate_image",
       description:
-        "I use this to generate an image. I choose the appropriate generator_id " +
+        "I use this to generate an image or iterate on a previous one. I choose the appropriate generator_id " +
         "based on the user's request and available generators. I can include " +
-        "anchor_images by ID as style/character references, and user_image_path " +
-        "if the user provided an image with their message.",
+        "anchor_images by ID as style/character references, user_image_path " +
+        "if the user provided an image with their message, or input_image_path " +
+        "with a path to a previously generated image for reference-based iteration.",
       parameters: {
         type: "object",
         properties: {
@@ -50,6 +52,10 @@ export const generateImageTool: Tool = {
             type: "string",
             description: "Optional path to a user-uploaded image to use as reference",
           },
+          input_image_path: {
+            type: "string",
+            description: "Optional path to an existing image to use as a starting reference for iteration/modification",
+          },
         },
         required: ["generator_id", "prompt"],
       },
@@ -68,6 +74,7 @@ async function generateViaOpenRouter(
   negativePrompt: string | undefined,
   anchorImages: Array<{ data: string; mediaType: string }>,
   userImage: { data: string; mediaType: string } | undefined,
+  inputImage: { data: string; mediaType: string } | undefined,
 ): Promise<{ imageData: string; mediaType: string }> {
   const settings = config.settings.openrouter;
   if (!settings) throw new Error("OpenRouter settings not configured for this generator");
@@ -92,6 +99,13 @@ async function generateViaOpenRouter(
     imageContent.push({
       type: "image_url",
       image_url: { url: `data:${userImage.mediaType};base64,${userImage.data}` },
+    });
+  }
+
+  if (inputImage) {
+    imageContent.push({
+      type: "image_url",
+      image_url: { url: `data:${inputImage.mediaType};base64,${inputImage.data}` },
     });
   }
 
@@ -233,6 +247,7 @@ async function generateViaGemini(
   negativePrompt: string | undefined,
   anchorImages: Array<{ data: string; mediaType: string }>,
   userImage: { data: string; mediaType: string } | undefined,
+  inputImage: { data: string; mediaType: string } | undefined,
 ): Promise<{ imageData: string; mediaType: string }> {
   const settings = config.settings.gemini;
   if (!settings) throw new Error("Gemini settings not configured for this generator");
@@ -267,6 +282,16 @@ async function generateViaGemini(
       inline_data: {
         mime_type: userImage.mediaType,
         data: userImage.data,
+      },
+    });
+  }
+
+  // Add input image for iteration as inline_data reference
+  if (inputImage) {
+    parts.push({
+      inline_data: {
+        mime_type: inputImage.mediaType,
+        data: inputImage.data,
       },
     });
   }
@@ -345,12 +370,13 @@ async function execute(
   args: Record<string, unknown>,
   ctx: ToolContext,
 ): Promise<ToolResult> {
-  const { generator_id, prompt, negative_prompt, anchor_ids, user_image_path } = args as {
+  const { generator_id, prompt, negative_prompt, anchor_ids, user_image_path, input_image_path } = args as {
     generator_id: string;
     prompt: string;
     negative_prompt?: string;
     anchor_ids?: string[];
     user_image_path?: string;
+    input_image_path?: string;
   };
 
   // Get image gen settings from config
@@ -420,13 +446,31 @@ async function execute(
       // user_image_path is relative to .psycheros/
       const filePath = join(projectRoot, ".psycheros", user_image_path);
       const fileData = await Deno.readFile(filePath);
-      const base64 = btoa(String.fromCharCode(...fileData));
+      const base64 = uint8ToBase64(fileData);
       const mediaType = getMediaType(user_image_path);
       userImage = { data: base64, mediaType };
     } catch (error) {
       return {
         toolCallId: ctx.toolCallId,
         content: `Error: Failed to read user image '${user_image_path}': ${error instanceof Error ? error.message : String(error)}`,
+        isError: true,
+      };
+    }
+  }
+
+  // Load input image for iteration if provided
+  let inputImage: { data: string; mediaType: string } | undefined;
+  if (input_image_path) {
+    try {
+      const filePath = join(projectRoot, ".psycheros", input_image_path);
+      const fileData = await Deno.readFile(filePath);
+      const base64 = uint8ToBase64(fileData);
+      const mediaType = getMediaType(input_image_path);
+      inputImage = { data: base64, mediaType };
+    } catch (error) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: `Error: Failed to read input image '${input_image_path}': ${error instanceof Error ? error.message : String(error)}`,
         isError: true,
       };
     }
@@ -443,6 +487,7 @@ async function execute(
           negative_prompt,
           anchorImages,
           userImage,
+          inputImage,
         );
         break;
       case "gemini":
@@ -452,6 +497,7 @@ async function execute(
           negative_prompt,
           anchorImages,
           userImage,
+          inputImage,
         );
         break;
       case "comfyui":
@@ -483,13 +529,28 @@ async function execute(
     const imageBytes = Uint8Array.from(atob(result.imageData), (c) => c.charCodeAt(0));
     await Deno.writeFile(filePath, imageBytes);
 
+    // Auto-caption the generated image if captioning is configured
+    let description: string | undefined;
+    const captioningSettings = ctx.config.captioningSettings;
+    if (captioningSettings?.provider) {
+      try {
+        description = await captionImage(result.imageData, result.mediaType, captioningSettings);
+      } catch (captionError) {
+        console.error("[ImageGen] Auto-captioning failed:", captionError);
+      }
+    }
+
     // Return a structured marker for the entity loop to detect
     const imagePath = `/generated-images/${filename}`;
-    const marker = JSON.stringify({
+    const markerData: Record<string, string> = {
       path: imagePath,
       prompt,
       generator: generator.name,
-    });
+    };
+    if (description) {
+      markerData.description = description;
+    }
+    const marker = JSON.stringify(markerData);
     return {
       toolCallId: ctx.toolCallId,
       content: `Image generated successfully. [IMAGE:${marker}]`,
@@ -504,7 +565,7 @@ async function execute(
 }
 
 // =============================================================================
-// Helpers
+// Helpers (exported for reuse by captioning)
 // =============================================================================
 
 /**
@@ -512,7 +573,7 @@ async function execute(
  * btoa(String.fromCharCode(...largeArray)) exceeds max call stack size
  * because spread passes each element as a separate argument.
  */
-function uint8ToBase64(data: Uint8Array): string {
+export function uint8ToBase64(data: Uint8Array): string {
   let binary = "";
   const chunkSize = 8192;
   for (let i = 0; i < data.length; i += chunkSize) {
@@ -522,7 +583,7 @@ function uint8ToBase64(data: Uint8Array): string {
   return btoa(binary);
 }
 
-function getMediaType(filename: string): string {
+export function getMediaType(filename: string): string {
   const ext = filename.split(".").pop()?.toLowerCase();
   switch (ext) {
     case "png": return "image/png";

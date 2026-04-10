@@ -1037,7 +1037,8 @@ async function sendMessage() {
   input.style.height = 'auto';
   input.disabled = true;
 
-  // Clear attachment
+  // Save and clear attachment before sending
+  const attachmentId = pendingAttachmentId || undefined;
   pendingAttachmentId = null;
   pendingAttachmentUrl = null;
   const preview = document.getElementById('attachment-preview');
@@ -1106,7 +1107,7 @@ async function sendMessage() {
       body: JSON.stringify({
         conversationId: currentConversationId,
         message: message,
-        attachmentId: pendingAttachmentId || undefined
+        attachmentId: attachmentId
       }),
       signal: currentAbortController.signal
     });
@@ -1615,10 +1616,12 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         const img = JSON.parse(data);
         const container = document.createElement('div');
         container.className = 'generated-image-container';
+        const descHtml = img.description ? `<div class="generated-image-desc">${escapeHtml(img.description)}</div>` : '';
         container.innerHTML = `
           <img src="${escapeHtml(img.imagePath)}" alt="${escapeHtml(img.prompt)}"
                class="generated-image" loading="lazy"/>
           <div class="generated-image-meta">${escapeHtml(img.generatorName)}</div>
+          ${descHtml}
         `;
         contentContainer.appendChild(container);
         AutoScroll.streamTick();
@@ -3674,4 +3677,34 @@ globalThis.toggleStickyDuration = function(checkbox) {
   durInput.disabled = !checkbox.checked;
   durInput.style.opacity = checkbox.checked ? '1' : '0.5';
   durInput.style.pointerEvents = checkbox.checked ? 'auto' : 'none';
+};
+
+// =============================================================================
+// Anchor Images (global functions for htmx-fragment compatibility)
+// =============================================================================
+
+globalThis.handleAnchorUpload = function() {
+  const file = document.getElementById('anchor-file').files[0];
+  if (!file) return;
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('label', document.getElementById('anchor-label').value || 'Unnamed');
+  formData.append('description', document.getElementById('anchor-upload-desc').value || '');
+  fetch('/api/anchor-images', { method: 'POST', body: formData }).then(() => {
+    htmx.ajax('GET', '/fragments/settings/connections/image-gen/anchors', '#chat');
+  });
+};
+
+globalThis.saveAnchorMeta = async function(id) {
+  const card = document.getElementById('anchor-' + id);
+  if (!card) return;
+  const label = card.querySelector('.anchor-label').value;
+  const description = card.querySelector('.anchor-desc').value;
+  await fetch('/api/anchor-images/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label, description }) });
+};
+
+globalThis.deleteAnchor = async function(id) {
+  if (!confirm('Delete this anchor image?')) return;
+  await fetch('/api/anchor-images/' + id, { method: 'DELETE' });
+  htmx.ajax('GET', '/fragments/settings/connections/image-gen/anchors', '#chat');
 };

@@ -1051,7 +1051,8 @@ export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics, enti
         (_match, jsonStr) => {
           try {
             const img = JSON.parse(jsonStr);
-            return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div></div>`;
+            const descHtml = img.description ? `<div class="generated-image-desc">${escapeHtml(img.description)}</div>` : '';
+            return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div>${descHtml}</div>`;
           } catch { return _match; }
         }
       );
@@ -1175,8 +1176,17 @@ export function renderInputArea(): string {
       onkeydown="Psycheros.handleKeyDown(event)"
       oninput="Psycheros.autoResize(this)"
     ></textarea>
+    <button class="attach-btn" onclick="document.getElementById('attach-input').click()" title="Attach image">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+        <circle cx="8.5" cy="8.5" r="1.5"/>
+        <polyline points="21 15 16 10 5 21"/>
+      </svg>
+    </button>
+    <input type="file" id="attach-input" accept="image/*" style="display:none" onchange="Psycheros.handleAttachment(this)">
     <button class="send-btn" id="send-btn" onclick="Psycheros.sendMessage()">Send</button>
   </div>
+  <div id="attachment-preview" class="attachment-preview" style="display:none;"></div>
 </div>`;
 }
 
@@ -1259,7 +1269,8 @@ export function renderToolResult(result: ToolResult): string {
     content = content.replace(imagePattern, (_match, jsonStr) => {
       try {
         const img = JSON.parse(jsonStr);
-        return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div></div>`;
+        const descHtml = img.description ? `<div class="generated-image-desc">${escapeHtml(img.description)}</div>` : '';
+        return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div>${descHtml}</div>`;
       } catch {
         return _match;
       }
@@ -4755,10 +4766,36 @@ export function renderImageGenTab(settings: ImageGenSettings): string {
       </svg>
     </a>`;
 
+  const captioningSettings = settings.captioning;
+  const captioningDesc = captioningSettings?.provider
+    ? `${escapeHtml(captioningSettings.provider)}${captioningSettings.enabled ? " — Enabled" : " — Disabled"}`
+    : "Not configured";
+
+  const captioningLink = `
+    <a class="settings-hub-card"
+      hx-get="/fragments/settings/connections/image-gen/captioning"
+      hx-target="#chat"
+      hx-swap="innerHTML">
+      <div class="settings-hub-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </div>
+      <div class="settings-hub-card-body">
+        <span class="settings-hub-card-title">Captioning</span>
+        <span class="settings-hub-card-desc">${captioningDesc}</span>
+      </div>
+      <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </a>`;
+
   return `<div class="settings-hub-grid">
     ${cards}
     ${addCard}
     ${anchorsLink}
+    ${captioningLink}
   </div>`;
 }
 
@@ -4853,8 +4890,7 @@ export function renderImageGenSlotSettings(generator: ImageGenConfig | undefined
             <select id="ig-gemini-model" class="input-field llm-input">
               <option value="gemini-3.1-flash-image-preview" ${(g.settings.gemini?.model || "") === "gemini-3.1-flash-image-preview" ? "selected" : ""}>gemini-3.1-flash-image-preview</option>
               <option value="gemini-3-pro-image-preview" ${(g.settings.gemini?.model || "") === "gemini-3-pro-image-preview" ? "selected" : ""}>gemini-3-pro-image-preview</option>
-              <option value="gemini-2.5-flash-preview-05-20" ${(g.settings.gemini?.model || "") === "gemini-2.5-flash-preview-05-20" ? "selected" : ""}>gemini-2.5-flash-preview-05-20</option>
-              <option value="gemini-2.0-flash-exp-image-generation" ${(g.settings.gemini?.model || "") === "gemini-2.0-flash-exp-image-generation" ? "selected" : ""}>gemini-2.0-flash-exp-image-generation</option>
+              <option value="gemini-2.5-flash-image" ${(g.settings.gemini?.model || "") === "gemini-2.5-flash-image" ? "selected" : ""}>gemini-2.5-flash-image</option>
             </select>
           </div>
           <p class="settings-note">Size and aspect ratio are decided per-generation by the entity based on context.</p>
@@ -4974,7 +5010,7 @@ export function renderImageGenAnchors(
         <div class="llm-field" style="flex:0 0 auto;">
           <label>File</label>
           <button type="button" class="btn btn--sm" onclick="document.getElementById('anchor-file').click()">Choose File</button>
-          <input type="file" id="anchor-file" accept="image/*" style="display:none;">
+          <input type="file" id="anchor-file" accept="image/*" style="display:none;" onchange="document.getElementById('anchor-file-name').textContent = this.files[0]?.name || ''">
           <span id="anchor-file-name" class="anchor-meta"></span>
         </div>
         <div class="llm-field" style="flex:1;min-width:150px;">
@@ -4985,7 +5021,7 @@ export function renderImageGenAnchors(
           <label for="anchor-upload-desc">Description</label>
           <input type="text" id="anchor-upload-desc" class="input-field llm-input" placeholder="Brief description for context">
         </div>
-        <button type="submit" class="btn btn--primary" style="align-self:end;">Upload</button>
+        <button type="button" class="btn btn--primary" style="align-self:end;" onclick="handleAnchorUpload()">Upload</button>
       </form>
     </section>
 
@@ -4999,37 +5035,129 @@ export function renderImageGenAnchors(
     .anchor-meta { font-size: var(--font-size-xs); color: var(--c-fg-muted); margin-top: var(--sp-1); }
     .anchor-actions { display: flex; gap: var(--sp-2); }
   </style>
-
-<script>
-document.getElementById('anchor-file').addEventListener('change', (e) => {
-  const name = e.target.files[0]?.name || '';
-  document.getElementById('anchor-file-name').textContent = name;
-});
-
-document.getElementById('anchor-upload-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const file = document.getElementById('anchor-file').files[0];
-  if (!file) return;
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('label', document.getElementById('anchor-label').value || 'Unnamed');
-  formData.append('description', document.getElementById('anchor-upload-desc').value || '');
-  await fetch('/api/anchor-images', { method: 'POST', body: formData });
-  // Reload just the anchor list within the page
-  htmx.ajax('GET', '/fragments/settings/connections/image-gen/anchors', '#chat');
-});
-
-async function saveAnchorMeta(id) {
-  const card = document.getElementById('anchor-' + id);
-  const label = card.querySelector('.anchor-label').value;
-  const description = card.querySelector('.anchor-desc').value;
-  await fetch('/api/anchor-images/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label, description }) });
+</div>`;
 }
 
-async function deleteAnchor(id) {
-  if (!confirm('Delete this anchor image?')) return;
-  await fetch('/api/anchor-images/' + id, { method: 'DELETE' });
-  htmx.ajax('GET', '/fragments/settings/connections/image-gen/anchors', '#chat');
+/**
+ * Render the captioning settings page.
+ */
+export function renderImageGenCaptioning(
+  captioning: import("../llm/image-gen-settings.ts").CaptioningSettings | undefined,
+): string {
+  const c = captioning || {
+    enabled: false,
+    provider: "gemini" as const,
+    gemini: { apiKey: "", model: "gemini-2.0-flash" },
+  };
+  const provider = c.provider || "gemini";
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Captioning</h1>
+        <p class="settings-desc">Configure image captioning for auto-describing chat attachments and the describe_image tool</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <section class="theme-section">
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label class="toggle-label">
+            <input type="checkbox" id="cap-enabled" role="switch" aria-label="Auto-caption chat attachments" ${c.enabled ? "checked" : ""}>
+            <span class="toggle-slider"></span>
+            <span class="toggle-text">Auto-caption chat attachments</span>
+          </label>
+          <p class="settings-note">When enabled, images attached to chat messages are automatically described before sending to the entity. The description is included in the message context.</p>
+        </div>
+
+        <div class="llm-field">
+          <label for="cap-provider">Provider</label>
+          <select id="cap-provider" class="input-field llm-input" onchange="toggleCaptioningProvider()">
+            <option value="gemini" ${provider === "gemini" ? "selected" : ""}>Google Gemini</option>
+            <option value="openrouter" ${provider === "openrouter" ? "selected" : ""}>OpenRouter</option>
+          </select>
+        </div>
+
+        <div id="cap-gemini-section" style="${provider === "gemini" ? "" : "display:none;"}">
+          <h3 style="margin-top:var(--sp-4);font-size:var(--font-size-sm);color:var(--c-fg-muted);">Gemini Captioning Settings</h3>
+          <div class="llm-field">
+            <label for="cap-gemini-key">API Key</label>
+            <input type="password" id="cap-gemini-key" class="input-field llm-input" value="${escapeHtml(c.gemini?.apiKey || "")}" placeholder="AIza...">
+          </div>
+          <div class="llm-field">
+            <label for="cap-gemini-model">Model</label>
+            <select id="cap-gemini-model" class="input-field llm-input">
+              <option value="gemini-2.5-flash" ${(c.gemini?.model || "") === "gemini-2.5-flash" ? "selected" : ""}>gemini-2.5-flash</option>
+              <option value="gemini-2.5-flash-lite" ${(c.gemini?.model || "") === "gemini-2.5-flash-lite" ? "selected" : ""}>gemini-2.5-flash-lite</option>
+              <option value="gemini-2.5-pro" ${(c.gemini?.model || "") === "gemini-2.5-pro" ? "selected" : ""}>gemini-2.5-pro</option>
+              <option value="gemini-3-flash-preview" ${(c.gemini?.model || "") === "gemini-3-flash-preview" ? "selected" : ""}>gemini-3-flash-preview</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="cap-openrouter-section" style="${provider === "openrouter" ? "" : "display:none;"}">
+          <h3 style="margin-top:var(--sp-4);font-size:var(--font-size-sm);color:var(--c-fg-muted);">OpenRouter Captioning Settings</h3>
+          <div class="llm-field">
+            <label for="cap-or-key">API Key</label>
+            <input type="password" id="cap-or-key" class="input-field llm-input" value="${escapeHtml(c.openrouter?.apiKey || "")}" placeholder="sk-or-...">
+          </div>
+          <div class="llm-field">
+            <label for="cap-or-model">Model</label>
+            <input type="text" id="cap-or-model" class="input-field llm-input" value="${escapeHtml(c.openrouter?.model || "")}" placeholder="google/gemini-2.0-flash-001">
+          </div>
+          <div class="llm-field">
+            <label for="cap-or-baseurl">Base URL</label>
+            <input type="text" id="cap-or-baseurl" class="input-field llm-input" value="${escapeHtml(c.openrouter?.baseUrl || "")}" placeholder="https://openrouter.ai/api (default)">
+          </div>
+        </div>
+
+        <div class="llm-field" style="display:flex;gap:var(--sp-3);margin-top:var(--sp-4);">
+          <button class="btn btn--primary" onclick="saveCaptioning()">Save</button>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+<script>
+function toggleCaptioningProvider() {
+  const provider = document.getElementById('cap-provider').value;
+  document.getElementById('cap-gemini-section').style.display = provider === 'gemini' ? '' : 'none';
+  document.getElementById('cap-openrouter-section').style.display = provider === 'openrouter' ? '' : 'none';
+}
+
+async function saveCaptioning() {
+  const provider = document.getElementById('cap-provider').value;
+  const enabled = document.getElementById('cap-enabled').checked;
+  let gemini, openrouter;
+
+  if (provider === 'gemini') {
+    gemini = {
+      apiKey: document.getElementById('cap-gemini-key').value,
+      model: document.getElementById('cap-gemini-model').value,
+    };
+  } else {
+    openrouter = {
+      apiKey: document.getElementById('cap-or-key').value,
+      model: document.getElementById('cap-or-model').value,
+      baseUrl: document.getElementById('cap-or-baseurl').value,
+    };
+  }
+
+  try {
+    await fetch('/api/image-gen-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ captioning: { enabled, provider, gemini, openrouter } }),
+    });
+    htmx.ajax('GET', '/fragments/settings/connections/image-gen', '#chat');
+  } catch (e) {
+    console.error('Failed to save captioning settings:', e);
+  }
 }
 </script>
 </div>`;

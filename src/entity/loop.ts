@@ -105,6 +105,8 @@ export interface EntityConfig {
   homeSettings?: HomeSettings;
   /** Optional image generation settings */
   imageGenSettings?: ImageGenSettings;
+  /** Optional captioning settings (accessed by describe_image tool) */
+  captioningSettings?: import("../llm/image-gen-settings.ts").CaptioningSettings;
 }
 
 /**
@@ -125,7 +127,7 @@ export type EntityYield =
   | { type: "metrics"; metrics: TurnMetrics }
   | { type: "context"; context: LLMContextSnapshot }
   | { type: "message_id"; role: "user" | "assistant"; id: string }
-  | { type: "image_generated"; imagePath: string; prompt: string; generatorName: string };
+  | { type: "image_generated"; imagePath: string; prompt: string; generatorName: string; description?: string };
 
 /**
  * Represents a single turn in the conversation.
@@ -671,6 +673,7 @@ export class EntityTurn {
               imagePath: img.path,
               prompt: img.prompt,
               generatorName: img.generator,
+              description: img.description,
             };
             // Append image marker to persisted content so it survives page reload
             if (messageId) {

@@ -127,6 +127,7 @@ import {
   handleConnectionsImageGenFragment,
   handleConnectionsImageGenSlotFragment,
   handleConnectionsImageGenAnchorsFragment,
+  handleConnectionsImageGenCaptioningFragment,
   handleGetHomeSettings,
   handleSaveHomeSettings,
   handleGetImageGenSettings,
@@ -502,6 +503,9 @@ export class Server {
     }
     if (this.imageGenSettings.generators.some((g) => g.enabled)) {
       autoEnabled.push("generate_image");
+    }
+    if (this.imageGenSettings.captioning?.provider) {
+      autoEnabled.push("describe_image");
     }
 
     // Resolve the final enabled list
@@ -1703,6 +1707,11 @@ export class Server {
     // GET /fragments/settings/connections/image-gen/anchors - Anchor images management
     if (path === "/fragments/settings/connections/image-gen/anchors") {
       return handleConnectionsImageGenAnchorsFragment(ctx);
+    }
+
+    // GET /fragments/settings/connections/image-gen/captioning - Captioning settings
+    if (path === "/fragments/settings/connections/image-gen/captioning") {
+      return handleConnectionsImageGenCaptioningFragment(ctx);
     }
 
     // GET /fragments/settings/connections/image-gen/:id - Image gen slot settings fragment

@@ -34,6 +34,8 @@ import { sendDiscordDmTool } from "./send-discord-dm.ts";
 import { controlDeviceTool } from "./control-device.ts";
 // Image generation tool
 import { generateImageTool } from "./generate-image.ts";
+// Image captioning tool
+import { describeImageTool } from "./describe-image.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -74,6 +76,7 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   control_device: controlDeviceTool,
   // Image generation tool
   generate_image: generateImageTool,
+  describe_image: describeImageTool,
 };
 
 /**

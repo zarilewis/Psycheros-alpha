@@ -214,13 +214,15 @@ Generated images render inline in chat messages. The entity uses the `generate_i
 
 **Features:**
 - Images display inline with a subtle container and generator name metadata
+- Auto-generated image descriptions displayed below the image (via the configured captioning provider)
 - Images persist across conversation switches via `[IMAGE:...]` markers stored in the assistant message content
+- Descriptions are included in the marker JSON and rendered from persisted messages
 - Lazy loading (`loading="lazy"`) for performance
 - Server-side rendered in `renderAssistantMessage()` for persisted messages, client-side rendered during SSE streaming
 
-**SSE event:** `image_generated` with JSON payload `{ imagePath, prompt, generatorName }`.
+**SSE event:** `image_generated` with JSON payload `{ imagePath, prompt, generatorName, description }`.
 
-Implemented in `web/js/psycheros.js` (SSE handler), `src/server/templates.ts` (server-side rendering), `web/css/components.css` (`.generated-image-container`, `.generated-image`, `.generated-image-meta`).
+Implemented in `web/js/psycheros.js` (SSE handler), `src/server/templates.ts` (server-side rendering), `web/css/components.css` (`.generated-image-container`, `.generated-image`, `.generated-image-meta`, `.generated-image-desc`).
 
 ## Chat Image Attachments
 
@@ -232,12 +234,15 @@ Users can attach images to chat messages for the entity to reference in generati
 - Thumbnail preview shown below the input after selecting a file
 - Remove button to cancel the attachment before sending
 - On send, the attachment is uploaded and its ID is included in the chat request
-- The user message is prefixed with `[USER_IMAGE: /chat-attachments/filename]` so the entity is aware of the image
+- The attachment is automatically captioned via the configured vision model before being passed to the entity
+- The user message is prefixed with `[USER_IMAGE: /chat-attachments/filename | Caption: description]` so the entity understands the image content
+- If captioning fails or is not configured, falls back to path-only: `[USER_IMAGE: /chat-attachments/filename]`
 - The entity can use `user_image_path` in `generate_image` to incorporate the attached image
+- The entity can use `describe_image` with the path to get a more detailed description
 
-**API:** `POST /api/chat-attachments` (multipart upload), returns `{ id, filename, url }`. Files stored in `.psycheros/chat-attachments/`.
+**API:** `POST /api/chat-attachments` (multipart upload), returns `{ id, filename, url }`. Files stored in `.psycheros/chat-attachments/`. Captioning is handled server-side in `handleChat` before creating the entity turn.
 
-Implemented in `web/js/psycheros.js` (`handleAttachment()`, `removeAttachment()`), `src/server/routes.ts` (`handleUploadChatAttachment`), `web/css/components.css` (`.attach-btn`, `.attachment-preview`, `.attachment-thumb`, `.attachment-remove`).
+Implemented in `web/js/psycheros.js` (`handleAttachment()`, `removeAttachment()`), `src/server/routes.ts` (`handleUploadChatAttachment`, auto-caption flow), `web/css/components.css` (`.attach-btn`, `.attachment-preview`, `.attachment-thumb`, `.attachment-remove`).
 
 ## System Admin Panel
 

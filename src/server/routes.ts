@@ -15,6 +15,8 @@ import type { WebSearchSettings } from "../llm/mod.ts";
 import type { DiscordSettings, HomeSettings } from "../llm/mod.ts";
 import type { ImageGenSettings } from "../llm/mod.ts";
 import { maskApiKey, getDefaultSettings, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings, getDefaultImageGenSettings, maskImageGenSettings } from "../llm/mod.ts";
+import { captionImage } from "../tools/describe-image.ts";
+import { uint8ToBase64, getMediaType as getImageMediaType } from "../tools/generate-image.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { ToolsSettings } from "../tools/mod.ts";
 import { AVAILABLE_TOOLS, TOOL_CATEGORIES, loadCustomTools } from "../tools/mod.ts";
@@ -58,6 +60,7 @@ import {
   renderImageGenTab,
   renderImageGenSlotSettings,
   renderImageGenAnchors,
+  renderImageGenCaptioning,
   renderToolsSettings,
   renderEntityCoreHub,
   renderEntityCoreOverview,
@@ -927,7 +930,34 @@ export async function handleChat(
         // Prefix user message with attachment reference if provided
         let userMessage = body.message;
         if (body.attachmentId) {
-          userMessage = `[USER_IMAGE: /chat-attachments/${body.attachmentId}] ${userMessage}`;
+          // Resolve the actual filename (attachment is saved as {uuid}.{ext} but we only have the UUID)
+          let attachmentFilename = body.attachmentId;
+          try {
+            const attachDir = `${ctx.projectRoot}/.psycheros/chat-attachments`;
+            for await (const entry of Deno.readDir(attachDir)) {
+              if (entry.name.startsWith(body.attachmentId)) {
+                attachmentFilename = entry.name;
+                break;
+              }
+            }
+          } catch { /* dir may not exist yet */ }
+
+          const captioningSettings = ctx.getImageGenSettings().captioning;
+          if (captioningSettings?.enabled) {
+            try {
+              const attachmentPath = `${ctx.projectRoot}/.psycheros/chat-attachments/${attachmentFilename}`;
+              const fileData = await Deno.readFile(attachmentPath);
+              const base64 = uint8ToBase64(fileData);
+              const mediaType = getImageMediaType(attachmentFilename);
+              const caption = await captionImage(base64, mediaType, captioningSettings);
+              userMessage = `[USER_IMAGE: /chat-attachments/${attachmentFilename} | Caption: ${caption}] ${body.message}`;
+            } catch (captionError) {
+              console.error("[Chat] Auto-captioning failed, falling back to path-only:", captionError);
+              userMessage = `[USER_IMAGE: /chat-attachments/${attachmentFilename}] ${body.message}`;
+            }
+          } else {
+            userMessage = `[USER_IMAGE: /chat-attachments/${attachmentFilename}] ${body.message}`;
+          }
         }
 
         // Start auto-title generation in parallel (runs concurrently with main response)
@@ -957,6 +987,7 @@ export async function handleChat(
             discordSettings: ctx.getDiscordSettings(),
             homeSettings: ctx.getHomeSettings(),
             imageGenSettings: ctx.getImageGenSettings(),
+            captioningSettings: ctx.getImageGenSettings().captioning,
           }
         );
 
@@ -1134,6 +1165,7 @@ export async function handleChatRetry(
             discordSettings: ctx.getDiscordSettings(),
             homeSettings: ctx.getHomeSettings(),
             imageGenSettings: ctx.getImageGenSettings(),
+            captioningSettings: ctx.getImageGenSettings().captioning,
           }
         );
 
@@ -1299,6 +1331,7 @@ function convertToSSEEvent(chunk: EntityYield): SSEEvent {
           imagePath: chunk.imagePath,
           prompt: chunk.prompt,
           generatorName: chunk.generatorName,
+          description: chunk.description,
         }),
       };
   }
@@ -4654,7 +4687,18 @@ export async function handleSaveImageGenSettings(
   request: Request,
 ): Promise<Response> {
   try {
-    const body = await request.json() as ImageGenSettings;
+    const body = await request.json() as Partial<ImageGenSettings>;
+
+    // If only captioning is provided (no generators), merge into existing settings
+    // to avoid overwriting actual API keys with masked versions
+    if (!body.generators && body.captioning) {
+      const current = ctx.getImageGenSettings();
+      current.captioning = body.captioning;
+      await ctx.updateImageGenSettings(current as ImageGenSettings);
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
 
     if (!body.generators || !Array.isArray(body.generators)) {
       return new Response(
@@ -4666,7 +4710,7 @@ export async function handleSaveImageGenSettings(
       );
     }
 
-    await ctx.updateImageGenSettings(body);
+    await ctx.updateImageGenSettings(body as ImageGenSettings);
     return new Response(JSON.stringify({ success: true }), {
       headers: {
         "Content-Type": "application/json",
@@ -4934,6 +4978,17 @@ export async function handleUploadChatAttachment(
  */
 export function handleConnectionsImageGenFragment(ctx: RouteContext): Response {
   const html = renderImageGenTab(maskImageGenSettings(ctx.getImageGenSettings()));
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/connections/image-gen/captioning - Captioning settings.
+ */
+export function handleConnectionsImageGenCaptioningFragment(ctx: RouteContext): Response {
+  const captioning = ctx.getImageGenSettings().captioning;
+  const html = renderImageGenCaptioning(captioning);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });

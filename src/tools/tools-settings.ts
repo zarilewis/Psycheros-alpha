@@ -107,6 +107,12 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     description: "Generate images using configured providers",
     toolNames: ["generate_image"],
   },
+  {
+    id: "image-captioning",
+    name: "Image Captioning",
+    description: "Describe and understand images",
+    toolNames: ["describe_image"],
+  },
 ];
 
 // =============================================================================
