@@ -6,6 +6,40 @@ Detailed documentation for Psycheros web UI features.
 
 Built-in debugging tool for inspecting the full context sent to the LLM. Toggle via the code icon (`</>`) in the header.
 
+## UI Component Patterns
+
+Reference for correct usage of shared UI components. Follow these patterns when building new settings pages or UI elements to avoid rendering bugs.
+
+### Toggle Switch
+
+The toggle switch uses CSS sibling selectors (`input:checked + .toggle-slider`) which require a **flat structure** — the `<input>` and `<span class="toggle-slider">` must be direct siblings inside `<label class="toggle-label">`.
+
+**Correct pattern (flat structure):**
+```html
+<label class="toggle-label">
+  <input type="checkbox" id="my-toggle" role="switch" aria-label="Label Text" checked>
+  <span class="toggle-slider"></span>
+  <span class="toggle-text">Label Text</span>
+</label>
+```
+
+**Incorrect pattern (nested label — breaks CSS selectors):**
+```html
+<label class="toggle-label" for="my-toggle">
+  <span>Label Text</span>
+  <label class="toggle">
+    <input type="checkbox" id="my-toggle" checked>
+    <span class="toggle-slider"></span>
+  </label>
+</label>
+```
+
+The nested `<label class="toggle">` wrapper breaks `input:checked + .toggle-slider` because there's an extra element between the input and the slider. This causes the accent color to not apply and the toggle to visually disappear when checked. **Do not use this pattern.**
+
+**CSS:** `web/css/settings.css` (`.toggle-label`, `.toggle-slider`, `.toggle-text`). Used in: Appearance Settings, LLM Settings, Tools Settings, Image Gen Settings, Captioning Settings, Situational Awareness Settings.
+
+## Context Inspector (continued)
+
 **Architecture:** Context snapshots are persisted to the `context_snapshots` database table on each turn. The inspector fetches data via `GET /api/conversations/:id/context` — data survives page refresh and conversation switching. Capped at 50 snapshots per conversation (auto-pruned on insert).
 
 **Turn Navigation:** Use the prev/next arrows to inspect any turn in the conversation, not just the latest.
@@ -13,7 +47,7 @@ Built-in debugging tool for inspecting the full context sent to the LLM. Toggle 
 **Search:** Full-text search across all snapshot content with match highlighting.
 
 **Tabs:**
-- **System**: Identity sections (self, user, relationship) as collapsible sections with size badges, plus the full assembled system message
+- **System**: Identity sections (self, user, relationship), situational awareness, and the full assembled system message as collapsible sections with size badges
 - **RAG**: All five retrieval sources — memories, chat history, lorebook entries, data vault, knowledge graph
 - **Messages**: Conversation history sent to the LLM with role badges and collapsible content
 - **Tools**: Available tool definitions with parameters
@@ -449,3 +483,43 @@ When `PSYCHEROS_DISPLAY_TZ` (or `TZ`) is set, daily/weekly/monthly and one-shot 
 - If the probability-based jitter window is missed, the Pulse falls through and fires once the threshold is exceeded (rather than being permanently suppressed)
 
 **Source files:** `src/pulse/engine.ts`, `src/pulse/routes.ts`, `src/pulse/templates.ts`, `src/pulse/timezone.ts`, `src/tools/pulse-tools.ts`, `src/db/client.ts` (pulse run persistence), `web/js/psycheros.js` (switchTab, savePulse, updatePulseTriggerFields, pulse_complete handler), `web/css/settings.css` (pulse-specific styles), `web/css/components.css` (.msg--pulse styles)
+
+## Situational Awareness
+
+Real-time signal feeds injected into the entity's context every turn, giving it awareness of the user's presence and environment. Access via Settings → Situational Awareness in the sidebar.
+
+**Settings UI:**
+- Enable/disable toggle to control whether the SA block is included in context
+- Active Signals section listing built-in feeds with descriptions
+- Future Feeds placeholder for upcoming signal types
+
+**Built-in Signals:**
+
+- **Last User Interaction** — Tracks the most recent human message across all threads (excluding automated Pulse messages). The entity sees the timestamp (formatted in the user's display timezone) and which thread the message was sent in (ID + title).
+
+- **Device Detection** — Frontend detects whether the user is on desktop or mobile using the existing `isMobileDevice()` heuristic (Android/iPhone/iPad/iPod UA or touch points + viewport width). The device type is sent with each `/api/chat` request and included in the SA block as a simple `desktop` or `mobile` indicator.
+
+**Context Format:**
+
+The SA block is injected into the system message as structured XML, placed after custom identity files and before lorebook/RAG content:
+
+```xml
+<situational_awareness>
+  <last_user_interaction>
+    <timestamp><t>2026-04-10 14:32</t></timestamp>
+    <thread id="abc-123">Thread Title</thread>
+  </last_user_interaction>
+  <current_device>desktop</current_device>
+</situational_awareness>
+```
+
+**Pulse Exclusion:** Pulse-triggered messages are excluded from the last user interaction query (`WHERE pulse_id IS NULL`), so the entity only sees the timestamp of genuine human messages.
+
+**Persistence:** Settings stored in `.psycheros/sa-settings.json`. Defaults to `{ "enabled": true }`.
+
+**API Endpoints:**
+- `GET /api/sa-settings` — get current SA settings
+- `POST /api/sa-settings` — save SA settings
+- `GET /fragments/settings/sa` — render SA settings page fragment
+
+**Source files:** `src/entity/loop.ts` (SA block builder, `escapeXml`, `ProcessOptions.deviceType`), `src/entity/context.ts` (injection into `buildSystemMessage`), `src/db/client.ts` (`getLatestUserInteraction`), `src/server/routes.ts` (handlers), `src/server/templates.ts` (`renderSASettings`), `web/js/psycheros.js` (`deviceType` in request body, Context Inspector rendering)

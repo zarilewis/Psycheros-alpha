@@ -68,6 +68,15 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/tools/pulse-tools.ts` | Entity-facing Pulse tools (create, trigger, delete) |
 | `src/push/mod.ts` | Push notification manager (VAPID keys, subscriptions, sending) |
 
+## Situational Awareness
+
+Real-time signal feeds injected into the entity's context every turn. Configured via Settings > Situational Awareness.
+
+- **Last User Interaction** — Most recent human message across all threads (excludes Pulses). Entity sees timestamp (user's display timezone) and thread ID/title.
+- **Device Detection** — Desktop or mobile, detected by frontend heuristic and sent with each `/api/chat` request.
+
+Settings persist to `.psycheros/sa-settings.json`. Default `{ "enabled": true }`.
+
 ## External Connections
 
 Psycheros supports third-party integrations organized under two tabs in Settings > External Connections:
@@ -125,7 +134,7 @@ Psycheros supports third-party integrations organized under two tabs in Settings
 | [docs/configuration.md](docs/configuration.md) | All env vars, available tools, RAG/MCP settings, migration commands |
 | [docs/tools-reference.md](docs/tools-reference.md) | Tool system, identity tiers, MCP fallback, core prompt file structure |
 | [docs/memory-and-rag.md](docs/memory-and-rag.md) | Memory hierarchy, consolidation, 4 RAG systems (memory, chat, lorebook, vault), vector search |
-| [docs/ui-features.md](docs/ui-features.md) | Context viewer, stop generation, retry failed turn, message editing, appearance, graph viz |
+| [docs/ui-features.md](docs/ui-features.md) | Context viewer, stop generation, retry failed turn, message editing, appearance, situational awareness, graph viz |
 | [docs/api-reference.md](docs/api-reference.md) | Full API endpoints, dual SSE architecture, retry stream |
 | [docs/code-review-findings.md](docs/code-review-findings.md) | Code review bugs fixed, architectural decisions |
 | [docs/security-audit.md](docs/security-audit.md) | Security audit findings, threat model, accepted risks |

@@ -398,6 +398,27 @@ export function renderSettingsHub(): string {
         </svg>
       </a>
       <a class="settings-hub-card"
+        hx-get="/fragments/settings/sa"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="2"/>
+            <path d="M16.24 7.76a6 6 0 010 8.49"/>
+            <path d="M7.76 16.24a6 6 0 010-8.49"/>
+            <path d="M19.07 4.93a10 10 0 010 14.14"/>
+            <path d="M4.93 19.07a10 10 0 010-14.14"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Situational Awareness</span>
+          <span class="settings-hub-card-desc">Real-time signal feeds for entity awareness</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
         hx-get="/fragments/settings/lorebooks"
         hx-target="#chat"
         hx-swap="innerHTML">
@@ -776,6 +797,111 @@ async function saveGeneralSettings() {
     if (!el) return;
     el.className = 'settings-status visible error';
     el.textContent = 'Failed to save settings';
+  }
+}
+</script>`;
+}
+
+// =============================================================================
+// Situational Awareness Settings
+// =============================================================================
+
+/**
+ * Render the Situational Awareness settings page.
+ * Shows active signal feeds and an enable/disable toggle.
+ */
+export function renderSASettings(settings: { enabled: boolean }): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Situational Awareness</h1>
+        <p class="settings-desc">Configure real-time signal feeds for entity awareness</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <section class="theme-section">
+      <h3 class="theme-section-title">Enable</h3>
+      <p class="theme-section-desc">When enabled, the entity receives a situational awareness block each turn with real-time signal data</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label class="toggle-label">
+            <input type="checkbox" id="sa-enabled" role="switch" aria-label="Situational Awareness" ${settings.enabled ? "checked" : ""}>
+            <span class="toggle-slider"></span>
+            <span class="toggle-text">Situational Awareness</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="theme-section">
+      <h3 class="theme-section-title">Active Signals</h3>
+      <p class="theme-section-desc">Built-in signal feeds currently providing data to the entity</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label>Last User Interaction</label>
+          <div class="sa-signal-desc">Tracks the most recent human message across all threads, excluding automated Pulse messages. The entity sees the timestamp and which thread the message was sent in.</div>
+        </div>
+        <div class="llm-field">
+          <label>Device Detection</label>
+          <div class="sa-signal-desc">Detects whether you're on desktop or mobile when sending a message. The entity receives this as a simple desktop/mobile indicator.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="theme-section">
+      <h3 class="theme-section-title">Future Feeds</h3>
+      <p class="theme-section-desc" style="opacity:0.6;">More signal feeds (biometrics, GPS, connected instances) will be added here as they become available.</p>
+    </section>
+
+    <div style="margin-top: 16px;">
+      <button class="btn btn--primary" onclick="saveSASettings()">Save Changes</button>
+    </div>
+
+    <div id="sa-settings-status" class="settings-status"></div>
+
+  </div>
+</div>
+<style>
+  .sa-signal-desc {
+    font-size: var(--font-size-sm);
+    color: var(--c-fg-muted);
+    line-height: 1.5;
+    margin-top: 4px;
+  }
+</style>
+<script>
+async function saveSASettings() {
+  const enabled = document.getElementById('sa-enabled').checked;
+
+  try {
+    const res = await fetch('/api/sa-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    });
+    const data = await res.json();
+    const el = document.getElementById('sa-settings-status');
+    if (!el) return;
+    if (data.success) {
+      el.className = 'settings-status visible success';
+      el.textContent = 'Settings saved successfully';
+      setTimeout(() => { el.className = 'settings-status'; }, 3000);
+    } else {
+      el.className = 'settings-status visible error';
+      el.textContent = data.error || 'Failed to save settings';
+      setTimeout(() => { el.className = 'settings-status'; }, 3000);
+    }
+  } catch (e) {
+    const el = document.getElementById('sa-settings-status');
+    if (el) {
+      el.className = 'settings-status visible error';
+      el.textContent = 'Failed to save settings';
+      setTimeout(() => { el.className = 'settings-status'; }, 3000);
+    }
   }
 }
 </script>`;

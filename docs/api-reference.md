@@ -43,6 +43,8 @@ Managed by `EventBroadcaster` singleton in `src/server/broadcaster.ts`.
 | `POST` | `/api/chat` | Send message, stream response (SSE) |
 | `POST` | `/api/chat/retry` | Retry failed turn without re-persisting user message (SSE) |
 
+Chat request body: `{ "conversationId": string, "message": string, "attachmentId"?: string, "deviceType"?: "desktop"|"mobile" }`. The `deviceType` field is used by the Situational Awareness system.
+
 ### Conversations
 
 | Method | Path | Description |
@@ -159,6 +161,15 @@ Settings stored in `.psycheros/appearance-settings.json`. Shape: `{ "preset": st
 | `POST` | `/api/general-settings` | Save general settings |
 
 Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName": "Assistant", "userName": "You" }`.
+
+### Situational Awareness Settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/sa-settings` | Get current SA settings |
+| `POST` | `/api/sa-settings` | Save SA settings |
+
+Settings stored in `.psycheros/sa-settings.json`. Shape: `{ "enabled": boolean }`. Defaults to `{ "enabled": true }`. When enabled, the entity receives a `<situational_awareness>` XML block in its system message each turn containing the last user interaction (cross-thread, excluding Pulses) and the user's current device type.
 
 ### LLM Settings
 
@@ -280,6 +291,7 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/settings/connections/image-gen/captioning` | Image captioning settings fragment |
 | `GET` | `/fragments/settings/connections/image-gen/:id` | Edit image generator config fragment |
 | `GET` | `/fragments/settings/tools` | Tools settings UI fragment |
+| `GET` | `/fragments/settings/sa` | Situational Awareness settings fragment |
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
 | `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
 | `GET` | `/fragments/settings/entity-core` | Entity Core hub with tab navigation |

@@ -102,6 +102,9 @@ import {
   handleGetGeneralSettings,
   handleSaveGeneralSettings,
   handleGeneralSettingsFragment,
+  handleGetSASettings,
+  handleSaveSASettings,
+  handleSASettingsFragment,
   handleGetAppearanceSettings,
   handleSaveAppearanceSettings,
   handleListBackgrounds,
@@ -1139,6 +1142,20 @@ export class Server {
     }
 
     // ========================================
+    // Situational Awareness Settings API Routes
+    // ========================================
+
+    // GET /api/sa-settings - Get current SA settings
+    if (method === "GET" && path === "/api/sa-settings") {
+      return await handleGetSASettings(ctx);
+    }
+
+    // POST /api/sa-settings - Save SA settings
+    if (method === "POST" && path === "/api/sa-settings") {
+      return await handleSaveSASettings(ctx, request);
+    }
+
+    // ========================================
     // Appearance Settings API Routes
     // ========================================
 
@@ -1528,6 +1545,11 @@ export class Server {
     // GET /fragments/settings/general - General settings fragment
     if (path === "/fragments/settings/general") {
       return await handleGeneralSettingsFragment(ctx);
+    }
+
+    // GET /fragments/settings/sa - Situational Awareness settings fragment
+    if (path === "/fragments/settings/sa") {
+      return await handleSASettingsFragment(ctx);
     }
 
     // GET /fragments/settings/core-prompts - Settings page fragment

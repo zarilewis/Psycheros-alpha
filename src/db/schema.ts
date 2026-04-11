@@ -570,6 +570,15 @@ function runMigrations(db: Database): void {
     console.log("[DB] Added vault_content column to context_snapshots");
   }
 
+  // Migration: Add situational_awareness_content column to context_snapshots if missing
+  const hasSACol = db
+    .prepare("SELECT 1 FROM pragma_table_info('context_snapshots') WHERE name = 'situational_awareness_content'")
+    .get();
+  if (!hasSACol) {
+    db.exec("ALTER TABLE context_snapshots ADD COLUMN situational_awareness_content TEXT");
+    console.log("[DB] Added situational_awareness_content column to context_snapshots");
+  }
+
   // Migration: Add custom_content column to context_snapshots if missing
   const hasCustomContentCol = db
     .prepare(

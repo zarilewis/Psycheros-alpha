@@ -417,6 +417,7 @@ export function buildSystemMessage(
   graphContent?: string,
   vaultContent?: string,
   imageGenContent?: string,
+  situationalAwarenessContent?: string,
 ): string {
   // Build sections — base instructions always first
   const sections: string[] = [];
@@ -454,6 +455,13 @@ ${relationshipContent}`);
 Custom files (from identity/custom/ directory):
 
 ${customContent}`);
+  }
+
+  // Add situational awareness content if present
+  if (situationalAwarenessContent?.trim()) {
+    sections.push(`---
+
+${situationalAwarenessContent}`);
   }
 
   // Add lorebook-triggered content if present

@@ -187,6 +187,8 @@ export interface LLMContextSnapshot {
   graphContent?: string;
   /** Vault document content from Data Vault RAG */
   vaultContent?: string;
+  /** Situational awareness content injected into context */
+  situationalAwarenessContent?: string;
   /** The messages array sent to the LLM (excluding system) */
   messages: Array<{
     role: string;
@@ -223,6 +225,7 @@ export interface ContextSnapshotRecord {
   lorebookContent?: string;
   graphContent?: string;
   vaultContent?: string;
+  situationalAwarenessContent?: string;
   messagesJson: string;
   toolDefinitionsJson: string;
   metricsJson: string;

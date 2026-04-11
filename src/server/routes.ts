@@ -70,6 +70,7 @@ import {
   renderEntityCoreSnapshotPreview,
   renderECConsolidationRunning,
   renderECConsolidationComplete,
+  renderSASettings,
   type GeneralSettings,
   type EntityCoreOverviewData,
   escapeHtml,
@@ -848,6 +849,7 @@ interface ChatRequestBody {
   conversationId: string;
   message: string;
   attachmentId?: string;
+  deviceType?: "desktop" | "mobile";
 }
 
 /**
@@ -992,7 +994,9 @@ export async function handleChat(
         );
 
         // Process the message and stream chunks
-        for await (const chunk of turn.process(body.conversationId, userMessage)) {
+        for await (const chunk of turn.process(body.conversationId, userMessage, {
+          deviceType: body.deviceType,
+        })) {
           if (signal.aborted) {
             console.log("Client disconnected, stopping stream");
             break;
@@ -5178,6 +5182,95 @@ export async function handleUploadCustomTool(
     const msg = error instanceof Error ? error.message : "Upload failed";
     return jsonResp({ success: false, error: msg }, 500);
   }
+}
+
+// =============================================================================
+// Situational Awareness Settings API Routes
+// =============================================================================
+
+interface SASettings {
+  enabled: boolean;
+}
+
+const SA_SETTINGS_PATH = ".psycheros/sa-settings.json";
+
+async function loadSASettings(projectRoot: string): Promise<SASettings> {
+  try {
+    const text = await Deno.readTextFile(`${projectRoot}/${SA_SETTINGS_PATH}`);
+    const saved = JSON.parse(text) as Partial<SASettings>;
+    return { enabled: saved.enabled !== false };
+  } catch {
+    return { enabled: true };
+  }
+}
+
+/**
+ * Handle GET /api/sa-settings - Return current SA settings as JSON.
+ */
+export async function handleGetSASettings(ctx: RouteContext): Promise<Response> {
+  const settings = await loadSASettings(ctx.projectRoot);
+  return new Response(JSON.stringify(settings), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/sa-settings - Save SA settings.
+ */
+export async function handleSaveSASettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<SASettings>;
+    const current = await loadSASettings(ctx.projectRoot);
+
+    const updated: SASettings = {
+      enabled: body.enabled !== undefined ? body.enabled : current.enabled,
+    };
+
+    const settingsDir = `${ctx.projectRoot}/.psycheros`;
+    await Deno.mkdir(settingsDir, { recursive: true });
+    await Deno.writeTextFile(
+      `${settingsDir}/sa-settings.json`,
+      JSON.stringify(updated, null, 2) + "\n",
+    );
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] Failed to save SA settings:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save settings" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      },
+    );
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/sa - Render the Situational Awareness settings page.
+ */
+export async function handleSASettingsFragment(ctx: RouteContext): Promise<Response> {
+  const settings = await loadSASettings(ctx.projectRoot);
+  const html = renderSASettings(settings);
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
 }
 
 function jsonResp(data: unknown, status = 200): Response {

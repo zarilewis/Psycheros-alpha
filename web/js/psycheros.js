@@ -1107,7 +1107,8 @@ async function sendMessage() {
       body: JSON.stringify({
         conversationId: currentConversationId,
         message: message,
-        attachmentId: attachmentId
+        attachmentId: attachmentId,
+        deviceType: isMobileDevice() ? 'mobile' : 'desktop'
       }),
       signal: currentAbortController.signal
     });
@@ -2933,6 +2934,7 @@ function renderSystemTab(snap) {
   html += renderContextSection('User Context', snap.userContent, true);
   html += renderContextSection('Relationship', snap.relationshipContent, true);
   html += renderContextSection('Custom', snap.customContent, true);
+  html += renderContextSection('Situational Awareness', snap.situationalAwarenessContent, true);
   html += renderContextSection('Full System Message', snap.systemMessage, false);
   return html;
 }

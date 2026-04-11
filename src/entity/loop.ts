@@ -43,6 +43,13 @@ import { generateUIUpdates } from "../server/ui-updates.ts";
 import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
 
 /**
+ * Escape special XML characters in a string.
+ */
+function escapeXml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+/**
  * Format a timestamp for message content.
  * Uses PSYCHEROS_DISPLAY_TZ for user-facing timezone, falls back to TZ, defaults to UTC.
  * Format: <t>YYYY-MM-DD HH:MM</t>
@@ -75,6 +82,8 @@ export interface ProcessOptions {
   pulseName?: string;
   /** When true, skip user message persistence (it's already in the DB from the failed turn) */
   retry?: boolean;
+  /** Device type of the user for this turn (from frontend detection) */
+  deviceType?: "desktop" | "mobile";
 }
 
 /**
@@ -355,7 +364,30 @@ export class EntityTurn {
       }
     }
 
-    const systemMessage = buildSystemMessage(baseInstructions, selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent, graphContent, vaultContent, imageGenContent);
+    // Build situational awareness block
+    let saContent: string | undefined;
+    const lastInteraction = this.db.getLatestUserInteraction();
+    if (lastInteraction || options?.deviceType) {
+      const parts: string[] = ["<situational_awareness>"];
+      if (lastInteraction) {
+        const date = new Date(lastInteraction.createdAt);
+        const formatted = formatMessageTimestamp(date);
+        const threadLabel = lastInteraction.title
+          ? escapeXml(lastInteraction.title)
+          : lastInteraction.conversationId;
+        parts.push("  <last_user_interaction>");
+        parts.push(`    <timestamp>${formatted}</timestamp>`);
+        parts.push(`    <thread id="${lastInteraction.conversationId}">${threadLabel}</thread>`);
+        parts.push("  </last_user_interaction>");
+      }
+      if (options?.deviceType) {
+        parts.push(`  <current_device>${options.deviceType}</current_device>`);
+      }
+      parts.push("</situational_awareness>");
+      saContent = parts.join("\n");
+    }
+
+    const systemMessage = buildSystemMessage(baseInstructions, selfContent, userContent, relationshipContent, customContent, memoriesContent, chatHistoryContent, lorebookContent, graphContent, vaultContent, imageGenContent, saContent);
 
     // Get conversation history from DB
     const history = this.db.getMessages(conversationId);
@@ -433,6 +465,7 @@ export class EntityTurn {
       lorebookContent,
       graphContent,
       vaultContent,
+      situationalAwarenessContent: saContent,
       messages: messages.slice(1).map((msg) => ({
         role: msg.role,
         content: msg.content,
@@ -476,6 +509,7 @@ export class EntityTurn {
       lorebookContent,
       graphContent,
       vaultContent,
+      situationalAwarenessContent: saContent,
       messagesJson: JSON.stringify(contextSnapshot.messages),
       toolDefinitionsJson: JSON.stringify(toolDefinitions),
       metricsJson: JSON.stringify(contextSnapshot.metrics),

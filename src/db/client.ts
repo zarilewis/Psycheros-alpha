@@ -81,6 +81,7 @@ interface ContextSnapshotRow {
   lorebook_content: string | null;
   graph_content: string | null;
   vault_content: string | null;
+  situational_awareness_content: string | null;
   messages_json: string;
   tool_definitions_json: string;
   metrics_json: string;
@@ -1024,6 +1025,30 @@ export class DBClient {
   }
 
   // ===========================================================================
+  // Situational Awareness Operations
+  // ===========================================================================
+
+  /**
+   * Get the most recent non-Pulse user message across all threads.
+   * Used to build the Situational Awareness block for entity context.
+   * Excludes Pulse-triggered messages (pulse_id IS NULL).
+   */
+  getLatestUserInteraction(): { createdAt: string; conversationId: string; title: string | null } | null {
+    const stmt = this.db.prepare(`
+      SELECT m.created_at, m.conversation_id, c.title
+      FROM messages m
+      LEFT JOIN conversations c ON c.id = m.conversation_id
+      WHERE m.role = 'user' AND m.pulse_id IS NULL
+      ORDER BY m.created_at DESC
+      LIMIT 1
+    `);
+    const row = stmt.get() as { created_at: string; conversation_id: string; title: string | null } | undefined;
+    stmt.finalize();
+    if (!row) return null;
+    return { createdAt: row.created_at, conversationId: row.conversation_id, title: row.title };
+  }
+
+  // ===========================================================================
   // Context Snapshot Operations
   // ===========================================================================
 
@@ -1049,9 +1074,9 @@ export class DBClient {
          (id, conversation_id, turn_index, iteration, timestamp, user_message,
           system_message, base_instructions_content, self_content, user_content,
           relationship_content, custom_content, memories_content, chat_history_content,
-          lorebook_content, graph_content, vault_content,
+          lorebook_content, graph_content, vault_content, situational_awareness_content,
           messages_json, tool_definitions_json, metrics_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           id,
           snapshot.conversationId,
@@ -1070,6 +1095,7 @@ export class DBClient {
           snapshot.lorebookContent ?? null,
           snapshot.graphContent ?? null,
           snapshot.vaultContent ?? null,
+          snapshot.situationalAwarenessContent ?? null,
           snapshot.messagesJson,
           snapshot.toolDefinitionsJson,
           snapshot.metricsJson,
@@ -1115,7 +1141,7 @@ export class DBClient {
       `SELECT id, conversation_id, turn_index, iteration, timestamp, user_message,
               system_message, base_instructions_content, self_content, user_content,
               relationship_content, custom_content, memories_content, chat_history_content,
-              lorebook_content, graph_content, vault_content,
+              lorebook_content, graph_content, vault_content, situational_awareness_content,
               messages_json, tool_definitions_json, metrics_json, created_at
        FROM context_snapshots
        WHERE conversation_id = ?
@@ -1139,7 +1165,7 @@ export class DBClient {
       `SELECT id, conversation_id, turn_index, iteration, timestamp, user_message,
               system_message, base_instructions_content, self_content, user_content,
               relationship_content, custom_content, memories_content, chat_history_content,
-              lorebook_content, graph_content, vault_content,
+              lorebook_content, graph_content, vault_content, situational_awareness_content,
               messages_json, tool_definitions_json, metrics_json, created_at
        FROM context_snapshots
        WHERE conversation_id = ?
@@ -1175,6 +1201,7 @@ export class DBClient {
       lorebookContent: row.lorebook_content ?? undefined,
       graphContent: row.graph_content ?? undefined,
       vaultContent: row.vault_content ?? undefined,
+      situationalAwarenessContent: row.situational_awareness_content ?? undefined,
       messagesJson: row.messages_json,
       toolDefinitionsJson: row.tool_definitions_json,
       metricsJson: row.metrics_json,
