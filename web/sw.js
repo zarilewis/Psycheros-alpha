@@ -47,6 +47,10 @@ self.addEventListener('activate', (event) => {
 
 // Fetch handler
 self.addEventListener('fetch', (event) => {
+  // Don't intercept non-GET requests — POST/PUT/DELETE with FormData
+  // can fail in standalone PWA mode when routed through the service worker.
+  if (event.request.method !== 'GET') return;
+
   const url = new URL(event.request.url);
   const path = url.pathname;
 

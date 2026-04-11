@@ -1177,8 +1177,7 @@ export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics, enti
         (_match, jsonStr) => {
           try {
             const img = JSON.parse(jsonStr);
-            const descHtml = img.description ? `<div class="generated-image-desc">${escapeHtml(img.description)}</div>` : '';
-            return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div>${descHtml}</div>`;
+            return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div></div>`;
           } catch { return _match; }
         }
       );
@@ -1395,8 +1394,7 @@ export function renderToolResult(result: ToolResult): string {
     content = content.replace(imagePattern, (_match, jsonStr) => {
       try {
         const img = JSON.parse(jsonStr);
-        const descHtml = img.description ? `<div class="generated-image-desc">${escapeHtml(img.description)}</div>` : '';
-        return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div>${descHtml}</div>`;
+        return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div></div>`;
       } catch {
         return _match;
       }

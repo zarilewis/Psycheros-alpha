@@ -1617,12 +1617,10 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         const img = JSON.parse(data);
         const container = document.createElement('div');
         container.className = 'generated-image-container';
-        const descHtml = img.description ? `<div class="generated-image-desc">${escapeHtml(img.description)}</div>` : '';
         container.innerHTML = `
           <img src="${escapeHtml(img.imagePath)}" alt="${escapeHtml(img.prompt)}"
                class="generated-image" loading="lazy"/>
           <div class="generated-image-meta">${escapeHtml(img.generatorName)}</div>
-          ${descHtml}
         `;
         contentContainer.appendChild(container);
         AutoScroll.streamTick();
