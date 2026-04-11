@@ -278,6 +278,39 @@ Users can attach images to chat messages for the entity to reference in generati
 
 Implemented in `web/js/psycheros.js` (`handleAttachment()`, `removeAttachment()`), `src/server/routes.ts` (`handleUploadChatAttachment`, auto-caption flow), `web/css/components.css` (`.attach-btn`, `.attachment-preview`, `.attachment-thumb`, `.attachment-remove`).
 
+## LLM Connections
+
+Multi-provider connection profile system. Access via Settings → LLM Connections in the sidebar. Uses the same hub-and-card pattern as Image Gen and other settings.
+
+**Hub View:**
+- Card grid showing all saved profiles with provider icon, name, model, and active badge
+- "Add Profile" card opens a new profile form
+- Clicking a profile card opens its edit form
+
+**Profile Edit Form:**
+- Provider dropdown (OpenRouter, OpenAI, Alibaba/Qwen, NanoGPT, Custom Endpoint) with auto-fill for base URL, model, and worker model
+- Connection fields: name, base URL, API key (masked display with show/hide toggle)
+- Sampling parameters: temperature, top-p, top-k, frequency penalty, presence penalty
+- Token limits: max tokens, context length
+- Thinking toggle for chain-of-thought reasoning (sent as `thinking: { type: "enabled" }` to the API)
+- Actions: Save Profile, Test Connection, Set as Active, Delete Profile (with confirmation)
+
+**Behavior:**
+- Active profile is used for all chat requests; switching reloads the LLM client immediately
+- Entity-core (MCP) is dynamically restarted with the new profile's credentials when the active profile changes
+- First-time users get a default profile from `ZAI_*` environment variables
+- Legacy single-profile settings are automatically migrated to the multi-profile format
+- Worker model (auto-titling, summarization) always has thinking disabled regardless of profile setting
+
+**API Endpoints:**
+- `POST /api/llm-settings/profile` — add/update a single profile (server-side merge)
+- `POST /api/llm-settings/set-active` — set active profile by ID
+- `POST /api/llm-settings/test` — test connection for a profile
+- `POST /api/llm-settings` — bulk save (delete operations)
+- `POST /api/llm-settings/reset` — reset to defaults
+
+**Persistence:** Settings stored in `.psycheros/llm-settings.json` as `{ profiles: LLMConnectionProfile[], activeProfileId: string }`.
+
 ## System Admin Panel
 
 Built-in diagnostics and log viewer for inspecting system health without shell access. Access via Settings → System Admin.

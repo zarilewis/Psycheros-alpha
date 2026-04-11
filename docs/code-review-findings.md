@@ -167,6 +167,23 @@ See also: [security-audit.md](security-audit.md) for the full security assessmen
 - **Location**: `src/pulse/engine.ts` — `executePulse()`; `web/js/psycheros.js` — persistent SSE handlers
 - **Fix**: Added `pulse_complete` event broadcast after Pulse execution (success or error). Client-side handler detects if streaming was missed (`pulseAssistantEl === null`) and reloads the conversation from the server.
 
+## Multi-Provider LLM Profiles
+
+### Profile save race condition (High — data loss)
+- **Problem**: Adding a new LLM profile used a client-side read-modify-write flow (GET all settings, push new profile, POST back). If the GET returned stale data (e.g., from cache, race condition, or HTMX page swap), existing profiles would be silently overwritten.
+- **Location**: `src/server/templates.ts` — `saveProfile()` JS; `src/server/routes.ts` — `handleSaveLLMSettings()`
+- **Fix**: Added `POST /api/llm-settings/profile` endpoint that handles add/update atomically on the server. The client now sends just the profile object; the server reads current settings, merges the profile in, and saves. The bulk `POST /api/llm-settings` is kept only for delete operations.
+
+### Test connection credential mixing (Medium — security)
+- **Problem**: `handleTestLLMConnection` fell back to the active profile's API key when the test profile's key was empty — even if the test profile had a different base URL. This could send requests to one provider with another provider's credentials.
+- **Location**: `src/server/routes.ts` — `handleTestLLMConnection()`
+- **Fix**: Credential fallback only triggers when ALL three values (baseUrl, apiKey, model) are empty on the test profile.
+
+### Worker model thinking not disabled (Medium — unnecessary tokens)
+- **Problem**: `createClientFromProfile()` with `useWorker: true` still had `thinkingEnabled` from the profile, causing lightweight tasks (auto-titling) to request chain-of-thought reasoning unnecessarily.
+- **Location**: `src/llm/client.ts` — `createClientFromProfile()`
+- **Fix**: `thinkingEnabled` defaults to `false` when `useWorker: true`, unless explicitly overridden.
+
 ## Memory System Bug Fixes
 
 ### Significant memories not indexed into RAG or synced to MCP (High — functionality)

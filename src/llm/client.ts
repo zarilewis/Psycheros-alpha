@@ -1,12 +1,13 @@
 /**
  * LLM Client
  *
- * Handles all communication with the Z.ai API using the OpenAI-compatible
- * protocol. Supports streaming requests, tool calling, and chain-of-thought
- * reasoning.
+ * Handles communication with LLM APIs using the OpenAI-compatible protocol.
+ * Supports streaming requests, tool calling, and chain-of-thought reasoning.
+ * Works with any OpenAI-compatible endpoint (OpenRouter, OpenAI, Alibaba, etc.).
  */
 
 import type { ToolDefinition } from "../types.ts";
+import type { LLMConnectionProfile } from "./provider-presets.ts";
 import type {
   ChatMessage,
   ChatRequest,
@@ -57,6 +58,7 @@ function* emitAccumulatedToolCalls(
  */
 export class LLMClient {
   private readonly config: LLMConfig;
+  private _loggedReasoningField = false;
 
   constructor(config: LLMConfig) {
     this.config = config;
@@ -127,6 +129,7 @@ export class LLMClient {
     let doneEmitted = false;
     // Track content chunks for stall/empty detection
     let contentChunkCount = 0;
+    let thinkingChunkCount = 0;
     // Track consecutive malformed chunks
     let consecutiveMalformed = 0;
     const MAX_CONSECUTIVE_MALFORMED = 5;
@@ -173,7 +176,7 @@ export class LLMClient {
           if (chunk === "done") {
             const elapsed = Date.now() - requestStart;
             console.log(
-              `[LLM] Stream complete — ${contentChunkCount} content chunks in ${elapsed}ms, ` +
+              `[LLM] Stream complete — ${contentChunkCount} content chunks (${thinkingChunkCount} thinking) in ${elapsed}ms, ` +
               `finish_reason=${lastFinishReason || "stop"}`,
             );
             // Emit any remaining tool calls before done
@@ -213,6 +216,7 @@ export class LLMClient {
             }
             if (streamChunk.type === "content" || streamChunk.type === "thinking") {
               contentChunkCount++;
+              if (streamChunk.type === "thinking") thinkingChunkCount++;
             }
             // Record chunk timing for metrics
             if (options?.metricsCollector) {
@@ -238,6 +242,7 @@ export class LLMClient {
             }
             if (streamChunk.type === "content" || streamChunk.type === "thinking") {
               contentChunkCount++;
+              if (streamChunk.type === "thinking") thinkingChunkCount++;
             }
             // Record chunk timing for metrics
             if (options?.metricsCollector) {
@@ -253,7 +258,7 @@ export class LLMClient {
       if (!doneEmitted) {
         const elapsed = Date.now() - requestStart;
         console.warn(
-          `[LLM] Stream ended without [DONE] signal — ${contentChunkCount} content chunks in ${elapsed}ms, ` +
+          `[LLM] Stream ended without [DONE] signal — ${contentChunkCount} content chunks (${thinkingChunkCount} thinking) in ${elapsed}ms, ` +
           `finish_reason=${lastFinishReason || "unknown"}`,
         );
         // Emit any remaining tool calls
@@ -489,8 +494,15 @@ export class LLMClient {
       }
 
       // Handle thinking/reasoning content
-      if (delta.reasoning_content) {
-        yield { type: "thinking", content: delta.reasoning_content };
+      // Check both "reasoning_content" (Zhipu/Z.ai) and "reasoning" (some proxies)
+      const reasoning = delta.reasoning_content || delta.reasoning;
+      if (reasoning) {
+        if (!this._loggedReasoningField) {
+          const field = delta.reasoning_content ? "reasoning_content" : "reasoning";
+          console.log(`[LLM] Detected reasoning via delta.${field} — model supports chain-of-thought`);
+          this._loggedReasoningField = true;
+        }
+        yield { type: "thinking", content: reasoning };
       }
 
       // Handle main content
@@ -573,6 +585,7 @@ export function createDefaultClient(
     apiKey,
     model: options?.model || Deno.env.get("ZAI_MODEL") || "glm-4.7",
     thinkingEnabled: options?.thinkingEnabled ?? true,
+    provider: options?.provider ?? "custom",
     ...parseTimeoutEnvVars(options),
   };
 
@@ -609,6 +622,46 @@ export function createWorkerClient(
     model: options?.model || Deno.env.get("ZAI_WORKER_MODEL") || "GLM-4.5-Air",
     thinkingEnabled: options?.thinkingEnabled ?? false, // Worker model doesn't need thinking
     ...parseTimeoutEnvVars(options),
+  };
+
+  return new LLMClient(config);
+}
+
+/**
+ * Create an LLM client from a connection profile.
+ *
+ * @param profile - The connection profile to use
+ * @param options - Optional overrides:
+ *   - useWorker: Use the profile's workerModel instead of the main model
+ *   - thinkingEnabled: Override the profile's thinking setting
+ * @throws LLMError if the profile has no API key
+ */
+export function createClientFromProfile(
+  profile: LLMConnectionProfile,
+  options?: { useWorker?: boolean; thinkingEnabled?: boolean },
+): LLMClient {
+  if (!profile.apiKey) {
+    throw new LLMError(
+      "API key is required in the connection profile.",
+      "MISSING_API_KEY",
+    );
+  }
+
+  const config: LLMConfig = {
+    baseUrl: profile.baseUrl,
+    apiKey: profile.apiKey,
+    model: options?.useWorker && profile.workerModel
+      ? profile.workerModel
+      : profile.model,
+    thinkingEnabled: options?.thinkingEnabled ?? (options?.useWorker ? false : profile.thinkingEnabled),
+    provider: profile.provider,
+    temperature: profile.temperature,
+    topP: profile.topP,
+    topK: profile.topK,
+    frequencyPenalty: profile.frequencyPenalty,
+    presencePenalty: profile.presencePenalty,
+    maxTokens: profile.maxTokens,
+    ...parseTimeoutEnvVars(),
   };
 
   return new LLMClient(config);

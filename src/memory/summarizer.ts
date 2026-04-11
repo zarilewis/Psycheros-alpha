@@ -9,7 +9,8 @@
 
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, ChatMessage } from "../llm/mod.ts";
-import { createDefaultClient } from "../llm/mod.ts";
+import { createDefaultClient, createClientFromProfile } from "../llm/mod.ts";
+import type { LLMConnectionProfile } from "../llm/mod.ts";
 import type {
   MemoryFile,
   ConversationForSummary,
@@ -197,6 +198,7 @@ export async function summarizeDay(
   projectRoot: string,
   config?: Partial<SummarizerConfig>,
   onCreated?: OnMemoryCreated,
+  options?: { llm?: LLMClient; activeProfile?: LLMConnectionProfile },
 ): Promise<MemoryFile | null> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
 
@@ -237,7 +239,8 @@ export async function summarizeDay(
   console.log(`[Memory] Summarizing ${conversations.length} conversations from ${dateStr}`);
 
   // Use main model for summarization (quality over cost savings)
-  const llm = createDefaultClient();
+  const llm = options?.llm
+    ?? (options?.activeProfile ? createClientFromProfile(options.activeProfile) : createDefaultClient());
 
   try {
     // Generate summary

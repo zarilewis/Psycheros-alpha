@@ -6,11 +6,13 @@ All Psycheros configuration is via environment variables. Copy `.env.example` to
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `ZAI_API_KEY` | Yes | — | Z.ai API key |
-| `ZAI_BASE_URL` | No | Z.ai endpoint | API endpoint URL |
-| `ZAI_MODEL` | No | `glm-4.7` | Main model for chat |
+| `ZAI_API_KEY` | No* | — | API key for default LLM profile |
+| `ZAI_BASE_URL` | No | Z.ai endpoint | API endpoint URL for default profile |
+| `ZAI_MODEL` | No | `glm-4.7` | Main model for chat (default profile) |
 | `ZAI_WORKER_MODEL` | No | `GLM-4.5-Air` | Lightweight model for background tasks (title generation) |
 | `PSYCHEROS_PORT` | No | `3000` | Server port |
+
+\* `ZAI_*` variables are only used to create a default profile on first run. LLM connections are configured via **Settings > LLM Connections** in the web UI. Multiple named profiles can be created for different providers (OpenRouter, OpenAI, Alibaba/Qwen, NanoGPT, custom). Once profiles are saved to `.psycheros/llm-settings.json`, the UI settings take precedence over env vars.
 | `PSYCHEROS_HOST` | No | `0.0.0.0` | Server hostname |
 | `PSYCHEROS_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
 | `PSYCHEROS_TOOLS` | No | (none) | Comma-separated list of enabled tools |
@@ -80,15 +82,16 @@ PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,iden
 | `PSYCHEROS_MCP_COMMAND` | `deno` | Command to spawn entity-core |
 | `PSYCHEROS_MCP_ARGS` | `run -A --unstable-cron <path>/entity-core/src/mod.ts` | Arguments for entity-core |
 | `PSYCHEROS_MCP_INSTANCE` | `psycheros` | Instance ID for this embodiment |
-| `ENTITY_CORE_LLM_API_KEY` | — | Override API key for entity-core's LLM (memory-to-graph extraction). Falls back to `ZAI_API_KEY` |
-| `ENTITY_CORE_LLM_BASE_URL` | — | Override LLM endpoint for entity-core. Falls back to `ZAI_BASE_URL` |
-| `ENTITY_CORE_LLM_MODEL` | — | Override model for entity-core extraction. Falls back to `ZAI_MODEL` |
+| `ENTITY_CORE_LLM_API_KEY` | — | Override API key for entity-core's LLM (memory-to-graph extraction). Falls back to active profile's API key, then `ZAI_API_KEY` |
+| `ENTITY_CORE_LLM_BASE_URL` | — | Override LLM endpoint for entity-core. Falls back to active profile's base URL, then `ZAI_BASE_URL` |
+| `ENTITY_CORE_LLM_MODEL` | — | Override model for entity-core extraction. Falls back to active profile's model, then `ZAI_MODEL` |
 
-Psycheros automatically forwards its `ZAI_API_KEY`, `ZAI_BASE_URL`, and `ZAI_MODEL` to entity-core so that knowledge graph extraction works out of the box. Set the `ENTITY_CORE_LLM_*` variants if entity-core needs different LLM settings than Psycheros (e.g., a cheaper model for extraction).
+Psycheros automatically forwards the **active LLM profile's** credentials to entity-core so that knowledge graph extraction works out of the box. When the active profile changes, entity-core is dynamically restarted with the new credentials. Set the `ENTITY_CORE_LLM_*` variants if entity-core needs different LLM settings than Psycheros (e.g., a cheaper model for extraction).
 
 When MCP is enabled, Psycheros:
 - Spawns entity-core as a subprocess on startup
-- Automatically forwards LLM env vars (`ZAI_API_KEY`, `ZAI_BASE_URL`, `ZAI_MODEL`) so entity-core's memory-to-graph extraction works
+- Forwards the active LLM profile's credentials (`apiKey`, `baseUrl`, `model`) to entity-core
+- Dynamically restarts entity-core when the active profile changes
 - Entity-core-specific `ENTITY_CORE_LLM_*` vars take priority if set
 - Pulls identity files (self, user, relationship, custom) from entity-core
 - Queues changes and syncs back periodically (every 5 minutes)

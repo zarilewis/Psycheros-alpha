@@ -60,10 +60,11 @@ src/
 ├── main.ts           # Daemon entry point, MCP initialization
 ├── types.ts          # Shared type definitions (SSEEvent, LLMContextSnapshot)
 ├── constants.ts      # App constants
-├── llm/              # OpenAI-compatible LLM client
+├── llm/              # OpenAI-compatible LLM client + multi-provider profiles
 │   ├── mod.ts
 │   ├── client.ts     # Streaming client, tool calls, thinking content
-│   ├── settings.ts   # LLM settings persistence
+│   ├── provider-presets.ts  # Provider types, connection profiles, presets
+│   ├── settings.ts   # LLM settings persistence, profile load/save/migration
 │   ├── web-search-settings.ts  # Web search settings persistence
 │   ├── discord-settings.ts     # Discord settings persistence
 │   └── image-gen-settings.ts   # Image generator config persistence

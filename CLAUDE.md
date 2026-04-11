@@ -21,8 +21,10 @@ deno lint              # Lint
 ## Setup
 
 ```bash
-cp .env.example .env   # Then set ZAI_API_KEY and PSYCHEROS_TOOLS
+cp .env.example .env   # Then set LLM API key and PSYCHEROS_TOOLS
 ```
+
+LLM connections are configured via **Settings > LLM Connections** in the web UI. Multiple named connection profiles can be created (OpenRouter, OpenAI, Alibaba/Qwen, NanoGPT, or custom endpoints). One profile is marked active for chat. On first run, a default profile is created from `ZAI_*` environment variables if set.
 
 ### With MCP (entity-core)
 
@@ -49,6 +51,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/tools/control-device.ts` | Home automation tool (smart plug control via Shelly API) |
 | `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini), auto-captioning |
 | `src/tools/describe-image.ts` | Image captioning tool (Gemini, OpenRouter), shared caption logic |
+| `src/llm/provider-presets.ts` | LLM provider types, connection profile types, and default presets |
 | `src/llm/discord-settings.ts` | Discord settings type, load/save, token masking |
 | `src/llm/home-settings.ts` | Home automation settings type, load/save (device list) |
 | `src/llm/image-gen-settings.ts` | Image generator + captioning config type, load/save, masking |
@@ -76,6 +79,17 @@ Real-time signal feeds injected into the entity's context every turn. Configured
 - **Device Detection** — Desktop or mobile, detected by frontend heuristic and sent with each `/api/chat` request.
 
 Settings persist to `.psycheros/sa-settings.json`. Default `{ "enabled": true }`.
+
+## LLM Connections
+
+Psycheros supports multiple named LLM connection profiles. Each profile stores an API endpoint, key, model, worker model, and sampling parameters. One profile is marked **active** for chat. Profiles are managed via Settings > LLM Connections in the web UI (hub view with card grid, same pattern as Image Gen).
+
+Supported provider presets: **OpenRouter** (default), OpenAI, Alibaba/Qwen, NanoGPT, Custom Endpoint. The `LLMClient` works with any OpenAI-compatible endpoint.
+
+- Settings persist to `.psycheros/llm-settings.json` as `LLMProfileSettings` (array of `LLMConnectionProfile` + `activeProfileId`)
+- Automatic migration from legacy flat `LLMSettings` format
+- Entity-core LLM credentials are derived from the active profile on startup and dynamically updated when the active profile changes (triggers entity-core restart if connected)
+- Worker model (auto-titling, summarization) uses the profile's `workerModel` with thinking disabled
 
 ## External Connections
 

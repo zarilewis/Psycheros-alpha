@@ -14,10 +14,10 @@ function getDisplayTZ(): string | undefined {
   return Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ") || undefined;
 }
 import type { Lorebook, LorebookEntry } from "../lorebook/mod.ts";
-import type { LLMSettings } from "../llm/mod.ts";
+import type { LLMSettings, LLMProfileSettings, LLMConnectionProfile, LLMProvider } from "../llm/mod.ts";
+import { maskApiKey, LLM_PROVIDER_PRESETS } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
 import type { DiscordSettings } from "../llm/mod.ts";
-import { maskApiKey } from "../llm/mod.ts";
 import type { ToolsSettings } from "../tools/mod.ts";
 import { TOOL_CATEGORIES } from "../tools/mod.ts";
 import type { Tool } from "../tools/mod.ts";
@@ -3443,22 +3443,115 @@ function clearBackground() {
 // =============================================================================
 
 /**
- * Render the LLM settings view.
+ * Render the LLM profile settings hub view (card grid of profiles).
  */
-export function renderLLMSettings(settings: LLMSettings): string {
-  const maskedKey = maskApiKey(settings.apiKey);
+export function renderLLMProfileHub(settings: LLMProfileSettings): string {
+  const profileCards = settings.profiles.map((p) => {
+    const isActive = p.id === settings.activeProfileId;
+    const preset = LLM_PROVIDER_PRESETS[p.provider];
+    return `
+    <a class="settings-hub-card ${isActive ? "settings-hub-card--active" : ""}"
+       hx-get="/fragments/settings/llm/${escapeHtml(p.id)}"
+       hx-target="#chat"
+       hx-swap="innerHTML">
+      <div class="settings-hub-card-icon">
+        ${renderProviderIcon(p.provider)}
+      </div>
+      <div class="settings-hub-card-body">
+        <span class="settings-hub-card-title">${escapeHtml(p.name)}</span>
+        <span class="settings-hub-card-desc">
+          ${escapeHtml(preset?.label || p.provider)} &mdash; ${escapeHtml(p.model)}
+          ${isActive ? ' <span class="badge badge--active">Active</span>' : ""}
+        </span>
+      </div>
+      <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 18 15 12 9 6"/>
+      </svg>
+    </a>`;
+  }).join("");
+
+  const addCard = `
+    <button class="settings-hub-card settings-hub-card-add"
+      hx-get="/fragments/settings/llm/new"
+      hx-target="#chat"
+      hx-swap="innerHTML">
+      <div class="settings-hub-card-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="5" x2="12" y2="19"/>
+          <line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </div>
+      <div class="settings-hub-card-body">
+        <span class="settings-hub-card-title">Add Profile</span>
+        <span class="settings-hub-card-desc">Configure a new LLM connection</span>
+      </div>
+    </button>`;
 
   return `<div class="settings-view">
   <div class="settings-header">
     <div class="settings-header-row">
       ${renderSettingsBackButton()}
       <div>
-        <h1 class="settings-title">LLM Settings</h1>
-        <p class="settings-desc">Configure model connection, sampling parameters, and generation limits</p>
+        <h1 class="settings-title">LLM Connections</h1>
+        <p class="settings-desc">Manage model connection profiles &mdash; ${settings.profiles.length} profile${settings.profiles.length !== 1 ? "s" : ""} configured</p>
       </div>
     </div>
   </div>
   <div class="settings-content" id="settings-content">
+    <div class="settings-hub-grid">
+      ${profileCards}
+      ${addCard}
+    </div>
+  </div>
+</div>`;
+}
+
+/**
+ * Render the LLM profile edit/create form.
+ */
+export function renderLLMProfileEdit(
+  profile: LLMConnectionProfile | undefined,
+  isNew: boolean,
+  activeProfileId: string,
+): string {
+  const maskedKey = profile ? maskApiKey(profile.apiKey) : "";
+  const isActive = !isNew && profile?.id === activeProfileId;
+  const profileId = profile?.id || "";
+
+  // Build provider options
+  const providerOptions = Object.entries(LLM_PROVIDER_PRESETS).map(([key, preset]) =>
+    `<option value="${escapeHtml(key)}" ${profile?.provider === key ? "selected" : ""}>${escapeHtml(preset.label)}</option>`
+  ).join("");
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">${isNew ? "New LLM Profile" : escapeHtml(profile!.name)}</h1>
+        <p class="settings-desc">${isNew ? "Configure a new model connection" : "Edit this LLM connection profile"}</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <!-- Profile Identity -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Profile</h3>
+      <p class="theme-section-desc">Name and provider selection</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="llm-name">Profile Name</label>
+          <input type="text" id="llm-name" class="input-field llm-input" value="${isNew ? "" : escapeHtml(profile!.name)}" placeholder="My OpenRouter, GPT-4o, etc.">
+        </div>
+        <div class="llm-field">
+          <label for="llm-provider">Provider</label>
+          <select id="llm-provider" class="input-field llm-input" onchange="onProviderChange()">
+            ${providerOptions}
+          </select>
+        </div>
+      </div>
+    </section>
 
     <!-- Connection Section -->
     <section class="theme-section">
@@ -3467,7 +3560,7 @@ export function renderLLMSettings(settings: LLMSettings): string {
       <div class="llm-fields">
         <div class="llm-field">
           <label for="llm-base-url">Base URL</label>
-          <input type="url" id="llm-base-url" class="input-field llm-input" value="${escapeHtml(settings.baseUrl)}" placeholder="https://api.example.com/v1/chat/completions">
+          <input type="url" id="llm-base-url" class="input-field llm-input" value="${isNew ? "https://openrouter.ai/api/v1/chat/completions" : escapeHtml(profile!.baseUrl)}" placeholder="https://api.example.com/v1/chat/completions">
         </div>
         <div class="llm-field">
           <label for="llm-api-key">API Key</label>
@@ -3483,7 +3576,7 @@ export function renderLLMSettings(settings: LLMSettings): string {
         </div>
         <div class="llm-field">
           <label for="llm-model">Model</label>
-          <input type="text" id="llm-model" class="input-field llm-input" value="${escapeHtml(settings.model)}" placeholder="model-name">
+          <input type="text" id="llm-model" class="input-field llm-input" value="${isNew ? "glm-4.7" : escapeHtml(profile!.model)}" placeholder="model-name">
         </div>
       </div>
     </section>
@@ -3495,7 +3588,7 @@ export function renderLLMSettings(settings: LLMSettings): string {
       <div class="llm-fields">
         <div class="llm-field">
           <label for="llm-worker-model">Worker Model</label>
-          <input type="text" id="llm-worker-model" class="input-field llm-input" value="${escapeHtml(settings.workerModel)}" placeholder="lighter-model-name">
+          <input type="text" id="llm-worker-model" class="input-field llm-input" value="${isNew ? "GLM-4.5-Air" : escapeHtml(profile!.workerModel)}" placeholder="lighter-model-name (optional)">
         </div>
       </div>
     </section>
@@ -3507,29 +3600,29 @@ export function renderLLMSettings(settings: LLMSettings): string {
       <div class="llm-sliders">
         <div class="slider-group">
           <label for="llm-temperature">Temperature</label>
-          <input type="range" id="llm-temperature" min="0" max="2" step="0.01" value="${settings.temperature}" oninput="document.getElementById('llm-temperature-val').textContent = this.value">
-          <span id="llm-temperature-val">${settings.temperature}</span>
+          <input type="range" id="llm-temperature" min="0" max="2" step="0.01" value="${isNew ? "0.7" : profile!.temperature}" oninput="document.getElementById('llm-temperature-val').textContent = this.value">
+          <span id="llm-temperature-val">${isNew ? "0.7" : profile!.temperature}</span>
         </div>
         <div class="slider-group">
           <label for="llm-top-p">Top P</label>
-          <input type="range" id="llm-top-p" min="0" max="1" step="0.01" value="${settings.topP}" oninput="document.getElementById('llm-top-p-val').textContent = this.value">
-          <span id="llm-top-p-val">${settings.topP}</span>
+          <input type="range" id="llm-top-p" min="0" max="1" step="0.01" value="${isNew ? "1" : profile!.topP}" oninput="document.getElementById('llm-top-p-val').textContent = this.value">
+          <span id="llm-top-p-val">${isNew ? "1" : profile!.topP}</span>
         </div>
         <div class="llm-field-row">
           <div class="llm-field inline">
             <label for="llm-top-k">Top K <span class="label-hint">(0 = disabled)</span></label>
-            <input type="number" id="llm-top-k" class="input-field llm-input sm" value="${settings.topK}" min="0" max="200" step="1">
+            <input type="number" id="llm-top-k" class="input-field llm-input sm" value="${isNew ? "0" : profile!.topK}" min="0" max="200" step="1">
           </div>
         </div>
         <div class="slider-group">
           <label for="llm-freq-penalty">Frequency Penalty</label>
-          <input type="range" id="llm-freq-penalty" min="-2" max="2" step="0.01" value="${settings.frequencyPenalty}" oninput="document.getElementById('llm-freq-penalty-val').textContent = this.value">
-          <span id="llm-freq-penalty-val">${settings.frequencyPenalty}</span>
+          <input type="range" id="llm-freq-penalty" min="-2" max="2" step="0.01" value="${isNew ? "0" : profile!.frequencyPenalty}" oninput="document.getElementById('llm-freq-penalty-val').textContent = this.value">
+          <span id="llm-freq-penalty-val">${isNew ? "0" : profile!.frequencyPenalty}</span>
         </div>
         <div class="slider-group">
           <label for="llm-pres-penalty">Presence Penalty</label>
-          <input type="range" id="llm-pres-penalty" min="-2" max="2" step="0.01" value="${settings.presencePenalty}" oninput="document.getElementById('llm-pres-penalty-val').textContent = this.value">
-          <span id="llm-pres-penalty-val">${settings.presencePenalty}</span>
+          <input type="range" id="llm-pres-penalty" min="-2" max="2" step="0.01" value="${isNew ? "0" : profile!.presencePenalty}" oninput="document.getElementById('llm-pres-penalty-val').textContent = this.value">
+          <span id="llm-pres-penalty-val">${isNew ? "0" : profile!.presencePenalty}</span>
         </div>
       </div>
     </section>
@@ -3542,11 +3635,11 @@ export function renderLLMSettings(settings: LLMSettings): string {
         <div class="llm-field-row">
           <div class="llm-field inline">
             <label for="llm-max-tokens">Max Tokens</label>
-            <input type="number" id="llm-max-tokens" class="input-field llm-input sm" value="${settings.maxTokens}" min="1" max="100000" step="1">
+            <input type="number" id="llm-max-tokens" class="input-field llm-input sm" value="${isNew ? "4096" : profile!.maxTokens}" min="1" max="100000" step="1">
           </div>
           <div class="llm-field inline">
             <label for="llm-context-length">Context Window <span class="label-hint">(reference)</span></label>
-            <input type="number" id="llm-context-length" class="input-field llm-input sm" value="${settings.contextLength}" min="1" max="1000000" step="1">
+            <input type="number" id="llm-context-length" class="input-field llm-input sm" value="${isNew ? "128000" : profile!.contextLength}" min="1" max="1000000" step="1">
           </div>
         </div>
       </div>
@@ -3557,19 +3650,24 @@ export function renderLLMSettings(settings: LLMSettings): string {
       <h3 class="theme-section-title">Behavior</h3>
       <p class="theme-section-desc">Chain-of-thought and reasoning settings</p>
       <label class="toggle-label">
-        <input type="checkbox" id="llm-thinking" role="switch" aria-label="Chain-of-Thought Reasoning" ${settings.thinkingEnabled ? "checked" : ""}>
+        <input type="checkbox" id="llm-thinking" role="switch" aria-label="Chain-of-Thought Reasoning" ${isNew ? "checked" : profile!.thinkingEnabled ? "checked" : ""}>
         <span class="toggle-slider"></span>
         <span class="toggle-text">Chain-of-Thought Reasoning</span>
       </label>
+      <p class="label-hint" id="thinking-provider-note" style="margin-top:0.5rem;font-size:0.8rem;opacity:0.7;">Not supported by all providers. Unsupported providers will silently ignore this parameter.</p>
     </section>
 
     <!-- Actions -->
     <div class="llm-actions">
       <div class="llm-actions-left">
-        <button class="btn btn--primary" onclick="saveLLMSettings(event)">Save Settings</button>
-        <button class="btn btn--ghost" onclick="testLLMConnection()" id="test-connection-btn">Test Connection</button>
+        <button class="btn btn--primary" onclick="saveProfile(event)">Save Profile</button>
+        <button class="btn btn--ghost" onclick="testProfileConnection()" id="test-connection-btn">Test Connection</button>
+        ${!isNew && !isActive ? `<button class="btn btn--ghost" onclick="setAsActive('${escapeHtml(profileId)}')">Set as Active</button>` : ""}
       </div>
-      <button class="btn btn--ghost" onclick="resetLLMDefaults(event)">Reset to Defaults</button>
+      <div class="llm-actions-right">
+        ${!isNew ? `<button class="btn btn--ghost" onclick="deleteProfile('${escapeHtml(profileId)}')" id="delete-profile-btn">Delete Profile</button>` : ""}
+        <button class="btn btn--ghost" onclick="htmx.ajax('GET', '/fragments/settings/llm', { target: '#chat', swap: 'innerHTML' })">Cancel</button>
+      </div>
     </div>
 
     <!-- Status -->
@@ -3579,6 +3677,12 @@ export function renderLLMSettings(settings: LLMSettings): string {
 </div>
 
 <script>
+window.__profileId = ${JSON.stringify(profileId)};
+window.__isNew = ${JSON.stringify(isNew)};
+window.__activeProfileId = ${JSON.stringify(activeProfileId)};
+
+const PROVIDER_PRESETS = ${JSON.stringify(LLM_PROVIDER_PRESETS)};
+
 let apiKeyVisible = false;
 
 function toggleApiKeyVisibility() {
@@ -3588,8 +3692,36 @@ function toggleApiKeyVisibility() {
   input.type = apiKeyVisible ? 'text' : 'password';
 }
 
-function gatherSettings() {
+function onProviderChange() {
+  const provider = document.getElementById('llm-provider').value;
+  const preset = PROVIDER_PRESETS[provider];
+  if (preset) {
+    if (preset.baseUrl) {
+      document.getElementById('llm-base-url').value = preset.baseUrl;
+    }
+    if (preset.defaultModel && window.__isNew) {
+      document.getElementById('llm-model').value = preset.defaultModel;
+    }
+    if (preset.defaultWorkerModel && window.__isNew) {
+      document.getElementById('llm-worker-model').value = preset.defaultWorkerModel;
+    }
+    if (window.__isNew) {
+      document.getElementById('llm-name').value = preset.label;
+    }
+    const thinkingNote = document.getElementById('thinking-provider-note');
+    if (thinkingNote) {
+      thinkingNote.style.display = preset.supportsThinking ? 'none' : 'block';
+    }
+    // Auto-adjust thinking toggle based on provider support
+    document.getElementById('llm-thinking').checked = preset.supportsThinking;
+  }
+}
+
+function gatherProfile() {
   return {
+    id: window.__profileId || crypto.randomUUID(),
+    name: document.getElementById('llm-name').value.trim() || 'Unnamed Profile',
+    provider: document.getElementById('llm-provider').value,
     baseUrl: document.getElementById('llm-base-url').value.trim(),
     apiKey: document.getElementById('llm-api-key').value.trim(),
     model: document.getElementById('llm-model').value.trim(),
@@ -3613,22 +3745,22 @@ function showStatus(type, message) {
   el.textContent = message;
 }
 
-async function saveLLMSettings(event) {
+async function saveProfile(event) {
   const btn = event.currentTarget;
   btn.disabled = true;
   btn.textContent = 'Saving...';
-  showStatus('loading', 'Saving settings...');
+  showStatus('loading', 'Saving profile...');
 
   try {
-    const settings = gatherSettings();
-    const resp = await fetch('/api/llm-settings', {
+    const profile = gatherProfile();
+    const saveResp = await fetch('/api/llm-settings/profile', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
+      body: JSON.stringify({ profile }),
     });
-    const data = await resp.json();
+    const data = await saveResp.json();
     if (data.success) {
-      showStatus('success', 'Settings saved successfully.');
+      htmx.ajax('GET', '/fragments/settings/llm', { target: '#chat', swap: 'innerHTML' });
     } else {
       showStatus('error', 'Failed to save: ' + (data.error || 'Unknown error'));
     }
@@ -3636,11 +3768,11 @@ async function saveLLMSettings(event) {
     showStatus('error', 'Failed to save: ' + e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Save Settings';
+    btn.textContent = 'Save Profile';
   }
 }
 
-async function testLLMConnection() {
+async function testProfileConnection() {
   const btn = document.getElementById('test-connection-btn');
   if (!btn) return;
   btn.disabled = true;
@@ -3648,11 +3780,11 @@ async function testLLMConnection() {
   showStatus('loading', 'Sending test request...');
 
   try {
-    const settings = gatherSettings();
+    const profile = gatherProfile();
     const resp = await fetch('/api/llm-settings/test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
+      body: JSON.stringify(profile),
     });
     const data = await resp.json();
     if (data.success) {
@@ -3668,51 +3800,141 @@ async function testLLMConnection() {
   }
 }
 
-let resetPending = false;
-async function resetLLMDefaults(event) {
-  const btn = event.currentTarget;
-  if (!resetPending) {
-    resetPending = true;
-    btn.textContent = 'Confirm Reset?';
+async function setAsActive(profileId) {
+  showStatus('loading', 'Switching active profile...');
+  try {
+    const resp = await fetch('/api/llm-settings/set-active', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profileId }),
+    });
+    const data = await resp.json();
+    if (data.success) {
+      htmx.ajax('GET', '/fragments/settings/llm', { target: '#chat', swap: 'innerHTML' });
+    } else {
+      showStatus('error', 'Failed to switch: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    showStatus('error', 'Failed to switch: ' + e.message);
+  }
+}
+
+async function deleteProfile(profileId) {
+  const btn = document.getElementById('delete-profile-btn');
+  if (!btn) return;
+  if (!btn.dataset.confirming) {
+    btn.dataset.confirming = 'true';
+    btn.textContent = 'Confirm Delete?';
     btn.classList.add('btn--danger');
     btn.classList.remove('btn--ghost');
     setTimeout(() => {
-      if (resetPending) {
-        resetPending = false;
-        btn.textContent = 'Reset to Defaults';
+      if (btn.dataset.confirming) {
+        delete btn.dataset.confirming;
+        btn.textContent = 'Delete Profile';
         btn.classList.remove('btn--danger');
         btn.classList.add('btn--ghost');
       }
     }, 3000);
     return;
   }
-  resetPending = false;
-  btn.textContent = 'Resetting...';
+  delete btn.dataset.confirming;
   btn.disabled = true;
-  showStatus('loading', 'Resetting to defaults...');
+  btn.textContent = 'Deleting...';
+  showStatus('loading', 'Deleting profile...');
 
   try {
-    const resp = await fetch('/api/llm-settings/reset', { method: 'POST' });
-    const data = await resp.json();
+    const resp = await fetch('/api/llm-settings', {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const settings = await resp.json();
+
+    if (settings.profiles.length <= 1) {
+      showStatus('error', 'Cannot delete the only profile.');
+      btn.disabled = false;
+      btn.textContent = 'Delete Profile';
+      btn.classList.remove('btn--danger');
+      btn.classList.add('btn--ghost');
+      return;
+    }
+
+    settings.profiles = settings.profiles.filter((p) => p.id !== profileId);
+    if (settings.activeProfileId === profileId) {
+      settings.activeProfileId = settings.profiles[0].id;
+    }
+
+    const saveResp = await fetch('/api/llm-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    const data = await saveResp.json();
     if (data.success) {
       htmx.ajax('GET', '/fragments/settings/llm', { target: '#chat', swap: 'innerHTML' });
     } else {
-      showStatus('error', 'Failed to reset: ' + (data.error || 'Unknown error'));
-      btn.disabled = false;
-      btn.textContent = 'Reset to Defaults';
-      btn.classList.remove('btn--danger');
-      btn.classList.add('btn--ghost');
+      showStatus('error', 'Failed to delete: ' + (data.error || 'Unknown error'));
     }
   } catch (e) {
-    showStatus('error', 'Failed to reset: ' + e.message);
-    btn.disabled = false;
-    btn.textContent = 'Reset to Defaults';
-    btn.classList.remove('btn--danger');
-    btn.classList.add('btn--ghost');
+    showStatus('error', 'Failed to delete: ' + e.message);
   }
 }
+
+// Initialize provider note visibility on page load
+(function() {
+  const provider = document.getElementById('llm-provider')?.value;
+  const preset = provider ? PROVIDER_PRESETS[provider] : null;
+  const thinkingNote = document.getElementById('thinking-provider-note');
+  if (thinkingNote && preset) {
+    thinkingNote.style.display = preset.supportsThinking ? 'none' : 'block';
+  }
+})();
 </script>
 `;
+}
+
+/**
+ * Render an SVG icon for a given LLM provider.
+ */
+function renderProviderIcon(provider: LLMProvider): string {
+  const icons: Record<string, string> = {
+    openrouter: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M22 2L11 13"/><path d="M22 2L15 22L11 13L2 9L22 2Z"/>
+    </svg>`,
+    openai: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
+    </svg>`,
+    alibaba: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+    </svg>`,
+    nanogpt: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+    </svg>`,
+    custom: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+    </svg>`,
+  };
+  return icons[provider] || icons.custom;
+}
+
+/**
+ * Render the LLM settings view (legacy, kept for backward compat).
+ * @deprecated Use renderLLMProfileHub and renderLLMProfileEdit instead.
+ */
+export function renderLLMSettings(_settings: LLMSettings): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">LLM Settings</h1>
+        <p class="settings-desc">Configure model connection, sampling parameters, and generation limits</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+    <div class="llm-status" style="display:block;">This settings page has been updated. Please refresh.</div>
+  </div>
+</div>`;
 }
 
 // =============================================================================

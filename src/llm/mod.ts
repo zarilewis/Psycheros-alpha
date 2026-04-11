@@ -1,9 +1,9 @@
 /**
  * LLM Module
  *
- * Provides the LLM client for communicating with the Z.ai API.
- * This module exports all types and the client class for use
- * throughout the Psycheros daemon.
+ * Provides the LLM client and settings management for multi-provider
+ * LLM connection profiles. This module exports all types and the client
+ * class for use throughout the Psycheros daemon.
  */
 
 // Re-export types (only those used externally)
@@ -12,11 +12,36 @@ export type { ChatMessage, LLMConfig, StreamChunk } from "./types.ts";
 export { LLMError } from "./types.ts";
 
 // Re-export client
-export { createDefaultClient, createWorkerClient, LLMClient } from "./client.ts";
+export { createDefaultClient, createWorkerClient, createClientFromProfile, LLMClient } from "./client.ts";
+
+// Re-export provider presets and profile types
+export type {
+  LLMProvider,
+  LLMConnectionProfile,
+  LLMProfileSettings,
+  LLMProviderPreset,
+} from "./provider-presets.ts";
+export {
+  LLM_PROVIDER_PRESETS,
+  inferProvider,
+  inferProviderName,
+  createDefaultProfile,
+} from "./provider-presets.ts";
 
 // Re-export settings
 export type { LLMSettings } from "./settings.ts";
-export { loadSettings, saveSettings, getDefaultSettings, maskApiKey } from "./settings.ts";
+export {
+  loadSettings,
+  saveSettings,
+  getDefaultSettings,
+  maskApiKey,
+  // Profile-based settings
+  loadProfileSettings,
+  saveProfileSettings,
+  maskProfileSettings,
+  getActiveProfile,
+  profileToLLMSettings,
+} from "./settings.ts";
 
 // Re-export web search settings
 export type { WebSearchSettings } from "./web-search-settings.ts";

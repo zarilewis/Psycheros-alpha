@@ -172,14 +172,19 @@ Settings stored in `.psycheros/general-settings.json`. Defaults: `{ "entityName"
 
 Settings stored in `.psycheros/sa-settings.json`. Shape: `{ "enabled": boolean }`. Defaults to `{ "enabled": true }`. When enabled, the entity receives a `<situational_awareness>` XML block in its system message each turn containing the last user interaction (cross-thread, excluding Pulses) and the user's current device type.
 
-### LLM Settings
+### LLM Settings (Multi-Provider Profiles)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/llm-settings` | Get current LLM settings |
-| `POST` | `/api/llm-settings` | Save LLM settings |
+| `GET` | `/api/llm-settings` | Get all profiles and active ID (API keys masked) |
+| `POST` | `/api/llm-settings` | Bulk save (used by delete operations) |
+| `POST` | `/api/llm-settings/profile` | Add or update a single profile (server-side merge) |
+| `POST` | `/api/llm-settings/set-active` | Set active profile by ID (triggers entity-core restart if connected) |
 | `POST` | `/api/llm-settings/reset` | Reset to environment variable defaults |
-| `POST` | `/api/llm-settings/test` | Test LLM connection |
+| `POST` | `/api/llm-settings/test` | Test connection for a profile (accepts partial profile) |
+| `GET` | `/fragments/settings/llm` | Hub view (card grid of all profiles) |
+| `GET` | `/fragments/settings/llm/new` | New profile edit form |
+| `GET` | `/fragments/settings/llm/:id` | Edit existing profile form |
 
 ### Web Search Settings
 

@@ -8,7 +8,7 @@
  */
 
 import { DBClient } from "../db/mod.ts";
-import { createDefaultClient, type LLMClient, type LLMSettings, type WebSearchSettings, type DiscordSettings, type HomeSettings, type ImageGenSettings, loadSettings, saveSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings, loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings } from "../llm/mod.ts";
+import { createClientFromProfile, createDefaultClient, type LLMClient, type LLMSettings, type LLMProfileSettings, type LLMConnectionProfile, type WebSearchSettings, type DiscordSettings, type HomeSettings, type ImageGenSettings, loadProfileSettings, saveProfileSettings, getActiveProfile, profileToLLMSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings, loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSettings, getEnabledToolNames, loadCustomTools, ToolRegistry, type ToolsSettings } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import type { MemoryIndexer } from "../rag/indexer.ts";
@@ -98,8 +98,11 @@ import {
   handleAppearanceSettingsFragment,
   handleGetLLMSettings,
   handleSaveLLMSettings,
+  handleSaveLLMProfile,
   handleTestLLMConnection,
+  handleSetActiveProfile,
   handleLLMSettingsFragment,
+  handleLLMProfileEditFragment,
   handleGetGeneralSettings,
   handleSaveGeneralSettings,
   handleGeneralSettingsFragment,
@@ -246,7 +249,7 @@ export class Server {
   private mcpClient: MCPClient | null = null;
   private lorebookManager: LorebookManager;
   private vaultManager: VaultManager;
-  private llmSettings: LLMSettings;
+  private llmProfileSettings: LLMProfileSettings;
   private webSearchSettings: WebSearchSettings;
   private discordSettings: DiscordSettings;
   private homeSettings: HomeSettings;
@@ -267,22 +270,9 @@ export class Server {
     const dbPath = config.dbPath || `${config.projectRoot}/.psycheros/psycheros.db`;
     this.db = new DBClient(dbPath);
 
-    // Initialize LLM client with defaults (will be reloaded from settings in init())
+    // Initialize LLM client with env-var defaults (will be reloaded from settings in init())
     this.llm = createDefaultClient();
-    this.llmSettings = {
-      baseUrl: Deno.env.get("ZAI_BASE_URL") || "https://api.z.ai/api/coding/paas/v4/chat/completions",
-      apiKey: Deno.env.get("ZAI_API_KEY") || "",
-      model: Deno.env.get("ZAI_MODEL") || "glm-4.7",
-      workerModel: Deno.env.get("ZAI_WORKER_MODEL") || "GLM-4.5-Air",
-      temperature: 0.7,
-      topP: 1,
-      topK: 0,
-      frequencyPenalty: 0,
-      presencePenalty: 0,
-      maxTokens: 4096,
-      contextLength: 128000,
-      thinkingEnabled: true,
-    };
+    this.llmProfileSettings = { profiles: [], activeProfileId: "" };
 
     // Initialize web search settings (will be reloaded from settings in init())
     this.webSearchSettings = {
@@ -345,7 +335,7 @@ export class Server {
    * Initialize async dependencies (must be called before start()).
    */
   async init(): Promise<void> {
-    this.llmSettings = await loadSettings(this.config.projectRoot);
+    this.llmProfileSettings = await loadProfileSettings(this.config.projectRoot);
     this.webSearchSettings = await loadWebSearchSettings(this.config.projectRoot);
     this.discordSettings = await loadDiscordSettings(this.config.projectRoot);
     this.homeSettings = await loadHomeSettings(this.config.projectRoot);
@@ -371,19 +361,82 @@ export class Server {
   }
 
   /**
-   * Get the current LLM settings.
+   * Get the current LLM settings (derived from active profile).
+   * @deprecated Use getLLMProfileSettings() or getActiveLLMProfile() instead.
    */
   getLLMSettings(): LLMSettings {
-    return this.llmSettings;
+    const active = getActiveProfile(this.llmProfileSettings);
+    return active ? profileToLLMSettings(active) : this.llmProfileSettings.profiles.length > 0
+      ? profileToLLMSettings(this.llmProfileSettings.profiles[0])
+      : {
+        baseUrl: "", apiKey: "", model: "", workerModel: "",
+        temperature: 0.7, topP: 1, topK: 0, frequencyPenalty: 0, presencePenalty: 0,
+        maxTokens: 4096, contextLength: 128000, thinkingEnabled: false,
+      };
   }
 
   /**
    * Update LLM settings, persist to disk, and hot-reload the client.
+   * @deprecated Use updateLLMProfileSettings() instead.
    */
   async updateLLMSettings(settings: LLMSettings): Promise<void> {
-    this.llmSettings = settings;
-    await saveSettings(this.config.projectRoot, settings);
+    const active = getActiveProfile(this.llmProfileSettings);
+    if (active) {
+      // Merge flat settings into the active profile
+      Object.assign(active, settings);
+      await this.updateLLMProfileSettings(this.llmProfileSettings);
+    }
+  }
+
+  /**
+   * Get the current LLM profile settings (all profiles + active ID).
+   */
+  getLLMProfileSettings(): LLMProfileSettings {
+    return this.llmProfileSettings;
+  }
+
+  /**
+   * Update LLM profile settings, persist to disk, and hot-reload the client.
+   */
+  async updateLLMProfileSettings(settings: LLMProfileSettings): Promise<void> {
+    this.llmProfileSettings = settings;
+    await saveProfileSettings(this.config.projectRoot, settings);
     this.reloadLLMClient();
+  }
+
+  /**
+   * Get the currently active LLM connection profile.
+   */
+  getActiveLLMProfile(): LLMConnectionProfile | null {
+    return getActiveProfile(this.llmProfileSettings);
+  }
+
+  /**
+   * Set the active LLM profile by ID, persist, and hot-reload the client.
+   * Optionally restarts entity-core to pick up new credentials.
+   */
+  async setActiveProfile(profileId: string): Promise<void> {
+    this.llmProfileSettings.activeProfileId = profileId;
+    await saveProfileSettings(this.config.projectRoot, this.llmProfileSettings);
+    this.reloadLLMClient();
+
+    // Restart entity-core to pick up new LLM credentials
+    if (this.mcpClient) {
+      const active = getActiveProfile(this.llmProfileSettings);
+      if (active) {
+        console.log("[Server] Restarting entity-core with updated LLM credentials...");
+        try {
+          await this.mcpClient.restart({
+            ENTITY_CORE_LLM_API_KEY: active.apiKey,
+            ENTITY_CORE_LLM_BASE_URL: active.baseUrl,
+            ENTITY_CORE_LLM_MODEL: active.model,
+          });
+          console.log("[Server] entity-core restarted successfully");
+        } catch (error) {
+          console.error("[Server] Failed to restart entity-core:", error instanceof Error ? error.message : String(error));
+        }
+      }
+    }
   }
 
   /**
@@ -467,21 +520,14 @@ export class Server {
   }
 
   /**
-   * Re-create the LLM client from current settings.
+   * Re-create the LLM client from the active profile.
    */
   private reloadLLMClient(): void {
-    this.llm = createDefaultClient({
-      baseUrl: this.llmSettings.baseUrl,
-      apiKey: this.llmSettings.apiKey,
-      model: this.llmSettings.model,
-      thinkingEnabled: this.llmSettings.thinkingEnabled,
-      temperature: this.llmSettings.temperature,
-      topP: this.llmSettings.topP,
-      topK: this.llmSettings.topK,
-      frequencyPenalty: this.llmSettings.frequencyPenalty,
-      presencePenalty: this.llmSettings.presencePenalty,
-      maxTokens: this.llmSettings.maxTokens,
-    });
+    const active = getActiveProfile(this.llmProfileSettings);
+    if (active && active.apiKey) {
+      this.llm = createClientFromProfile(active);
+    }
+    // If no active profile or no API key, keep the existing client (from env vars)
   }
 
   /**
@@ -751,8 +797,12 @@ export class Server {
       vaultManager: this.vaultManager,
       memoryIndexer: this.memoryIndexer ?? undefined,
       pulseEngine: this.pulseEngine ?? undefined,
-      getLLMSettings: () => this.llmSettings,
+      getLLMSettings: () => this.getLLMSettings(),
       updateLLMSettings: (settings) => this.updateLLMSettings(settings),
+      getLLMProfileSettings: () => this.llmProfileSettings,
+      updateLLMProfileSettings: (settings) => this.updateLLMProfileSettings(settings),
+      getActiveLLMProfile: () => this.getActiveLLMProfile(),
+      setActiveProfile: (profileId) => this.setActiveProfile(profileId),
       getWebSearchSettings: () => this.webSearchSettings,
       updateWebSearchSettings: (settings) => this.updateWebSearchSettings(settings),
       getDiscordSettings: () => this.discordSettings,
@@ -1189,9 +1239,14 @@ export class Server {
       return handleGetLLMSettings(ctx);
     }
 
-    // POST /api/llm-settings - Save settings
+    // POST /api/llm-settings - Save settings (bulk, used by delete)
     if (method === "POST" && path === "/api/llm-settings") {
       return await handleSaveLLMSettings(ctx, request);
+    }
+
+    // POST /api/llm-settings/profile - Add or update a single profile
+    if (method === "POST" && path === "/api/llm-settings/profile") {
+      return await handleSaveLLMProfile(ctx, request);
     }
 
     // POST /api/llm-settings/reset - Reset to defaults
@@ -1203,6 +1258,11 @@ export class Server {
     // POST /api/llm-settings/test - Test connection
     if (method === "POST" && path === "/api/llm-settings/test") {
       return await handleTestLLMConnection(ctx, request);
+    }
+
+    // POST /api/llm-settings/set-active - Set active profile
+    if (method === "POST" && path === "/api/llm-settings/set-active") {
+      return await handleSetActiveProfile(ctx, request);
     }
 
     // ========================================
@@ -1702,9 +1762,20 @@ export class Server {
     // LLM Settings Fragment Route
     // ========================================
 
-    // GET /fragments/settings/llm - LLM settings UI fragment
+    // GET /fragments/settings/llm - LLM settings hub (profile cards)
     if (path === "/fragments/settings/llm") {
       return handleLLMSettingsFragment(ctx);
+    }
+
+    // GET /fragments/settings/llm/new - New profile form
+    if (path === "/fragments/settings/llm/new") {
+      return handleLLMProfileEditFragment(ctx);
+    }
+
+    // GET /fragments/settings/llm/:id - Edit existing profile form
+    const llmProfileMatch = path.match(/^\/fragments\/settings\/llm\/([^/]+)$/);
+    if (llmProfileMatch && method === "GET") {
+      return handleLLMProfileEditFragment(ctx, llmProfileMatch[1]);
     }
 
     // GET /fragments/settings/web-search - Web search settings UI fragment

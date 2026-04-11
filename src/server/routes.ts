@@ -10,11 +10,11 @@
 
 import type { SSEEvent, TurnMetrics } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
-import type { LLMClient, LLMSettings } from "../llm/mod.ts";
+import type { LLMClient, LLMSettings, LLMProfileSettings, LLMConnectionProfile } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
 import type { DiscordSettings, HomeSettings } from "../llm/mod.ts";
 import type { ImageGenSettings } from "../llm/mod.ts";
-import { maskApiKey, getDefaultSettings, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings, getDefaultImageGenSettings, maskImageGenSettings } from "../llm/mod.ts";
+import { maskProfileSettings, createDefaultProfile, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings, getDefaultImageGenSettings, maskImageGenSettings } from "../llm/mod.ts";
 import { captionImage } from "../tools/describe-image.ts";
 import { uint8ToBase64, getMediaType as getImageMediaType } from "../tools/generate-image.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
@@ -50,7 +50,8 @@ import {
   renderLorebookDetailView,
   renderEntryEditor,
   renderAppearanceSettings,
-  renderLLMSettings,
+  renderLLMProfileHub,
+  renderLLMProfileEdit,
   renderSettingsHub,
   renderGeneralSettings,
   renderWebSearchSettings,
@@ -118,10 +119,18 @@ export interface RouteContext {
   vaultManager?: VaultManager;
   /** Optional memory indexer for reindexing after edits */
   memoryIndexer?: MemoryIndexer;
-  /** Get current LLM settings */
+  /** Get current LLM settings (derived from active profile) */
   getLLMSettings: () => LLMSettings;
   /** Update LLM settings and hot-reload */
   updateLLMSettings: (settings: LLMSettings) => Promise<void>;
+  /** Get current LLM profile settings (all profiles + active ID) */
+  getLLMProfileSettings: () => import("../llm/mod.ts").LLMProfileSettings;
+  /** Update LLM profile settings and hot-reload */
+  updateLLMProfileSettings: (settings: import("../llm/mod.ts").LLMProfileSettings) => Promise<void>;
+  /** Get the currently active LLM connection profile */
+  getActiveLLMProfile: () => import("../llm/mod.ts").LLMConnectionProfile | null;
+  /** Set the active LLM profile by ID */
+  setActiveProfile: (profileId: string) => Promise<void>;
   /** Get current web search settings */
   getWebSearchSettings: () => WebSearchSettings;
   /** Update web search settings and hot-reload tool registry */
@@ -964,7 +973,7 @@ export async function handleChat(
 
         // Start auto-title generation in parallel (runs concurrently with main response)
         const titlePromise = isFirstMessage
-          ? generateAndSetTitle(body.conversationId, userMessage, ctx.db)
+          ? generateAndSetTitle(body.conversationId, userMessage, ctx.db, { activeProfile: ctx.getActiveLLMProfile() ?? undefined })
           : null;
 
         // Update pulse engine's last user message timestamp (for inactivity triggers)
@@ -4242,15 +4251,12 @@ export async function handleServeBackground(
 // =============================================================================
 
 /**
- * Handle GET /api/llm-settings - Return current LLM settings (API key masked).
+ * Handle GET /api/llm-settings - Return current LLM profile settings (API keys masked).
  */
 export function handleGetLLMSettings(ctx: RouteContext): Response {
-  const settings = ctx.getLLMSettings();
-  const response = {
-    ...settings,
-    apiKey: maskApiKey(settings.apiKey),
-  };
-  return new Response(JSON.stringify(response), {
+  const settings = ctx.getLLMProfileSettings();
+  const masked = maskProfileSettings(settings);
+  return new Response(JSON.stringify(masked), {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
@@ -4259,33 +4265,27 @@ export function handleGetLLMSettings(ctx: RouteContext): Response {
 }
 
 /**
- * Handle POST /api/llm-settings - Save and apply LLM settings.
- * If the API key field contains the masked value, it keeps the existing key.
+ * Handle POST /api/llm-settings - Save and apply LLM profile settings.
+ * Accepts the full LLMProfileSettings object. Preserves existing API keys
+ * when the masked value is sent back.
  */
 export async function handleSaveLLMSettings(
   ctx: RouteContext,
   request: Request,
 ): Promise<Response> {
   try {
-    const body = await request.json() as Partial<LLMSettings>;
-    const current = ctx.getLLMSettings();
+    const body = await request.json() as LLMProfileSettings;
+    const current = ctx.getLLMProfileSettings();
 
-    const updated: LLMSettings = {
-      baseUrl: body.baseUrl ?? current.baseUrl,
-      apiKey: (body.apiKey && !body.apiKey.includes("••••")) ? body.apiKey : current.apiKey,
-      model: body.model ?? current.model,
-      workerModel: body.workerModel ?? current.workerModel,
-      temperature: body.temperature ?? current.temperature,
-      topP: body.topP ?? current.topP,
-      topK: body.topK ?? current.topK,
-      frequencyPenalty: body.frequencyPenalty ?? current.frequencyPenalty,
-      presencePenalty: body.presencePenalty ?? current.presencePenalty,
-      maxTokens: body.maxTokens ?? current.maxTokens,
-      contextLength: body.contextLength ?? current.contextLength,
-      thinkingEnabled: body.thinkingEnabled ?? current.thinkingEnabled,
-    };
+    // Preserve real API keys when masked values are sent back
+    for (const profile of body.profiles) {
+      const existing = current.profiles.find((p) => p.id === profile.id);
+      if (existing && profile.apiKey.includes("••••")) {
+        profile.apiKey = existing.apiKey;
+      }
+    }
 
-    await ctx.updateLLMSettings(updated);
+    await ctx.updateLLMProfileSettings(body);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: {
@@ -4309,15 +4309,78 @@ export async function handleSaveLLMSettings(
 }
 
 /**
+ * Handle POST /api/llm-settings/profile - Add or update a single profile.
+ * This eliminates the client-side read-modify-write race condition by doing
+ * the merge atomically on the server.
+ */
+export async function handleSaveLLMProfile(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as { profile: LLMConnectionProfile };
+    const profile = body.profile;
+
+    if (!profile || !profile.id || !profile.name) {
+      return new Response(
+        JSON.stringify({ error: "Profile must have id and name" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const settings = ctx.getLLMProfileSettings();
+    const existingIdx = settings.profiles.findIndex((p) => p.id === profile.id);
+
+    if (existingIdx >= 0) {
+      // Update existing profile — preserve real API key if masked value sent
+      const existing = settings.profiles[existingIdx];
+      if (profile.apiKey.includes("••••")) {
+        profile.apiKey = existing.apiKey;
+      }
+      settings.profiles[existingIdx] = profile;
+    } else {
+      // New profile — add it
+      settings.profiles.push(profile);
+      // Auto-set as active if it's the first profile or no active profile
+      if (!settings.activeProfileId || settings.profiles.length === 1) {
+        settings.activeProfileId = profile.id;
+      }
+    }
+
+    await ctx.updateLLMProfileSettings(settings);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (error) {
+    console.error("[Routes] handleSaveLLMProfile error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save profile" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
+}
+
+/**
  * Handle POST /api/llm-settings/reset - Reset to env-based defaults.
- * Deletes any saved overrides and reloads from environment variables.
+ * Replaces all profiles with a single default profile from environment variables.
  */
 export async function handleResetLLMSettings(
   ctx: RouteContext,
 ): Promise<Response> {
   try {
-    const defaults = getDefaultSettings();
-    await ctx.updateLLMSettings(defaults);
+    const defaultProfile = createDefaultProfile();
+    const settings: LLMProfileSettings = {
+      profiles: [defaultProfile],
+      activeProfileId: defaultProfile.id,
+    };
+    await ctx.updateLLMProfileSettings(settings);
 
     return new Response(JSON.stringify({ success: true }), {
       headers: {
@@ -4341,40 +4404,69 @@ export async function handleResetLLMSettings(
 }
 
 /**
- * Handle POST /api/llm-settings/test - Test the API connection.
- * Sends a minimal request and reports success/failure with latency.
+ * Handle POST /api/llm-settings/test - Test an LLM connection.
+ * Accepts a profile object (may not be saved yet). Preserves existing API key if masked.
  */
 export async function handleTestLLMConnection(
   ctx: RouteContext,
   request: Request,
 ): Promise<Response> {
   try {
-    // Allow testing with provided settings before saving
-    let settings = ctx.getLLMSettings();
+    let baseUrl = "";
+    let apiKey = "";
+    let model = "";
+
     try {
-      const body = await request.json() as Partial<LLMSettings> | undefined;
+      const body = await request.json() as Partial<LLMConnectionProfile> | undefined;
       if (body) {
-        const current = ctx.getLLMSettings();
-        settings = {
-          ...current,
-          ...body,
-          apiKey: (body.apiKey && !body.apiKey.includes("••••")) ? body.apiKey : current.apiKey,
-        };
+        // If testing a specific profile, use its values
+        baseUrl = body.baseUrl || "";
+        model = body.model || "";
+        // Check if apiKey is masked — if so, look up the real key
+        if (body.apiKey && body.apiKey.includes("••••")) {
+          const current = ctx.getLLMProfileSettings();
+          const existing = body.id
+            ? current.profiles.find((p) => p.id === body.id)
+            : current.profiles.find((p) => p.baseUrl === baseUrl);
+          apiKey = existing?.apiKey || "";
+        } else {
+          apiKey = body.apiKey || "";
+        }
       }
     } catch {
-      // No body or invalid JSON - use current settings
+      // No body or invalid JSON
+    }
+
+    // Fall back to active profile if no values provided (empty form submit)
+    if (!baseUrl && !apiKey && !model) {
+      const active = ctx.getActiveLLMProfile();
+      if (active) {
+        baseUrl = active.baseUrl;
+        apiKey = active.apiKey;
+        model = active.model;
+      }
+    }
+
+    if (!baseUrl || !apiKey) {
+      return new Response(
+        JSON.stringify({ success: false, error: "No API key or base URL configured" }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
     }
 
     const startTime = performance.now();
 
-    const response = await fetch(settings.baseUrl, {
+    const response = await fetch(baseUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${settings.apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: settings.model,
+        model: model || "test",
         messages: [{ role: "user", content: "Hi" }],
         max_tokens: 5,
         stream: false,
@@ -4387,10 +4479,7 @@ export async function handleTestLLMConnection(
       return new Response(
         JSON.stringify({ success: true, latency }),
         {
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         },
       );
     } else {
@@ -4407,10 +4496,7 @@ export async function handleTestLLMConnection(
         JSON.stringify({ success: false, error: errorMsg, latency }),
         {
           status: 200,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
-          },
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
         },
       );
     }
@@ -4420,20 +4506,86 @@ export async function handleTestLLMConnection(
       JSON.stringify({ success: false, error: "Connection failed" }),
       {
         status: 200,
-        headers: {
-          "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
-        },
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       },
     );
   }
 }
 
 /**
- * Handle GET /fragments/settings/llm - LLM settings UI fragment.
+ * Handle POST /api/llm-settings/set-active - Set the active LLM profile.
+ */
+export async function handleSetActiveProfile(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as { profileId: string };
+    if (!body.profileId) {
+      return new Response(
+        JSON.stringify({ error: "profileId is required" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const settings = ctx.getLLMProfileSettings();
+    const exists = settings.profiles.some((p) => p.id === body.profileId);
+    if (!exists) {
+      return new Response(
+        JSON.stringify({ error: "Profile not found" }),
+        {
+          status: 404,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    await ctx.setActiveProfile(body.profileId);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (error) {
+    console.error("[Routes] handleSetActiveProfile error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to set active profile" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/llm - LLM settings hub (profile cards).
  */
 export function handleLLMSettingsFragment(ctx: RouteContext): Response {
-  const html = renderLLMSettings(ctx.getLLMSettings());
+  const settings = ctx.getLLMProfileSettings();
+  const html = renderLLMProfileHub(settings);
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/llm/new - New profile form.
+ * Handle GET /fragments/settings/llm/:id - Edit existing profile form.
+ */
+export function handleLLMProfileEditFragment(ctx: RouteContext, profileId?: string): Response {
+  const settings = ctx.getLLMProfileSettings();
+  const profile = profileId ? settings.profiles.find((p) => p.id === profileId) : undefined;
+  const isNew = !profile;
+  const html = renderLLMProfileEdit(
+    profile || undefined,
+    isNew,
+    settings.activeProfileId,
+  );
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

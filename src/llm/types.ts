@@ -24,6 +24,13 @@ export interface LLMConfig {
   model: string;
   /** Whether to enable chain-of-thought reasoning */
   thinkingEnabled: boolean;
+  /**
+   * Provider type. Only "custom" providers (e.g. Z.ai) send the
+   * thinking: { type: "enabled" } parameter. Other providers (OpenRouter,
+   * OpenAI, etc.) may still return reasoning_content in SSE chunks
+   * without needing this parameter.
+   */
+  provider?: string;
   /** Default sampling temperature (0-2) */
   temperature?: number;
   /** Default top-p (nucleus) sampling (0-1) */
@@ -86,7 +93,10 @@ export interface ChatRequest {
  */
 export interface ChatDelta {
   content?: string;
+  /** Zhipu/Z.ai chain-of-thought reasoning (stripped by some proxies like OpenRouter) */
   reasoning_content?: string;
+  /** Alternative field name used by some providers for reasoning */
+  reasoning?: string;
   tool_calls?: Array<{
     index: number;
     id?: string;

@@ -6,7 +6,8 @@
  * persistent SSE channel.
  */
 
-import { createWorkerClient } from "../llm/mod.ts";
+import { createWorkerClient, createClientFromProfile } from "../llm/mod.ts";
+import type { LLMClient, LLMConnectionProfile } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import { updateConversationTitle } from "../server/state-changes.ts";
 import { getBroadcaster } from "../server/broadcaster.ts";
@@ -27,9 +28,11 @@ export async function generateAndSetTitle(
   conversationId: string,
   userMessage: string,
   db: DBClient,
+  options?: { workerClient?: LLMClient; activeProfile?: LLMConnectionProfile },
 ): Promise<{ success: boolean; title?: string }> {
   try {
-    const workerClient = createWorkerClient();
+    const workerClient = options?.workerClient
+      ?? (options?.activeProfile ? createClientFromProfile(options.activeProfile, { useWorker: true, thinkingEnabled: false }) : createWorkerClient());
 
     let generatedTitle = "";
     for await (const chunk of workerClient.chatStream([

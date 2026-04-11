@@ -87,6 +87,13 @@ console.log(`Press Ctrl+C to stop\n`);
 let mcpClient: MCPClient | undefined;
 const mcpEnabled = Deno.env.get("PSYCHEROS_MCP_ENABLED") !== "false";
 
+// Load LLM profile settings for entity-core env vars
+const { loadProfileSettings, getActiveProfile } = await import("./llm/mod.ts");
+const activeProfile = getActiveProfile(await loadProfileSettings(config.projectRoot));
+if (activeProfile) {
+  console.log(`Active LLM profile: "${activeProfile.name}" (${activeProfile.provider}) — ${activeProfile.model}`);
+}
+
 if (mcpEnabled) {
   const mcpCommand = Deno.env.get("PSYCHEROS_MCP_COMMAND") || "/home/zari/.deno/bin/deno";
   const entityCoreRoot = Deno.env.get("PSYCHEROS_ENTITY_CORE_PATH") || join(config.projectRoot, "..", "entity-core");
@@ -103,11 +110,10 @@ if (mcpEnabled) {
     instanceId: mcpInstance,
     env: {
       ENTITY_CORE_DATA_DIR: entityCoreDataDir,
-      // Entity-core LLM settings — fall back to Psycheros ZAI_* vars,
-      // but prefer entity-core specific vars if set
-      ENTITY_CORE_LLM_API_KEY: Deno.env.get("ENTITY_CORE_LLM_API_KEY") || Deno.env.get("ZAI_API_KEY") || "",
-      ENTITY_CORE_LLM_BASE_URL: Deno.env.get("ENTITY_CORE_LLM_BASE_URL") || Deno.env.get("ZAI_BASE_URL") || "",
-      ENTITY_CORE_LLM_MODEL: Deno.env.get("ENTITY_CORE_LLM_MODEL") || Deno.env.get("ZAI_MODEL") || "",
+      // Entity-core LLM settings — prefer entity-core specific vars, then active profile, then ZAI_* vars
+      ENTITY_CORE_LLM_API_KEY: Deno.env.get("ENTITY_CORE_LLM_API_KEY") || activeProfile?.apiKey || Deno.env.get("ZAI_API_KEY") || "",
+      ENTITY_CORE_LLM_BASE_URL: Deno.env.get("ENTITY_CORE_LLM_BASE_URL") || activeProfile?.baseUrl || Deno.env.get("ZAI_BASE_URL") || "",
+      ENTITY_CORE_LLM_MODEL: Deno.env.get("ENTITY_CORE_LLM_MODEL") || activeProfile?.model || Deno.env.get("ZAI_MODEL") || "",
       ENTITY_CORE_LLM_TEMPERATURE: Deno.env.get("ENTITY_CORE_LLM_TEMPERATURE") || "",
       ENTITY_CORE_LLM_MAX_TOKENS: Deno.env.get("ENTITY_CORE_LLM_MAX_TOKENS") || "",
       // Also pass ZAI_* directly for any code paths that read those

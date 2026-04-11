@@ -206,6 +206,27 @@ export class MCPClient {
   }
 
   /**
+   * Restart the MCP server connection with updated environment variables.
+   * Disconnects (with sync), updates env vars, and reconnects.
+   *
+   * @param newEnv - Environment variables to merge into the existing config
+   */
+  async restart(newEnv?: Record<string, string>): Promise<boolean> {
+    console.log("[MCP] Restarting entity-core connection...");
+
+    // Update env vars if provided
+    if (newEnv) {
+      this.config.env = { ...this.config.env, ...newEnv };
+    }
+
+    // Disconnect (triggers final sync)
+    await this.disconnect();
+
+    // Reconnect
+    return await this.connect();
+  }
+
+  /**
    * Check if connected to MCP server.
    */
   isConnected(): boolean {
