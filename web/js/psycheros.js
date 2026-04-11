@@ -323,7 +323,10 @@ function initPersistentSSE() {
   persistentSSE.addEventListener('pulse_complete', (event) => {
     try {
       const { conversationId } = JSON.parse(event.data);
-      if (!pulseStreamed && !pulseAssistantEl && conversationId === currentConversationId) {
+      // Don't reload the conversation if the user is viewing settings —
+      // they'll see the Pulse response when they navigate back to the chat.
+      const viewingSettings = document.getElementById('settings-content') !== null;
+      if (!pulseStreamed && !pulseAssistantEl && conversationId === currentConversationId && !viewingSettings) {
         // Streaming was missed entirely — reload the conversation to show the response
         loadConversationFromUrl(conversationId);
       }
@@ -378,7 +381,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.visibilityState === 'visible') {
       initPersistentSSE();
 
-      if (currentConversationId) {
+      // Don't reload the conversation if the user is viewing settings,
+      // so their in-progress work isn't lost when they switch windows.
+      const viewingSettings = document.getElementById('settings-content') !== null;
+
+      if (currentConversationId && !viewingSettings) {
         // Preserve unsent message text across the reload
         const input = document.getElementById('message-input');
         const unsentText = input?.value || '';

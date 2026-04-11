@@ -461,7 +461,7 @@ When `PSYCHEROS_DISPLAY_TZ` (or `TZ`) is set, daily/weekly/monthly and one-shot 
 - Input is disabled during Pulse streaming; the stop button appears (double-tap to confirm)
 - Chat auto-scrolls as Pulse content arrives
 - Pulse message metadata (pulse_id, pulse_name) is stored on messages for traceability
-- **Streaming fallback**: If the persistent SSE connection drops during pulse execution (common during idle periods), a `pulse_complete` event triggers a conversation reload so the response is always visible even when real-time streaming was missed
+- **Streaming fallback**: If the persistent SSE connection drops during pulse execution (common during idle periods), a `pulse_complete` event triggers a conversation reload so the response is always visible even when real-time streaming was missed. Recovery is suppressed while viewing settings to avoid interrupting in-progress work — the Pulse response is visible once the user returns to the chat
 
 **Pulse Chaining:**
 - Pulses can chain into other Pulses for complex workflows
