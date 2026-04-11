@@ -24,7 +24,7 @@ const CAPTION_PROMPT =
 /**
  * Caption an image using base64 data via the configured provider.
  */
-export async function captionImage(
+export function captionImage(
   imageData: string,
   mediaType: string,
   settings: CaptioningSettings,
