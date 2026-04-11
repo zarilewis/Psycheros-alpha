@@ -2272,6 +2272,71 @@ ${content.trim()}
   }
 }
 
+/**
+ * Handle DELETE /api/memories/significant/:filename - Delete a significant memory.
+ */
+export async function handleDeleteSignificantMemory(
+  ctx: RouteContext,
+  filename: string,
+): Promise<Response> {
+  // Validate filename — must end with .md, no path separators
+  const decoded = decodeURIComponent(filename);
+  if (!isValidFilename(decoded)) {
+    return new Response(
+      JSON.stringify({ error: "Invalid filename" }),
+      {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  const filePath = `significant/${decoded}`;
+  const fullPath = `${ctx.projectRoot}/memories/${filePath}`;
+
+  try {
+    await Deno.stat(fullPath);
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Memory not found" }),
+      {
+        status: 404,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  try {
+    await Deno.remove(fullPath);
+    console.log(`[Routes] Deleted significant memory: ${filePath}`);
+
+    // Remove from RAG index
+    if (ctx.memoryIndexer) {
+      try {
+        ctx.memoryIndexer.removeFile(filePath);
+      } catch (error) {
+        console.error("[Routes] RAG remove failed (non-fatal):", error instanceof Error ? error.message : String(error));
+      }
+    }
+
+    return new Response(
+      JSON.stringify({ success: true }),
+      {
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  } catch (error) {
+    console.error("[Routes] handleDeleteSignificantMemory error:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to delete memory" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+  }
+}
+
 // =============================================================================
 // Memory Consolidation Routes
 // =============================================================================

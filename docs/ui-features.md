@@ -395,7 +395,7 @@ Review and edit the entity's recorded memories accessible via Settings → Memor
 - File lists sorted newest-first, each linking to a full editor
 - Editor displays read-only metadata (source instance, created/updated timestamps, version) when available from entity-core
 - Save writes the local file, pushes an overwrite update to entity-core via MCP (if connected), and reindexes the file in RAG
-- Significant tab includes a Create form for manually adding new significant memories
+- Significant tab includes a Create form for manually adding new significant memories, and a Delete button on each memory with confirmation
 - Catch-up tab shows consolidation status (weekly/monthly/yearly) with a Run Catch-up button that backfills all missed periods in the background, with results displayed via SSE
 - Works in offline mode (no MCP) — edits are saved locally only
 
@@ -425,6 +425,7 @@ Review and edit the entity's recorded memories accessible via Settings → Memor
 - `GET /fragments/settings/memories/:granularity/:date` — editor
 - `POST /api/memories/:granularity/:date` — save edited memory
 - `POST /api/memories/significant/create` — create new significant memory
+- `DELETE /api/memories/significant/:filename` — delete a significant memory
 - `POST /api/memories/consolidation/run` — run catch-up consolidation
 
 **Source files:** `src/server/templates.ts` (render functions), `src/server/routes.ts` (handlers), `src/mcp-client/mod.ts` (MCP methods), `src/rag/indexer.ts` (reindexFile)

@@ -57,6 +57,7 @@ import {
   handleMemoriesEditorFragment,
   handleSaveMemory,
   handleCreateSignificantMemory,
+  handleDeleteSignificantMemory,
   handleConsolidationFragment,
   handleConsolidationRun,
   handleListSnapshots,
@@ -963,6 +964,13 @@ export class Server {
     // Must be before the :granularity/:date catch-all
     if (method === "POST" && path === "/api/memories/significant/create") {
       return await handleCreateSignificantMemory(ctx, request);
+    }
+
+    // DELETE /api/memories/significant/:filename - Delete a significant memory
+    const deleteSignificantMatch = path.match(/^\/api\/memories\/significant\/(.+)$/);
+    if (method === "DELETE" && deleteSignificantMatch) {
+      const filename = deleteSignificantMatch[1];
+      return await handleDeleteSignificantMemory(ctx, filename);
     }
 
     // POST /api/memories/:granularity/:date - Save edited memory

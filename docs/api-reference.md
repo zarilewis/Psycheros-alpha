@@ -72,6 +72,7 @@ Chat request body: `{ "conversationId": string, "message": string, "attachmentId
 | `POST` | `/api/memories/consolidation/run` | Run catch-up consolidation for all missed periods |
 | `POST` | `/api/memories/:granularity/:date` | Save edited memory (writes local file, pushes MCP update, reindexes RAG) |
 | `POST` | `/api/memories/significant/create` | Create new significant memory |
+| `DELETE` | `/api/memories/significant/:filename` | Delete a significant memory (removes file, clears RAG index) |
 
 ### Identity / Core Prompts
 
