@@ -355,6 +355,9 @@ export class Server {
     this.reloadLLMClient();
     this.reloadToolRegistry();
 
+    // Index any vault template files seeded by init that aren't in the DB yet
+    await this.vaultManager.indexSeededTemplates();
+
     // Load general settings to set PSYCHEROS_DISPLAY_TZ for server-side timestamp formatting
     try {
       const settingsText = await Deno.readTextFile(`${this.config.projectRoot}/.psycheros/general-settings.json`);

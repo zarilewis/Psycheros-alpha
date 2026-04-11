@@ -130,6 +130,52 @@ export class VaultManager {
   }
 
   // ===========================================================================
+  // Template Seeding
+  // ===========================================================================
+
+  /**
+   * Seed vault documents from templates/vault/ into the global vault.
+   * Each template .md file is read, registered with the vault manager
+   * (creating a DB record, file on disk, and embeddings), and skipped
+   * on subsequent startups if already indexed.
+   * Called once during server startup.
+   */
+  async indexSeededTemplates(): Promise<void> {
+    const templateDir = join(this.projectRoot, "templates", "vault");
+
+    try {
+      for await (const entry of Deno.readDir(templateDir)) {
+        if (!entry.isFile) continue;
+        if (!entry.name.endsWith(".md")) continue;
+
+        // Derive a human-readable title from the filename
+        const title = entry.name.replace(/\.[^.]+$/, "")
+          .replace(/[-_]+/g, " ")
+          .replace(/\b\w/g, (c) => c.toUpperCase());
+
+        // Check if a document with this title already exists in the vault
+        const db = this.db.getRawDb();
+        const stmt = db.prepare(
+          "SELECT id FROM vault_documents WHERE title = ? AND scope = 'global'"
+        );
+        const existing = stmt.get<{ id: string }>(title);
+        stmt.finalize();
+
+        if (existing) continue;
+
+        // Not yet indexed — read template and register it
+        const content = await Deno.readTextFile(join(templateDir, entry.name));
+        const doc = await this.createFromContent(title, content, {
+          scope: "global",
+        });
+        console.log(`[Vault] Indexed seeded template: "${doc.title}"`);
+      }
+    } catch {
+      // templates/vault/ directory doesn't exist — nothing to seed
+    }
+  }
+
+  // ===========================================================================
   // Document CRUD
   // ===========================================================================
 

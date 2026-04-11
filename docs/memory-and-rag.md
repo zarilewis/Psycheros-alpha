@@ -119,6 +119,7 @@ Eager RAG over user-uploaded and entity-created reference documents. Documents a
 **Document storage:**
 - Users upload via Settings → Data Vault UI or `POST /api/vault` (supports .md, .txt, .pdf, .docx, .xlsx)
 - Entity creates/updates via `vault` tool (saved as markdown)
+- Template seeding: `.md` files in `templates/vault/` are automatically indexed into the global vault on first startup (skipped if already present). Used for pre-populated documents like welcome messages.
 - Files stored at `data/vault/documents/{global|chat-{convId}}/`
 - Content extracted, chunked (512 tokens), embedded (all-MiniLM-L6-v2, 384 dims)
 

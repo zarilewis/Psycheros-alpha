@@ -60,7 +60,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/lorebook/mod.ts` | Lorebook/world info system |
 | `src/vault/mod.ts` | Data Vault — document storage and eager RAG |
 | `src/db/schema.ts` | Database schema, migrations, vector table sync |
-| `src/init/mod.ts` | Initialization — seeds identity and custom-tools directories |
+| `src/init/mod.ts` | Initialization — seeds identity, custom-tools, and vault template directories |
 | `src/pulse/engine.ts` | Pulse system — autonomous scheduled entity prompts |
 | `src/pulse/routes.ts` | Pulse API routes, CRUD, triggers, webhook endpoint |
 | `src/pulse/templates.ts` | Pulse UI — settings hub card, editor, execution log |
@@ -123,7 +123,7 @@ Psycheros supports third-party integrations organized under two tabs in Settings
 
 **User data protection**:
 - `identity/`, `memories/`, `.snapshots/`, `data/vault/` are **runtime-only directories** — gitignored, never committed
-- To change identity defaults, edit `templates/identity/` (committed). `src/init/mod.ts` seeds `identity/` from templates on first run if empty. **Never `git add` files from `identity/`** — they contain user-specific entity data.
+- To change identity defaults, edit `templates/identity/` (committed). `src/init/mod.ts` seeds `identity/` from templates on first run if empty. Vault documents in `templates/vault/` are seeded into the global Data Vault on first startup. **Never `git add` files from `identity/`** — they contain user-specific entity data.
 - Entity-core is canonical source; local `identity/` is a cache when MCP is enabled
 
 ## Documentation Index
