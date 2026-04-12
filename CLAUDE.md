@@ -38,7 +38,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 |------|---------|
 | `src/main.ts` | Entry point, MCP initialization |
 | `src/types.ts` | Shared types (SSEEvent, LLMContextSnapshot, ToolCall) |
-| `src/entity/loop.ts` | Agentic loop — LLM calls, tool execution, context capture |
+| `src/entity/loop.ts` | Agentic loop — LLM calls, tool execution, context capture, image/tool-arg fading |
 | `src/entity/context.ts` | Context loading (supports MCP client) |
 | `src/server/routes.ts` | API endpoints and handlers |
 | `src/server/state-changes.ts` | Unified state mutations |
