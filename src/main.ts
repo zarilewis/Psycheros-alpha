@@ -95,7 +95,7 @@ if (activeProfile) {
 }
 
 if (mcpEnabled) {
-  const mcpCommand = Deno.env.get("PSYCHEROS_MCP_COMMAND") || "/home/zari/.deno/bin/deno";
+  const mcpCommand = Deno.env.get("PSYCHEROS_MCP_COMMAND") || "deno";
   const entityCoreRoot = Deno.env.get("PSYCHEROS_ENTITY_CORE_PATH") || join(config.projectRoot, "..", "entity-core");
   const mcpArgsStr = Deno.env.get("PSYCHEROS_MCP_ARGS") || `run -A --unstable-cron ${entityCoreRoot}/src/mod.ts`;
   const mcpArgs = mcpArgsStr.split(" ");

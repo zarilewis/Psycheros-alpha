@@ -98,7 +98,7 @@ const DEFAULT_CONFIG: Partial<MCPClientConfig> = {
   syncOnStartup: true,
   syncInterval: 5 * 60 * 1000, // 5 minutes
   offlineFallback: true,
-  denoPath: "/home/zari/.deno/bin/deno", // Full path to deno executable
+  denoPath: "deno",
 };
 
 /**
