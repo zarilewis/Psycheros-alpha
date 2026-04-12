@@ -48,7 +48,7 @@ The nested `<label class="toggle">` wrapper breaks `input:checked + .toggle-slid
 
 **Tabs:**
 - **System**: Identity sections (self, user, relationship), situational awareness, and the full assembled system message as collapsible sections with size badges
-- **RAG**: All five retrieval sources — memories, chat history, lorebook entries, data vault, knowledge graph
+- **RAG**: All five retrieval sources — memories, chat history, context book entries, data vault, knowledge graph
 - **Messages**: Conversation history sent to the LLM with role badges and collapsible content
 - **Tools**: Available tool definitions with parameters
 - **Metrics**: Per-section size breakdown, token counts, and context window utilization bar
