@@ -560,10 +560,14 @@ export class LLMClient {
 }
 
 /**
- * Create an LLM client with the default Z.ai configuration.
+ * Create an LLM client with the default configuration.
+ *
+ * If no API key is provided via options or ZAI_API_KEY env var, returns an
+ * unconfigured placeholder client. The server will still start and the user
+ * can configure a key through the web UI. Actual API calls will fail until
+ * a key is set.
  *
  * @param options - Optional configuration overrides
- * @throws LLMError if API key is not provided and ZAI_API_KEY env var is not set
  */
 export function createDefaultClient(
   options?: Partial<LLMConfig>,
@@ -571,10 +575,15 @@ export function createDefaultClient(
   const apiKey = options?.apiKey || Deno.env.get("ZAI_API_KEY");
 
   if (!apiKey) {
-    throw new LLMError(
-      "API key is required. Set ZAI_API_KEY environment variable or provide apiKey in options.",
-      "MISSING_API_KEY",
-    );
+    // No key yet — return an unconfigured client so the server can start.
+    // The user can set a key via Settings > LLM Settings in the web UI.
+    return new LLMClient({
+      baseUrl: "",
+      apiKey: "",
+      model: "",
+      thinkingEnabled: false,
+      provider: "custom",
+    });
   }
 
   const config: LLMConfig = {
@@ -599,7 +608,6 @@ export function createDefaultClient(
  * suitable for quick tasks like auto-titling conversations.
  *
  * @param options - Optional configuration overrides
- * @throws LLMError if API key is not provided and ZAI_API_KEY env var is not set
  */
 export function createWorkerClient(
   options?: Partial<LLMConfig>,
@@ -607,10 +615,13 @@ export function createWorkerClient(
   const apiKey = options?.apiKey || Deno.env.get("ZAI_API_KEY");
 
   if (!apiKey) {
-    throw new LLMError(
-      "API key is required. Set ZAI_API_KEY environment variable or provide apiKey in options.",
-      "MISSING_API_KEY",
-    );
+    return new LLMClient({
+      baseUrl: "",
+      apiKey: "",
+      model: "",
+      thinkingEnabled: false,
+      provider: "custom",
+    });
   }
 
   const config: LLMConfig = {
