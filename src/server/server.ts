@@ -1876,7 +1876,7 @@ export class Server {
 
     // GET /fragments/settings/vision/gallery - Gallery tab content
     if (path === "/fragments/settings/vision/gallery") {
-      return handleVisionGalleryFragment();
+      return handleVisionGalleryFragment(ctx);
     }
 
     // GET /fragments/settings/vision/image-gen/new - Create new generator slot

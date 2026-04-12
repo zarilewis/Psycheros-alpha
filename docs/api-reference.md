@@ -303,7 +303,7 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/settings/vision` | Vision settings hub (Generators, Anchors, Gallery tabs) |
 | `GET` | `/fragments/settings/vision/generators` | Generators tab content (HTMX fragment) |
 | `GET` | `/fragments/settings/vision/anchors` | Anchors tab content (HTMX fragment) |
-| `GET` | `/fragments/settings/vision/gallery` | Gallery tab content (HTMX fragment, loads images via API) |
+| `GET` | `/fragments/settings/vision/gallery` | Gallery tab content (HTMX fragment, server-rendered) |
 | `GET` | `/fragments/settings/vision/image-gen/new` | New image generator config fragment |
 | `GET` | `/fragments/settings/vision/image-gen/:id` | Edit image generator config fragment |
 | `GET` | `/fragments/settings/tools` | Tools settings UI fragment |

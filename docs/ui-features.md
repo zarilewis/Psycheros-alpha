@@ -288,16 +288,16 @@ Settings > Vision provides three tabs:
 
 **Anchors** — List of labeled reference images used as style/character guides by the `generate_image` tool. Each anchor shows a thumbnail, editable label and description fields, file size, and save/delete buttons. Upload form at bottom with file picker, label, and description inputs (max 10MB). Anchor images are stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table.
 
-**Gallery** — Browse all generated and user-uploaded images. Lazy-loaded via `GET /api/gallery/images` when the tab is first clicked. Features:
+**Gallery** — Browse all generated and user-uploaded images. Rendered server-side on tab load. Features:
 - Stats bar showing total count, disk usage, generated count, and uploaded count
 - CSS grid of thumbnail cards (150px min column width) with lazy loading
-- Each card shows: square thumbnail, truncated UUID filename (full on hover), copy-to-clipboard button, file size, and creation date
+- Each card shows: square thumbnail with category badge (generated/uploaded), truncated UUID filename (full on hover), copy-to-clipboard button, file size, and creation date
 - Generated image cards include prompt as hover tooltip
 - Full-screen lightbox overlay on thumbnail click (close via click-outside, Escape key, or X button)
-- Pagination: 24 images per page with "Load more" button
+- Pagination: 24 images per page with "Load more" button (fetches additional pages via `GET /api/gallery/images`)
 - View-only — no delete capability
 
-Implemented in `src/server/templates.ts` (`renderVisionSettings`, `renderVisionGeneratorsTab`, `renderVisionAnchorsTab`, `renderVisionGalleryTab`, `renderVisionTabActiveState`), `src/server/routes.ts` (`handleGalleryImages`, fragment handlers).
+Implemented in `src/server/templates.ts` (`renderVisionSettings`, `renderVisionGeneratorsTab`, `renderVisionAnchorsTab`, `renderVisionGalleryTab`, `renderVisionTabActiveState`), `src/server/routes.ts` (`scanGalleryImages`, `handleGalleryImages`, `handleVisionGalleryFragment`).
 
 ## LLM Connections
 

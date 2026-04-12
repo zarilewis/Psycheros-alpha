@@ -5430,9 +5430,69 @@ async function handleAnchorUpload() {
 
 /**
  * Render the Gallery tab content (loaded via HTMX fragment).
+ * Images are rendered server-side; load-more, lightbox, and copy are client-side.
  */
-export function renderVisionGalleryTab(): string {
+export function renderVisionGalleryTab(data: {
+  totalSize: number;
+  generatedCount: number;
+  userCount: number;
+  total: number;
+  hasMore: boolean;
+  images: Array<{
+    filename: string;
+    url: string;
+    category: string;
+    size: number;
+    createdAt: string;
+    prompt?: string;
+  }>;
+}): string {
   const oobTabs = renderVisionTabActiveState("gallery");
+
+  const totalMB = (data.totalSize / (1024 * 1024)).toFixed(1);
+  const totalKB = (data.totalSize / 1024).toFixed(1);
+  const sizeStr = data.totalSize >= 1024 * 1024 ? totalMB + " MB" : totalKB + " KB";
+
+  let cardsHtml = "";
+  if (data.images.length > 0) {
+    cardsHtml = data.images.map((img) => {
+      const sizeStr = img.size >= 1024 * 1024
+        ? (img.size / (1024 * 1024)).toFixed(1) + " MB"
+        : (img.size / 1024).toFixed(1) + " KB";
+      const dateStr = img.createdAt
+        ? new Date(img.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+        : "";
+      const shortName = img.filename.length > 20
+        ? img.filename.substring(0, 8) + "..." + img.filename.slice(-8)
+        : img.filename;
+      const promptAttr = img.prompt ? ` title="${escapeHtml(img.prompt)}"` : "";
+      const escapedUrl = escapeHtml(img.url);
+      const escapedFilename = escapeHtml(img.filename);
+      const categoryLabel = img.category === "generated" ? "generated" : "uploaded";
+      const categoryClass = img.category === "generated" ? "gallery-badge--generated" : "gallery-badge--user";
+      return `<div class="gallery-card" data-category="${escapeHtml(img.category)}"${promptAttr}>
+      <div class="gallery-thumb-wrap">
+        <img src="${escapedUrl}" class="gallery-thumb" loading="lazy" onclick="openLightbox('${escapedUrl}','${escapedFilename}')"/>
+        <span class="gallery-badge ${categoryClass}">${categoryLabel}</span>
+      </div>
+      <div class="gallery-meta">
+      <span class="gallery-filename" title="${escapedFilename}">${escapeHtml(shortName)}</span>
+      <button class="gallery-copy-btn" onclick="event.stopPropagation();copyFilename('${escapedFilename}',this)" title="Copy filename">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      </button>
+      </div>
+      <div class="gallery-info">${sizeStr} &middot; ${dateStr}</div>
+      </div>`;
+    }).join("");
+  }
+
+  const loadMoreHtml = data.hasMore
+    ? '<div class="gallery-load-more"><button class="btn btn--sm" onclick="loadMoreGallery()">Load more</button></div>'
+    : "";
+
+  const galleryContent = data.images.length === 0
+    ? '<div class="gallery-empty">No images yet</div>'
+    : `<div class="gallery-grid">${cardsHtml}</div>${loadMoreHtml}`;
 
   return `${oobTabs}
   <style>
@@ -5441,7 +5501,11 @@ export function renderVisionGalleryTab(): string {
     .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); }
     .gallery-card { border: 1px solid var(--c-border); border-radius: var(--radius-md); overflow: hidden; background: var(--c-bg); transition: border-color var(--transition); }
     .gallery-card:hover { border-color: var(--c-accent); }
+    .gallery-thumb-wrap { position: relative; }
     .gallery-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; cursor: pointer; display: block; }
+    .gallery-badge { position: absolute; top: 6px; left: 6px; font-size: 10px; font-weight: 500; padding: 1px 6px; border-radius: var(--radius-sm); pointer-events: none; text-transform: uppercase; letter-spacing: 0.3px; }
+    .gallery-badge--generated { background: rgba(0,0,0,0.65); color: #fff; }
+    .gallery-badge--user { background: rgba(255,255,255,0.85); color: #333; }
     .gallery-meta { padding: var(--sp-2); display: flex; align-items: center; gap: var(--sp-1); }
     .gallery-filename { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--c-fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; cursor: default; }
     .gallery-copy-btn { flex-shrink: 0; background: none; border: none; color: var(--c-fg-muted); cursor: pointer; padding: 2px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; transition: color var(--transition); }
@@ -5457,16 +5521,22 @@ export function renderVisionGalleryTab(): string {
     .gallery-lightbox-close:hover { background: rgba(255,255,255,0.2); }
   </style>
 
-<div id="gallery-container">
-  <div class="gallery-empty">Loading...</div>
+<div id="gallery-container" data-gallery-offset="${data.images.length}">
+  <div class="gallery-stats">
+    <span><strong>${data.total}</strong> images</span>
+    <span><strong>${sizeStr}</strong> total</span>
+    <span><strong>${data.generatedCount}</strong> generated</span>
+    <span><strong>${data.userCount}</strong> uploaded</span>
+  </div>
+  ${galleryContent}
 </div>
 
 <script>
-let galleryOffset = 0;
+let galleryOffset = ${data.images.length};
 
-(async function() {
-  await loadGallery(0);
-})();
+function loadMoreGallery() {
+  loadGallery(galleryOffset);
+}
 
 async function loadGallery(offset) {
   const container = document.getElementById('gallery-container');
@@ -5476,62 +5546,39 @@ async function loadGallery(offset) {
     const resp = await fetch('/api/gallery/images?offset=' + offset + '&limit=24');
     const data = await resp.json();
 
-    if (offset === 0) {
-      galleryOffset = 24;
-      const totalMB = (data.totalSize / (1024 * 1024)).toFixed(1);
-      const totalKB = (data.totalSize / 1024).toFixed(1);
-      const sizeStr = data.totalSize >= 1024 * 1024 ? totalMB + ' MB' : totalKB + ' KB';
+    galleryOffset = offset + 24;
+    const esc = function(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
 
-      let html = '<div class="gallery-stats">'
-        + '<span><strong>' + data.total + '</strong> images</span>'
-        + '<span><strong>' + sizeStr + '</strong> total</span>'
-        + '<span><strong>' + data.generatedCount + '</strong> generated</span>'
-        + '<span><strong>' + data.userCount + '</strong> uploaded</span>'
+    const cardsHtml = data.images.map(function(img) {
+      const sizeStr = img.size >= 1024 * 1024 ? (img.size / (1024 * 1024)).toFixed(1) + ' MB' : (img.size / 1024).toFixed(1) + ' KB';
+      const dateStr = img.createdAt ? new Date(img.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+      const shortName = img.filename.length > 20 ? img.filename.substring(0, 8) + '...' + img.filename.slice(-8) : img.filename;
+      const promptAttr = img.prompt ? ' title="' + esc(img.prompt) + '"' : '';
+      const catLabel = img.category === 'generated' ? 'generated' : 'uploaded';
+      const catClass = img.category === 'generated' ? 'gallery-badge--generated' : 'gallery-badge--user';
+      return '<div class="gallery-card" data-category="' + img.category + '"' + promptAttr + '>'
+        + '<div class="gallery-thumb-wrap">'
+        + '<img src="' + esc(img.url) + '" class="gallery-thumb" loading="lazy" onclick="openLightbox(\'' + esc(img.url) + '\',\'' + esc(img.filename) + '\')"/>'
+        + '<span class="gallery-badge ' + catClass + '">' + catLabel + '</span>'
+        + '</div>'
+        + '<div class="gallery-meta">'
+        + '<span class="gallery-filename" title="' + esc(img.filename) + '">' + esc(shortName) + '</span>'
+        + '<button class="gallery-copy-btn" onclick="event.stopPropagation();copyFilename(\'' + esc(img.filename) + '\',this)" title="Copy filename">'
+        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+        + '</button>'
+        + '</div>'
+        + '<div class="gallery-info">' + sizeStr + ' &middot; ' + dateStr + '</div>'
         + '</div>';
+    }).join('');
 
-      if (data.images.length === 0) {
-        html += '<div class="gallery-empty">No images yet</div>';
-      } else {
-        html += '<div class="gallery-grid">' + renderGalleryCards(data.images) + '</div>';
-        if (data.hasMore) html += '<div class="gallery-load-more"><button class="btn btn--sm" onclick="loadMoreGallery()">Load more</button></div>';
-      }
-      container.innerHTML = html;
-    } else {
-      galleryOffset = offset + 24;
-      const grid = container.querySelector('.gallery-grid');
-      if (grid) grid.insertAdjacentHTML('beforeend', renderGalleryCards(data.images));
-      const loadMoreDiv = container.querySelector('.gallery-load-more');
-      if (loadMoreDiv) loadMoreDiv.remove();
-      if (data.hasMore) container.insertAdjacentHTML('beforeend', '<div class="gallery-load-more"><button class="btn btn--sm" onclick="loadMoreGallery()">Load more</button></div>');
-    }
+    const grid = container.querySelector('.gallery-grid');
+    if (grid) grid.insertAdjacentHTML('beforeend', cardsHtml);
+    const loadMoreDiv = container.querySelector('.gallery-load-more');
+    if (loadMoreDiv) loadMoreDiv.remove();
+    if (data.hasMore) container.insertAdjacentHTML('beforeend', '<div class="gallery-load-more"><button class="btn btn--sm" onclick="loadMoreGallery()">Load more</button></div>');
   } catch (e) {
-    console.error('Failed to load gallery:', e);
-    if (offset === 0) container.innerHTML = '<div class="gallery-empty">Failed to load gallery</div>';
+    console.error('Failed to load more gallery images:', e);
   }
-}
-
-function loadMoreGallery() {
-  loadGallery(galleryOffset);
-}
-
-function renderGalleryCards(images) {
-  const esc = function(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
-  return images.map(function(img) {
-    const sizeStr = img.size >= 1024 * 1024 ? (img.size / (1024 * 1024)).toFixed(1) + ' MB' : (img.size / 1024).toFixed(1) + ' KB';
-    const dateStr = img.createdAt ? new Date(img.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-    const shortName = img.filename.length > 20 ? img.filename.substring(0, 8) + '...' + img.filename.slice(-8) : img.filename;
-    const promptAttr = img.prompt ? ' title="' + esc(img.prompt) + '"' : '';
-    return '<div class="gallery-card" data-category="' + img.category + '"' + promptAttr + '>'
-      + '<img src="' + esc(img.url) + '" class="gallery-thumb" loading="lazy" onclick="openLightbox(\'' + esc(img.url) + '\',\'' + esc(img.filename) + '\')"/>'
-      + '<div class="gallery-meta">'
-      + '<span class="gallery-filename" title="' + esc(img.filename) + '">' + esc(shortName) + '</span>'
-      + '<button class="gallery-copy-btn" onclick="event.stopPropagation();copyFilename(\'' + esc(img.filename) + '\',this)" title="Copy filename">'
-      + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
-      + '</button>'
-      + '</div>'
-      + '<div class="gallery-info">' + sizeStr + ' &middot; ' + dateStr + '</div>'
-      + '</div>';
-  }).join('');
 }
 
 async function copyFilename(filename, btn) {

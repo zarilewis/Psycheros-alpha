@@ -116,7 +116,7 @@ Image generation and visual analysis configured via Settings > Vision (top-level
 
 - **Image Generation** — Entity generates images via OpenRouter or Google Gemini. Supports multiple generator slots, anchor images for style/character reference, user image attachments, reference-based iteration (`input_image_path`), and auto-captioning of generated images. Auto-enables the `generate_image` tool when at least one generator is enabled. Settings persist to `.psycheros/image-gen-settings.json`. Generated images saved to `.psycheros/generated-images/`.
 - **Image Captioning** — Auto-captions chat attachments and generated images via a configurable vision model (Gemini or OpenRouter). Captions produce both shortform (under 15 words) and longform descriptions. Longform fades to shortform in context after 5 turns; `look_closer` tool retrieves full details. Also provides the `describe_image` tool. Configured under Settings > Vision > Generators tab. Auto-enables `describe_image` and `look_closer` when a captioning provider is configured.
-- **Gallery** — Browse all generated and user-uploaded images with thumbnails, metadata, copy-to-clipboard, and lightbox. Paginated (24/page), derived from filesystem + messages (no DB table).
+- **Gallery** — Browse all generated and user-uploaded images with thumbnails, category badges, metadata, copy-to-clipboard, and lightbox. Server-rendered on tab load with client-side pagination (24/page), derived from filesystem + messages (no DB table).
 
 ## Core Patterns
 
