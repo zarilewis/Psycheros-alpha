@@ -48,7 +48,7 @@ export const maintainIdentityTool: Tool = {
           operation: {
             type: "string",
             description:
-              "The operation to perform: 'append' (add to end), 'prepend' (add to beginning), 'update_section' (replace content under a heading), 'replace' (full file replacement)",
+              "The operation to perform: 'append' (add to end), 'prepend' (add to beginning), 'update_section' (append content under a heading), 'replace' (full file replacement)",
             enum: ["append", "prepend", "update_section", "replace"],
           },
           content: {
@@ -58,7 +58,7 @@ export const maintainIdentityTool: Tool = {
           section: {
             type: "string",
             description:
-              "Required for update_section: the heading name (without ##) of the section to update",
+              "Required for update_section: the heading name (without ##) of the section to append to",
           },
           reason: {
             type: "string",

@@ -29,7 +29,7 @@ export const customFileTool: Tool = {
           operation: {
             type: "string",
             description:
-              "The operation to perform: 'create' (new file, auto-wraps in XML tags), 'append' (add to end), 'prepend' (add to beginning), 'update_section' (replace content under a heading), 'replace' (overwrite entire file, creates snapshot)",
+              "The operation to perform: 'create' (new file, auto-wraps in XML tags), 'append' (add to end), 'prepend' (add to beginning), 'update_section' (append content under a heading), 'replace' (overwrite entire file, creates snapshot)",
             enum: VALID_OPERATIONS,
           },
           filename: {
@@ -45,7 +45,7 @@ export const customFileTool: Tool = {
           section: {
             type: "string",
             description:
-              "Required for update_section: the heading name (without ##) of the section to update.",
+              "Required for update_section: the heading name (without ##) of the section to append to.",
           },
         },
         required: ["operation", "filename"],

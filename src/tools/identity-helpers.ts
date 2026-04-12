@@ -138,8 +138,9 @@ export function prependToXmlContent(
 }
 
 /**
- * Update content within a specific markdown section.
+ * Append content within a specific markdown section.
  * Section is identified by a heading (e.g., "## Preferences").
+ * New content is added after any existing content in the section.
  */
 export function updateSection(
   existingContent: string,
@@ -179,8 +180,11 @@ export function updateSection(
     endIndex = headingEndIndex + nextMatch.index;
   }
 
-  // Build the new section content
-  const newSection = `${match[0]}\n${newSectionContent.trim()}`;
+  // Preserve existing content in the section and append new content after it
+  const existingSectionContent = innerContent.slice(headingEndIndex, endIndex).trim();
+  const newSection = existingSectionContent
+    ? `${match[0]}\n${existingSectionContent}\n\n${newSectionContent.trim()}`
+    : `${match[0]}\n${newSectionContent.trim()}`;
 
   // Reconstruct the content
   const newInnerContent =
