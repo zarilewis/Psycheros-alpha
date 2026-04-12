@@ -230,7 +230,7 @@ The `POST` handler supports partial updates: if the body contains only a `captio
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/anchor-images` | List all anchor images (metadata from DB) |
-| `POST` | `/api/anchor-images` | Upload anchor image (multipart: image file, label, description) |
+| `POST` | `/api/anchor-images` | Upload anchor image (multipart: image file, label, description; max 10MB) |
 | `PATCH` | `/api/anchor-images/:id` | Update anchor image label/description |
 | `DELETE` | `/api/anchor-images/:id` | Delete anchor image (file + DB row) |
 
@@ -248,7 +248,7 @@ Scans `.psycheros/generated-images/` and `.psycheros/chat-attachments/` director
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/chat-attachments` | Upload image attachment for chat (multipart: attachment file) |
+| `POST` | `/api/chat-attachments` | Upload image attachment for chat (multipart: attachment file; max 10MB) |
 | `GET` | `/chat-attachments/:filename` | Serve chat attachment image file |
 
 Attachments are stored in `.psycheros/chat-attachments/`. The chat request body includes an optional `attachmentId` field; if provided and captioning is configured, the attachment is auto-captioned via the configured vision model and prefixed to the user message as `[USER_IMAGE: /chat-attachments/filename | Caption: description]`. If captioning fails or is not configured, falls back to `[USER_IMAGE: /chat-attachments/filename]`.

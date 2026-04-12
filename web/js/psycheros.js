@@ -989,6 +989,10 @@ async function handleAttachment(input) {
     const formData = new FormData();
     formData.append('file', file);
     const resp = await fetch('/api/chat-attachments', { method: 'POST', body: formData });
+    if (!resp.ok) {
+      showToast('Failed to upload attachment');
+      return;
+    }
     const data = await resp.json();
     pendingAttachmentId = data.id;
     pendingAttachmentUrl = data.url;
@@ -3697,7 +3701,8 @@ globalThis.handleAnchorUpload = function() {
   formData.append('file', file);
   formData.append('label', document.getElementById('anchor-label').value || 'Unnamed');
   formData.append('description', document.getElementById('anchor-upload-desc').value || '');
-  fetch('/api/anchor-images', { method: 'POST', body: formData }).then(() => {
+  fetch('/api/anchor-images', { method: 'POST', body: formData }).then(resp => {
+    if (!resp.ok) showToast('Failed to upload anchor image');
     htmx.ajax('GET', '/fragments/settings/vision', '#chat');
   });
 };

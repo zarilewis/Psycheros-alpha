@@ -276,7 +276,7 @@ Users can attach images to chat messages for the entity to reference in generati
 - The entity can use `user_image_path` in `generate_image` to incorporate the attached image
 - The entity can use `describe_image` with the path to get a more detailed description
 
-**API:** `POST /api/chat-attachments` (multipart upload), returns `{ id, filename, url }`. Files stored in `.psycheros/chat-attachments/`. Captioning is handled server-side in `handleChat` before creating the entity turn.
+**API:** `POST /api/chat-attachments` (multipart upload, max 10MB), returns `{ id, filename, url }`. Files stored in `.psycheros/chat-attachments/`. Captioning is handled server-side in `handleChat` before creating the entity turn.
 
 Implemented in `web/js/psycheros.js` (`handleAttachment()`, `removeAttachment()`), `src/server/routes.ts` (`handleUploadChatAttachment`, auto-caption flow), `web/css/components.css` (`.attach-btn`, `.attachment-preview`, `.attachment-thumb`, `.attachment-remove`).
 
@@ -286,7 +286,7 @@ Settings > Vision provides three tabs:
 
 **Generators** — Card grid for managing image generation provider slots (OpenRouter, Gemini). Each card links to a config form for provider, model, API key, default params, and NSFW toggle. Includes captioning config section (provider, API key, model). Uses HTMX-driven tabs with OOB swaps for active state.
 
-**Anchors** — List of labeled reference images used as style/character guides by the `generate_image` tool. Each anchor shows a thumbnail, editable label and description fields, file size, and save/delete buttons. Upload form at bottom with file picker, label, and description inputs. Anchor images are stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table.
+**Anchors** — List of labeled reference images used as style/character guides by the `generate_image` tool. Each anchor shows a thumbnail, editable label and description fields, file size, and save/delete buttons. Upload form at bottom with file picker, label, and description inputs (max 10MB). Anchor images are stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table.
 
 **Gallery** — Browse all generated and user-uploaded images. Lazy-loaded via `GET /api/gallery/images` when the tab is first clicked. Features:
 - Stats bar showing total count, disk usage, generated count, and uploaded count

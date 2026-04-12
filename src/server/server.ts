@@ -898,7 +898,8 @@ export class Server {
       const contentLength = request.headers.get("content-length");
       if (contentLength) {
         const size = parseInt(contentLength);
-        const limit = path === "/api/backgrounds" ? MAX_UPLOAD_BODY_SIZE : MAX_REQUEST_BODY_SIZE;
+        const isUpload = path === "/api/backgrounds" || path === "/api/chat-attachments" || path === "/api/anchor-images";
+        const limit = isUpload ? MAX_UPLOAD_BODY_SIZE : MAX_REQUEST_BODY_SIZE;
         if (size > limit) {
           return new Response(
             JSON.stringify({ error: `Request body too large (max ${Math.round(limit / 1024 / 1024)}MB)` }),
