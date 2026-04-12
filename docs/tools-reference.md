@@ -170,7 +170,7 @@ For managing freeform custom files in `identity/custom/` — topics that don't f
 |------|-------------|
 | `custom_file` | Create and modify custom identity files |
 
-Operations: `create` (new file, content auto-wrapped in XML tags), `append` (add to end), `prepend` (add to beginning), `update_section` (replace content under a heading), `replace` (overwrite with snapshot). Filenames use `.md` extension with letters, numbers, and underscores only. Deletion is user-only via the Core Prompts UI.
+Operations: `create` (new file, content auto-wrapped in XML tags), `append` (add to end), `prepend` (add to beginning), `update_section` (append content under a markdown heading, preserves existing content), `replace` (overwrite with snapshot). Filenames use `.md` extension with letters, numbers, and underscores only. Deletion is user-only via the Core Prompts UI.
 
 ### MCP Fallback Pattern
 
