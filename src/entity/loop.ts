@@ -185,6 +185,50 @@ function fadeImageMarker(content: string): string {
   return content;
 }
 
+/**
+ * Tool names whose arguments are verbose and should be faded in context.
+ * These tools have their key info (image path, prompt) captured in the
+ * tool result content or IMAGE markers, so the full arguments are redundant.
+ */
+const FADE_ARGUMENT_TOOLS = new Set(["generate_image", "describe_image", "look_closer"]);
+
+/**
+ * Fade verbose tool call arguments to reduce token usage in context.
+ * For image-related tools, replaces the arguments JSON with a minimal
+ * version that preserves structure but removes verbose fields (long prompts,
+ * detailed descriptions). The LLM only needs the tool_call_id to match
+ * results; the arguments are redundant with tool result content.
+ */
+function fadeToolCallArguments(toolCalls: ToolCall[]): ToolCall[] {
+  return toolCalls.map((tc) => {
+    const name = tc.function.name;
+    if (!FADE_ARGUMENT_TOOLS.has(name)) return tc;
+
+    try {
+      const args = JSON.parse(tc.function.arguments) as Record<string, unknown>;
+      // Keep only structural fields, truncate verbose string fields
+      const faded: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(args)) {
+        if (typeof value === "string" && value.length > 50) {
+          faded[key] = value.slice(0, 50) + "... [truncated]";
+        } else {
+          faded[key] = value;
+        }
+      }
+      return {
+        ...tc,
+        function: {
+          ...tc.function,
+          arguments: JSON.stringify(faded),
+        },
+      };
+    } catch {
+      // If we can't parse the arguments, leave them as-is
+      return tc;
+    }
+  });
+}
+
 export class EntityTurn {
   private readonly maxToolIterations: number;
 
@@ -958,8 +1002,9 @@ export class EntityTurn {
       }
 
       // Add tool calls if present (for assistant messages)
+      // Fade verbose arguments for image tools to reduce token usage
       if (msg.toolCalls && msg.toolCalls.length > 0) {
-        chatMsg.tool_calls = msg.toolCalls;
+        chatMsg.tool_calls = fadeToolCallArguments(msg.toolCalls);
       }
 
       messages.push(chatMsg);
