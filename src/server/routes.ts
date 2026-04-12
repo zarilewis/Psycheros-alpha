@@ -59,6 +59,9 @@ import {
   renderConnectionsDiscordSettings,
   renderHomeSettings,
   renderVisionSettings,
+  renderVisionGeneratorsTab,
+  renderVisionAnchorsTab,
+  renderVisionGalleryTab,
   renderImageGenSlotSettings,
   renderToolsSettings,
   renderEntityCoreHub,
@@ -5192,14 +5195,45 @@ export async function handleUploadChatAttachment(
 // =============================================================================
 
 /**
- * Handle GET /fragments/settings/vision - Vision settings fragment.
+ * Handle GET /fragments/settings/vision - Vision settings fragment (hub with tabs).
  */
 export function handleVisionSettingsFragment(ctx: RouteContext): Response {
   const settings = maskImageGenSettings(ctx.getImageGenSettings());
+  const html = renderVisionSettings(settings);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/vision/generators - Generators tab content.
+ */
+export function handleVisionGeneratorsFragment(ctx: RouteContext): Response {
+  const settings = maskImageGenSettings(ctx.getImageGenSettings());
+  const html = renderVisionGeneratorsTab(settings);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/vision/anchors - Anchors tab content.
+ */
+export function handleVisionAnchorsFragment(ctx: RouteContext): Response {
   const anchors = ctx.db.getRawDb()
     .prepare("SELECT * FROM anchor_images ORDER BY created_at DESC")
     .all<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>();
-  const html = renderVisionSettings(settings, anchors);
+  const html = renderVisionAnchorsTab(anchors);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/vision/gallery - Gallery tab content.
+ */
+export function handleVisionGalleryFragment(): Response {
+  const html = renderVisionGalleryTab();
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
@@ -6483,5 +6517,169 @@ export async function handleEmbedMemories(_ctx: RouteContext, body: Record<strin
       exitCode: -1,
       output: `Failed to spawn script: ${error instanceof Error ? error.message : String(error)}`,
     }), { headers: { "Content-Type": "application/json" } });
+  }
+}
+
+// =============================================================================
+// Gallery API Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/gallery/images - List images with pagination.
+ *
+ * Scans generated-images and chat-attachments directories, cross-references
+ * with messages table for metadata (prompt, generator, date).
+ */
+export async function handleGalleryImages(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  const url = new URL(request.url);
+  const offset = parseInt(url.searchParams.get("offset") || "0");
+  const limit = Math.min(parseInt(url.searchParams.get("limit") || "24"), 96);
+
+  try {
+    const genDir = `${ctx.projectRoot}/.psycheros/generated-images`;
+    const attDir = `${ctx.projectRoot}/.psycheros/chat-attachments`;
+
+    interface GalleryImage {
+      filename: string;
+      path: string;
+      category: "generated" | "user";
+      size: number;
+      url: string;
+      createdAt: string;
+      prompt?: string;
+      generator?: string;
+      description?: string;
+    }
+
+    const allImages: GalleryImage[] = [];
+
+    // Scan generated-images directory
+    try {
+      for await (const entry of Deno.readDir(genDir)) {
+        if (!entry.isFile) continue;
+        const ext = entry.name.split(".").pop()?.toLowerCase();
+        if (!["png", "jpg", "jpeg", "webp", "gif"].includes(ext || "")) continue;
+
+        const filePath = `${genDir}/${entry.name}`;
+        let stat: Deno.FileInfo;
+        try {
+          stat = await Deno.stat(filePath);
+        } catch {
+          continue;
+        }
+
+        // Query messages for metadata
+        const row = ctx.db.getRawDb()
+          .prepare("SELECT content, created_at FROM messages WHERE content LIKE ? ORDER BY created_at ASC LIMIT 1")
+          .get<{ content: string; created_at: string }>(`%/generated-images/${entry.name}%`);
+
+        let prompt: string | undefined;
+        let generator: string | undefined;
+        let description: string | undefined;
+        let createdAt = stat.birthtime?.toISOString() || stat.mtime?.toISOString() || "";
+
+        if (row) {
+          createdAt = row.created_at;
+          // Parse [IMAGE:{...}] metadata
+          const match = row.content.match(/\[IMAGE:\s*(\{[^}]+\})\]/);
+          if (match) {
+            try {
+              const meta = JSON.parse(match[1]);
+              prompt = typeof meta.prompt === "string" ? meta.prompt : undefined;
+              generator = typeof meta.generator === "string" ? meta.generator : undefined;
+              description = typeof meta.description === "string" ? meta.description : undefined;
+            } catch {
+              // Ignore malformed JSON
+            }
+          }
+        }
+
+        allImages.push({
+          filename: entry.name,
+          path: `/generated-images/${entry.name}`,
+          category: "generated",
+          size: stat.size,
+          url: `/generated-images/${entry.name}`,
+          createdAt,
+          prompt,
+          generator,
+          description,
+        });
+      }
+    } catch {
+      // Directory doesn't exist yet
+    }
+
+    // Scan chat-attachments directory
+    try {
+      for await (const entry of Deno.readDir(attDir)) {
+        if (!entry.isFile) continue;
+        const ext = entry.name.split(".").pop()?.toLowerCase();
+        if (!["png", "jpg", "jpeg", "webp", "gif"].includes(ext || "")) continue;
+
+        const filePath = `${attDir}/${entry.name}`;
+        let stat: Deno.FileInfo;
+        try {
+          stat = await Deno.stat(filePath);
+        } catch {
+          continue;
+        }
+
+        // Query messages for earliest date
+        const row = ctx.db.getRawDb()
+          .prepare("SELECT created_at FROM messages WHERE content LIKE ? ORDER BY created_at ASC LIMIT 1")
+          .get<{ created_at: string }>(`%/chat-attachments/${entry.name}%`);
+
+        const createdAt = row?.created_at || stat.birthtime?.toISOString() || stat.mtime?.toISOString() || "";
+
+        allImages.push({
+          filename: entry.name,
+          path: `/chat-attachments/${entry.name}`,
+          category: "user",
+          size: stat.size,
+          url: `/chat-attachments/${entry.name}`,
+          createdAt,
+        });
+      }
+    } catch {
+      // Directory doesn't exist yet
+    }
+
+    // Sort by date descending (most recent first)
+    allImages.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+    // Compute stats
+    const totalSize = allImages.reduce((sum, img) => sum + img.size, 0);
+    const generatedCount = allImages.filter((img) => img.category === "generated").length;
+    const userCount = allImages.filter((img) => img.category === "user").length;
+
+    // Paginate
+    const paginated = allImages.slice(offset, offset + limit);
+    const hasMore = offset + limit < allImages.length;
+
+    return new Response(JSON.stringify({
+      totalSize,
+      generatedCount,
+      userCount,
+      total: allImages.length,
+      offset,
+      limit,
+      hasMore,
+      images: paginated,
+    }), {
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] Failed to list gallery images:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to list gallery images" }),
+      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
   }
 }

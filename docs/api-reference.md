@@ -236,6 +236,14 @@ The `POST` handler supports partial updates: if the body contains only a `captio
 
 Anchor images are stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table. Used as style/character references by the `generate_image` tool.
 
+### Gallery Images
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/gallery/images` | List all gallery images with pagination (`?offset=N&limit=N`, default 24) |
+
+Scans `.psycheros/generated-images/` and `.psycheros/chat-attachments/` directories, cross-references with the `messages` table for metadata (prompt, generator, description for generated images; upload date for all). Returns JSON with `{ totalSize, generatedCount, userCount, total, hasMore, images[] }`. Anchor images are excluded (managed in their own tab). View-only — no delete endpoint.
+
 ### Chat Attachments
 
 | Method | Path | Description |
@@ -292,7 +300,10 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/settings/connections` | External connections hub (Channels + Home tabs) |
 | `GET` | `/fragments/settings/connections/discord` | Discord connection settings fragment |
 | `GET` | `/fragments/settings/connections/home` | Home automation settings fragment |
-| `GET` | `/fragments/settings/vision` | Vision settings hub (Generators + Anchors tabs) |
+| `GET` | `/fragments/settings/vision` | Vision settings hub (Generators, Anchors, Gallery tabs) |
+| `GET` | `/fragments/settings/vision/generators` | Generators tab content (HTMX fragment) |
+| `GET` | `/fragments/settings/vision/anchors` | Anchors tab content (HTMX fragment) |
+| `GET` | `/fragments/settings/vision/gallery` | Gallery tab content (HTMX fragment, loads images via API) |
 | `GET` | `/fragments/settings/vision/image-gen/new` | New image generator config fragment |
 | `GET` | `/fragments/settings/vision/image-gen/:id` | Edit image generator config fragment |
 | `GET` | `/fragments/settings/tools` | Tools settings UI fragment |

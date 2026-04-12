@@ -278,6 +278,25 @@ Users can attach images to chat messages for the entity to reference in generati
 
 Implemented in `web/js/psycheros.js` (`handleAttachment()`, `removeAttachment()`), `src/server/routes.ts` (`handleUploadChatAttachment`, auto-caption flow), `web/css/components.css` (`.attach-btn`, `.attachment-preview`, `.attachment-thumb`, `.attachment-remove`).
 
+## Vision Settings
+
+Settings > Vision provides three tabs:
+
+**Generators** — Card grid for managing image generation provider slots (OpenRouter, Gemini). Each card links to a config form for provider, model, API key, default params, and NSFW toggle. Includes captioning config section (provider, API key, model). Uses HTMX-driven tabs with OOB swaps for active state.
+
+**Anchors** — List of labeled reference images used as style/character guides by the `generate_image` tool. Each anchor shows a thumbnail, editable label and description fields, file size, and save/delete buttons. Upload form at bottom with file picker, label, and description inputs. Anchor images are stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table.
+
+**Gallery** — Browse all generated and user-uploaded images. Lazy-loaded via `GET /api/gallery/images` when the tab is first clicked. Features:
+- Stats bar showing total count, disk usage, generated count, and uploaded count
+- CSS grid of thumbnail cards (150px min column width) with lazy loading
+- Each card shows: square thumbnail, truncated UUID filename (full on hover), copy-to-clipboard button, file size, and creation date
+- Generated image cards include prompt as hover tooltip
+- Full-screen lightbox overlay on thumbnail click (close via click-outside, Escape key, or X button)
+- Pagination: 24 images per page with "Load more" button
+- View-only — no delete capability
+
+Implemented in `src/server/templates.ts` (`renderVisionSettings`, `renderVisionGeneratorsTab`, `renderVisionAnchorsTab`, `renderVisionGalleryTab`, `renderVisionTabActiveState`), `src/server/routes.ts` (`handleGalleryImages`, fragment handlers).
+
 ## LLM Connections
 
 Multi-provider connection profile system. Access via Settings → LLM Connections in the sidebar. Uses the same hub-and-card pattern as Image Gen and other settings.

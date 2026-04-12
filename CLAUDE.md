@@ -104,11 +104,11 @@ Psycheros supports third-party integrations organized under two tabs in Settings
 - **Smart Devices** — Entity controls smart plugs (Shelly Plug) via local HTTP API. Configured via Settings > External Connections > Home. Auto-enables the `control_device` tool when at least one device is enabled. Settings persist to `.psycheros/home-settings.json`.
 
 ## Vision
-
-Image generation and visual analysis configured via Settings > Vision (top-level settings card with Generators and Anchors tabs).
+Image generation and visual analysis configured via Settings > Vision (top-level settings card with Generators, Anchors, and Gallery tabs).
 
 - **Image Generation** — Entity generates images via OpenRouter or Google Gemini. Supports multiple generator slots, anchor images for style/character reference, user image attachments, reference-based iteration (`input_image_path`), and auto-captioning of generated images. Auto-enables the `generate_image` tool when at least one generator is enabled. Settings persist to `.psycheros/image-gen-settings.json`. Generated images saved to `.psycheros/generated-images/`.
-- **Image Captioning** — Auto-captions chat attachments and generated images via a configurable vision model (Gemini or OpenRouter). Also provides the `describe_image` tool for explicit image description. Configured under Settings > Vision > Generators tab. Auto-enables `describe_image` when a captioning provider is configured.
+- **Image Captioning** — Auto-captions chat attachments and generated images via a configurable vision model (Gemini or OpenRouter). Also provides the `describe_image` tool. Configured under Settings > Vision > Generators tab. Auto-enables `describe_image` when a captioning provider is configured.
+- **Gallery** — Browse all generated and user-uploaded images with thumbnails, metadata, copy-to-clipboard, and lightbox. Paginated (24/page), derived from filesystem + messages (no DB table).
 
 ## Core Patterns
 

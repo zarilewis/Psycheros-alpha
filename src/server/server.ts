@@ -132,6 +132,9 @@ import {
   handleConnectionsDiscordFragment,
   handleConnectionsHomeFragment,
   handleVisionSettingsFragment,
+  handleVisionGeneratorsFragment,
+  handleVisionAnchorsFragment,
+  handleVisionGalleryFragment,
   handleVisionImageGenSlotFragment,
   handleGetHomeSettings,
   handleSaveHomeSettings,
@@ -143,6 +146,7 @@ import {
   handleDeleteAnchorImage,
   handleUploadChatAttachment,
   handleServeImageFile,
+  handleGalleryImages,
   handleGetToolsSettings,
   handleSaveToolsSettings,
   handleToolsSettingsFragment,
@@ -1364,6 +1368,11 @@ export class Server {
       return await handleUploadChatAttachment(ctx, request);
     }
 
+    // GET /api/gallery/images - List gallery images with pagination
+    if (method === "GET" && path === "/api/gallery/images") {
+      return await handleGalleryImages(ctx, request);
+    }
+
     // ========================================
     // Tools Settings API Routes
     // ========================================
@@ -1799,6 +1808,21 @@ export class Server {
     // GET /fragments/settings/vision - Vision settings fragment
     if (path === "/fragments/settings/vision") {
       return handleVisionSettingsFragment(ctx);
+    }
+
+    // GET /fragments/settings/vision/generators - Generators tab content
+    if (path === "/fragments/settings/vision/generators") {
+      return handleVisionGeneratorsFragment(ctx);
+    }
+
+    // GET /fragments/settings/vision/anchors - Anchors tab content
+    if (path === "/fragments/settings/vision/anchors") {
+      return handleVisionAnchorsFragment(ctx);
+    }
+
+    // GET /fragments/settings/vision/gallery - Gallery tab content
+    if (path === "/fragments/settings/vision/gallery") {
+      return handleVisionGalleryFragment();
     }
 
     // GET /fragments/settings/vision/image-gen/new - Create new generator slot

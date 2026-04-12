@@ -5075,12 +5075,8 @@ type ImageGenSettings = import("../llm/image-gen-settings.ts").ImageGenSettings;
  * Render the Vision settings page with Generators and Anchors tabs.
  */
 export function renderVisionSettings(
-  settings: ImageGenSettings,
-  anchors: Array<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>,
+  _settings: ImageGenSettings,
 ): string {
-  const generatorsContent = renderVisionGeneratorsTab(settings);
-  const anchorsContent = renderVisionAnchorsTab(anchors);
-
   return `<div class="settings-view">
   <div class="settings-header">
     <div class="settings-header-row">
@@ -5091,57 +5087,60 @@ export function renderVisionSettings(
       </div>
     </div>
   </div>
-  <div class="settings-content" id="settings-content">
-
-    <nav class="vision-nav">
-      <button class="vision-nav-tab active" data-tab="generators" onclick="switchVisionTab('generators')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-        Generators
-      </button>
-      <button class="vision-nav-tab" data-tab="anchors" onclick="switchVisionTab('anchors')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-        </svg>
-        Anchors
-      </button>
-    </nav>
-
-    <div id="vision-tab-generators" class="vision-tab-panel">${generatorsContent}</div>
-    <div id="vision-tab-anchors" class="vision-tab-panel" style="display:none;">${anchorsContent}</div>
-
+  ${renderVisionTabs("generators")}
+  <div class="settings-content" id="settings-content"
+    hx-get="/fragments/settings/vision/generators"
+    hx-trigger="load"
+    hx-swap="innerHTML">
+    <div class="settings-loading">Loading...</div>
   </div>
-
-  <style>
-    .vision-nav { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4); border-bottom: 1px solid var(--c-border); padding-bottom: var(--sp-2); }
-    .vision-nav-tab { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); background: none; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--c-fg-muted); font-size: var(--font-size-sm); cursor: pointer; transition: color var(--transition), background var(--transition), border-color var(--transition); }
-    .vision-nav-tab:hover { color: var(--c-fg); background: var(--c-bg-hover); }
-    .vision-nav-tab:active { transform: scale(0.98); }
-    .vision-nav-tab.active { color: var(--c-accent); background: var(--c-accent-subtle); border-color: var(--c-accent); }
-    .anchor-list { display: flex; flex-direction: column; gap: var(--sp-3); }
-    .anchor-card { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--radius-md); background: var(--c-bg); }
-    .anchor-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radius-sm); }
-    .anchor-info { flex: 1; }
-    .anchor-meta { font-size: var(--font-size-xs); color: var(--c-fg-muted); margin-top: var(--sp-1); }
-    .anchor-actions { display: flex; gap: var(--sp-2); }
-  </style>
-
-<script>
-function switchVisionTab(tab) {
-  document.querySelectorAll('.vision-nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  document.querySelectorAll('.vision-tab-panel').forEach(p => p.style.display = p.id === 'vision-tab-' + tab ? '' : 'none');
-}
-</script>
 </div>`;
+}
+
+/**
+ * Render the Vision tab bar with active state.
+ */
+function renderVisionTabs(activeTab: string): string {
+  const tabs = [
+    { id: "generators", label: "Generators" },
+    { id: "anchors", label: "Anchors" },
+    { id: "gallery", label: "Gallery" },
+  ];
+
+  return `<div class="settings-tabs">
+    ${tabs.map((tab) =>
+      `<button
+        class="settings-tab${tab.id === activeTab ? " active" : ""}"
+        hx-get="/fragments/settings/vision/${tab.id}"
+        hx-target="#settings-content"
+        hx-swap="innerHTML"
+        id="visiontab-${tab.id}"
+      >${tab.label}</button>`
+    ).join("")}
+  </div>`;
+}
+
+/**
+ * Render the active tab indicator for vision tabs as an OOB swap.
+ */
+function renderVisionTabActiveState(activeTab: string): string {
+  const tabs = ["generators", "anchors", "gallery"];
+  return tabs.map((tab) =>
+    `<button
+      class="settings-tab${tab === activeTab ? " active" : ""}"
+      hx-get="/fragments/settings/vision/${tab}"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-swap-oob="true"
+      id="visiontab-${tab}"
+    >${tab.charAt(0).toUpperCase() + tab.slice(1)}</button>`
+  ).join("");
 }
 
 /**
  * Render the Generators tab panel — generator cards + add button + captioning config.
  */
-function renderVisionGeneratorsTab(settings: ImageGenSettings): string {
+export function renderVisionGeneratorsTab(settings: ImageGenSettings): string {
   const cards = settings.generators.map((g) => `
     <a class="settings-hub-card"
       hx-get="/fragments/settings/vision/image-gen/${escapeHtml(g.id)}"
@@ -5180,7 +5179,10 @@ function renderVisionGeneratorsTab(settings: ImageGenSettings): string {
       </div>
     </button>`;
 
-  return `<section>
+  const oobTabs = renderVisionTabActiveState("generators");
+
+  return `${oobTabs}
+  <section>
     <h3 style="font-size:var(--font-size-sm);color:var(--c-fg-muted);margin-bottom:var(--sp-3);">Image Generators</h3>
     <div class="settings-hub-grid">
       ${cards}
@@ -5302,7 +5304,7 @@ async function saveCaptioning() {
 /**
  * Render the Anchors tab panel content (inline, no page wrapper).
  */
-function renderVisionAnchorsTab(
+export function renderVisionAnchorsTab(
   anchors: Array<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>,
 ): string {
   const rows = anchors.map((a) => `
@@ -5319,7 +5321,18 @@ function renderVisionAnchorsTab(
       </div>
     </div>`).join("");
 
-  return `<section class="theme-section">
+  const oobTabs = renderVisionTabActiveState("anchors");
+
+  return `${oobTabs}
+  <style>
+    .anchor-list { display: flex; flex-direction: column; gap: var(--sp-3); }
+    .anchor-card { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--radius-md); background: var(--c-bg); }
+    .anchor-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radius-sm); }
+    .anchor-info { flex: 1; }
+    .anchor-meta { font-size: var(--font-size-xs); color: var(--c-fg-muted); margin-top: var(--sp-1); }
+    .anchor-actions { display: flex; gap: var(--sp-2); }
+  </style>
+  <section class="theme-section">
     <div class="anchor-list" id="anchor-list">
       ${rows || '<p class="settings-note">No anchor images yet. Upload one below.</p>'}
     </div>
@@ -5344,7 +5357,181 @@ function renderVisionAnchorsTab(
       </div>
       <button type="button" class="btn btn--primary" style="align-self:end;" onclick="handleAnchorUpload()">Upload</button>
     </form>
-  </section>`;
+  </section>
+
+<script>
+async function saveAnchorMeta(id) {
+  const card = document.getElementById('anchor-' + id);
+  if (!card) return;
+  const label = card.querySelector('.anchor-label').value;
+  const description = card.querySelector('.anchor-desc').value;
+  await fetch('/api/anchor-images/' + id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ label, description }) });
+  htmx.ajax('GET', '/fragments/settings/vision/anchors', '#settings-content');
+}
+
+async function deleteAnchor(id) {
+  if (!confirm('Delete this anchor image?')) return;
+  await fetch('/api/anchor-images/' + id, { method: 'DELETE' });
+  htmx.ajax('GET', '/fragments/settings/vision/anchors', '#settings-content');
+}
+
+async function handleAnchorUpload() {
+  const fileInput = document.getElementById('anchor-file');
+  const label = document.getElementById('anchor-label').value;
+  const description = document.getElementById('anchor-upload-desc').value;
+  if (!fileInput.files.length) { alert('Choose a file first.'); return; }
+  const form = new FormData();
+  form.append('file', fileInput.files[0]);
+  form.append('label', label);
+  form.append('description', description);
+  await fetch('/api/anchor-images', { method: 'POST', body: form });
+  htmx.ajax('GET', '/fragments/settings/vision/anchors', '#settings-content');
+}
+</script>`;
+}
+
+/**
+ * Render the Gallery tab content (loaded via HTMX fragment).
+ */
+export function renderVisionGalleryTab(): string {
+  const oobTabs = renderVisionTabActiveState("gallery");
+
+  return `${oobTabs}
+  <style>
+    .gallery-stats { display: flex; gap: var(--sp-4); padding: var(--sp-3) var(--sp-4); background: var(--c-bg-hover); border-radius: var(--radius-md); margin-bottom: var(--sp-4); font-size: var(--font-size-sm); color: var(--c-fg-muted); flex-wrap: wrap; }
+    .gallery-stats strong { color: var(--c-fg); }
+    .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--sp-3); }
+    .gallery-card { border: 1px solid var(--c-border); border-radius: var(--radius-md); overflow: hidden; background: var(--c-bg); transition: border-color var(--transition); }
+    .gallery-card:hover { border-color: var(--c-accent); }
+    .gallery-thumb { width: 100%; aspect-ratio: 1; object-fit: cover; cursor: pointer; display: block; }
+    .gallery-meta { padding: var(--sp-2); display: flex; align-items: center; gap: var(--sp-1); }
+    .gallery-filename { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--c-fg-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; cursor: default; }
+    .gallery-copy-btn { flex-shrink: 0; background: none; border: none; color: var(--c-fg-muted); cursor: pointer; padding: 2px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; transition: color var(--transition); }
+    .gallery-copy-btn:hover { color: var(--c-accent); }
+    .gallery-copy-btn.copied { color: var(--c-accent); }
+    .gallery-info { padding: 0 var(--sp-2) var(--sp-2); font-size: var(--font-size-xs); color: var(--c-fg-muted); }
+    .gallery-empty { color: var(--c-fg-muted); font-size: var(--font-size-sm); text-align: center; padding: var(--sp-8) 0; }
+    .gallery-load-more { margin-top: var(--sp-4); text-align: center; }
+    .gallery-lightbox { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: var(--sp-3); cursor: pointer; }
+    .gallery-lightbox img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: var(--radius-sm); cursor: default; }
+    .gallery-lightbox-info { color: #ccc; font-size: var(--font-size-sm); font-family: var(--font-mono, monospace); text-align: center; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gallery-lightbox-close { position: absolute; top: var(--sp-4); right: var(--sp-4); background: rgba(255,255,255,0.1); border: none; color: #fff; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
+    .gallery-lightbox-close:hover { background: rgba(255,255,255,0.2); }
+  </style>
+
+<div id="gallery-container">
+  <div class="gallery-empty">Loading...</div>
+</div>
+
+<script>
+let galleryOffset = 0;
+
+(async function() {
+  await loadGallery(0);
+})();
+
+async function loadGallery(offset) {
+  const container = document.getElementById('gallery-container');
+  if (!container) return;
+
+  try {
+    const resp = await fetch('/api/gallery/images?offset=' + offset + '&limit=24');
+    const data = await resp.json();
+
+    if (offset === 0) {
+      galleryOffset = 24;
+      const totalMB = (data.totalSize / (1024 * 1024)).toFixed(1);
+      const totalKB = (data.totalSize / 1024).toFixed(1);
+      const sizeStr = data.totalSize >= 1024 * 1024 ? totalMB + ' MB' : totalKB + ' KB';
+
+      let html = '<div class="gallery-stats">'
+        + '<span><strong>' + data.total + '</strong> images</span>'
+        + '<span><strong>' + sizeStr + '</strong> total</span>'
+        + '<span><strong>' + data.generatedCount + '</strong> generated</span>'
+        + '<span><strong>' + data.userCount + '</strong> uploaded</span>'
+        + '</div>';
+
+      if (data.images.length === 0) {
+        html += '<div class="gallery-empty">No images yet</div>';
+      } else {
+        html += '<div class="gallery-grid">' + renderGalleryCards(data.images) + '</div>';
+        if (data.hasMore) html += '<div class="gallery-load-more"><button class="btn btn--sm" onclick="loadMoreGallery()">Load more</button></div>';
+      }
+      container.innerHTML = html;
+    } else {
+      galleryOffset = offset + 24;
+      const grid = container.querySelector('.gallery-grid');
+      if (grid) grid.insertAdjacentHTML('beforeend', renderGalleryCards(data.images));
+      const loadMoreDiv = container.querySelector('.gallery-load-more');
+      if (loadMoreDiv) loadMoreDiv.remove();
+      if (data.hasMore) container.insertAdjacentHTML('beforeend', '<div class="gallery-load-more"><button class="btn btn--sm" onclick="loadMoreGallery()">Load more</button></div>');
+    }
+  } catch (e) {
+    console.error('Failed to load gallery:', e);
+    if (offset === 0) container.innerHTML = '<div class="gallery-empty">Failed to load gallery</div>';
+  }
+}
+
+function loadMoreGallery() {
+  loadGallery(galleryOffset);
+}
+
+function renderGalleryCards(images) {
+  const esc = function(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+  return images.map(function(img) {
+    const sizeStr = img.size >= 1024 * 1024 ? (img.size / (1024 * 1024)).toFixed(1) + ' MB' : (img.size / 1024).toFixed(1) + ' KB';
+    const dateStr = img.createdAt ? new Date(img.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    const shortName = img.filename.length > 20 ? img.filename.substring(0, 8) + '...' + img.filename.slice(-8) : img.filename;
+    const promptAttr = img.prompt ? ' title="' + esc(img.prompt) + '"' : '';
+    return '<div class="gallery-card" data-category="' + img.category + '"' + promptAttr + '>'
+      + '<img src="' + esc(img.url) + '" class="gallery-thumb" loading="lazy" onclick="openLightbox(\'' + esc(img.url) + '\',\'' + esc(img.filename) + '\')"/>'
+      + '<div class="gallery-meta">'
+      + '<span class="gallery-filename" title="' + esc(img.filename) + '">' + esc(shortName) + '</span>'
+      + '<button class="gallery-copy-btn" onclick="event.stopPropagation();copyFilename(\'' + esc(img.filename) + '\',this)" title="Copy filename">'
+      + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+      + '</button>'
+      + '</div>'
+      + '<div class="gallery-info">' + sizeStr + ' &middot; ' + dateStr + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+async function copyFilename(filename, btn) {
+  try {
+    await navigator.clipboard.writeText(filename);
+    btn.classList.add('copied');
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+    setTimeout(function() {
+      btn.classList.remove('copied');
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+    }, 1500);
+  } catch (e) {
+    console.error('Failed to copy:', e);
+  }
+}
+
+function openLightbox(url, filename) {
+  const overlay = document.createElement('div');
+  overlay.className = 'gallery-lightbox';
+  overlay.id = 'gallery-lightbox';
+  overlay.onclick = function(e) { if (e.target === overlay) closeLightbox(); };
+  overlay.innerHTML = '<button class="gallery-lightbox-close" onclick="closeLightbox()">&times;</button>'
+    + '<img src="' + url + '" onclick="event.stopPropagation()"/>'
+    + '<div class="gallery-lightbox-info">' + filename + '</div>';
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', closeLightboxOnEsc);
+}
+
+function closeLightbox() {
+  const overlay = document.getElementById('gallery-lightbox');
+  if (overlay) overlay.remove();
+  document.removeEventListener('keydown', closeLightboxOnEsc);
+}
+
+function closeLightboxOnEsc(e) {
+  if (e.key === 'Escape') closeLightbox();
+}
+</script>`;
 }
 
 /**
