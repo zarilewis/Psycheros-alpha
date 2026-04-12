@@ -8,7 +8,7 @@
  */
 
 import { DBClient } from "../db/mod.ts";
-import { createClientFromProfile, createDefaultClient, type LLMClient, type LLMSettings, type LLMProfileSettings, type LLMConnectionProfile, type WebSearchSettings, type DiscordSettings, type HomeSettings, type ImageGenSettings, loadProfileSettings, saveProfileSettings, getActiveProfile, profileToLLMSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings, loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings } from "../llm/mod.ts";
+import { createClientFromProfile, createDefaultClient, type LLMClient, type LLMSettings, type LLMProfileSettings, type LLMConnectionProfile, type WebSearchSettings, type DiscordSettings, type HomeSettings, type ImageGenSettings, type EntityCoreLLMSettings, loadProfileSettings, saveProfileSettings, getActiveProfile, profileToLLMSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings, loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings, loadEntityCoreLLMSettings, saveEntityCoreLLMSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSettings, getEnabledToolNames, loadCustomTools, ToolRegistry, type ToolsSettings } from "../tools/mod.ts";
 import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import type { MemoryIndexer } from "../rag/indexer.ts";
@@ -88,7 +88,10 @@ import {
   handleEntityCoreSnapshotPreview,
   handleEntityCoreConsolidationRun,
   handleEntityCoreSync,
+  handleEntityCoreLLM,
   handleEmbedMemories,
+  handleGetEntityCoreLLMSettings,
+  handleSaveEntityCoreLLMSettings,
   handleCreateGraphNode,
   handleCreateGraphEdge,
   handleDeleteGraphNode,
@@ -255,6 +258,7 @@ export class Server {
   private homeSettings: HomeSettings;
   private imageGenSettings: ImageGenSettings;
   private toolSettings: ToolsSettings;
+  private entityCoreLLMSettings: EntityCoreLLMSettings;
   private customTools: Record<string, import("../tools/types.ts").Tool>;
   private pulseEngine: PulseEngine | null = null;
 
@@ -296,6 +300,9 @@ export class Server {
 
     // Initialize tool settings (will be reloaded from settings in init())
     this.toolSettings = { toolOverrides: {} };
+
+    // Initialize Entity-Core LLM settings (will be reloaded from settings in init())
+    this.entityCoreLLMSettings = {};
 
     // Initialize custom tools (will be loaded in init())
     this.customTools = {};
@@ -340,6 +347,7 @@ export class Server {
     this.discordSettings = await loadDiscordSettings(this.config.projectRoot);
     this.homeSettings = await loadHomeSettings(this.config.projectRoot);
     this.imageGenSettings = await loadImageGenSettings(this.config.projectRoot);
+    this.entityCoreLLMSettings = await loadEntityCoreLLMSettings(this.config.projectRoot);
     this.toolSettings = await loadToolsSettings(this.config.projectRoot);
     this.customTools = await loadCustomTools(this.config.projectRoot);
     this.reloadLLMClient();
@@ -424,12 +432,19 @@ export class Server {
     if (this.mcpClient) {
       const active = getActiveProfile(this.llmProfileSettings);
       if (active) {
+        // Apply entity-core LLM overrides on top of the active profile
+        const ecSettings = await loadEntityCoreLLMSettings(this.config.projectRoot);
+        const ecTemperature = ecSettings.temperature ?? 0.3;
+        const ecMaxTokens = ecSettings.maxTokens ?? 4000;
+
         console.log("[Server] Restarting entity-core with updated LLM credentials...");
         try {
           await this.mcpClient.restart({
             ENTITY_CORE_LLM_API_KEY: active.apiKey,
             ENTITY_CORE_LLM_BASE_URL: active.baseUrl,
-            ENTITY_CORE_LLM_MODEL: active.model,
+            ENTITY_CORE_LLM_MODEL: ecSettings.model || active.model,
+            ENTITY_CORE_LLM_TEMPERATURE: String(ecTemperature),
+            ENTITY_CORE_LLM_MAX_TOKENS: String(ecMaxTokens),
           });
           console.log("[Server] entity-core restarted successfully");
         } catch (error) {
@@ -501,6 +516,42 @@ export class Server {
     this.imageGenSettings = settings;
     await saveImageGenSettings(this.config.projectRoot, settings);
     this.reloadToolRegistry();
+  }
+
+  /**
+   * Get the current entity-core LLM settings.
+   */
+  getEntityCoreLLMSettings(): EntityCoreLLMSettings {
+    return this.entityCoreLLMSettings;
+  }
+
+  /**
+   * Update entity-core LLM settings, persist to disk, and restart MCP client.
+   */
+  async updateEntityCoreLLMSettings(settings: EntityCoreLLMSettings): Promise<void> {
+    this.entityCoreLLMSettings = settings;
+    await saveEntityCoreLLMSettings(this.config.projectRoot, settings);
+
+    // Restart entity-core with updated LLM settings
+    if (this.mcpClient) {
+      const active = getActiveProfile(this.llmProfileSettings);
+      if (active) {
+        const ecTemperature = settings.temperature ?? 0.3;
+        const ecMaxTokens = settings.maxTokens ?? 4000;
+
+        console.log("[Server] Restarting entity-core with updated LLM settings...");
+        try {
+          await this.mcpClient.restart({
+            ENTITY_CORE_LLM_MODEL: settings.model || active.model,
+            ENTITY_CORE_LLM_TEMPERATURE: String(ecTemperature),
+            ENTITY_CORE_LLM_MAX_TOKENS: String(ecMaxTokens),
+          });
+          console.log("[Server] entity-core restarted successfully");
+        } catch (error) {
+          console.error("[Server] Failed to restart entity-core:", error instanceof Error ? error.message : String(error));
+        }
+      }
+    }
   }
 
   /**
@@ -813,6 +864,8 @@ export class Server {
       updateImageGenSettings: (settings) => this.updateImageGenSettings(settings),
       getToolSettings: () => this.toolSettings,
       updateToolSettings: (settings) => this.updateToolSettings(settings),
+      getEntityCoreLLMSettings: () => this.entityCoreLLMSettings,
+      updateEntityCoreLLMSettings: (settings) => this.updateEntityCoreLLMSettings(settings),
       customTools: this.customTools,
     };
   }
@@ -1007,6 +1060,16 @@ export class Server {
     if (method === "POST" && path === "/api/entity-core/actions/embed-memories") {
       const body = await request.json() as Record<string, unknown>;
       return await handleEmbedMemories(ctx, body);
+    }
+
+    // GET /api/entity-core-llm-settings - Get entity-core LLM settings
+    if (method === "GET" && path === "/api/entity-core-llm-settings") {
+      return handleGetEntityCoreLLMSettings(ctx);
+    }
+
+    // POST /api/entity-core-llm-settings - Save entity-core LLM settings
+    if (method === "POST" && path === "/api/entity-core-llm-settings") {
+      return await handleSaveEntityCoreLLMSettings(ctx, request);
     }
 
     // ========================================
@@ -1690,6 +1753,11 @@ export class Server {
     // GET /fragments/settings/entity-core/overview
     if (path === "/fragments/settings/entity-core/overview") {
       return await handleEntityCoreOverview(ctx);
+    }
+
+    // GET /fragments/settings/entity-core/llm
+    if (path === "/fragments/settings/entity-core/llm") {
+      return handleEntityCoreLLM(ctx);
     }
 
     // GET /fragments/settings/entity-core/graph

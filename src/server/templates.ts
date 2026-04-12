@@ -2670,6 +2670,7 @@ export function renderEntryEditor(entry: LorebookEntry): string {
 export function renderEntityCoreHub(activeTab: string = "overview"): string {
   const tabs = [
     { id: "overview", label: "Overview" },
+    { id: "llm", label: "LLM" },
     { id: "graph", label: "Knowledge Graph" },
     { id: "maintenance", label: "Maintenance" },
     { id: "snapshots", label: "Snapshots" },
@@ -2693,7 +2694,7 @@ export function renderEntityCoreHub(activeTab: string = "overview"): string {
       ${renderSettingsBackButton()}
       <div>
         <h1 class="settings-title">Entity Core</h1>
-        <p class="settings-desc">Manage connection, knowledge graph, maintenance, and snapshots</p>
+        <p class="settings-desc">Manage connection, LLM, knowledge graph, maintenance, and snapshots</p>
       </div>
     </div>
   </div>
@@ -2713,7 +2714,7 @@ export function renderEntityCoreHub(activeTab: string = "overview"): string {
  * Render Entity Core tab active state as an OOB swap.
  */
 function renderEntityCoreTabActiveState(activeTab: string): string {
-  const tabs = ["overview", "graph", "maintenance", "snapshots"];
+  const tabs = ["overview", "llm", "graph", "maintenance", "snapshots"];
   return tabs.map((tab) => {
     const isActive = tab === activeTab;
     const label = tab.charAt(0).toUpperCase() + tab.slice(1);
@@ -2831,6 +2832,111 @@ export function renderEntityCoreOverview(data: EntityCoreOverviewData): string {
     >Sync Now</button>
   </div>
 </div>`;
+}
+
+/**
+ * Data for the Entity Core LLM tab.
+ */
+export interface EntityCoreLLMData {
+  settings: {
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+  };
+  resolved: {
+    model: string;
+    temperature: number;
+    maxTokens: number;
+    profileName: string | null;
+  };
+}
+
+/**
+ * Render the Entity Core LLM tab.
+ * Shows current resolved LLM config and allows overriding model, temperature, maxTokens.
+ */
+export function renderEntityCoreLLM(data: EntityCoreLLMData): string {
+  const oobTabs = renderEntityCoreTabActiveState("llm");
+  const { settings, resolved } = data;
+  const isOverridden = (field: string) => field === "model" ? !!settings.model : settings[field as keyof typeof settings] !== undefined;
+
+  return `${oobTabs}
+<div class="ec-overview">
+  <p class="ec-llm-desc">Entity-core uses an LLM for extraction, memory consolidation, and knowledge graph tasks. By default it inherits your active chat profile's connection. Override fields below to use a different model or parameters.</p>
+
+  <div class="ec-detail">
+    <span class="ec-detail-label">Source profile:</span>
+    <span class="ec-detail-value">${resolved.profileName ? escapeHtml(resolved.profileName) : "None"}</span>
+  </div>
+
+  <div class="ec-llm-section">
+    <h3>Model Override</h3>
+    <div class="form-group">
+      <label for="ec-llm-model">Model</label>
+      <div class="ec-llm-field-row">
+        <input type="text" id="ec-llm-model" placeholder="Inherits from profile" value="${escapeHtml(settings.model || "")}" />
+        ${isOverridden("model") ? '<button type="button" class="btn btn--sm btn--ghost" onclick="document.getElementById(\'ec-llm-model\').value=\'\'">Reset</button>' : ''}
+      </div>
+      <span class="ec-llm-resolved">Currently using: <strong>${escapeHtml(resolved.model || "(none)")}</strong></span>
+    </div>
+  </div>
+
+  <div class="ec-llm-section">
+    <h3>Parameters</h3>
+    <div class="form-group">
+      <label for="ec-llm-temperature">Temperature</label>
+      <div class="ec-llm-field-row">
+        <input type="number" id="ec-llm-temperature" step="0.1" min="0" max="2" placeholder="0.3" value="${settings.temperature !== undefined ? settings.temperature : ""}" />
+        ${isOverridden("temperature") ? '<button type="button" class="btn btn--sm btn--ghost" onclick="document.getElementById(\'ec-llm-temperature\').value=\'\'">Reset</button>' : ''}
+      </div>
+      <span class="ec-llm-resolved">Default: <strong>0.3</strong> (lower = more deterministic)</span>
+    </div>
+    <div class="form-group">
+      <label for="ec-llm-max-tokens">Max Tokens</label>
+      <div class="ec-llm-field-row">
+        <input type="number" id="ec-llm-max-tokens" step="256" min="256" placeholder="4000" value="${settings.maxTokens !== undefined ? settings.maxTokens : ""}" />
+        ${isOverridden("maxTokens") ? '<button type="button" class="btn btn--sm btn--ghost" onclick="document.getElementById(\'ec-llm-max-tokens\').value=\'\'">Reset</button>' : ''}
+      </div>
+      <span class="ec-llm-resolved">Default: <strong>4000</strong></span>
+    </div>
+  </div>
+
+  <div class="ec-actions">
+    <button
+      class="btn btn--primary btn--sm"
+      onclick="saveEntityCoreLLMSettings()"
+    >Save & Restart</button>
+  </div>
+</div>
+
+<script>
+function saveEntityCoreLLMSettings() {
+  const model = document.getElementById('ec-llm-model').value.trim();
+  const temperature = document.getElementById('ec-llm-temperature').value;
+  const maxTokens = document.getElementById('ec-llm-max-tokens').value;
+
+  const body = {};
+  if (model) body.model = model;
+  if (temperature) body.temperature = parseFloat(temperature);
+  if (maxTokens) body.maxTokens = parseInt(maxTokens, 10);
+
+  fetch('/api/entity-core-llm-settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.success) {
+      // Reload the tab to show updated resolved values
+      htmx.ajax('GET', '/fragments/settings/entity-core/llm', '#settings-content');
+    } else {
+      alert('Failed to save: ' + (d.error || 'Unknown error'));
+    }
+  })
+  .catch(e => alert('Error: ' + e.message));
+}
+</script>`;
 }
 
 /**

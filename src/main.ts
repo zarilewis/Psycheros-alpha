@@ -12,6 +12,7 @@ import { Server } from "./server/mod.ts";
 import { createMCPClient, type MCPClient } from "./mcp-client/mod.ts";
 import { initialize } from "./init/mod.ts";
 import { getDefaultWebSearchSettings } from "./llm/web-search-settings.ts";
+import { loadEntityCoreLLMSettings } from "./llm/entity-core-settings.ts";
 import { join } from "@std/path";
 
 const VERSION = "0.1.0";
@@ -104,18 +105,23 @@ if (mcpEnabled) {
 
   console.log(`MCP enabled: connecting to entity-core as ${mcpInstance}`);
 
+  // Load entity-core LLM overrides (model/temperature/maxTokens independent of chat model)
+  const ecLLMSettings = await loadEntityCoreLLMSettings(config.projectRoot);
+  const ecTemperature = ecLLMSettings.temperature ?? 0.3;
+  const ecMaxTokens = ecLLMSettings.maxTokens ?? 4000;
+
   mcpClient = createMCPClient({
     command: mcpCommand,
     args: mcpArgs,
     instanceId: mcpInstance,
     env: {
       ENTITY_CORE_DATA_DIR: entityCoreDataDir,
-      // Entity-core LLM settings — prefer entity-core specific vars, then active profile, then ZAI_* vars
+      // Entity-core LLM settings — prefer entity-core override, then active profile, then ZAI_* vars
       ENTITY_CORE_LLM_API_KEY: Deno.env.get("ENTITY_CORE_LLM_API_KEY") || activeProfile?.apiKey || Deno.env.get("ZAI_API_KEY") || "",
       ENTITY_CORE_LLM_BASE_URL: Deno.env.get("ENTITY_CORE_LLM_BASE_URL") || activeProfile?.baseUrl || Deno.env.get("ZAI_BASE_URL") || "",
-      ENTITY_CORE_LLM_MODEL: Deno.env.get("ENTITY_CORE_LLM_MODEL") || activeProfile?.model || Deno.env.get("ZAI_MODEL") || "",
-      ENTITY_CORE_LLM_TEMPERATURE: Deno.env.get("ENTITY_CORE_LLM_TEMPERATURE") || "",
-      ENTITY_CORE_LLM_MAX_TOKENS: Deno.env.get("ENTITY_CORE_LLM_MAX_TOKENS") || "",
+      ENTITY_CORE_LLM_MODEL: ecLLMSettings.model || Deno.env.get("ENTITY_CORE_LLM_MODEL") || activeProfile?.model || Deno.env.get("ZAI_MODEL") || "",
+      ENTITY_CORE_LLM_TEMPERATURE: Deno.env.get("ENTITY_CORE_LLM_TEMPERATURE") || String(ecTemperature),
+      ENTITY_CORE_LLM_MAX_TOKENS: Deno.env.get("ENTITY_CORE_LLM_MAX_TOKENS") || String(ecMaxTokens),
       // Also pass ZAI_* directly for any code paths that read those
       ZAI_API_KEY: Deno.env.get("ZAI_API_KEY") || "",
       ZAI_BASE_URL: Deno.env.get("ZAI_BASE_URL") || "",

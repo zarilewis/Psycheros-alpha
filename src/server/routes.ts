@@ -13,7 +13,7 @@ import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, LLMSettings, LLMProfileSettings, LLMConnectionProfile } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
 import type { DiscordSettings, HomeSettings } from "../llm/mod.ts";
-import type { ImageGenSettings } from "../llm/mod.ts";
+import type { ImageGenSettings, EntityCoreLLMSettings } from "../llm/mod.ts";
 import { maskProfileSettings, createDefaultProfile, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings, getDefaultImageGenSettings, maskImageGenSettings } from "../llm/mod.ts";
 import { captionImage } from "../tools/describe-image.ts";
 import { uint8ToBase64, getMediaType as getImageMediaType } from "../tools/generate-image.ts";
@@ -64,6 +64,7 @@ import {
   renderToolsSettings,
   renderEntityCoreHub,
   renderEntityCoreOverview,
+  renderEntityCoreLLM,
   renderEntityCoreGraph,
   renderEntityCoreMaintenance,
   renderEntityCoreSnapshots,
@@ -150,6 +151,10 @@ export interface RouteContext {
   getToolSettings: () => ToolsSettings;
   /** Update tools settings and hot-reload tool registry */
   updateToolSettings: (settings: ToolsSettings) => Promise<void>;
+  /** Get current entity-core LLM settings */
+  getEntityCoreLLMSettings: () => EntityCoreLLMSettings;
+  /** Update entity-core LLM settings and restart MCP client */
+  updateEntityCoreLLMSettings: (settings: EntityCoreLLMSettings) => Promise<void>;
   /** Custom tools loaded from custom-tools/ directory */
   customTools: Record<string, import("../tools/types.ts").Tool>;
 }
@@ -6256,6 +6261,29 @@ export async function handleEntityCoreOverview(ctx: RouteContext): Promise<Respo
 }
 
 /**
+ * Handle GET /fragments/settings/entity-core/llm — LLM settings tab.
+ */
+export function handleEntityCoreLLM(ctx: RouteContext): Response {
+  const settings = ctx.getEntityCoreLLMSettings();
+  const activeProfile = ctx.getActiveLLMProfile();
+
+  const data: import("./templates.ts").EntityCoreLLMData = {
+    settings,
+    resolved: {
+      model: settings.model || activeProfile?.model || "",
+      temperature: settings.temperature ?? 0.3,
+      maxTokens: settings.maxTokens ?? 4000,
+      profileName: activeProfile?.name || null,
+    },
+  };
+
+  const html = renderEntityCoreLLM(data);
+  return new Response(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
+/**
  * Handle GET /fragments/settings/entity-core/graph — Knowledge Graph tab.
  */
 export async function handleEntityCoreGraph(ctx: RouteContext): Promise<Response> {
@@ -6648,6 +6676,74 @@ export async function handleGalleryImages(
     console.error("[Routes] Failed to list gallery images:", error);
     return new Response(
       JSON.stringify({ error: "Failed to list gallery images" }),
+      { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  }
+}
+
+/**
+ * Handle GET /api/entity-core-llm-settings — Get entity-core LLM settings.
+ * Returns both the saved overrides and the resolved values (after applying active profile defaults).
+ */
+export function handleGetEntityCoreLLMSettings(ctx: RouteContext): Response {
+  const settings = ctx.getEntityCoreLLMSettings();
+  const activeProfile = ctx.getActiveLLMProfile();
+
+  const resolved = {
+    model: settings.model || activeProfile?.model || "",
+    temperature: settings.temperature ?? 0.3,
+    maxTokens: settings.maxTokens ?? 4000,
+    profileName: activeProfile?.name || null,
+  };
+
+  return new Response(
+    JSON.stringify({ settings, resolved }),
+    { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+  );
+}
+
+/**
+ * Handle POST /api/entity-core-llm-settings — Save entity-core LLM settings and restart MCP.
+ */
+export async function handleSaveEntityCoreLLMSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<EntityCoreLLMSettings>;
+
+    const updated: EntityCoreLLMSettings = {};
+
+    if (body.model !== undefined && body.model !== "") {
+      updated.model = body.model;
+    }
+
+    if (body.temperature !== undefined && body.temperature !== null) {
+      updated.temperature = typeof body.temperature === "string" ? parseFloat(body.temperature) : body.temperature;
+    }
+
+    if (body.maxTokens !== undefined && body.maxTokens !== null) {
+      updated.maxTokens = typeof body.maxTokens === "string" ? parseInt(body.maxTokens, 10) : body.maxTokens;
+    }
+
+    await ctx.updateEntityCoreLLMSettings(updated);
+
+    const activeProfile = ctx.getActiveLLMProfile();
+    const resolved = {
+      model: updated.model || activeProfile?.model || "",
+      temperature: updated.temperature ?? 0.3,
+      maxTokens: updated.maxTokens ?? 4000,
+      profileName: activeProfile?.name || null,
+    };
+
+    return new Response(
+      JSON.stringify({ success: true, settings: updated, resolved }),
+      { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  } catch (error) {
+    console.error("[Routes] Failed to save entity-core LLM settings:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save entity-core LLM settings" }),
       { status: 500, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
     );
   }

@@ -58,3 +58,7 @@ export { loadHomeSettings, saveHomeSettings, getDefaultHomeSettings } from "./ho
 // Re-export Image Gen settings
 export type { ImageGenSettings, ImageGenConfig, ImageGenProvider, ImageGenProviderSettings, CommonImageGenParams, CaptioningSettings, CaptioningProvider, CaptioningGeminiSettings, CaptioningOpenRouterSettings } from "./image-gen-settings.ts";
 export { loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings, maskImageGenSettings } from "./image-gen-settings.ts";
+
+// Re-export Entity-Core LLM settings
+export type { EntityCoreLLMSettings } from "./entity-core-settings.ts";
+export { loadEntityCoreLLMSettings, saveEntityCoreLLMSettings, getDefaultEntityCoreLLMSettings } from "./entity-core-settings.ts";

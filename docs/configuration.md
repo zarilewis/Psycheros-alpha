@@ -85,8 +85,12 @@ PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,iden
 | `ENTITY_CORE_LLM_API_KEY` | — | Override API key for entity-core's LLM (memory-to-graph extraction). Falls back to active profile's API key, then `ZAI_API_KEY` |
 | `ENTITY_CORE_LLM_BASE_URL` | — | Override LLM endpoint for entity-core. Falls back to active profile's base URL, then `ZAI_BASE_URL` |
 | `ENTITY_CORE_LLM_MODEL` | — | Override model for entity-core extraction. Falls back to active profile's model, then `ZAI_MODEL` |
+| `ENTITY_CORE_LLM_TEMPERATURE` | — | Override temperature for entity-core extraction. Falls back to `0.3` |
+| `ENTITY_CORE_LLM_MAX_TOKENS` | — | Override max tokens for entity-core extraction. Falls back to `4000` |
 
 Psycheros automatically forwards the **active LLM profile's** credentials to entity-core so that knowledge graph extraction works out of the box. When the active profile changes, entity-core is dynamically restarted with the new credentials. Set the `ENTITY_CORE_LLM_*` variants if entity-core needs different LLM settings than Psycheros (e.g., a cheaper model for extraction).
+
+Entity-core's model, temperature, and max tokens can also be configured via **Settings > Entity Core > LLM** in the web UI. These overrides persist to `.psycheros/entity-core-llm-settings.json` and take priority over the active profile defaults when set.
 
 When MCP is enabled, Psycheros:
 - Spawns entity-core as a subprocess on startup

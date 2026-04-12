@@ -55,6 +55,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/llm/discord-settings.ts` | Discord settings type, load/save, token masking |
 | `src/llm/home-settings.ts` | Home automation settings type, load/save (device list) |
 | `src/llm/image-gen-settings.ts` | Image generator + captioning config type, load/save, masking |
+| `src/llm/entity-core-settings.ts` | Entity-core LLM override settings type, load/save (model, temperature, maxTokens) |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
 | `src/tools/identity-custom.ts` | Custom identity file tool (create, append, prepend, update_section, replace) |
 | `src/memory/mod.ts` | Hierarchical memory system (daily summarization only; weekly/monthly/yearly consolidation moved to entity-core) |
@@ -89,6 +90,7 @@ Supported provider presets: **OpenRouter** (default), OpenAI, Alibaba/Qwen, Nano
 - Settings persist to `.psycheros/llm-settings.json` as `LLMProfileSettings` (array of `LLMConnectionProfile` + `activeProfileId`)
 - Automatic migration from legacy flat `LLMSettings` format
 - Entity-core LLM credentials are derived from the active profile on startup and dynamically updated when the active profile changes (triggers entity-core restart if connected)
+- Entity-core LLM model/temperature/maxTokens can be overridden independently via Settings > Entity Core > LLM (persists to `.psycheros/entity-core-llm-settings.json`)
 - Worker model (auto-titling, summarization) uses the profile's `workerModel` with thinking disabled
 
 ## External Connections
