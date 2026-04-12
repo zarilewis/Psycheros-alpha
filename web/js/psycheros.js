@@ -3698,7 +3698,7 @@ globalThis.handleAnchorUpload = function() {
   formData.append('label', document.getElementById('anchor-label').value || 'Unnamed');
   formData.append('description', document.getElementById('anchor-upload-desc').value || '');
   fetch('/api/anchor-images', { method: 'POST', body: formData }).then(() => {
-    htmx.ajax('GET', '/fragments/settings/connections/image-gen/anchors', '#chat');
+    htmx.ajax('GET', '/fragments/settings/vision', '#chat');
   });
 };
 
@@ -3713,5 +3713,5 @@ globalThis.saveAnchorMeta = async function(id) {
 globalThis.deleteAnchor = async function(id) {
   if (!confirm('Delete this anchor image?')) return;
   await fetch('/api/anchor-images/' + id, { method: 'DELETE' });
-  htmx.ajax('GET', '/fragments/settings/connections/image-gen/anchors', '#chat');
+  htmx.ajax('GET', '/fragments/settings/vision', '#chat');
 };

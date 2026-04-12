@@ -58,10 +58,8 @@ import {
   renderConnectionsSettings,
   renderConnectionsDiscordSettings,
   renderHomeSettings,
-  renderImageGenTab,
+  renderVisionSettings,
   renderImageGenSlotSettings,
-  renderImageGenAnchors,
-  renderImageGenCaptioning,
   renderToolsSettings,
   renderEntityCoreHub,
   renderEntityCoreOverview,
@@ -4796,7 +4794,6 @@ export function handleConnectionsSettingsFragment(ctx: RouteContext): Response {
   const html = renderConnectionsSettings(
     maskDiscordSettings(ctx.getDiscordSettings()),
     ctx.getHomeSettings(),
-    maskImageGenSettings(ctx.getImageGenSettings()),
   );
   return new Response(html, {
     headers: {
@@ -5195,46 +5192,26 @@ export async function handleUploadChatAttachment(
 // =============================================================================
 
 /**
- * Handle GET /fragments/settings/connections/image-gen - Image gen hub fragment.
+ * Handle GET /fragments/settings/vision - Vision settings fragment.
  */
-export function handleConnectionsImageGenFragment(ctx: RouteContext): Response {
-  const html = renderImageGenTab(maskImageGenSettings(ctx.getImageGenSettings()));
+export function handleVisionSettingsFragment(ctx: RouteContext): Response {
+  const settings = maskImageGenSettings(ctx.getImageGenSettings());
+  const anchors = ctx.db.getRawDb()
+    .prepare("SELECT * FROM anchor_images ORDER BY created_at DESC")
+    .all<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>();
+  const html = renderVisionSettings(settings, anchors);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
 }
 
 /**
- * Handle GET /fragments/settings/connections/image-gen/captioning - Captioning settings.
+ * Handle GET /fragments/settings/vision/image-gen/:id - Image gen slot settings.
  */
-export function handleConnectionsImageGenCaptioningFragment(ctx: RouteContext): Response {
-  const captioning = ctx.getImageGenSettings().captioning;
-  const html = renderImageGenCaptioning(captioning);
-  return new Response(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
-}
-
-/**
- * Handle GET /fragments/settings/connections/image-gen/:id - Image gen slot settings.
- */
-export function handleConnectionsImageGenSlotFragment(ctx: RouteContext, id: string): Response {
+export function handleVisionImageGenSlotFragment(ctx: RouteContext, id: string): Response {
   const settings = ctx.getImageGenSettings();
   const generator = settings.generators.find((g) => g.id === id);
   const html = renderImageGenSlotSettings(generator, id);
-  return new Response(html, {
-    headers: { "Content-Type": "text/html; charset=utf-8" },
-  });
-}
-
-/**
- * Handle GET /fragments/settings/connections/image-gen/anchors - Anchor images management.
- */
-export function handleConnectionsImageGenAnchorsFragment(ctx: RouteContext): Response {
-  const rows = ctx.db.getRawDb()
-    .prepare("SELECT * FROM anchor_images ORDER BY created_at DESC")
-    .all<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>();
-  const html = renderImageGenAnchors(rows);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });

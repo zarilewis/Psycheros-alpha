@@ -300,7 +300,7 @@ The entity can generate images using configured provider slots (OpenRouter or Go
 
 **Parameters:** `generator_id` (required, ID of the configured generator), `prompt` (required, text description of the desired image), `negative_prompt` (optional, things to avoid), `anchor_ids` (optional, array of anchor image IDs to use as style reference), `user_image_path` (optional, path to a user-attached chat image), `input_image_path` (optional, path to a previously generated image for reference-based iteration/modification).
 
-**Setup:** Configure via Settings > External Connections > Image Gen. Each generator has a name, description, provider (OpenRouter or Gemini), and provider-specific settings. Settings are persisted to `.psycheros/image-gen-settings.json` (gitignored). The tool is auto-enabled when at least one generator has `enabled: true`.
+**Setup:** Configure via Settings > Vision > Generators. Each generator has a name, description, provider (OpenRouter or Gemini), and provider-specific settings. Settings are persisted to `.psycheros/image-gen-settings.json` (gitignored). The tool is auto-enabled when at least one generator has `enabled: true`.
 
 **Supported Providers:**
 
@@ -351,7 +351,7 @@ The entity can explicitly describe any image by local path or URL.
 
 **Use cases:** Examining images found via web search, reviewing previously generated images, understanding user-attached images in more detail.
 
-**Setup:** Configure via Settings > External Connections > Image Gen > Captioning. Supports Gemini and OpenRouter as captioning providers with independent model selection. The tool is auto-enabled when a captioning provider is configured.
+**Setup:** Configure via Settings > Vision > Generators (Captioning section). Supports Gemini and OpenRouter as captioning providers with independent model selection. The tool is auto-enabled when a captioning provider is configured.
 
 ### Related Source Files
 

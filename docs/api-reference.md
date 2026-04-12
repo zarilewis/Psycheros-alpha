@@ -289,13 +289,12 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/admin/logs` | Log viewer HTML fragment |
 | `GET` | `/fragments/admin/jobs` | Scheduled jobs dashboard HTML fragment |
 | `GET` | `/fragments/admin/actions` | Actions panel HTML fragment |
-| `GET` | `/fragments/settings/connections` | External connections hub (Channels + Home + Image Gen tabs) |
+| `GET` | `/fragments/settings/connections` | External connections hub (Channels + Home tabs) |
 | `GET` | `/fragments/settings/connections/discord` | Discord connection settings fragment |
 | `GET` | `/fragments/settings/connections/home` | Home automation settings fragment |
-| `GET` | `/fragments/settings/connections/image-gen/new` | New image generator config fragment |
-| `GET` | `/fragments/settings/connections/image-gen/anchors` | Anchor images management fragment |
-| `GET` | `/fragments/settings/connections/image-gen/captioning` | Image captioning settings fragment |
-| `GET` | `/fragments/settings/connections/image-gen/:id` | Edit image generator config fragment |
+| `GET` | `/fragments/settings/vision` | Vision settings hub (Generators + Anchors tabs) |
+| `GET` | `/fragments/settings/vision/image-gen/new` | New image generator config fragment |
+| `GET` | `/fragments/settings/vision/image-gen/:id` | Edit image generator config fragment |
 | `GET` | `/fragments/settings/tools` | Tools settings UI fragment |
 | `GET` | `/fragments/settings/sa` | Situational Awareness settings fragment |
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |

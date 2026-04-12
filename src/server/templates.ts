@@ -519,6 +519,24 @@ export function renderSettingsHub(): string {
         </svg>
       </a>
       <a class="settings-hub-card"
+        hx-get="/fragments/settings/vision"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">Vision</span>
+          <span class="settings-hub-card-desc">Image generation, captioning, and visual references</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
         hx-get="/fragments/settings/connections"
         hx-target="#chat"
         hx-swap="innerHTML">
@@ -3993,10 +4011,9 @@ function renderToolItem(tool: { name: string; description: string; enabled: bool
  * Render External Connections page with tabbed navigation.
  * Tabs: Channels (Discord, etc.) and Home (smart devices).
  */
-export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings, imageGenSettings?: import("../llm/image-gen-settings.ts").ImageGenSettings): string {
+export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings): string {
   const channelsContent = renderChannelsTab(discordSettings);
   const homeContent = renderHomeTab(homeSettings);
-  const imageGenContent = renderImageGenTab(imageGenSettings || { generators: [] });
 
   return `<div class="settings-view">
   <div class="settings-header">
@@ -4024,19 +4041,10 @@ export function renderConnectionsSettings(discordSettings: DiscordSettings, home
         </svg>
         Home
       </button>
-      <button class="connections-nav-tab" data-tab="image-gen" onclick="switchConnectionsTab('image-gen')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          <circle cx="8.5" cy="8.5" r="1.5"/>
-          <polyline points="21 15 16 10 5 21"/>
-        </svg>
-        Image Gen
-      </button>
     </nav>
 
     <div id="connections-tab-channels" class="connections-tab-panel">${channelsContent}</div>
     <div id="connections-tab-home" class="connections-tab-panel" style="display:none;">${homeContent}</div>
-    <div id="connections-tab-image-gen" class="connections-tab-panel" style="display:none;">${imageGenContent}</div>
 
   </div>
 
@@ -5057,19 +5065,86 @@ export function renderConsolidationComplete(results: { granularity: string; succ
 }
 
 // =============================================================================
-// Image Gen Settings Templates
+// Vision Settings Templates
 // =============================================================================
 
 type ImageGenConfig = import("../llm/image-gen-settings.ts").ImageGenConfig;
 type ImageGenSettings = import("../llm/image-gen-settings.ts").ImageGenSettings;
 
 /**
- * Render the Image Gen tab content — hub grid of generator cards.
+ * Render the Vision settings page with Generators and Anchors tabs.
  */
-export function renderImageGenTab(settings: ImageGenSettings): string {
+export function renderVisionSettings(
+  settings: ImageGenSettings,
+  anchors: Array<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>,
+): string {
+  const generatorsContent = renderVisionGeneratorsTab(settings);
+  const anchorsContent = renderVisionAnchorsTab(anchors);
+
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Vision</h1>
+        <p class="settings-desc">Image generation, captioning, and visual references</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+
+    <nav class="vision-nav">
+      <button class="vision-nav-tab active" data-tab="generators" onclick="switchVisionTab('generators')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+        Generators
+      </button>
+      <button class="vision-nav-tab" data-tab="anchors" onclick="switchVisionTab('anchors')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+        </svg>
+        Anchors
+      </button>
+    </nav>
+
+    <div id="vision-tab-generators" class="vision-tab-panel">${generatorsContent}</div>
+    <div id="vision-tab-anchors" class="vision-tab-panel" style="display:none;">${anchorsContent}</div>
+
+  </div>
+
+  <style>
+    .vision-nav { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4); border-bottom: 1px solid var(--c-border); padding-bottom: var(--sp-2); }
+    .vision-nav-tab { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2) var(--sp-3); background: none; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--c-fg-muted); font-size: var(--font-size-sm); cursor: pointer; transition: color var(--transition), background var(--transition), border-color var(--transition); }
+    .vision-nav-tab:hover { color: var(--c-fg); background: var(--c-bg-hover); }
+    .vision-nav-tab:active { transform: scale(0.98); }
+    .vision-nav-tab.active { color: var(--c-accent); background: var(--c-accent-subtle); border-color: var(--c-accent); }
+    .anchor-list { display: flex; flex-direction: column; gap: var(--sp-3); }
+    .anchor-card { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--radius-md); background: var(--c-bg); }
+    .anchor-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radius-sm); }
+    .anchor-info { flex: 1; }
+    .anchor-meta { font-size: var(--font-size-xs); color: var(--c-fg-muted); margin-top: var(--sp-1); }
+    .anchor-actions { display: flex; gap: var(--sp-2); }
+  </style>
+
+<script>
+function switchVisionTab(tab) {
+  document.querySelectorAll('.vision-nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.vision-tab-panel').forEach(p => p.style.display = p.id === 'vision-tab-' + tab ? '' : 'none');
+}
+</script>
+</div>`;
+}
+
+/**
+ * Render the Generators tab panel — generator cards + add button + captioning config.
+ */
+function renderVisionGeneratorsTab(settings: ImageGenSettings): string {
   const cards = settings.generators.map((g) => `
     <a class="settings-hub-card"
-      hx-get="/fragments/settings/connections/image-gen/${escapeHtml(g.id)}"
+      hx-get="/fragments/settings/vision/image-gen/${escapeHtml(g.id)}"
       hx-target="#chat"
       hx-swap="innerHTML">
       <div class="settings-hub-card-icon">
@@ -5090,7 +5165,7 @@ export function renderImageGenTab(settings: ImageGenSettings): string {
 
   const addCard = `
     <button class="settings-hub-card settings-hub-card-add"
-      hx-get="/fragments/settings/connections/image-gen/new"
+      hx-get="/fragments/settings/vision/image-gen/new"
       hx-target="#chat"
       hx-swap="innerHTML">
       <div class="settings-hub-card-icon">
@@ -5105,56 +5180,171 @@ export function renderImageGenTab(settings: ImageGenSettings): string {
       </div>
     </button>`;
 
-  const anchorsLink = `
-    <a class="settings-hub-card"
-      hx-get="/fragments/settings/connections/image-gen/anchors"
-      hx-target="#chat"
-      hx-swap="innerHTML">
-      <div class="settings-hub-card-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
-        </svg>
-      </div>
-      <div class="settings-hub-card-body">
-        <span class="settings-hub-card-title">Anchor Images</span>
-        <span class="settings-hub-card-desc">Manage style and character reference images</span>
-      </div>
-      <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="9 18 15 12 9 6"/>
-      </svg>
-    </a>`;
+  return `<section>
+    <h3 style="font-size:var(--font-size-sm);color:var(--c-fg-muted);margin-bottom:var(--sp-3);">Image Generators</h3>
+    <div class="settings-hub-grid">
+      ${cards}
+      ${addCard}
+    </div>
+  </section>
+  ${renderVisionCaptioningSection(settings.captioning)}`;
+}
 
-  const captioningSettings = settings.captioning;
-  const captioningDesc = captioningSettings?.provider
-    ? `${escapeHtml(captioningSettings.provider)}${captioningSettings.enabled ? " — Enabled" : " — Disabled"}`
-    : "Not configured";
+/**
+ * Render the captioning config section (inline, no page wrapper).
+ */
+function renderVisionCaptioningSection(
+  captioning: import("../llm/image-gen-settings.ts").CaptioningSettings | undefined,
+): string {
+  const c = captioning || {
+    enabled: false,
+    provider: "gemini" as const,
+    gemini: { apiKey: "", model: "gemini-2.0-flash" },
+  };
+  const provider = c.provider || "gemini";
 
-  const captioningLink = `
-    <a class="settings-hub-card"
-      hx-get="/fragments/settings/connections/image-gen/captioning"
-      hx-target="#chat"
-      hx-swap="innerHTML">
-      <div class="settings-hub-card-icon">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-          <circle cx="12" cy="12" r="3"/>
-        </svg>
+  return `<section class="theme-section" style="margin-top:var(--sp-6);padding-top:var(--sp-4);border-top:1px solid var(--c-border);">
+    <h3 style="font-size:var(--font-size-sm);color:var(--c-fg-muted);margin-bottom:var(--sp-3);">Captioning</h3>
+    <div class="llm-fields">
+      <div class="llm-field">
+        <label class="toggle-label">
+          <input type="checkbox" id="cap-enabled" role="switch" aria-label="Auto-caption chat attachments" ${c.enabled ? "checked" : ""}>
+          <span class="toggle-slider"></span>
+          <span class="toggle-text">Auto-caption chat attachments</span>
+        </label>
+        <p class="settings-note">When enabled, images attached to chat messages are automatically described before sending to the entity. The description is included in the message context.</p>
       </div>
-      <div class="settings-hub-card-body">
-        <span class="settings-hub-card-title">Captioning</span>
-        <span class="settings-hub-card-desc">${captioningDesc}</span>
-      </div>
-      <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="9 18 15 12 9 6"/>
-      </svg>
-    </a>`;
 
-  return `<div class="settings-hub-grid">
-    ${cards}
-    ${addCard}
-    ${anchorsLink}
-    ${captioningLink}
-  </div>`;
+      <div class="llm-field">
+        <label for="cap-provider">Provider</label>
+        <select id="cap-provider" class="input-field llm-input" onchange="toggleCaptioningProvider()">
+          <option value="gemini" ${provider === "gemini" ? "selected" : ""}>Google Gemini</option>
+          <option value="openrouter" ${provider === "openrouter" ? "selected" : ""}>OpenRouter</option>
+        </select>
+      </div>
+
+      <div id="cap-gemini-section" style="${provider === "gemini" ? "" : "display:none;"}">
+        <div class="llm-field">
+          <label for="cap-gemini-key">API Key</label>
+          <input type="password" id="cap-gemini-key" class="input-field llm-input" value="${escapeHtml(c.gemini?.apiKey || "")}" placeholder="AIza...">
+        </div>
+        <div class="llm-field">
+          <label for="cap-gemini-model">Model</label>
+          <select id="cap-gemini-model" class="input-field llm-input">
+            <option value="gemini-2.5-flash" ${(c.gemini?.model || "") === "gemini-2.5-flash" ? "selected" : ""}>gemini-2.5-flash</option>
+            <option value="gemini-2.5-flash-lite" ${(c.gemini?.model || "") === "gemini-2.5-flash-lite" ? "selected" : ""}>gemini-2.5-flash-lite</option>
+            <option value="gemini-2.5-pro" ${(c.gemini?.model || "") === "gemini-2.5-pro" ? "selected" : ""}>gemini-2.5-pro</option>
+            <option value="gemini-3-flash-preview" ${(c.gemini?.model || "") === "gemini-3-flash-preview" ? "selected" : ""}>gemini-3-flash-preview</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="cap-openrouter-section" style="${provider === "openrouter" ? "" : "display:none;"}">
+        <div class="llm-field">
+          <label for="cap-or-key">API Key</label>
+          <input type="password" id="cap-or-key" class="input-field llm-input" value="${escapeHtml(c.openrouter?.apiKey || "")}" placeholder="sk-or-...">
+        </div>
+        <div class="llm-field">
+          <label for="cap-or-model">Model</label>
+          <input type="text" id="cap-or-model" class="input-field llm-input" value="${escapeHtml(c.openrouter?.model || "")}" placeholder="google/gemini-2.0-flash-001">
+        </div>
+        <div class="llm-field">
+          <label for="cap-or-baseurl">Base URL</label>
+          <input type="text" id="cap-or-baseurl" class="input-field llm-input" value="${escapeHtml(c.openrouter?.baseUrl || "")}" placeholder="https://openrouter.ai/api (default)">
+        </div>
+      </div>
+
+      <div class="llm-field" style="display:flex;gap:var(--sp-3);margin-top:var(--sp-4);">
+        <button class="btn btn--primary" onclick="saveCaptioning()">Save</button>
+      </div>
+    </div>
+  </section>
+
+<script>
+function toggleCaptioningProvider() {
+  const provider = document.getElementById('cap-provider').value;
+  document.getElementById('cap-gemini-section').style.display = provider === 'gemini' ? '' : 'none';
+  document.getElementById('cap-openrouter-section').style.display = provider === 'openrouter' ? '' : 'none';
+}
+
+async function saveCaptioning() {
+  const provider = document.getElementById('cap-provider').value;
+  const enabled = document.getElementById('cap-enabled').checked;
+  let gemini, openrouter;
+
+  if (provider === 'gemini') {
+    gemini = {
+      apiKey: document.getElementById('cap-gemini-key').value,
+      model: document.getElementById('cap-gemini-model').value,
+    };
+  } else {
+    openrouter = {
+      apiKey: document.getElementById('cap-or-key').value,
+      model: document.getElementById('cap-or-model').value,
+      baseUrl: document.getElementById('cap-or-baseurl').value,
+    };
+  }
+
+  try {
+    await fetch('/api/image-gen-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ captioning: { enabled, provider, gemini, openrouter } }),
+    });
+    htmx.ajax('GET', '/fragments/settings/vision', '#chat');
+  } catch (e) {
+    console.error('Failed to save captioning settings:', e);
+  }
+}
+</script>`;
+}
+
+/**
+ * Render the Anchors tab panel content (inline, no page wrapper).
+ */
+function renderVisionAnchorsTab(
+  anchors: Array<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>,
+): string {
+  const rows = anchors.map((a) => `
+    <div class="anchor-card" id="anchor-${escapeHtml(a.id)}">
+      <img src="/anchors/${escapeHtml(a.filename)}" class="anchor-thumb" alt="${escapeHtml(a.label)}" loading="lazy"/>
+      <div class="anchor-info">
+        <input type="text" class="input-field anchor-label" value="${escapeHtml(a.label)}" placeholder="Label" style="font-size:var(--font-size-sm);padding:var(--sp-1) var(--sp-2);margin-bottom:var(--sp-1);">
+        <input type="text" class="input-field anchor-desc" value="${escapeHtml(a.description)}" placeholder="Description" style="font-size:var(--font-size-xs);padding:var(--sp-1) var(--sp-2);color:var(--c-fg-muted);">
+        <div class="anchor-meta">${(a.file_size / 1024).toFixed(1)} KB</div>
+      </div>
+      <div class="anchor-actions">
+        <button class="btn btn--sm btn--primary" onclick="saveAnchorMeta('${escapeHtml(a.id)}')">Save</button>
+        <button class="btn btn--sm btn--danger" onclick="deleteAnchor('${escapeHtml(a.id)}')">Delete</button>
+      </div>
+    </div>`).join("");
+
+  return `<section class="theme-section">
+    <div class="anchor-list" id="anchor-list">
+      ${rows || '<p class="settings-note">No anchor images yet. Upload one below.</p>'}
+    </div>
+  </section>
+
+  <section class="theme-section" style="margin-top:var(--sp-4);">
+    <h3 style="font-size:var(--font-size-sm);color:var(--c-fg-muted);">Upload Anchor Image</h3>
+    <form id="anchor-upload-form" style="display:flex;gap:var(--sp-3);align-items:end;flex-wrap:wrap;">
+      <div class="llm-field" style="flex:0 0 auto;">
+        <label>File</label>
+        <button type="button" class="btn btn--sm" onclick="document.getElementById('anchor-file').click()">Choose File</button>
+        <input type="file" id="anchor-file" accept="image/*" style="display:none;" onchange="document.getElementById('anchor-file-name').textContent = this.files[0]?.name || ''">
+        <span id="anchor-file-name" class="anchor-meta"></span>
+      </div>
+      <div class="llm-field" style="flex:1;min-width:150px;">
+        <label for="anchor-label">Label</label>
+        <input type="text" id="anchor-label" class="input-field llm-input" placeholder="Character name or style tag">
+      </div>
+      <div class="llm-field" style="flex:2;min-width:200px;">
+        <label for="anchor-upload-desc">Description</label>
+        <input type="text" id="anchor-upload-desc" class="input-field llm-input" placeholder="Brief description for context">
+      </div>
+      <button type="button" class="btn btn--primary" style="align-self:end;" onclick="handleAnchorUpload()">Upload</button>
+    </form>
+  </section>`;
 }
 
 /**
@@ -5178,7 +5368,15 @@ export function renderImageGenSlotSettings(generator: ImageGenConfig | undefined
   return `<div class="settings-view">
   <div class="settings-header">
     <div class="settings-header-row">
-      ${renderSettingsBackButton()}
+      <a class="settings-back-btn"
+        hx-get="/fragments/settings/vision"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        <span>Vision</span>
+      </a>
       <div>
         <h1 class="settings-title">${isNew ? "New Generator" : escapeHtml(g.name)}</h1>
         <p class="settings-desc">Configure image generation provider settings</p>
@@ -5309,7 +5507,7 @@ async function saveImageGenSlot(id, isNew) {
   }
 
   await fetch('/api/image-gen-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
-  htmx.ajax('GET', '/fragments/settings/connections/image-gen', '#chat');
+  htmx.ajax('GET', '/fragments/settings/vision', '#chat');
 }
 
 async function deleteImageGenSlot(id) {
@@ -5318,7 +5516,7 @@ async function deleteImageGenSlot(id) {
   const settings = await resp.json();
   settings.generators = settings.generators.filter(g => g.id !== id);
   await fetch('/api/image-gen-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
-  htmx.ajax('GET', '/fragments/settings/connections/image-gen', '#chat');
+  htmx.ajax('GET', '/fragments/settings/vision', '#chat');
 }
 </script>
 </div>`;
@@ -5327,196 +5525,4 @@ async function deleteImageGenSlot(id) {
 /**
  * Render anchor images management page.
  */
-export function renderImageGenAnchors(
-  anchors: Array<{ id: string; label: string; description: string; filename: string; file_size: number; created_at: string }>,
-): string {
-  const rows = anchors.map((a) => `
-    <div class="anchor-card" id="anchor-${escapeHtml(a.id)}">
-      <img src="/anchors/${escapeHtml(a.filename)}" class="anchor-thumb" alt="${escapeHtml(a.label)}" loading="lazy"/>
-      <div class="anchor-info">
-        <input type="text" class="input-field anchor-label" value="${escapeHtml(a.label)}" placeholder="Label" style="font-size:var(--font-size-sm);padding:var(--sp-1) var(--sp-2);margin-bottom:var(--sp-1);">
-        <input type="text" class="input-field anchor-desc" value="${escapeHtml(a.description)}" placeholder="Description" style="font-size:var(--font-size-xs);padding:var(--sp-1) var(--sp-2);color:var(--c-fg-muted);">
-        <div class="anchor-meta">${(a.file_size / 1024).toFixed(1)} KB</div>
-      </div>
-      <div class="anchor-actions">
-        <button class="btn btn--sm btn--primary" onclick="saveAnchorMeta('${escapeHtml(a.id)}')">Save</button>
-        <button class="btn btn--sm btn--danger" onclick="deleteAnchor('${escapeHtml(a.id)}')">Delete</button>
-      </div>
-    </div>`).join("");
 
-  return `<div class="settings-view">
-  <div class="settings-header">
-    <div class="settings-header-row">
-      ${renderSettingsBackButton()}
-      <div>
-        <h1 class="settings-title">Anchor Images</h1>
-        <p class="settings-desc">Reference images for style and character consistency</p>
-      </div>
-    </div>
-  </div>
-  <div class="settings-content" id="settings-content">
-
-    <section class="theme-section">
-      <div class="anchor-list" id="anchor-list">
-        ${rows || '<p class="settings-note">No anchor images yet. Upload one below.</p>'}
-      </div>
-    </section>
-
-    <section class="theme-section" style="margin-top:var(--sp-4);">
-      <h3 style="font-size:var(--font-size-sm);color:var(--c-fg-muted);">Upload Anchor Image</h3>
-      <form id="anchor-upload-form" style="display:flex;gap:var(--sp-3);align-items:end;flex-wrap:wrap;">
-        <div class="llm-field" style="flex:0 0 auto;">
-          <label>File</label>
-          <button type="button" class="btn btn--sm" onclick="document.getElementById('anchor-file').click()">Choose File</button>
-          <input type="file" id="anchor-file" accept="image/*" style="display:none;" onchange="document.getElementById('anchor-file-name').textContent = this.files[0]?.name || ''">
-          <span id="anchor-file-name" class="anchor-meta"></span>
-        </div>
-        <div class="llm-field" style="flex:1;min-width:150px;">
-          <label for="anchor-label">Label</label>
-          <input type="text" id="anchor-label" class="input-field llm-input" placeholder="Character name or style tag">
-        </div>
-        <div class="llm-field" style="flex:2;min-width:200px;">
-          <label for="anchor-upload-desc">Description</label>
-          <input type="text" id="anchor-upload-desc" class="input-field llm-input" placeholder="Brief description for context">
-        </div>
-        <button type="button" class="btn btn--primary" style="align-self:end;" onclick="handleAnchorUpload()">Upload</button>
-      </form>
-    </section>
-
-  </div>
-
-  <style>
-    .anchor-list { display: flex; flex-direction: column; gap: var(--sp-3); }
-    .anchor-card { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--c-border); border-radius: var(--radius-md); background: var(--c-bg); }
-    .anchor-thumb { width: 64px; height: 64px; object-fit: cover; border-radius: var(--radius-sm); }
-    .anchor-info { flex: 1; }
-    .anchor-meta { font-size: var(--font-size-xs); color: var(--c-fg-muted); margin-top: var(--sp-1); }
-    .anchor-actions { display: flex; gap: var(--sp-2); }
-  </style>
-</div>`;
-}
-
-/**
- * Render the captioning settings page.
- */
-export function renderImageGenCaptioning(
-  captioning: import("../llm/image-gen-settings.ts").CaptioningSettings | undefined,
-): string {
-  const c = captioning || {
-    enabled: false,
-    provider: "gemini" as const,
-    gemini: { apiKey: "", model: "gemini-2.0-flash" },
-  };
-  const provider = c.provider || "gemini";
-
-  return `<div class="settings-view">
-  <div class="settings-header">
-    <div class="settings-header-row">
-      ${renderSettingsBackButton()}
-      <div>
-        <h1 class="settings-title">Captioning</h1>
-        <p class="settings-desc">Configure image captioning for auto-describing chat attachments and the describe_image tool</p>
-      </div>
-    </div>
-  </div>
-  <div class="settings-content" id="settings-content">
-
-    <section class="theme-section">
-      <div class="llm-fields">
-        <div class="llm-field">
-          <label class="toggle-label">
-            <input type="checkbox" id="cap-enabled" role="switch" aria-label="Auto-caption chat attachments" ${c.enabled ? "checked" : ""}>
-            <span class="toggle-slider"></span>
-            <span class="toggle-text">Auto-caption chat attachments</span>
-          </label>
-          <p class="settings-note">When enabled, images attached to chat messages are automatically described before sending to the entity. The description is included in the message context.</p>
-        </div>
-
-        <div class="llm-field">
-          <label for="cap-provider">Provider</label>
-          <select id="cap-provider" class="input-field llm-input" onchange="toggleCaptioningProvider()">
-            <option value="gemini" ${provider === "gemini" ? "selected" : ""}>Google Gemini</option>
-            <option value="openrouter" ${provider === "openrouter" ? "selected" : ""}>OpenRouter</option>
-          </select>
-        </div>
-
-        <div id="cap-gemini-section" style="${provider === "gemini" ? "" : "display:none;"}">
-          <h3 style="margin-top:var(--sp-4);font-size:var(--font-size-sm);color:var(--c-fg-muted);">Gemini Captioning Settings</h3>
-          <div class="llm-field">
-            <label for="cap-gemini-key">API Key</label>
-            <input type="password" id="cap-gemini-key" class="input-field llm-input" value="${escapeHtml(c.gemini?.apiKey || "")}" placeholder="AIza...">
-          </div>
-          <div class="llm-field">
-            <label for="cap-gemini-model">Model</label>
-            <select id="cap-gemini-model" class="input-field llm-input">
-              <option value="gemini-2.5-flash" ${(c.gemini?.model || "") === "gemini-2.5-flash" ? "selected" : ""}>gemini-2.5-flash</option>
-              <option value="gemini-2.5-flash-lite" ${(c.gemini?.model || "") === "gemini-2.5-flash-lite" ? "selected" : ""}>gemini-2.5-flash-lite</option>
-              <option value="gemini-2.5-pro" ${(c.gemini?.model || "") === "gemini-2.5-pro" ? "selected" : ""}>gemini-2.5-pro</option>
-              <option value="gemini-3-flash-preview" ${(c.gemini?.model || "") === "gemini-3-flash-preview" ? "selected" : ""}>gemini-3-flash-preview</option>
-            </select>
-          </div>
-        </div>
-
-        <div id="cap-openrouter-section" style="${provider === "openrouter" ? "" : "display:none;"}">
-          <h3 style="margin-top:var(--sp-4);font-size:var(--font-size-sm);color:var(--c-fg-muted);">OpenRouter Captioning Settings</h3>
-          <div class="llm-field">
-            <label for="cap-or-key">API Key</label>
-            <input type="password" id="cap-or-key" class="input-field llm-input" value="${escapeHtml(c.openrouter?.apiKey || "")}" placeholder="sk-or-...">
-          </div>
-          <div class="llm-field">
-            <label for="cap-or-model">Model</label>
-            <input type="text" id="cap-or-model" class="input-field llm-input" value="${escapeHtml(c.openrouter?.model || "")}" placeholder="google/gemini-2.0-flash-001">
-          </div>
-          <div class="llm-field">
-            <label for="cap-or-baseurl">Base URL</label>
-            <input type="text" id="cap-or-baseurl" class="input-field llm-input" value="${escapeHtml(c.openrouter?.baseUrl || "")}" placeholder="https://openrouter.ai/api (default)">
-          </div>
-        </div>
-
-        <div class="llm-field" style="display:flex;gap:var(--sp-3);margin-top:var(--sp-4);">
-          <button class="btn btn--primary" onclick="saveCaptioning()">Save</button>
-        </div>
-      </div>
-    </section>
-
-  </div>
-
-<script>
-function toggleCaptioningProvider() {
-  const provider = document.getElementById('cap-provider').value;
-  document.getElementById('cap-gemini-section').style.display = provider === 'gemini' ? '' : 'none';
-  document.getElementById('cap-openrouter-section').style.display = provider === 'openrouter' ? '' : 'none';
-}
-
-async function saveCaptioning() {
-  const provider = document.getElementById('cap-provider').value;
-  const enabled = document.getElementById('cap-enabled').checked;
-  let gemini, openrouter;
-
-  if (provider === 'gemini') {
-    gemini = {
-      apiKey: document.getElementById('cap-gemini-key').value,
-      model: document.getElementById('cap-gemini-model').value,
-    };
-  } else {
-    openrouter = {
-      apiKey: document.getElementById('cap-or-key').value,
-      model: document.getElementById('cap-or-model').value,
-      baseUrl: document.getElementById('cap-or-baseurl').value,
-    };
-  }
-
-  try {
-    await fetch('/api/image-gen-settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ captioning: { enabled, provider, gemini, openrouter } }),
-    });
-    htmx.ajax('GET', '/fragments/settings/connections/image-gen', '#chat');
-  } catch (e) {
-    console.error('Failed to save captioning settings:', e);
-  }
-}
-</script>
-</div>`;
-}

@@ -36,7 +36,7 @@ The toggle switch uses CSS sibling selectors (`input:checked + .toggle-slider`) 
 
 The nested `<label class="toggle">` wrapper breaks `input:checked + .toggle-slider` because there's an extra element between the input and the slider. This causes the accent color to not apply and the toggle to visually disappear when checked. **Do not use this pattern.**
 
-**CSS:** `web/css/settings.css` (`.toggle-label`, `.toggle-slider`, `.toggle-text`). Used in: Appearance Settings, LLM Settings, Tools Settings, Image Gen Settings, Captioning Settings, Situational Awareness Settings.
+**CSS:** `web/css/settings.css` (`.toggle-label`, `.toggle-slider`, `.toggle-text`). Used in: Appearance Settings, LLM Settings, Tools Settings, Vision Settings, Situational Awareness Settings.
 
 ## Context Inspector (continued)
 

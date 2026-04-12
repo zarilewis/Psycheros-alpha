@@ -131,10 +131,8 @@ import {
   handleConnectionsSettingsFragment,
   handleConnectionsDiscordFragment,
   handleConnectionsHomeFragment,
-  handleConnectionsImageGenFragment,
-  handleConnectionsImageGenSlotFragment,
-  handleConnectionsImageGenAnchorsFragment,
-  handleConnectionsImageGenCaptioningFragment,
+  handleVisionSettingsFragment,
+  handleVisionImageGenSlotFragment,
   handleGetHomeSettings,
   handleSaveHomeSettings,
   handleGetImageGenSettings,
@@ -1798,30 +1796,20 @@ export class Server {
       return handleConnectionsHomeFragment(ctx);
     }
 
-    // GET /fragments/settings/connections/image-gen - Image gen hub fragment
-    if (path === "/fragments/settings/connections/image-gen") {
-      return handleConnectionsImageGenFragment(ctx);
+    // GET /fragments/settings/vision - Vision settings fragment
+    if (path === "/fragments/settings/vision") {
+      return handleVisionSettingsFragment(ctx);
     }
 
-    // GET /fragments/settings/connections/image-gen/new - Create new generator slot
-    if (path === "/fragments/settings/connections/image-gen/new") {
-      return handleConnectionsImageGenSlotFragment(ctx, crypto.randomUUID());
+    // GET /fragments/settings/vision/image-gen/new - Create new generator slot
+    if (path === "/fragments/settings/vision/image-gen/new") {
+      return handleVisionImageGenSlotFragment(ctx, crypto.randomUUID());
     }
 
-    // GET /fragments/settings/connections/image-gen/anchors - Anchor images management
-    if (path === "/fragments/settings/connections/image-gen/anchors") {
-      return handleConnectionsImageGenAnchorsFragment(ctx);
-    }
-
-    // GET /fragments/settings/connections/image-gen/captioning - Captioning settings
-    if (path === "/fragments/settings/connections/image-gen/captioning") {
-      return handleConnectionsImageGenCaptioningFragment(ctx);
-    }
-
-    // GET /fragments/settings/connections/image-gen/:id - Image gen slot settings fragment
-    const imageGenSlotMatch = path.match(/^\/fragments\/settings\/connections\/image-gen\/([^/]+)$/);
-    if (imageGenSlotMatch) {
-      return handleConnectionsImageGenSlotFragment(ctx, imageGenSlotMatch[1]);
+    // GET /fragments/settings/vision/image-gen/:id - Image gen slot settings fragment
+    const visionImageGenSlotMatch = path.match(/^\/fragments\/settings\/vision\/image-gen\/([^/]+)$/);
+    if (visionImageGenSlotMatch) {
+      return handleVisionImageGenSlotFragment(ctx, visionImageGenSlotMatch[1]);
     }
 
     // Serve generated images from .psycheros/generated-images/

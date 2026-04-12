@@ -221,7 +221,7 @@ async function executeDescribeImage(
   if (!captioningSettings?.provider) {
     return {
       toolCallId: ctx.toolCallId,
-      content: "Error: Image captioning is not configured. Configure a captioning provider in Settings > External Connections > Image Gen > Captioning.",
+      content: "Error: Image captioning is not configured. Configure a captioning provider in Settings > Vision > Generators.",
       isError: true,
     };
   }
