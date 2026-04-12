@@ -223,13 +223,13 @@ The entity can send push notifications to the user's device. This works even whe
 
 ## Discord DM Tool
 
-The entity can send Discord DMs to the user as an alternative notification channel. This is useful when push notifications are unreliable (e.g., on Android web apps). Uses a Discord bot token to open a DM channel and send messages via the Discord REST API.
+The entity can send Discord DMs to the user as an alternative notification channel. This is useful when push notifications are unreliable (e.g., on Android web apps). Uses a Discord bot token to open a DM channel and send messages via the Discord REST API. The entity can also attach images (e.g., generated via `generate_image`) to DMs.
 
 | Tool | Description |
 |------|-------------|
-| `send_discord_dm` | Send a Discord DM with a message; optionally specify a target channel/user ID |
+| `send_discord_dm` | Send a Discord DM with a message; optionally attach an image or specify a target channel/user ID |
 
-**Parameters:** `message` (required, up to 2000 chars), `channel_id` (optional, overrides the configured default).
+**Parameters:** `message` (required, up to 2000 chars), `channel_id` (optional, overrides the configured default), `image_path` (optional, path to an image file relative to `.psycheros/`, e.g. `generated-images/abc.png`). Supported image formats: png, jpg/jpeg, webp, gif.
 
 **Setup:** Configure via Settings > External Connections in the web UI, or set environment variables:
 
@@ -240,9 +240,9 @@ The entity can send Discord DMs to the user as an alternative notification chann
 
 Settings are persisted to `.psycheros/discord-settings.json` (gitignored). The tool is auto-enabled when a bot token is configured and the feature is enabled.
 
-**Data flow:** Entity calls `send_discord_dm` → server opens DM channel via `POST /users/@me/channels` with the user ID → sends message via `POST /channels/{dm_channel_id}/messages` with bot auth.
+**Data flow:** Entity calls `send_discord_dm` → server opens DM channel via `POST /users/@me/channels` with the user ID → if `image_path` is provided, sends a `multipart/form-data` request with the image attachment; otherwise sends a JSON request → message (and optional image) sent via `POST /channels/{dm_channel_id}/messages` with bot auth.
 
-**Error handling:** The tool returns clear messages for common Discord API errors — 401 (invalid token), 403 (missing access), 404 (unknown channel/user), 429 (rate limited with retry-after info).
+**Error handling:** The tool returns clear messages for common Discord API errors — 401 (invalid token), 403 (missing access), 404 (unknown channel/user), 429 (rate limited with retry-after info), as well as file-not-found and unsupported image type errors.
 
 ### Related Source Files
 
