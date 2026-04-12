@@ -297,7 +297,7 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/admin/logs` | Log viewer HTML fragment |
 | `GET` | `/fragments/admin/jobs` | Scheduled jobs dashboard HTML fragment |
 | `GET` | `/fragments/admin/actions` | Actions panel HTML fragment |
-| `GET` | `/fragments/settings/connections` | External connections hub (Channels + Home tabs) |
+| `GET` | `/fragments/settings/connections` | External connections hub (Channels, Home, Web Search tabs) |
 | `GET` | `/fragments/settings/connections/discord` | Discord connection settings fragment |
 | `GET` | `/fragments/settings/connections/home` | Home automation settings fragment |
 | `GET` | `/fragments/settings/vision` | Vision settings hub (Generators, Anchors, Gallery tabs) |

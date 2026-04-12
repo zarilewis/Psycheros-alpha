@@ -36,7 +36,7 @@ The toggle switch uses CSS sibling selectors (`input:checked + .toggle-slider`) 
 
 The nested `<label class="toggle">` wrapper breaks `input:checked + .toggle-slider` because there's an extra element between the input and the slider. This causes the accent color to not apply and the toggle to visually disappear when checked. **Do not use this pattern.**
 
-**CSS:** `web/css/settings.css` (`.toggle-label`, `.toggle-slider`, `.toggle-text`). Used in: Appearance Settings, LLM Settings, Tools Settings, Vision Settings, Situational Awareness Settings.
+**CSS:** `web/css/settings.css` (`.toggle-label`, `.toggle-slider`, `.toggle-text`). Used in: General Settings (Theme tab), LLM Settings, Tools Settings, Vision Settings, Situational Awareness Settings.
 
 ## Context Inspector (continued)
 
@@ -154,14 +154,16 @@ Both user and assistant messages render markdown formatting with progressive str
 
 ## General Settings
 
-Customizable display names and timezone for the chat interface. Access via Settings → General Settings (first card in the settings hub).
+Customizable display names, timezone, and appearance. Access via Settings → General Settings (first card in the settings hub). Two tabs: **General** and **Theme**.
 
-### Display Names
+### General Tab
+
+#### Display Names
 
 - **Entity Name** — replaces "Assistant" in message headers across the chat UI
 - **Your Name** — replaces "You" in message headers across the chat UI
 
-### Timezone
+#### Timezone
 
 - **Display Timezone** — dropdown of ~40 common IANA timezones grouped by region, with "(System Default)" option
 - Affects all server-rendered date/time display: message timestamps, snapshot dates (Today/Yesterday labels), memory metadata, vault document dates, knowledge graph sync times, and daily memory summarization schedule
@@ -177,9 +179,9 @@ Settings are loaded on page init from the server and cached in `globalThis.Psych
 - `POST /api/general-settings` — save settings (`{ "entityName": "...", "userName": "...", "timezone": "..." }`)
 - `GET /fragments/settings/general` — render settings form fragment
 
-## Appearance Settings
+### Theme Tab
 
-Customizable UI theming accessible via Settings → Appearance in the sidebar.
+Customizable UI theming. Access via Settings → General Settings → Theme tab.
 
 ### Color Themes
 
@@ -299,7 +301,7 @@ Implemented in `src/server/templates.ts` (`renderVisionSettings`, `renderVisionG
 
 ## LLM Connections
 
-Multi-provider connection profile system. Access via Settings → LLM Connections in the sidebar. Uses the same hub-and-card pattern as Image Gen and other settings.
+Multi-provider connection profile system. Access via Settings → LLM Settings (second card in the settings hub). Uses the same hub-and-card pattern as Image Gen and other settings.
 
 **Hub View:**
 - Card grid showing all saved profiles with provider icon, name, model, and active badge

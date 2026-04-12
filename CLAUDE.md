@@ -24,7 +24,7 @@ deno lint              # Lint
 cp .env.example .env   # Then set LLM API key and PSYCHEROS_TOOLS
 ```
 
-LLM connections are configured via **Settings > LLM Connections** in the web UI. Multiple named connection profiles can be created (OpenRouter, OpenAI, Alibaba/Qwen, NanoGPT, or custom endpoints). One profile is marked active for chat. On first run, a default profile is created from `ZAI_*` environment variables if set.
+LLM connections are configured via **Settings > LLM Settings** in the web UI. Multiple named connection profiles can be created (OpenRouter, OpenAI, Alibaba/Qwen, NanoGPT, or custom endpoints). One profile is marked active for chat. On first run, a default profile is created from `ZAI_*` environment variables if set.
 
 ### With MCP (entity-core)
 
@@ -82,7 +82,7 @@ Settings persist to `.psycheros/sa-settings.json`. Default `{ "enabled": true }`
 
 ## LLM Connections
 
-Psycheros supports multiple named LLM connection profiles. Each profile stores an API endpoint, key, model, worker model, and sampling parameters. One profile is marked **active** for chat. Profiles are managed via Settings > LLM Connections in the web UI (hub view with card grid, same pattern as Image Gen).
+Psycheros supports multiple named LLM connection profiles. Each profile stores an API endpoint, key, model, worker model, and sampling parameters. One profile is marked **active** for chat. Profiles are managed via Settings > LLM Settings in the web UI (hub view with card grid, same pattern as Image Gen).
 
 Supported provider presets: **OpenRouter** (default), OpenAI, Alibaba/Qwen, NanoGPT, Custom Endpoint. The `LLMClient` works with any OpenAI-compatible endpoint.
 
@@ -93,11 +93,15 @@ Supported provider presets: **OpenRouter** (default), OpenAI, Alibaba/Qwen, Nano
 
 ## External Connections
 
-Psycheros supports third-party integrations organized under two tabs in Settings > External Connections:
+Psycheros supports third-party integrations organized under three tabs in Settings > External Connections:
 
 ### Channels
 
 - **Discord DM** — Entity sends DMs via a Discord bot. Configured via Settings > External Connections > Channels or env vars (`DISCORD_BOT_TOKEN`, `DISCORD_DEFAULT_CHANNEL_ID`). Auto-enables the `send_discord_dm` tool when configured. Settings persist to `.psycheros/discord-settings.json`.
+
+### Web Search
+
+- **Provider Selection** — Choose None, Tavily, or Brave Search. API keys configured per provider. Auto-enables the `web_search` tool when a provider is set. Settings persist to `.psycheros/web-search-settings.json`.
 
 ### Home
 

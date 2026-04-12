@@ -95,7 +95,6 @@ import {
   handleDeleteGraphEdge,
   handleUpdateGraphNode,
   handleUpdateGraphEdge,
-  handleAppearanceSettingsFragment,
   handleGetLLMSettings,
   handleSaveLLMSettings,
   handleSaveLLMProfile,
@@ -125,7 +124,6 @@ import {
   handleVaultDetailFragment,
   handleGetWebSearchSettings,
   handleSaveWebSearchSettings,
-  handleWebSearchSettingsFragment,
   handleGetDiscordSettings,
   handleSaveDiscordSettings,
   handleConnectionsSettingsFragment,
@@ -1742,15 +1740,6 @@ export class Server {
     }
 
     // ========================================
-    // Appearance Settings Routes
-    // ========================================
-
-    // GET /fragments/settings/appearance - Appearance settings fragment
-    if (path === "/fragments/settings/appearance") {
-      return handleAppearanceSettingsFragment(ctx);
-    }
-
-    // ========================================
     // Vault Fragment Routes
     // ========================================
 
@@ -1783,11 +1772,6 @@ export class Server {
     const llmProfileMatch = path.match(/^\/fragments\/settings\/llm\/([^/]+)$/);
     if (llmProfileMatch && method === "GET") {
       return handleLLMProfileEditFragment(ctx, llmProfileMatch[1]);
-    }
-
-    // GET /fragments/settings/web-search - Web search settings UI fragment
-    if (path === "/fragments/settings/web-search") {
-      return handleWebSearchSettingsFragment(ctx);
     }
 
     // GET /fragments/settings/connections - External connections hub fragment

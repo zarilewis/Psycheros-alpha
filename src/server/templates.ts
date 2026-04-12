@@ -16,7 +16,6 @@ function getDisplayTZ(): string | undefined {
 import type { Lorebook, LorebookEntry } from "../lorebook/mod.ts";
 import type { LLMSettings, LLMProfileSettings, LLMConnectionProfile, LLMProvider } from "../llm/mod.ts";
 import { maskApiKey, LLM_PROVIDER_PRESETS } from "../llm/mod.ts";
-import type { WebSearchSettings } from "../llm/mod.ts";
 import type { DiscordSettings } from "../llm/mod.ts";
 import type { ToolsSettings } from "../tools/mod.ts";
 import { TOOL_CATEGORIES } from "../tools/mod.ts";
@@ -352,7 +351,26 @@ export function renderSettingsHub(): string {
         </div>
         <div class="settings-hub-card-body">
           <span class="settings-hub-card-title">General Settings</span>
-          <span class="settings-hub-card-desc">Display names and basic chat configuration</span>
+          <span class="settings-hub-card-desc">Display names, chat configuration, and appearance</span>
+        </div>
+        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+      <a class="settings-hub-card"
+        hx-get="/fragments/settings/llm"
+        hx-target="#chat"
+        hx-swap="innerHTML">
+        <div class="settings-hub-card-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="4" y="4" width="16" height="16" rx="2"/>
+            <rect x="9" y="9" width="6" height="6"/>
+            <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/>
+          </svg>
+        </div>
+        <div class="settings-hub-card-body">
+          <span class="settings-hub-card-title">LLM Settings</span>
+          <span class="settings-hub-card-desc">Configure model connection and generation parameters</span>
         </div>
         <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 18 15 12 9 6"/>
@@ -456,31 +474,6 @@ export function renderSettingsHub(): string {
         </svg>
       </a>
       <a class="settings-hub-card"
-        hx-get="/fragments/settings/appearance"
-        hx-target="#chat"
-        hx-swap="innerHTML">
-        <div class="settings-hub-card-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="5"/>
-            <line x1="12" y1="1" x2="12" y2="3"/>
-            <line x1="12" y1="21" x2="12" y2="23"/>
-            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-            <line x1="1" y1="12" x2="3" y2="12"/>
-            <line x1="21" y1="12" x2="23" y2="12"/>
-            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-          </svg>
-        </div>
-        <div class="settings-hub-card-body">
-          <span class="settings-hub-card-title">Appearance</span>
-          <span class="settings-hub-card-desc">Customize colors, backgrounds, and visual effects</span>
-        </div>
-        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </a>
-      <a class="settings-hub-card"
         hx-get="/fragments/settings/vault"
         hx-target="#chat"
         hx-swap="innerHTML">
@@ -494,25 +487,6 @@ export function renderSettingsHub(): string {
         <div class="settings-hub-card-body">
           <span class="settings-hub-card-title">Data Vault</span>
           <span class="settings-hub-card-desc">Store and search documents for context-aware responses</span>
-        </div>
-        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </a>
-      <a class="settings-hub-card"
-        hx-get="/fragments/settings/web-search"
-        hx-target="#chat"
-        hx-swap="innerHTML">
-        <div class="settings-hub-card-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="2" y1="12" x2="22" y2="12"/>
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-          </svg>
-        </div>
-        <div class="settings-hub-card-body">
-          <span class="settings-hub-card-title">Web Search</span>
-          <span class="settings-hub-card-desc">Enable web search for current information and news</span>
         </div>
         <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 18 15 12 9 6"/>
@@ -549,7 +523,7 @@ export function renderSettingsHub(): string {
         </div>
         <div class="settings-hub-card-body">
           <span class="settings-hub-card-title">External Connections</span>
-          <span class="settings-hub-card-desc">Discord, notifications, and third-party integrations</span>
+          <span class="settings-hub-card-desc">Discord, web search, and third-party integrations</span>
         </div>
         <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 18 15 12 9 6"/>
@@ -567,25 +541,6 @@ export function renderSettingsHub(): string {
         <div class="settings-hub-card-body">
           <span class="settings-hub-card-title">Tools</span>
           <span class="settings-hub-card-desc">Manage entity tools and add custom tools</span>
-        </div>
-        <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="9 18 15 12 9 6"/>
-        </svg>
-      </a>
-      <a class="settings-hub-card"
-        hx-get="/fragments/settings/llm"
-        hx-target="#chat"
-        hx-swap="innerHTML">
-        <div class="settings-hub-card-icon">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="4" y="4" width="16" height="16" rx="2"/>
-            <rect x="9" y="9" width="6" height="6"/>
-            <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3"/>
-          </svg>
-        </div>
-        <div class="settings-hub-card-body">
-          <span class="settings-hub-card-title">LLM Settings</span>
-          <span class="settings-hub-card-desc">Configure model connection and generation parameters</span>
         </div>
         <svg class="settings-hub-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="9 18 15 12 9 6"/>
@@ -646,11 +601,44 @@ export function renderGeneralSettings(settings: GeneralSettings): string {
       ${renderSettingsBackButton()}
       <div>
         <h1 class="settings-title">General Settings</h1>
-        <p class="settings-desc">Display names and basic chat configuration</p>
+        <p class="settings-desc">Display names, chat configuration, and appearance</p>
       </div>
     </div>
   </div>
   <div class="settings-content" id="settings-content">
+
+    <nav class="connections-nav">
+      <button class="connections-nav-tab active" data-tab="general" onclick="switchGeneralTab('general')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="4" y1="21" x2="4" y2="14"/>
+          <line x1="4" y1="10" x2="4" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12" y2="3"/>
+          <line x1="20" y1="21" x2="20" y2="16"/>
+          <line x1="20" y1="12" x2="20" y2="3"/>
+          <line x1="1" y1="14" x2="7" y2="14"/>
+          <line x1="9" y1="8" x2="15" y2="8"/>
+          <line x1="17" y1="16" x2="23" y2="16"/>
+        </svg>
+        General
+      </button>
+      <button class="connections-nav-tab" data-tab="theme" onclick="switchGeneralTab('theme')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/>
+          <line x1="12" y1="1" x2="12" y2="3"/>
+          <line x1="12" y1="21" x2="12" y2="23"/>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+          <line x1="1" y1="12" x2="3" y2="12"/>
+          <line x1="21" y1="12" x2="23" y2="12"/>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+        Theme
+      </button>
+    </nav>
+
+    <div id="general-tab-general" class="connections-tab-panel">
 
     <section class="theme-section">
       <h3 class="theme-section-title">Display Names</h3>
@@ -735,18 +723,136 @@ export function renderGeneralSettings(settings: GeneralSettings): string {
     <!-- Status messages -->
     <div id="general-settings-status" class="settings-status"></div>
 
+    </div>
+
+    <div id="general-tab-theme" class="connections-tab-panel" style="display:none;">
+
+    <!-- Accent Color Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Accent Color</h3>
+      <p class="theme-section-desc">Choose a preset or pick a custom color</p>
+      <div class="theme-grid" id="theme-grid">
+        <button class="theme-swatch" data-theme="phosphor" title="Phosphor Green" style="--swatch-color: #39ff14">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Phosphor</span>
+        </button>
+        <button class="theme-swatch" data-theme="ocean" title="Ocean Blue" style="--swatch-color: #00d4ff">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Ocean</span>
+        </button>
+        <button class="theme-swatch" data-theme="sunset" title="Sunset Orange" style="--swatch-color: #ff6b35">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Sunset</span>
+        </button>
+        <button class="theme-swatch" data-theme="violet" title="Violet Dream" style="--swatch-color: #a855f7">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Violet</span>
+        </button>
+        <button class="theme-swatch" data-theme="rose" title="Rose" style="--swatch-color: #f43f5e">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Rose</span>
+        </button>
+        <button class="theme-swatch" data-theme="amber" title="Amber" style="--swatch-color: #f59e0b">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Amber</span>
+        </button>
+        <button class="theme-swatch" data-theme="mint" title="Mint" style="--swatch-color: #10b981">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Mint</span>
+        </button>
+        <button class="theme-swatch" data-theme="slate" title="Slate" style="--swatch-color: #64748b">
+          <span class="swatch-preview"></span>
+          <span class="swatch-name">Slate</span>
+        </button>
+        <button class="theme-swatch" data-theme="custom" title="Custom Color" style="--swatch-color: #888888">
+          <span class="swatch-preview swatch-preview--custom">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.71 4.63l-1.34-1.34c-.37-.39-1.02-.39-1.41 0L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.04 0-1.41z"/>
+              <path d="M7 14l-4.69 4.69a1 1 0 0 0-.21.33l-1 3a1 1 0 0 0 1.21 1.21l3-1a1 1 0 0 0 .33-.21L10 18"/>
+            </svg>
+          </span>
+          <span class="swatch-name">Custom</span>
+        </button>
+      </div>
+      <div class="custom-color-row" id="custom-color-row" style="display: none;">
+        <input type="color" id="custom-color-picker" class="color-picker" value="#39ff14">
+        <input type="text" id="custom-color-hex" class="color-hex-input" placeholder="#39ff14" maxlength="7">
+      </div>
+      <button class="btn btn--ghost btn--sm" onclick="Theme.reset(); initAppearance();" style="margin-top: var(--sp-3);">Reset to Default</button>
+    </section>
+
+    <!-- Background Image Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Background Image</h3>
+      <p class="theme-section-desc">Add a background image for a personalized look</p>
+
+      <div class="bg-controls">
+        <div class="bg-url-input">
+          <input type="url" id="bg-url" class="input-field" placeholder="Enter image URL...">
+          <button class="btn btn--primary btn--sm" onclick="applyBackgroundUrl()">Apply URL</button>
+        </div>
+
+        <div class="bg-upload-area">
+          <span class="bg-upload-label">Or upload an image:</span>
+          <label class="btn btn--ghost btn--sm upload-btn">
+            <input type="file" id="bg-file-input" accept="image/*" onchange="handleBackgroundUpload(this)" hidden>
+            Choose File
+          </label>
+        </div>
+
+        <div class="bg-gallery" id="bg-gallery">
+          <!-- Populated by JS -->
+        </div>
+
+        <div class="bg-sliders">
+          <div class="slider-group">
+            <label for="bg-blur">Blur</label>
+            <input type="range" id="bg-blur" min="0" max="50" value="0" oninput="updateBgBlur(this.value)">
+            <span id="bg-blur-value">0px</span>
+          </div>
+          <div class="slider-group">
+            <label for="bg-overlay">Overlay</label>
+            <input type="range" id="bg-overlay" min="0" max="100" value="0" oninput="updateBgOverlay(this.value)">
+            <span id="bg-overlay-value">0%</span>
+          </div>
+        </div>
+
+        <button class="btn btn--ghost btn--sm" onclick="clearBackground()">Clear Background</button>
+      </div>
+    </section>
+
+    <!-- Glass Effect Section -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Glass Effect</h3>
+      <p class="theme-section-desc">Enable frosted glass effect on UI panels when background is active</p>
+      <label class="toggle-label">
+        <input type="checkbox" id="glass-toggle" role="switch" aria-label="Enable Glass Effect" onchange="toggleGlass(this.checked)">
+        <span class="toggle-slider"></span>
+        <span class="toggle-text">Enable Glass Effect</span>
+      </label>
+    </section>
+
+    <!-- Status messages -->
+    <div id="appearance-status" class="settings-status"></div>
+
+    </div>
+
   </div>
 </div>
 
 <script>
-// Set timezone select value from saved settings
+function switchGeneralTab(tab) {
+  document.querySelectorAll('.connections-nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.connections-tab-panel').forEach(p => p.style.display = p.id === 'general-tab-' + tab ? '' : 'none');
+}
+
+// General tab logic
 (function() {
   const sel = document.getElementById('general-timezone');
   if (sel && window.PsycherosSettings && window.PsycherosSettings.timezone) {
     sel.value = window.PsycherosSettings.timezone;
   }
 
-  // Update notification permission label
   const label = document.getElementById('notification-permission-label');
   const btn = document.getElementById('notification-enable-btn');
   if (label) {
@@ -800,7 +906,6 @@ async function saveGeneralSettings() {
       el.className = 'settings-status visible success';
       el.textContent = 'Settings saved successfully';
       setTimeout(() => { el.className = 'settings-status'; }, 3000);
-      // Update in-memory settings for subsequent streaming messages
       if (window.PsycherosSettings) {
         window.PsycherosSettings.entityName = entityName || 'Assistant';
         window.PsycherosSettings.userName = userName || 'You';
@@ -816,6 +921,164 @@ async function saveGeneralSettings() {
     el.className = 'settings-status visible error';
     el.textContent = 'Failed to save settings';
   }
+}
+
+// Theme tab logic
+function showAppearanceStatus(type, message) {
+  const el = document.getElementById('appearance-status');
+  if (!el) return;
+  el.className = 'settings-status visible ' + type;
+  el.textContent = message;
+  if (type !== 'error') {
+    setTimeout(() => { el.className = 'settings-status'; }, 3000);
+  }
+}
+
+function initAppearance() {
+  const theme = Theme.get();
+  const customRow = document.getElementById('custom-color-row');
+  const colorPicker = document.getElementById('custom-color-picker');
+  const colorHex = document.getElementById('custom-color-hex');
+  const customSwatch = document.querySelector('.theme-swatch[data-theme="custom"]');
+
+  const isCustom = !!theme.customAccent;
+
+  document.querySelectorAll('.theme-swatch').forEach(el => {
+    const isPresetMatch = !isCustom && el.dataset.theme === theme.preset;
+    const isCustomMatch = isCustom && el.dataset.theme === 'custom';
+    el.classList.toggle('active', isPresetMatch || isCustomMatch);
+
+    el.onclick = () => {
+      document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
+      el.classList.add('active');
+      if (el.dataset.theme === 'custom') {
+        customRow.style.display = 'flex';
+        const hex = colorPicker.value;
+        Theme.setCustomAccent(hex);
+        customSwatch.style.setProperty('--swatch-color', hex);
+      } else {
+        customRow.style.display = 'none';
+        Theme.setPreset(el.dataset.theme);
+      }
+    };
+  });
+
+  if (isCustom) {
+    customRow.style.display = 'flex';
+    colorPicker.value = theme.customAccent;
+    colorHex.value = theme.customAccent;
+    customSwatch.style.setProperty('--swatch-color', theme.customAccent);
+  } else {
+    customRow.style.display = 'none';
+  }
+
+  colorPicker.oninput = () => {
+    colorHex.value = colorPicker.value;
+    Theme.setCustomAccent(colorPicker.value);
+    customSwatch.style.setProperty('--swatch-color', colorPicker.value);
+  };
+  colorHex.onchange = () => {
+    if (/^#[0-9a-fA-F]{6}$/.test(colorHex.value)) {
+      colorPicker.value = colorHex.value;
+      Theme.setCustomAccent(colorHex.value);
+      customSwatch.style.setProperty('--swatch-color', colorHex.value);
+    }
+  };
+
+  const bgBlur = document.getElementById('bg-blur');
+  const bgOverlay = document.getElementById('bg-overlay');
+  const glassToggle = document.getElementById('glass-toggle');
+  bgBlur.value = theme.bgBlur;
+  bgOverlay.value = Math.round(theme.bgOverlayOpacity * 100);
+  glassToggle.checked = theme.glassEnabled;
+  document.getElementById('bg-blur-value').textContent = theme.bgBlur + 'px';
+  document.getElementById('bg-overlay-value').textContent = Math.round(theme.bgOverlayOpacity * 100) + '%';
+
+  loadBackgroundGallery();
+}
+initAppearance();
+
+function updateBgBlur(value) {
+  document.getElementById('bg-blur-value').textContent = value + 'px';
+  Theme.setBackgroundBlur(parseInt(value));
+}
+
+function updateBgOverlay(value) {
+  document.getElementById('bg-overlay-value').textContent = value + '%';
+  Theme.setBackgroundOverlay(parseInt(value) / 100);
+}
+
+function toggleGlass(enabled) {
+  Theme.setGlassEnabled(enabled);
+}
+
+async function applyBackgroundUrl() {
+  const url = document.getElementById('bg-url').value.trim();
+  if (url) {
+    Theme.setBackground(url);
+    await loadBackgroundGallery();
+  }
+}
+
+function handleBackgroundUpload(input) {
+  if (input.files && input.files[0]) {
+    uploadBackground(input.files[0]);
+  }
+}
+
+async function uploadBackground(file) {
+  const result = await Theme.uploadBackground(file);
+  if (result.success) {
+    Theme.setBackground(result.url);
+    await loadBackgroundGallery();
+  } else {
+    showAppearanceStatus('error', 'Upload failed: ' + result.error);
+  }
+}
+
+function escapeAttr(s) {
+  return s.replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function loadBackgroundGallery() {
+  const gallery = document.getElementById('bg-gallery');
+  const backgrounds = await Theme.listBackgrounds();
+  const currentTheme = Theme.get();
+
+  gallery.innerHTML = backgrounds.map(bg => \`
+    <div class="bg-gallery-item \${currentTheme.bgImage === bg.url ? 'active' : ''}" onclick="selectBackground('\${escapeAttr(bg.url)}')">
+      <img src="\${escapeAttr(bg.url)}" alt="\${escapeAttr(bg.filename)}">
+      <button class="delete-btn" onclick="event.stopPropagation(); deleteBackground('\${escapeAttr(bg.filename)}')" title="Delete">×</button>
+    </div>
+  \`).join('');
+}
+
+function selectBackground(url) {
+  Theme.setBackground(url);
+  document.querySelectorAll('.bg-gallery-item').forEach(el => {
+    el.classList.toggle('active', el.querySelector('img').src === url);
+  });
+}
+
+async function deleteBackground(filename) {
+  if (confirm('Delete this background image?')) {
+    const result = await Theme.deleteBackground(filename);
+    if (result.success) {
+      const theme = Theme.get();
+      if (theme.bgImage && theme.bgImage.includes(filename)) {
+        Theme.setBackground(null);
+      }
+      await loadBackgroundGallery();
+    } else {
+      showAppearanceStatus('error', 'Delete failed: ' + result.error);
+    }
+  }
+}
+
+function clearBackground() {
+  Theme.setBackground(null);
+  document.getElementById('bg-url').value = '';
+  document.querySelectorAll('.bg-gallery-item').forEach(el => el.classList.remove('active'));
 }
 </script>`;
 }
@@ -3156,307 +3419,6 @@ export function renderEntityCoreSnapshotPreview(
 }
 
 // =============================================================================
-// Appearance Settings Templates
-// =============================================================================
-
-/**
- * Render the Appearance Settings view.
- */
-export function renderAppearanceSettings(): string {
-  return `<div class="settings-view">
-  <div class="settings-header">
-    <div class="settings-header-row">
-      ${renderSettingsBackButton()}
-      <div>
-        <h1 class="settings-title">Appearance</h1>
-        <p class="settings-desc">Customize colors, background images, and visual effects</p>
-      </div>
-    </div>
-  </div>
-  <div class="settings-content" id="settings-content">
-
-    <!-- Accent Color Section -->
-    <section class="theme-section">
-      <h3 class="theme-section-title">Accent Color</h3>
-      <p class="theme-section-desc">Choose a preset or pick a custom color</p>
-      <div class="theme-grid" id="theme-grid">
-        <button class="theme-swatch" data-theme="phosphor" title="Phosphor Green" style="--swatch-color: #39ff14">
-          <span class="swatch-preview"></span>
-          <span class="swatch-name">Phosphor</span>
-        </button>
-        <button class="theme-swatch" data-theme="ocean" title="Ocean Blue" style="--swatch-color: #00d4ff">
-          <span class="swatch-preview"></span>
-          <span class="swatch-name">Ocean</span>
-        </button>
-        <button class="theme-swatch" data-theme="sunset" title="Sunset Orange" style="--swatch-color: #ff6b35">
-          <span class="swatch-preview"></span>
-          <span class="swatch-name">Sunset</span>
-        </button>
-        <button class="theme-swatch" data-theme="violet" title="Violet Dream" style="--swatch-color: #a855f7">
-          <span class="swatch-preview"></span>
-          <span class="swatch-name">Violet</span>
-        </button>
-        <button class="theme-swatch" data-theme="rose" title="Rose" style="--swatch-color: #f43f5e">
-          <span class="swatch-preview"></span>
-          <span class="swatch-name">Rose</span>
-        </button>
-        <button class="theme-swatch" data-theme="amber" title="Amber" style="--swatch-color: #f59e0b">
-          <span class="swatch-preview"></span>
-          <span class="swatch-name">Amber</span>
-        </button>
-        <button class="theme-swatch" data-theme="mint" title="Mint" style="--swatch-color: #10b981">
-          <span class="swatch-preview"></span>
-          <span class="swatch-name">Mint</span>
-        </button>
-        <button class="theme-swatch" data-theme="slate" title="Slate" style="--swatch-color: #64748b">
-          <span class="swatch-preview"></span>
-          <span class="swatch-name">Slate</span>
-        </button>
-        <button class="theme-swatch" data-theme="custom" title="Custom Color" style="--swatch-color: #888888">
-          <span class="swatch-preview swatch-preview--custom">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M20.71 4.63l-1.34-1.34c-.37-.39-1.02-.39-1.41 0L9 12.25 11.75 15l8.96-8.96c.39-.39.39-1.04 0-1.41z"/>
-              <path d="M7 14l-4.69 4.69a1 1 0 0 0-.21.33l-1 3a1 1 0 0 0 1.21 1.21l3-1a1 1 0 0 0 .33-.21L10 18"/>
-            </svg>
-          </span>
-          <span class="swatch-name">Custom</span>
-        </button>
-      </div>
-      <div class="custom-color-row" id="custom-color-row" style="display: none;">
-        <input type="color" id="custom-color-picker" class="color-picker" value="#39ff14">
-        <input type="text" id="custom-color-hex" class="color-hex-input" placeholder="#39ff14" maxlength="7">
-      </div>
-      <button class="btn btn--ghost btn--sm" onclick="Theme.reset(); initAppearance();" style="margin-top: var(--sp-3);">Reset to Default</button>
-    </section>
-
-    <!-- Background Image Section -->
-    <section class="theme-section">
-      <h3 class="theme-section-title">Background Image</h3>
-      <p class="theme-section-desc">Add a background image for a personalized look</p>
-
-      <div class="bg-controls">
-        <div class="bg-url-input">
-          <input type="url" id="bg-url" class="input-field" placeholder="Enter image URL...">
-          <button class="btn btn--primary btn--sm" onclick="applyBackgroundUrl()">Apply URL</button>
-        </div>
-
-        <div class="bg-upload-area">
-          <span class="bg-upload-label">Or upload an image:</span>
-          <label class="btn btn--ghost btn--sm upload-btn">
-            <input type="file" id="bg-file-input" accept="image/*" onchange="handleBackgroundUpload(this)" hidden>
-            Choose File
-          </label>
-        </div>
-
-        <div class="bg-gallery" id="bg-gallery">
-          <!-- Populated by JS -->
-        </div>
-
-        <div class="bg-sliders">
-          <div class="slider-group">
-            <label for="bg-blur">Blur</label>
-            <input type="range" id="bg-blur" min="0" max="50" value="0" oninput="updateBgBlur(this.value)">
-            <span id="bg-blur-value">0px</span>
-          </div>
-          <div class="slider-group">
-            <label for="bg-overlay">Overlay</label>
-            <input type="range" id="bg-overlay" min="0" max="100" value="0" oninput="updateBgOverlay(this.value)">
-            <span id="bg-overlay-value">0%</span>
-          </div>
-        </div>
-
-        <button class="btn btn--ghost btn--sm" onclick="clearBackground()">Clear Background</button>
-      </div>
-    </section>
-
-    <!-- Glass Effect Section -->
-    <section class="theme-section">
-      <h3 class="theme-section-title">Glass Effect</h3>
-      <p class="theme-section-desc">Enable frosted glass effect on UI panels when background is active</p>
-      <label class="toggle-label">
-        <input type="checkbox" id="glass-toggle" role="switch" aria-label="Enable Glass Effect" onchange="toggleGlass(this.checked)">
-        <span class="toggle-slider"></span>
-        <span class="toggle-text">Enable Glass Effect</span>
-      </label>
-    </section>
-
-    <!-- Status messages -->
-    <div id="appearance-status" class="settings-status"></div>
-
-  </div>
-</div>
-
-<script>
-function showAppearanceStatus(type, message) {
-  const el = document.getElementById('appearance-status');
-  if (!el) return;
-  el.className = 'settings-status visible ' + type;
-  el.textContent = message;
-  if (type !== 'error') {
-    setTimeout(() => { el.className = 'settings-status'; }, 3000);
-  }
-}
-
-// Initialize appearance settings from saved theme
-function initAppearance() {
-  const theme = Theme.get();
-  const customRow = document.getElementById('custom-color-row');
-  const colorPicker = document.getElementById('custom-color-picker');
-  const colorHex = document.getElementById('custom-color-hex');
-  const customSwatch = document.querySelector('.theme-swatch[data-theme="custom"]');
-
-  // Determine active state
-  const isCustom = !!theme.customAccent;
-
-  // Update all swatches
-  document.querySelectorAll('.theme-swatch').forEach(el => {
-    const isPresetMatch = !isCustom && el.dataset.theme === theme.preset;
-    const isCustomMatch = isCustom && el.dataset.theme === 'custom';
-    el.classList.toggle('active', isPresetMatch || isCustomMatch);
-
-    el.onclick = () => {
-      document.querySelectorAll('.theme-swatch').forEach(s => s.classList.remove('active'));
-      el.classList.add('active');
-      if (el.dataset.theme === 'custom') {
-        customRow.style.display = 'flex';
-        // Apply whatever is in the picker
-        const hex = colorPicker.value;
-        Theme.setCustomAccent(hex);
-        customSwatch.style.setProperty('--swatch-color', hex);
-      } else {
-        customRow.style.display = 'none';
-        Theme.setPreset(el.dataset.theme);
-      }
-    };
-  });
-
-  // Set custom swatch color and show/hide picker
-  if (isCustom) {
-    customRow.style.display = 'flex';
-    colorPicker.value = theme.customAccent;
-    colorHex.value = theme.customAccent;
-    customSwatch.style.setProperty('--swatch-color', theme.customAccent);
-  } else {
-    customRow.style.display = 'none';
-  }
-
-  // Bind color picker events
-  colorPicker.oninput = () => {
-    colorHex.value = colorPicker.value;
-    Theme.setCustomAccent(colorPicker.value);
-    customSwatch.style.setProperty('--swatch-color', colorPicker.value);
-  };
-  colorHex.onchange = () => {
-    if (/^#[0-9a-fA-F]{6}$/.test(colorHex.value)) {
-      colorPicker.value = colorHex.value;
-      Theme.setCustomAccent(colorHex.value);
-      customSwatch.style.setProperty('--swatch-color', colorHex.value);
-    }
-  };
-
-  // Update background controls
-  const bgBlur = document.getElementById('bg-blur');
-  const bgOverlay = document.getElementById('bg-overlay');
-  const glassToggle = document.getElementById('glass-toggle');
-  bgBlur.value = theme.bgBlur;
-  bgOverlay.value = Math.round(theme.bgOverlayOpacity * 100);
-  glassToggle.checked = theme.glassEnabled;
-  document.getElementById('bg-blur-value').textContent = theme.bgBlur + 'px';
-  document.getElementById('bg-overlay-value').textContent = Math.round(theme.bgOverlayOpacity * 100) + '%';
-
-  // Load background gallery
-  loadBackgroundGallery();
-}
-initAppearance();
-
-function updateBgBlur(value) {
-  document.getElementById('bg-blur-value').textContent = value + 'px';
-  Theme.setBackgroundBlur(parseInt(value));
-}
-
-function updateBgOverlay(value) {
-  document.getElementById('bg-overlay-value').textContent = value + '%';
-  Theme.setBackgroundOverlay(parseInt(value) / 100);
-}
-
-function toggleGlass(enabled) {
-  Theme.setGlassEnabled(enabled);
-}
-
-async function applyBackgroundUrl() {
-  const url = document.getElementById('bg-url').value.trim();
-  if (url) {
-    Theme.setBackground(url);
-    await loadBackgroundGallery();
-  }
-}
-
-function handleBackgroundUpload(input) {
-  if (input.files && input.files[0]) {
-    uploadBackground(input.files[0]);
-  }
-}
-
-async function uploadBackground(file) {
-  const result = await Theme.uploadBackground(file);
-  if (result.success) {
-    Theme.setBackground(result.url);
-    await loadBackgroundGallery();
-  } else {
-    showAppearanceStatus('error', 'Upload failed: ' + result.error);
-  }
-}
-
-function escapeAttr(s) {
-  return s.replace(/&/g, '&amp;').replace(/'/g, '&#39;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-async function loadBackgroundGallery() {
-  const gallery = document.getElementById('bg-gallery');
-  const backgrounds = await Theme.listBackgrounds();
-  const currentTheme = Theme.get();
-
-  gallery.innerHTML = backgrounds.map(bg => \`
-    <div class="bg-gallery-item \${currentTheme.bgImage === bg.url ? 'active' : ''}" onclick="selectBackground('\${escapeAttr(bg.url)}')">
-      <img src="\${escapeAttr(bg.url)}" alt="\${escapeAttr(bg.filename)}">
-      <button class="delete-btn" onclick="event.stopPropagation(); deleteBackground('\${escapeAttr(bg.filename)}')" title="Delete">×</button>
-    </div>
-  \`).join('');
-}
-
-function selectBackground(url) {
-  Theme.setBackground(url);
-  document.querySelectorAll('.bg-gallery-item').forEach(el => {
-    el.classList.toggle('active', el.querySelector('img').src === url);
-  });
-}
-
-async function deleteBackground(filename) {
-  if (confirm('Delete this background image?')) {
-    const result = await Theme.deleteBackground(filename);
-    if (result.success) {
-      // Clear if it was active
-      const theme = Theme.get();
-      if (theme.bgImage && theme.bgImage.includes(filename)) {
-        Theme.setBackground(null);
-      }
-      await loadBackgroundGallery();
-    } else {
-      showAppearanceStatus('error', 'Delete failed: ' + result.error);
-    }
-  }
-}
-
-function clearBackground() {
-  Theme.setBackground(null);
-  document.getElementById('bg-url').value = '';
-  document.querySelectorAll('.bg-gallery-item').forEach(el => el.classList.remove('active'));
-}
-</script>
-`;
-}
-
-// =============================================================================
 // LLM Settings Template
 // =============================================================================
 
@@ -4009,11 +3971,12 @@ function renderToolItem(tool: { name: string; description: string; enabled: bool
 
 /**
  * Render External Connections page with tabbed navigation.
- * Tabs: Channels (Discord, etc.) and Home (smart devices).
+ * Tabs: Channels (Discord, etc.), Home (smart devices), and Web Search.
  */
-export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings): string {
+export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings, webSearchSettings?: import("../llm/web-search-settings.ts").WebSearchSettings): string {
   const channelsContent = renderChannelsTab(discordSettings);
   const homeContent = renderHomeTab(homeSettings);
+  const wsSettings = webSearchSettings ?? { provider: "disabled" as const, tavilyApiKey: "", braveApiKey: "" };
 
   return `<div class="settings-view">
   <div class="settings-header">
@@ -4021,7 +3984,7 @@ export function renderConnectionsSettings(discordSettings: DiscordSettings, home
       ${renderSettingsBackButton()}
       <div>
         <h1 class="settings-title">External Connections</h1>
-        <p class="settings-desc">Configure third-party integrations for notifications and external access</p>
+        <p class="settings-desc">Discord, web search, and third-party integrations</p>
       </div>
     </div>
   </div>
@@ -4041,10 +4004,80 @@ export function renderConnectionsSettings(discordSettings: DiscordSettings, home
         </svg>
         Home
       </button>
+      <button class="connections-nav-tab" data-tab="websearch" onclick="switchConnectionsTab('websearch')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="2" y1="12" x2="22" y2="12"/>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+        </svg>
+        Web Search
+      </button>
     </nav>
 
     <div id="connections-tab-channels" class="connections-tab-panel">${channelsContent}</div>
     <div id="connections-tab-home" class="connections-tab-panel" style="display:none;">${homeContent}</div>
+
+    <div id="connections-tab-websearch" class="connections-tab-panel" style="display:none;">
+
+    <!-- Provider Selection -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Provider</h3>
+      <p class="theme-section-desc">Choose which web search service to use</p>
+      <div class="llm-fields">
+        <label class="radio-label">
+          <input type="radio" name="ws-provider" value="none" ${wsSettings.provider === "disabled" ? "checked" : ""}>
+          <span class="radio-text">None</span>
+          <span class="label-hint">No web search capability</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="ws-provider" value="tavily" ${wsSettings.provider === "tavily" ? "checked" : ""}>
+          <span class="radio-text">Tavily</span>
+          <span class="label-hint">AI-optimized search API (requires API key)</span>
+        </label>
+        <label class="radio-label">
+          <input type="radio" name="ws-provider" value="brave" ${wsSettings.provider === "brave" ? "checked" : ""}>
+          <span class="radio-text">Brave Search</span>
+          <span class="label-hint">General web search API (requires API key)</span>
+        </label>
+      </div>
+    </section>
+
+    <!-- Tavily API Key -->
+    <section class="theme-section" id="ws-tavily-section" style="${wsSettings.provider === "tavily" ? "" : "display:none;"}">
+      <h3 class="theme-section-title">Tavily API Key</h3>
+      <p class="theme-section-desc">Get an API key from <a href="https://tavily.com" target="_blank" rel="noopener" style="color:var(--accent)">tavily.com</a></p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="ws-tavily-key">API Key</label>
+          <input type="password" id="ws-tavily-key" class="input-field llm-input" value="${escapeHtml(wsSettings.tavilyApiKey || "")}" placeholder="tvly-...">
+        </div>
+      </div>
+    </section>
+
+    <!-- Brave API Key -->
+    <section class="theme-section" id="ws-brave-section" style="${wsSettings.provider === "brave" ? "" : "display:none;"}">
+      <h3 class="theme-section-title">Brave Search API Key</h3>
+      <p class="theme-section-desc">Get an API key from <a href="https://brave.com/search/api/" target="_blank" rel="noopener" style="color:var(--accent)">brave.com/search/api</a></p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="ws-brave-key">API Key</label>
+          <input type="password" id="ws-brave-key" class="input-field llm-input" value="${escapeHtml(wsSettings.braveApiKey || "")}" placeholder="BSA-...">
+        </div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <div class="llm-actions">
+      <div class="llm-actions-left">
+        <button class="btn btn--primary" onclick="saveWebSearchSettings(event)">Save Settings</button>
+      </div>
+      <button class="btn btn--ghost" onclick="resetWebSearchDefaults(event)">Reset to Defaults</button>
+    </div>
+
+    <!-- Status -->
+    <div id="ws-status" class="llm-status" style="display:none;"></div>
+
+    </div>
 
   </div>
 
@@ -4054,12 +4087,114 @@ export function renderConnectionsSettings(discordSettings: DiscordSettings, home
     .connections-nav-tab:hover { color: var(--c-fg); background: var(--c-bg-hover); }
     .connections-nav-tab:active { transform: scale(0.98); }
     .connections-nav-tab.active { color: var(--c-accent); background: var(--c-accent-subtle); border-color: var(--c-accent); }
+    .radio-label { display: flex; align-items: center; gap: 10px; padding: 8px 0; cursor: pointer; }
+    .radio-label input[type="radio"] { accent-color: var(--accent); width: 16px; height: 16px; flex-shrink: 0; }
+    .radio-text { font-weight: 500; min-width: 100px; }
+    .label-hint { color: var(--text-dim); font-size: 0.85rem; }
   </style>
 
 <script>
 function switchConnectionsTab(tab) {
   document.querySelectorAll('.connections-nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   document.querySelectorAll('.connections-tab-panel').forEach(p => p.style.display = p.id === 'connections-tab-' + tab ? '' : 'none');
+}
+
+document.querySelectorAll('input[name="ws-provider"]').forEach(radio => {
+  radio.addEventListener('change', () => {
+    const tavily = document.getElementById('ws-tavily-section');
+    const brave = document.getElementById('ws-brave-section');
+    if (!tavily || !brave) return;
+    tavily.style.display = radio.value === 'tavily' ? '' : 'none';
+    brave.style.display = radio.value === 'brave' ? '' : 'none';
+  });
+});
+
+function showWsStatus(type, message) {
+  const el = document.getElementById('ws-status');
+  if (!el) return;
+  el.style.display = 'block';
+  el.className = 'llm-status ' + type;
+  el.textContent = message;
+}
+
+function getSelectedProvider() {
+  const checked = document.querySelector('input[name="ws-provider"]:checked');
+  return checked ? checked.value : 'disabled';
+}
+
+async function saveWebSearchSettings(event) {
+  const btn = event.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  showWsStatus('loading', 'Saving settings...');
+
+  try {
+    const settings = {
+      provider: getSelectedProvider(),
+      tavilyApiKey: document.getElementById('ws-tavily-key')?.value.trim() || '',
+      braveApiKey: document.getElementById('ws-brave-key')?.value.trim() || '',
+    };
+    const resp = await fetch('/api/web-search-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    const data = await resp.json();
+    if (data.success) {
+      showWsStatus('success', 'Settings saved successfully.');
+    } else {
+      showWsStatus('error', 'Failed to save: ' + (data.error || 'Unknown error'));
+    }
+  } catch (e) {
+    showWsStatus('error', 'Failed to save: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Settings';
+  }
+}
+
+let wsResetPending = false;
+async function resetWebSearchDefaults(event) {
+  const btn = event.currentTarget;
+  if (!wsResetPending) {
+    wsResetPending = true;
+    btn.textContent = 'Confirm Reset?';
+    btn.classList.add('btn--danger');
+    btn.classList.remove('btn--ghost');
+    setTimeout(() => {
+      if (wsResetPending) {
+        wsResetPending = false;
+        btn.textContent = 'Reset to Defaults';
+        btn.classList.remove('btn--danger');
+        btn.classList.add('btn--ghost');
+      }
+    }, 3000);
+    return;
+  }
+  wsResetPending = false;
+  btn.textContent = 'Resetting...';
+  btn.disabled = true;
+  showWsStatus('loading', 'Resetting to defaults...');
+
+  try {
+    const resp = await fetch('/api/web-search-settings/reset', { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      htmx.ajax('GET', '/fragments/settings/connections', { target: '#chat', swap: 'innerHTML' });
+    } else {
+      showWsStatus('error', 'Failed to reset: ' + (data.error || 'Unknown error'));
+      btn.disabled = false;
+      btn.textContent = 'Reset to Defaults';
+      btn.classList.remove('btn--danger');
+      btn.classList.add('btn--ghost');
+    }
+  } catch (e) {
+    showWsStatus('error', 'Failed to reset: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = 'Reset to Defaults';
+    btn.classList.remove('btn--danger');
+    btn.classList.add('btn--ghost');
+  }
 }
 </script>
 </div>`;
@@ -4750,206 +4885,6 @@ async function saveToolsSettings(event) {
 // =============================================================================
 // Web Search Settings Template
 // =============================================================================
-
-export function renderWebSearchSettings(settings: WebSearchSettings): string {
-  return `<div class="settings-view">
-  <div class="settings-header">
-    <div class="settings-header-row">
-      ${renderSettingsBackButton()}
-      <div>
-        <h1 class="settings-title">Web Search</h1>
-        <p class="settings-desc">Enable web search for current information and news access</p>
-      </div>
-    </div>
-  </div>
-  <div class="settings-content" id="settings-content">
-
-    <!-- Provider Selection -->
-    <section class="theme-section">
-      <h3 class="theme-section-title">Provider</h3>
-      <p class="theme-section-desc">Choose which web search service to use</p>
-      <div class="llm-fields">
-        <label class="radio-label">
-          <input type="radio" name="ws-provider" value="none" ${settings.provider === "disabled" ? "checked" : ""}>
-          <span class="radio-text">None</span>
-          <span class="label-hint">No web search capability</span>
-        </label>
-        <label class="radio-label">
-          <input type="radio" name="ws-provider" value="tavily" ${settings.provider === "tavily" ? "checked" : ""}>
-          <span class="radio-text">Tavily</span>
-          <span class="label-hint">AI-optimized search API (requires API key)</span>
-        </label>
-        <label class="radio-label">
-          <input type="radio" name="ws-provider" value="brave" ${settings.provider === "brave" ? "checked" : ""}>
-          <span class="radio-text">Brave Search</span>
-          <span class="label-hint">General web search API (requires API key)</span>
-        </label>
-      </div>
-    </section>
-
-    <!-- Tavily API Key -->
-    <section class="theme-section" id="ws-tavily-section" style="${settings.provider === "tavily" ? "" : "display:none;"}">
-      <h3 class="theme-section-title">Tavily API Key</h3>
-      <p class="theme-section-desc">Get an API key from <a href="https://tavily.com" target="_blank" rel="noopener" style="color:var(--accent)">tavily.com</a></p>
-      <div class="llm-fields">
-        <div class="llm-field">
-          <label for="ws-tavily-key">API Key</label>
-          <input type="password" id="ws-tavily-key" class="input-field llm-input" value="${escapeHtml(settings.tavilyApiKey || "")}" placeholder="tvly-...">
-        </div>
-      </div>
-    </section>
-
-    <!-- Brave API Key -->
-    <section class="theme-section" id="ws-brave-section" style="${settings.provider === "brave" ? "" : "display:none;"}">
-      <h3 class="theme-section-title">Brave Search API Key</h3>
-      <p class="theme-section-desc">Get an API key from <a href="https://brave.com/search/api/" target="_blank" rel="noopener" style="color:var(--accent)">brave.com/search/api</a></p>
-      <div class="llm-fields">
-        <div class="llm-field">
-          <label for="ws-brave-key">API Key</label>
-          <input type="password" id="ws-brave-key" class="input-field llm-input" value="${escapeHtml(settings.braveApiKey || "")}" placeholder="BSA-...">
-        </div>
-      </div>
-    </section>
-
-    <!-- Actions -->
-    <div class="llm-actions">
-      <div class="llm-actions-left">
-        <button class="btn btn--primary" onclick="saveWebSearchSettings(event)">Save Settings</button>
-      </div>
-      <button class="btn btn--ghost" onclick="resetWebSearchDefaults(event)">Reset to Defaults</button>
-    </div>
-
-    <!-- Status -->
-    <div id="ws-status" class="llm-status" style="display:none;"></div>
-
-  </div>
-</div>
-
-<style>
-  .radio-label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 0;
-    cursor: pointer;
-  }
-  .radio-label input[type="radio"] {
-    accent-color: var(--accent);
-    width: 16px;
-    height: 16px;
-    flex-shrink: 0;
-  }
-  .radio-text {
-    font-weight: 500;
-    min-width: 100px;
-  }
-  .label-hint {
-    color: var(--text-dim);
-    font-size: 0.85rem;
-  }
-</style>
-
-<script>
-document.querySelectorAll('input[name="ws-provider"]').forEach(radio => {
-  radio.addEventListener('change', () => {
-    const tavily = document.getElementById('ws-tavily-section');
-    const brave = document.getElementById('ws-brave-section');
-    if (!tavily || !brave) return;
-    tavily.style.display = radio.value === 'tavily' ? '' : 'none';
-    brave.style.display = radio.value === 'brave' ? '' : 'none';
-  });
-});
-
-function showWsStatus(type, message) {
-  const el = document.getElementById('ws-status');
-  if (!el) return;
-  el.style.display = 'block';
-  el.className = 'llm-status ' + type;
-  el.textContent = message;
-}
-
-function getSelectedProvider() {
-  const checked = document.querySelector('input[name="ws-provider"]:checked');
-  return checked ? checked.value : 'disabled';
-}
-
-async function saveWebSearchSettings(event) {
-  const btn = event.currentTarget;
-  btn.disabled = true;
-  btn.textContent = 'Saving...';
-  showWsStatus('loading', 'Saving settings...');
-
-  try {
-    const settings = {
-      provider: getSelectedProvider(),
-      tavilyApiKey: document.getElementById('ws-tavily-key')?.value.trim() || '',
-      braveApiKey: document.getElementById('ws-brave-key')?.value.trim() || '',
-    };
-    const resp = await fetch('/api/web-search-settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(settings),
-    });
-    const data = await resp.json();
-    if (data.success) {
-      showWsStatus('success', 'Settings saved successfully.');
-    } else {
-      showWsStatus('error', 'Failed to save: ' + (data.error || 'Unknown error'));
-    }
-  } catch (e) {
-    showWsStatus('error', 'Failed to save: ' + e.message);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Save Settings';
-  }
-}
-
-let wsResetPending = false;
-async function resetWebSearchDefaults(event) {
-  const btn = event.currentTarget;
-  if (!wsResetPending) {
-    wsResetPending = true;
-    btn.textContent = 'Confirm Reset?';
-    btn.classList.add('btn--danger');
-    btn.classList.remove('btn--ghost');
-    setTimeout(() => {
-      if (wsResetPending) {
-        wsResetPending = false;
-        btn.textContent = 'Reset to Defaults';
-        btn.classList.remove('btn--danger');
-        btn.classList.add('btn--ghost');
-      }
-    }, 3000);
-    return;
-  }
-  wsResetPending = false;
-  btn.textContent = 'Resetting...';
-  btn.disabled = true;
-  showWsStatus('loading', 'Resetting to defaults...');
-
-  try {
-    const resp = await fetch('/api/web-search-settings/reset', { method: 'POST' });
-    const data = await resp.json();
-    if (data.success) {
-      htmx.ajax('GET', '/fragments/settings/web-search', { target: '#chat', swap: 'innerHTML' });
-    } else {
-      showWsStatus('error', 'Failed to reset: ' + (data.error || 'Unknown error'));
-      btn.disabled = false;
-      btn.textContent = 'Reset to Defaults';
-      btn.classList.remove('btn--danger');
-      btn.classList.add('btn--ghost');
-    }
-  } catch (e) {
-    showWsStatus('error', 'Failed to reset: ' + e.message);
-    btn.disabled = false;
-    btn.textContent = 'Reset to Defaults';
-    btn.classList.remove('btn--danger');
-    btn.classList.add('btn--ghost');
-  }
-}
-</script>
-`;
-}
 
 // =============================================================================
 // Consolidation Tab Templates

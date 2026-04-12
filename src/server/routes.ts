@@ -49,12 +49,10 @@ import {
   renderLorebooksView,
   renderLorebookDetailView,
   renderEntryEditor,
-  renderAppearanceSettings,
   renderLLMProfileHub,
   renderLLMProfileEdit,
   renderSettingsHub,
   renderGeneralSettings,
-  renderWebSearchSettings,
   renderConnectionsSettings,
   renderConnectionsDiscordSettings,
   renderHomeSettings,
@@ -3958,25 +3956,6 @@ export async function handleUpdateGraphEdge(
 }
 
 // =============================================================================
-// Appearance Settings Routes
-// =============================================================================
-
-/**
- * Handle GET /fragments/settings/appearance - Appearance settings fragment
- *
- * @param _ctx - Route context
- * @returns HTTP Response with appearance settings HTML fragment
- */
-export function handleAppearanceSettingsFragment(_ctx: RouteContext): Response {
-  const html = renderAppearanceSettings();
-  return new Response(html, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-    },
-  });
-}
-
-// =============================================================================
 // Background Image Upload Routes
 // =============================================================================
 
@@ -4687,18 +4666,6 @@ export async function handleResetWebSearchSettings(
   }
 }
 
-/**
- * Handle GET /fragments/settings/web-search - Web search settings UI fragment.
- */
-export function handleWebSearchSettingsFragment(ctx: RouteContext): Response {
-  const html = renderWebSearchSettings(maskWebSearchSettings(ctx.getWebSearchSettings()));
-  return new Response(html, {
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-    },
-  });
-}
-
 // =============================================================================
 // Discord Settings API Routes
 // =============================================================================
@@ -4797,6 +4764,7 @@ export function handleConnectionsSettingsFragment(ctx: RouteContext): Response {
   const html = renderConnectionsSettings(
     maskDiscordSettings(ctx.getDiscordSettings()),
     ctx.getHomeSettings(),
+    maskWebSearchSettings(ctx.getWebSearchSettings()),
   );
   return new Response(html, {
     headers: {
