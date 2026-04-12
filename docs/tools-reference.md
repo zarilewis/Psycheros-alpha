@@ -311,13 +311,15 @@ The entity can generate images using configured provider slots (OpenRouter or Go
 
 **Anchor Images:** Reference images stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table. The entity sees available anchor IDs in its system context and can reference them by ID for style/character consistency.
 
-**Chat Attachments:** Users can attach images to messages via a clip icon button in the chat input. Attachments are uploaded to `.psycheros/chat-attachments/` and auto-captioned before being passed to the entity. The user message is prefixed with `[USER_IMAGE: /chat-attachments/filename | Caption: ...]`.
+**Chat Attachments:** Users can attach images to messages via a clip icon button in the chat input. Attachments are uploaded to `.psycheros/chat-attachments/` and auto-captioned (dual short/long) before being passed to the entity. The user message is prefixed with `[USER_IMAGE: /chat-attachments/filename | Caption: long description | Short: brief description]`.
 
 **Reference-Based Iteration:** The `input_image_path` parameter allows the entity to send a previously generated image back to the provider along with a modification prompt. The reference image is included as inline data in the API request. This enables workflows like "change the background", "make it darker", "add a character".
 
-**Image Persistence:** Generated images are saved to `.psycheros/generated-images/` and displayed inline in chat. Images persist across conversation switches via `[IMAGE:...]` markers appended to the assistant message content in the database. Generated images are automatically captioned, and the description is included in the marker and displayed below the image in chat.
+**Image Persistence:** Generated images are saved to `.psycheros/generated-images/` and displayed inline in chat. Images persist across conversation switches via `[IMAGE:...]` markers appended to the assistant message content in the database. Generated images are automatically captioned with both a longform and shortform description. Both are stored in the marker JSON; the shortform replaces the longform in LLM context after 5 conversation turns to save tokens.
 
-**Data flow:** Entity calls `generate_image` → server reads generator config → dispatches to provider (OpenRouter or Gemini API) → saves image to disk → auto-captions via configured captioning provider → returns `[IMAGE:...]` marker with description → entity loop yields `image_generated` SSE event → frontend renders inline image with description.
+**Context Fading:** Image descriptions (both `[IMAGE:...]` and `[USER_IMAGE:...]`) fade from longform to shortform after 5 conversation turns in the LLM context. The DB always retains the full description. The entity can use the `look_closer` tool to re-examine any image for full details. `look_closer` results also fade after 5 turns.
+
+**Data flow:** Entity calls `generate_image` → server reads generator config → dispatches to provider (OpenRouter or Gemini API) → saves image to disk → auto-captions via configured captioning provider (dual short/long) → returns `[IMAGE:...]` marker with both descriptions → entity loop yields `image_generated` SSE event → frontend renders inline image.
 
 **Error handling:** The tool returns clear messages for provider errors, missing generators, disabled generators, and image read failures.
 
@@ -326,22 +328,29 @@ The entity can generate images using configured provider slots (OpenRouter or Go
 | File | Purpose |
 |------|---------|
 | `src/tools/generate-image.ts` | `generate_image` tool with OpenRouter and Gemini providers, auto-captioning |
-| `src/tools/describe-image.ts` | Shared captioning functions, `describe_image` tool |
+| `src/tools/describe-image.ts` | Shared captioning functions (dual short/long), `describe_image` tool |
+| `src/tools/look-closer.ts` | `look_closer` tool for re-examining images after context fade |
 | `src/llm/image-gen-settings.ts` | Settings type (generators + captioning), load/save, API key masking |
 
 ## Image Captioning
 
-Image captioning provides automatic description of images via a configurable vision model. It serves two purposes: auto-captioning chat attachments and generated images, and providing the entity with an explicit `describe_image` tool.
+Image captioning provides automatic description of images via a configurable vision model. It serves three purposes: auto-captioning chat attachments and generated images, providing the entity with an explicit `describe_image` tool, and providing a `look_closer` tool for re-examining images after context fading.
+
+### Dual Description System
+
+All auto-captioning produces both a **longform** (detailed, thorough) and **shortform** (single sentence, under 15 words) description. Both are stored in the message content in the database. When building LLM context, the `buildMessages()` method in the entity loop applies fading: after 5 conversation turns, longform is replaced with shortform. This significantly reduces token usage in long conversations with many images.
+
+The `IMAGE_DESCRIPTION_FADE_TURNS` constant (default: 5) controls the grace period.
 
 ### Auto-Captioning
 
-- **Chat attachments**: When a user sends a message with an image, the server synchronously captions it before passing to the entity. The caption is included in the user message as `[USER_IMAGE: path | Caption: description]`.
-- **Generated images**: After the `generate_image` tool saves an image, it is automatically captioned. The description is included in the `[IMAGE:...]` marker JSON and displayed below the image in chat.
+- **Chat attachments**: When a user sends a message with an image, the server synchronously captions it before passing to the entity. Both descriptions are included: `[USER_IMAGE: path | Caption: long | Short: short]`.
+- **Generated images**: After the `generate_image` tool saves an image, it is automatically captioned. Both `description` (long) and `shortDescription` (short) are included in the `[IMAGE:...]` marker JSON.
 - **Failure handling**: Captioning failures are non-blocking. Chat attachments fall back to path-only (`[USER_IMAGE: path]`). Generated images still display without a description.
 
 ### describe_image Tool
 
-The entity can explicitly describe any image by local path or URL.
+The entity can explicitly describe any image by local path or URL. Returns the full longform description.
 
 | Tool | Description |
 |------|-------------|
@@ -351,14 +360,28 @@ The entity can explicitly describe any image by local path or URL.
 
 **Use cases:** Examining images found via web search, reviewing previously generated images, understanding user-attached images in more detail.
 
-**Setup:** Configure via Settings > Vision > Generators (Captioning section). Supports Gemini and OpenRouter as captioning providers with independent model selection. The tool is auto-enabled when a captioning provider is configured.
+### look_closer Tool
+
+The entity can re-examine any image by path to get a fresh detailed description. This is useful when the image's description has faded from context.
+
+| Tool | Description |
+|------|-------------|
+| `look_closer` | Re-examine an image for a detailed description |
+
+**Parameters:** `image_path` (required, path relative to `.psycheros/`).
+
+**Behavior:** Re-captions the image using the configured captioning provider and returns the full longform description. The result is prefixed with `[look_closer]` for identification and also fades from context after 5 turns.
+
+**Setup:** Both `describe_image` and `look_closer` are auto-enabled when a captioning provider is configured. Supports Gemini and OpenRouter as captioning providers with independent model selection.
 
 ### Related Source Files
 
 | File | Purpose |
 |------|---------|
-| `src/tools/describe-image.ts` | `describe_image` tool, `captionImage()`, `fetchAndCaptionUrl()` |
+| `src/tools/describe-image.ts` | `describe_image` tool, `captionImage()`, `captionImageDual()`, `fetchAndCaptionUrl()` |
+| `src/tools/look-closer.ts` | `look_closer` tool |
 | `src/server/routes.ts` | Auto-caption flow for chat attachments |
+| `src/entity/loop.ts` | Context fading logic (`buildFadeMap()`, `fadeImageMarker()`) |
 | `src/llm/image-gen-settings.ts` | `CaptioningSettings` type, part of `ImageGenSettings` |
 
 ## Identity File Structure (Core Prompts)

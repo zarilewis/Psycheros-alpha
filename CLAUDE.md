@@ -49,8 +49,9 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/tools/web-search.ts` | Web search tool (Tavily / Brave) |
 | `src/tools/send-discord-dm.ts` | Discord DM tool (sends DMs via Discord bot API) |
 | `src/tools/control-device.ts` | Home automation tool (smart plug control via Shelly API) |
-| `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini), auto-captioning |
-| `src/tools/describe-image.ts` | Image captioning tool (Gemini, OpenRouter), shared caption logic |
+| `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini), auto-captioning (dual short/long) |
+| `src/tools/describe-image.ts` | Image captioning tool (Gemini, OpenRouter), shared caption logic (dual short/long) |
+| `src/tools/look-closer.ts` | Re-examine images for detailed descriptions after context fade |
 | `src/llm/provider-presets.ts` | LLM provider types, connection profile types, and default presets |
 | `src/llm/discord-settings.ts` | Discord settings type, load/save, token masking |
 | `src/llm/home-settings.ts` | Home automation settings type, load/save (device list) |
@@ -113,7 +114,7 @@ Psycheros supports third-party integrations organized under three tabs in Settin
 Image generation and visual analysis configured via Settings > Vision (top-level settings card with Generators, Anchors, and Gallery tabs).
 
 - **Image Generation** — Entity generates images via OpenRouter or Google Gemini. Supports multiple generator slots, anchor images for style/character reference, user image attachments, reference-based iteration (`input_image_path`), and auto-captioning of generated images. Auto-enables the `generate_image` tool when at least one generator is enabled. Settings persist to `.psycheros/image-gen-settings.json`. Generated images saved to `.psycheros/generated-images/`.
-- **Image Captioning** — Auto-captions chat attachments and generated images via a configurable vision model (Gemini or OpenRouter). Also provides the `describe_image` tool. Configured under Settings > Vision > Generators tab. Auto-enables `describe_image` when a captioning provider is configured.
+- **Image Captioning** — Auto-captions chat attachments and generated images via a configurable vision model (Gemini or OpenRouter). Captions produce both shortform (under 15 words) and longform descriptions. Longform fades to shortform in context after 5 turns; `look_closer` tool retrieves full details. Also provides the `describe_image` tool. Configured under Settings > Vision > Generators tab. Auto-enables `describe_image` and `look_closer` when a captioning provider is configured.
 - **Gallery** — Browse all generated and user-uploaded images with thumbnails, metadata, copy-to-clipboard, and lightbox. Paginated (24/page), derived from filesystem + messages (no DB table).
 
 ## Core Patterns
@@ -124,7 +125,8 @@ Image generation and visual analysis configured via Settings > Vision (top-level
 1. Create `src/tools/my-tool.ts` implementing the `Tool` interface
 2. Register in `AVAILABLE_TOOLS` in `src/tools/registry.ts`
 3. Add tool name to the appropriate category in `TOOL_CATEGORIES` in `src/tools/tools-settings.ts`
-4. For UI updates: use state-change function, return `affectedRegions`
+4. For auto-enablement: add to `autoEnabled` array in `src/server/server.ts`
+5. For UI updates: use state-change function, return `affectedRegions`
 
 **Adding a custom tool** (no core code changes needed):
 1. Create `custom-tools/my-tool.js` exporting a default `Tool` object
