@@ -550,6 +550,8 @@ Real-time signal feeds injected into the entity's context every turn, giving it 
 
 **Built-in Signals:**
 
+- **Current Conversation** — The conversation ID and title the entity is currently processing. Always present when a conversation exists.
+
 - **Last User Interaction** — Tracks the most recent human message across all threads (excluding automated Pulse messages). The entity sees the timestamp (formatted in the user's display timezone) and which thread the message was sent in (ID + title).
 
 - **Device Detection** — Frontend detects whether the user is on desktop or mobile using the existing `isMobileDevice()` heuristic (Android/iPhone/iPad/iPod UA or touch points + viewport width). The device type is sent with each `/api/chat` request and included in the SA block as a simple `desktop` or `mobile` indicator.
@@ -560,6 +562,7 @@ The SA block is injected into the system message as structured XML, placed after
 
 ```xml
 <situational_awareness>
+  <current_conversation id="abc-123">Thread Title</current_conversation>
   <last_user_interaction>
     <timestamp><t>2026-04-10 14:32</t></timestamp>
     <thread id="abc-123">Thread Title</thread>

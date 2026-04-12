@@ -77,6 +77,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 
 Real-time signal feeds injected into the entity's context every turn. Configured via Settings > Situational Awareness.
 
+- **Current Conversation** — The conversation ID and title the entity is currently processing.
 - **Last User Interaction** — Most recent human message across all threads (excludes Pulses). Entity sees timestamp (user's display timezone) and thread ID/title.
 - **Device Detection** — Desktop or mobile, detected by frontend heuristic and sent with each `/api/chat` request.
 

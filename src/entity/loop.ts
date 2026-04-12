@@ -454,8 +454,14 @@ export class EntityTurn {
     // Build situational awareness block
     let saContent: string | undefined;
     const lastInteraction = this.db.getLatestUserInteraction();
-    if (lastInteraction || options?.deviceType) {
+    if (lastInteraction || options?.deviceType || conversation) {
       const parts: string[] = ["<situational_awareness>"];
+      if (conversation) {
+        const convLabel = conversation.title
+          ? escapeXml(conversation.title)
+          : conversation.id;
+        parts.push(`  <current_conversation id="${conversation.id}">${convLabel}</current_conversation>`);
+      }
       if (lastInteraction) {
         const date = new Date(lastInteraction.createdAt);
         const formatted = formatMessageTimestamp(date);

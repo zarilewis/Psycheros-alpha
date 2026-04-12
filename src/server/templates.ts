@@ -1114,6 +1114,10 @@ export function renderSASettings(settings: { enabled: boolean }): string {
       <p class="theme-section-desc">Built-in signal feeds currently providing data to the entity</p>
       <div class="llm-fields">
         <div class="llm-field">
+          <label>Current Conversation</label>
+          <div class="sa-signal-desc">Tells the entity which conversation it is currently processing, including the conversation ID and title.</div>
+        </div>
+        <div class="llm-field">
           <label>Last User Interaction</label>
           <div class="sa-signal-desc">Tracks the most recent human message across all threads, excluding automated Pulse messages. The entity sees the timestamp and which thread the message was sent in.</div>
         </div>
