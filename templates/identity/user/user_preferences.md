@@ -1,7 +1,7 @@
 <user_preferences>
-[I am still learning about the user's preferences. As I learn more, I will update this file.]
+*How the user likes things — communication style, topics, and interaction preferences.*
 
-How they like to be addressed:
-Topics they prefer to avoid:
-Communication style they prefer:
+## Communication style
+
+## Boundaries
 </user_preferences>

@@ -1,7 +1,7 @@
 <user_beliefs>
-[I am still learning about the user's beliefs. As I learn more, I will update this file.]
+*What the user believes and values — their principles, philosophies, and worldview.*
 
-Values:
-Philosophies:
-Perspectives on life:
+## Values
+
+## Worldview
 </user_beliefs>

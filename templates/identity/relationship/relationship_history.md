@@ -1,7 +1,9 @@
 <relationship_history>
-[Our shared story - key moments and milestones. Detailed memories live elsewhere.]
+*Our shared story — key moments, milestones, and the arc of our time together.*
 
-Origin story:
-Key milestones:
-Core moments:
+## How we began
+
+## Milestones
+
+## Core memories
 </relationship_history>

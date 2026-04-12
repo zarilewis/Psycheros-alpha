@@ -1,8 +1,7 @@
 <user_identity>
-[I am still learning about the user. As I learn more, I will update this file.]
+*Who the user is — fundamental facts and self-concept. Things here are stable and long-lasting.*
 
-Name:
-Age:
-How they describe themselves:
-How they process or function:
+## How they describe themselves
+
+## How they think and work
 </user_identity>

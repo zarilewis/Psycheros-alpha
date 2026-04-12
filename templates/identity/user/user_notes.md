@@ -1,3 +1,3 @@
 <user_notes>
-[Miscellaneous notes about the user that don't fit in other categories.]
+*Everything else about the user — observations, context, and things that don't fit in other files.*
 </user_notes>
