@@ -36,6 +36,8 @@ import { controlDeviceTool } from "./control-device.ts";
 import { generateImageTool } from "./generate-image.ts";
 // Image captioning tool
 import { describeImageTool } from "./describe-image.ts";
+// Look closer tool
+import { lookCloserTool } from "./look-closer.ts";
 
 // =============================================================================
 // Available Tools Catalog
@@ -77,6 +79,7 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   // Image generation tool
   generate_image: generateImageTool,
   describe_image: describeImageTool,
+  look_closer: lookCloserTool,
 };
 
 /**

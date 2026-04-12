@@ -126,6 +126,13 @@ export interface EntityConfig {
 const DEFAULT_MAX_TOOL_ITERATIONS = 25;
 
 /**
+ * Number of conversation turns (user+assistant pairs) to keep longform image
+ * descriptions in context before fading to shorthand. After this many turns,
+ * the entity can use the look_closer tool to retrieve the full description.
+ */
+const IMAGE_DESCRIPTION_FADE_TURNS = 5;
+
+/**
  * Extended yield type that includes tool results, UI updates, and metrics.
  */
 export type EntityYield =
@@ -142,6 +149,42 @@ export type EntityYield =
  * Represents a single turn in the conversation.
  * Handles the full cycle: LLM call -> tool execution -> continue until done.
  */
+/**
+ * Fade an image marker's longform description to its shortform.
+ * Operates on raw message content (not HTML-rendered).
+ *
+ * For [IMAGE:{...}] markers: replaces "description" with "shortDescription" if available.
+ * For [USER_IMAGE:... | Caption: ... | Short: ...]: replaces Caption with Short.
+ */
+function fadeImageMarker(content: string): string {
+  // Fade [IMAGE:{...}] markers — replace long description with short
+  // Use a greedy match up to }] to handle JSON with complex string values
+  content = content.replace(
+    /\[IMAGE:(\{.*\})\]/g,
+    (_match, jsonStr) => {
+      try {
+        const img = JSON.parse(jsonStr);
+        if (img.shortDescription && img.description) {
+          img.description = img.shortDescription;
+        }
+        return `[IMAGE:${JSON.stringify(img)}]`;
+      } catch {
+        return _match;
+      }
+    },
+  );
+
+  // Fade [USER_IMAGE:... | Caption: ... | Short: ...] markers
+  content = content.replace(
+    /\[USER_IMAGE:\s*(\S+)\s*\|\s*Caption:\s*(.*?)\s*\|\s*Short:\s*(.*?)\]/g,
+    (_match, path, _caption, short) => {
+      return `[USER_IMAGE: ${path} | Short: ${short}]`;
+    },
+  );
+
+  return content;
+}
+
 export class EntityTurn {
   private readonly maxToolIterations: number;
 
@@ -808,6 +851,67 @@ export class EntityTurn {
   }
 
   /**
+   * Build a map of message ID -> faded content for image descriptions.
+   *
+   * For messages containing [IMAGE:...] or [USER_IMAGE:...] markers with both
+   * long and short descriptions, replaces the longform with the shortform
+   * after IMAGE_DESCRIPTION_FADE_TURNS conversation turns have passed.
+   * Also fades look_closer tool results after the same threshold.
+   */
+  private buildFadeMap(history: Message[]): Map<string, string> {
+    const fadeMap = new Map<string, string>();
+    // Count conversation turns (user or assistant messages, excluding tool messages)
+    let turnCount = 0;
+    // Track which image markers are at which turn index
+    // Map: messageIndex -> turnIndex when the image appeared
+    const imageTurns = new Map<number, number>();
+    // Track which look_closer results are at which turn index
+    const lookCloserTurns = new Map<number, number>();
+
+    // First pass: identify image markers and look_closer results with their turn positions
+    for (let i = 0; i < history.length; i++) {
+      const msg = history[i];
+      if (msg.role === "user" || msg.role === "assistant") {
+        turnCount++;
+        if (/\[IMAGE:\{/.test(msg.content)) {
+          imageTurns.set(i, turnCount);
+        }
+      }
+      if (msg.role === "tool" && msg.content.startsWith("[look_closer]")) {
+        lookCloserTurns.set(i, turnCount);
+      }
+    }
+
+    // Second pass: fade descriptions that are past the threshold
+    const currentTurn = turnCount;
+
+    // Fade [IMAGE:...] markers
+    for (const [msgIdx, imgTurn] of imageTurns) {
+      if (currentTurn - imgTurn > IMAGE_DESCRIPTION_FADE_TURNS) {
+        const msg = history[msgIdx];
+        const faded = fadeImageMarker(msg.content);
+        if (faded !== msg.content) {
+          fadeMap.set(msg.id, faded);
+        }
+      }
+    }
+
+    // Fade look_closer results
+    for (const [msgIdx, resultTurn] of lookCloserTurns) {
+      if (currentTurn - resultTurn > IMAGE_DESCRIPTION_FADE_TURNS) {
+        const msg = history[msgIdx];
+        // Extract the image path from "[look_closer] /path/to/img.png: description..."
+        const pathMatch = msg.content.match(/^\[look_closer]\s+(\S+?):/);
+        if (pathMatch) {
+          fadeMap.set(msg.id, `[look_closer] ${pathMatch[1]}: [description faded — use look_closer again for details]`);
+        }
+      }
+    }
+
+    return fadeMap;
+  }
+
+  /**
    * Build the messages array for the LLM request.
    * Each message includes a timestamp prefix for temporal awareness.
    *
@@ -832,11 +936,17 @@ export class EntityTurn {
     });
 
     // Add history with timestamps (convert from DB format to LLM format)
+    const fadeMap = this.buildFadeMap(history);
     for (const msg of history) {
       const timestamp = formatMessageTimestamp(msg.createdAt);
       // Strip any <t>...</t> tags the LLM may have echoed in its output
       // to prevent timestamp accumulation across turns
-      const cleanContent = msg.content.replace(/<t>[^<]*<\/t>\s*/g, "");
+      let cleanContent = msg.content.replace(/<t>[^<]*<\/t>\s*/g, "");
+      // Apply image description fading
+      const faded = fadeMap.get(msg.id);
+      if (faded) {
+        cleanContent = faded;
+      }
       const chatMsg: ChatMessage = {
         role: msg.role,
         content: `${timestamp} ${cleanContent}`,

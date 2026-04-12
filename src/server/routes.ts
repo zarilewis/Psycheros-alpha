@@ -15,7 +15,7 @@ import type { WebSearchSettings } from "../llm/mod.ts";
 import type { DiscordSettings, HomeSettings } from "../llm/mod.ts";
 import type { ImageGenSettings, EntityCoreLLMSettings } from "../llm/mod.ts";
 import { maskProfileSettings, createDefaultProfile, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings, getDefaultImageGenSettings, maskImageGenSettings } from "../llm/mod.ts";
-import { captionImage } from "../tools/describe-image.ts";
+import { captionImageDual } from "../tools/describe-image.ts";
 import { uint8ToBase64, getMediaType as getImageMediaType } from "../tools/generate-image.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { ToolsSettings } from "../tools/mod.ts";
@@ -964,8 +964,8 @@ export async function handleChat(
               const fileData = await Deno.readFile(attachmentPath);
               const base64 = uint8ToBase64(fileData);
               const mediaType = getImageMediaType(attachmentFilename);
-              const caption = await captionImage(base64, mediaType, captioningSettings);
-              userMessage = `[USER_IMAGE: /chat-attachments/${attachmentFilename} | Caption: ${caption}] ${body.message}`;
+              const caption = await captionImageDual(base64, mediaType, captioningSettings);
+              userMessage = `[USER_IMAGE: /chat-attachments/${attachmentFilename} | Caption: ${caption.long} | Short: ${caption.short}] ${body.message}`;
             } catch (captionError) {
               console.error("[Chat] Auto-captioning failed, falling back to path-only:", captionError);
               userMessage = `[USER_IMAGE: /chat-attachments/${attachmentFilename}] ${body.message}`;

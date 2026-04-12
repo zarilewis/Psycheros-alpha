@@ -610,6 +610,7 @@ export class Server {
     }
     if (this.imageGenSettings.captioning?.provider) {
       autoEnabled.push("describe_image");
+      autoEnabled.push("look_closer");
     }
 
     // Resolve the final enabled list

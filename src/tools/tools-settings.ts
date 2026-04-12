@@ -113,6 +113,12 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     description: "Describe and understand images",
     toolNames: ["describe_image"],
   },
+  {
+    id: "look-closer",
+    name: "Look Closer",
+    description: "Re-examine images for detailed descriptions",
+    toolNames: ["look_closer"],
+  },
 ];
 
 // =============================================================================

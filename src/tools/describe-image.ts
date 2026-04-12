@@ -21,8 +21,65 @@ const CAPTION_PROMPT =
   "setting, colors, composition, style, mood, and any other notable details. " +
   "Be thorough and specific.";
 
+const CAPTION_DUAL_PROMPT =
+  "Provide two descriptions of this image.\n\n" +
+  "SHORT: A single concise sentence (under 15 words) capturing the main subject and action.\n" +
+  "LONG: A detailed description including subjects, setting, colors, composition, style, mood, " +
+  "and any other notable details. Be thorough and specific.\n\n" +
+  "Format your response exactly as:\n" +
+  "SHORT: <your short description>\n" +
+  "LONG: <your long description>";
+
+/** Parsed caption with short and long forms. */
+export interface DualCaption {
+  short: string;
+  long: string;
+}
+
+/**
+ * Parse a dual caption response into short and long forms.
+ * Falls back gracefully if the structured format isn't followed.
+ */
+function parseDualCaption(raw: string): DualCaption {
+  const shortMatch = raw.match(/SHORT:\s*(.+)/);
+  const longMatch = raw.match(/LONG:\s*([\s\S]+)/);
+
+  if (shortMatch && longMatch) {
+    return {
+      short: shortMatch[1].trim(),
+      long: longMatch[1].trim(),
+    };
+  }
+
+  // Fallback: use the full response as long, truncate to first sentence as short
+  const firstSentence = raw.match(/^[^.!?]+[.!?]/);
+  return {
+    short: firstSentence ? firstSentence[0].trim() : raw.slice(0, 80).trim(),
+    long: raw.trim(),
+  };
+}
+
+/**
+ * Caption an image and return both short and long descriptions.
+ */
+export function captionImageDual(
+  imageData: string,
+  mediaType: string,
+  settings: CaptioningSettings,
+): Promise<DualCaption> {
+  switch (settings.provider) {
+    case "gemini":
+      return captionViaGeminiDual(imageData, mediaType, settings);
+    case "openrouter":
+      return captionViaOpenRouterDual(imageData, mediaType, settings);
+    default:
+      throw new Error(`Unknown captioning provider: ${settings.provider}`);
+  }
+}
+
 /**
  * Caption an image using base64 data via the configured provider.
+ * Returns only the longform description (backward compat for describe_image tool).
  */
 export function captionImage(
   imageData: string,
@@ -37,6 +94,23 @@ export function captionImage(
     default:
       throw new Error(`Unknown captioning provider: ${settings.provider}`);
   }
+}
+
+/**
+ * Fetch an image from a URL and return dual caption.
+ */
+export async function fetchAndCaptionUrlDual(
+  url: string,
+  settings: CaptioningSettings,
+): Promise<DualCaption> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch image from URL: ${response.status} ${response.statusText}`);
+  }
+  const buffer = await response.arrayBuffer();
+  const base64 = uint8ToBase64(new Uint8Array(buffer));
+  const mediaType = response.headers.get("content-type") || "image/png";
+  return captionImageDual(base64, mediaType, settings);
 }
 
 /**
@@ -120,6 +194,69 @@ async function captionViaGemini(
 }
 
 // =============================================================================
+// Gemini Provider (Dual Caption)
+// =============================================================================
+
+async function captionViaGeminiDual(
+  imageData: string,
+  mediaType: string,
+  settings: CaptioningSettings,
+): Promise<DualCaption> {
+  const geminiSettings = settings.gemini;
+  if (!geminiSettings) throw new Error("Gemini captioning settings not configured");
+
+  const model = geminiSettings.model || "gemini-2.5-flash";
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+
+  const body = {
+    contents: [{
+      role: "user",
+      parts: [
+        { inline_data: { mime_type: mediaType, data: imageData } },
+        { text: CAPTION_DUAL_PROMPT },
+      ],
+    }],
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": geminiSettings.apiKey,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Gemini captioning API error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json() as {
+    candidates?: Array<{
+      content?: {
+        parts?: Array<Record<string, unknown>>;
+      };
+    }>;
+  };
+
+  if (!data.candidates || data.candidates.length === 0) {
+    throw new Error("Gemini captioning returned no candidates");
+  }
+
+  for (const candidate of data.candidates) {
+    if (!candidate.content?.parts) continue;
+    for (const part of candidate.content.parts) {
+      if (part.text && typeof part.text === "string") {
+        return parseDualCaption(part.text);
+      }
+    }
+  }
+
+  throw new Error("Gemini captioning returned no text content");
+}
+
+// =============================================================================
 // OpenRouter Provider
 // =============================================================================
 
@@ -169,6 +306,58 @@ async function captionViaOpenRouter(
   }
 
   return content;
+}
+
+// =============================================================================
+// OpenRouter Provider (Dual Caption)
+// =============================================================================
+
+async function captionViaOpenRouterDual(
+  imageData: string,
+  mediaType: string,
+  settings: CaptioningSettings,
+): Promise<DualCaption> {
+  const orSettings = settings.openrouter;
+  if (!orSettings) throw new Error("OpenRouter captioning settings not configured");
+
+  const baseUrl = orSettings.baseUrl || "https://openrouter.ai/api";
+  const url = `${baseUrl}/chat/completions`;
+
+  const body = {
+    model: orSettings.model,
+    messages: [{
+      role: "user",
+      content: [
+        { type: "image_url", image_url: { url: `data:${mediaType};base64,${imageData}` } },
+        { type: "text", text: CAPTION_DUAL_PROMPT },
+      ],
+    }],
+  };
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${orSettings.apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenRouter captioning API error (${response.status}): ${errorText}`);
+  }
+
+  const data = await response.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+  };
+
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("OpenRouter captioning returned no content");
+  }
+
+  return parseDualCaption(content);
 }
 
 // =============================================================================

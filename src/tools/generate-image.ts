@@ -11,7 +11,7 @@ import { join } from "@std/path";
 import type { ToolResult } from "../types.ts";
 import type { Tool, ToolContext } from "./types.ts";
 import type { ImageGenConfig } from "../llm/image-gen-settings.ts";
-import { captionImage } from "./describe-image.ts";
+import { captionImageDual } from "./describe-image.ts";
 
 // =============================================================================
 // Tool Definition
@@ -531,10 +531,13 @@ async function execute(
 
     // Auto-caption the generated image if captioning is configured
     let description: string | undefined;
+    let shortDescription: string | undefined;
     const captioningSettings = ctx.config.captioningSettings;
     if (captioningSettings?.provider) {
       try {
-        description = await captionImage(result.imageData, result.mediaType, captioningSettings);
+        const caption = await captionImageDual(result.imageData, result.mediaType, captioningSettings);
+        description = caption.long;
+        shortDescription = caption.short;
       } catch (captionError) {
         console.error("[ImageGen] Auto-captioning failed:", captionError);
       }
@@ -549,6 +552,9 @@ async function execute(
     };
     if (description) {
       markerData.description = description;
+    }
+    if (shortDescription) {
+      markerData.shortDescription = shortDescription;
     }
     const marker = JSON.stringify(markerData);
     return {
