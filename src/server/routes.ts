@@ -5948,9 +5948,10 @@ function renderVaultView(
     <div class="vault-upload">
       <form hx-post="/api/vault" hx-encoding="multipart/form-data" hx-target="#chat" hx-swap="innerHTML">
         <div class="form-row">
-          <div class="form-group" style="flex:2">
+          <div class="form-group" style="flex:0 0 auto;">
             <label>Document</label>
-            <input type="file" name="document" accept=".md,.txt,.pdf,.docx,.xlsx" required />
+            <button type="button" class="btn btn--sm" onclick="document.getElementById('vault-file-input').click()">Choose File</button>
+            <input type="file" id="vault-file-input" name="document" accept=".md,.txt,.pdf,.docx,.xlsx" required style="display:none;" />
           </div>
           <div class="form-group">
             <label>Title (optional)</label>
