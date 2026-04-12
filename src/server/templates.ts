@@ -607,38 +607,12 @@ export function renderGeneralSettings(settings: GeneralSettings): string {
   </div>
   <div class="settings-content" id="settings-content">
 
-    <nav class="connections-nav">
-      <button class="connections-nav-tab active" data-tab="general" onclick="switchGeneralTab('general')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="4" y1="21" x2="4" y2="14"/>
-          <line x1="4" y1="10" x2="4" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="12"/>
-          <line x1="12" y1="8" x2="12" y2="3"/>
-          <line x1="20" y1="21" x2="20" y2="16"/>
-          <line x1="20" y1="12" x2="20" y2="3"/>
-          <line x1="1" y1="14" x2="7" y2="14"/>
-          <line x1="9" y1="8" x2="15" y2="8"/>
-          <line x1="17" y1="16" x2="23" y2="16"/>
-        </svg>
-        General
-      </button>
-      <button class="connections-nav-tab" data-tab="theme" onclick="switchGeneralTab('theme')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="5"/>
-          <line x1="12" y1="1" x2="12" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="23"/>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
-          <line x1="1" y1="12" x2="3" y2="12"/>
-          <line x1="21" y1="12" x2="23" y2="12"/>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
-        </svg>
-        Theme
-      </button>
-    </nav>
+    <div class="settings-tabs">
+      <button class="settings-tab active" data-tab="general" onclick="switchGeneralTab('general')">General</button>
+      <button class="settings-tab" data-tab="theme" onclick="switchGeneralTab('theme')">Theme</button>
+    </div>
 
-    <div id="general-tab-general" class="connections-tab-panel">
+    <div id="general-tab-general" class="general-tab-panel">
 
     <section class="theme-section">
       <h3 class="theme-section-title">Display Names</h3>
@@ -725,7 +699,7 @@ export function renderGeneralSettings(settings: GeneralSettings): string {
 
     </div>
 
-    <div id="general-tab-theme" class="connections-tab-panel" style="display:none;">
+    <div id="general-tab-theme" class="general-tab-panel" style="display:none;">
 
     <!-- Accent Color Section -->
     <section class="theme-section">
@@ -842,8 +816,8 @@ export function renderGeneralSettings(settings: GeneralSettings): string {
 
 <script>
 function switchGeneralTab(tab) {
-  document.querySelectorAll('.connections-nav-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
-  document.querySelectorAll('.connections-tab-panel').forEach(p => p.style.display = p.id === 'general-tab-' + tab ? '' : 'none');
+  document.querySelectorAll('#settings-content .settings-tab[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.querySelectorAll('.general-tab-panel').forEach(p => p.style.display = p.id === 'general-tab-' + tab ? '' : 'none');
 }
 
 // General tab logic
