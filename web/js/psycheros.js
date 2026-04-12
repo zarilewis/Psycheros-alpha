@@ -2951,7 +2951,7 @@ function renderRagTab(snap) {
   let html = '';
   html += renderContextSection('Retrieved Memories', snap.memoriesContent, true);
   html += renderContextSection('Chat History', snap.chatHistoryContent, true);
-  html += renderContextSection('Lorebook Entries', snap.lorebookContent, true);
+  html += renderContextSection('Context Book Entries', snap.lorebookContent, true);
   html += renderContextSection('Data Vault', snap.vaultContent, true);
   html += renderContextSection('Knowledge Graph', snap.graphContent, true);
 
