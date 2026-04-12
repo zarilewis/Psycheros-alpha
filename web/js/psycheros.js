@@ -990,7 +990,8 @@ async function handleAttachment(input) {
     formData.append('file', file);
     const resp = await fetch('/api/chat-attachments', { method: 'POST', body: formData });
     if (!resp.ok) {
-      showToast('Failed to upload attachment');
+      const err = await resp.json().catch(() => ({}));
+      showToast(err.error || 'Failed to upload attachment');
       return;
     }
     const data = await resp.json();
@@ -3701,8 +3702,12 @@ globalThis.handleAnchorUpload = function() {
   formData.append('file', file);
   formData.append('label', document.getElementById('anchor-label').value || 'Unnamed');
   formData.append('description', document.getElementById('anchor-upload-desc').value || '');
-  fetch('/api/anchor-images', { method: 'POST', body: formData }).then(resp => {
-    if (!resp.ok) showToast('Failed to upload anchor image');
+  fetch('/api/anchor-images', { method: 'POST', body: formData }).then(async resp => {
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      showToast(err.error || 'Failed to upload anchor image');
+      return;
+    }
     htmx.ajax('GET', '/fragments/settings/vision', '#chat');
   });
 };
