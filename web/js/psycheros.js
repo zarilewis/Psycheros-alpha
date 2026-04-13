@@ -452,6 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const id = convItem.dataset.convId;
       if (id) {
+        e.preventDefault();
         selectConversation(id);
       }
     }
@@ -814,8 +815,14 @@ function selectConversation(id) {
     renderContextInspector();
   }
 
-  // Close sidebar after selecting conversation
-  toggleSidebar();
+  // Load chat content (handles both initial load and returning from settings/views)
+  loadConversationFromUrl(id);
+
+  // Update URL to reflect the selected conversation
+  history.pushState({}, '', `/c/${id}`);
+
+  // Close sidebar after selecting conversation (only if open — don't toggle)
+  closeSidebarAfterNav();
 }
 
 // =============================================================================

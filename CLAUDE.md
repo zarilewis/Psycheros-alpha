@@ -65,6 +65,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/lorebook/mod.ts` | Lorebook/world info system |
 | `src/vault/mod.ts` | Data Vault — document storage and eager RAG |
 | `src/db/schema.ts` | Database schema, migrations, vector table sync |
+| `src/db/vector.ts` | sqlite-vec extension loading with auto-download from GitHub releases |
 | `src/init/mod.ts` | Initialization — seeds identity, custom-tools, and vault template directories |
 | `src/pulse/engine.ts` | Pulse system — autonomous scheduled entity prompts |
 | `src/pulse/routes.ts` | Pulse API routes, CRUD, triggers, webhook endpoint |

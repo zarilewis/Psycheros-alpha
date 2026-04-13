@@ -94,6 +94,7 @@ Full code review covering code quality, error handling, input validation, SQLite
 ### sqlite-vec on macOS
 - Native extensions available for both platforms: `lib/vec0.so` (Linux x86-64) and `lib/vec0.dylib` (macOS aarch64)
 - sqlite-vec loads natively on both macOS and Docker — no fallback needed
+- Auto-download: if no matching extension is found at startup, the correct binary is downloaded from GitHub releases (v0.1.9) and cached in `lib/`. Covers Windows as well.
 
 ### graph_create_edge rejects labels with cryptic JSON error (Medium — UX)
 - `graph_create_edge` only accepted `fromId`/`toId` but entity naturally used `fromLabel`/`toLabel` (consistent with `graph_write_batch`)

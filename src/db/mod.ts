@@ -7,6 +7,7 @@
 export { DBClient } from "./client.ts";
 export { initializeSchema } from "./schema.ts";
 export {
+  prepareVectorExtension,
   loadVectorExtension,
   isVectorModuleAvailable,
   ensureVectorModule,

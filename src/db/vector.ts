@@ -7,9 +7,137 @@
 
 import type { Database } from "@db/sqlite";
 import { join, dirname, fromFileUrl } from "@std/path";
+import { ensureDir, exists } from "@std/fs";
 
 // Track extension loading state
 let extensionLoaded = false;
+
+/**
+ * Get the expected extension filename for the current platform.
+ */
+function getPlatformExtension(): string {
+  const os = Deno.build.os;
+  switch (os) {
+    case "windows": return "vec0.dll";
+    case "darwin": return "vec0.dylib";
+    default: return "vec0.so";
+  }
+}
+
+/**
+ * Detect the current platform and return a sqlite-vec release asset name.
+ * Returns null if the platform is unsupported.
+ */
+function detectPlatformAsset(): string | null {
+  const os = Deno.build.os;
+  const arch = Deno.build.arch;
+
+  const osMap: Record<string, string> = {
+    linux: "linux",
+    darwin: "macos",
+    windows: "windows",
+  };
+  const archMap: Record<string, string> = {
+    x86_64: "x86_64",
+    aarch64: "aarch64",
+  };
+
+  const osName = osMap[os];
+  const archName = archMap[arch];
+  if (!osName || !archName) return null;
+
+  return `sqlite-vec-0.1.9-loadable-${osName}-${archName}.tar.gz`;
+}
+
+interface TarEntry { dataOffset: number; size: number }
+
+/**
+ * Find a file entry in a raw tar archive and return its data offset and size.
+ * Minimal tar parser — only handles regular files with no extended headers.
+ */
+function findTarEntry(data: Uint8Array, filename: string): TarEntry | null {
+  let offset = 0;
+  while (offset + 512 <= data.length) {
+    const header = data.subarray(offset, offset + 512);
+
+    // Check for end-of-archive (two zero blocks)
+    if (header.every(b => b === 0)) break;
+
+    // Filename is at offset 0, null-terminated, max 100 bytes
+    const nameBytes = header.subarray(0, 100);
+    const nullIdx = nameBytes.indexOf(0);
+    const name = new TextDecoder().decode(nameBytes.subarray(0, nullIdx === -1 ? 100 : nullIdx));
+
+    if (name === filename) {
+      // Size is at offset 124, 12 bytes, octal ASCII
+      const sizeStr = new TextDecoder().decode(header.subarray(124, 136)).trim();
+      const size = parseInt(sizeStr, 8) || 0;
+      // File data starts at next 512-byte boundary after header
+      return { dataOffset: offset + 512, size };
+    }
+
+    // Size of this entry's data
+    const sizeStr = new TextDecoder().decode(header.subarray(124, 136)).trim();
+    const size = parseInt(sizeStr, 8) || 0;
+    // Advance past header + data (padded to 512-byte blocks)
+    offset += 512 + Math.ceil(size / 512) * 512;
+  }
+  return null;
+}
+
+/**
+ * Attempt to auto-download the sqlite-vec extension binary from GitHub releases.
+ * Downloads and extracts to the lib/ directory if the extension file doesn't already exist.
+ * Called during startup before database initialization.
+ */
+export async function prepareVectorExtension(projectRoot: string): Promise<void> {
+  const libDir = join(projectRoot, "lib");
+  const extFile = getPlatformExtension();
+  const extPath = join(libDir, extFile);
+
+  // Already exists — skip download
+  if (await exists(extPath)) return;
+
+  const assetName = detectPlatformAsset();
+  if (!assetName) {
+    console.warn(`[Vector] Unsupported platform (${Deno.build.os}/${Deno.build.arch}) for sqlite-vec auto-download`);
+    return;
+  }
+
+  const url = `https://github.com/asg017/sqlite-vec/releases/download/v0.1.9/${assetName}`;
+  console.log(`[Vector] sqlite-vec extension not found. Downloading ${assetName}...`);
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`[Vector] Failed to download sqlite-vec: HTTP ${response.status}`);
+      return;
+    }
+
+    await ensureDir(libDir);
+
+    // Decompress the tar.gz and extract vec0.{so,dll,dylib}
+    const tarData = new Uint8Array(await response.arrayBuffer());
+    // Use Deno's built-in decompress for gzip
+    const decompressed = new Uint8Array(
+      await new Response(
+        new Response(tarData).body!.pipeThrough(new DecompressionStream("gzip"))
+      ).arrayBuffer()
+    );
+
+    // Find the vec0 file in the tar archive
+    const vec0Offset = findTarEntry(decompressed, extFile);
+    if (vec0Offset === null) {
+      console.error("[Vector] Downloaded archive does not contain expected file");
+      return;
+    }
+
+    await Deno.writeFile(extPath, decompressed.subarray(vec0Offset.dataOffset, vec0Offset.dataOffset + vec0Offset.size));
+    console.log(`[Vector] sqlite-vec extension installed to ${extPath}`);
+  } catch (error) {
+    console.error("[Vector] Failed to download sqlite-vec:", error instanceof Error ? error.message : String(error));
+  }
+}
 
 /**
  * Get the path to the sqlite-vec extension file.
@@ -64,16 +192,22 @@ export function loadVectorExtension(db: Database): boolean {
   try {
     db.enableLoadExtension = true;
 
-    // Try loading from local file first
-    const extPath = getExtensionPath();
-    if (extPath) {
+    // Build candidate paths — try explicit platform filename first, then auto-suffix
+    const moduleDir = dirname(fromFileUrl(import.meta.url));
+    const extFile = getPlatformExtension();
+    const candidates = [
+      join(moduleDir, "..", "..", "lib", extFile),  // lib/vec0.{so,dll,dylib}
+      getExtensionPath(),                           // lib/vec0 (auto-suffix)
+    ].filter((p): p is string => p !== null);
+
+    for (const extPath of candidates) {
       try {
         db.exec(`SELECT load_extension('${extPath}')`);
         extensionLoaded = true;
         db.enableLoadExtension = false;
         return true;
       } catch {
-        // File load failed, fall through to in-memory fallback
+        // Try next candidate
       }
     }
 

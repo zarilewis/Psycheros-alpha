@@ -127,6 +127,7 @@ export class MCPClient {
   }> = [];
   private pendingMemoryChanges: MemoryEntry[] = [];
   private syncTimer: number | null = null;
+  private intentionalClose = false;
 
   constructor(config: MCPClientConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config } as MCPClientConfig;
@@ -137,6 +138,7 @@ export class MCPClient {
    */
   async connect(): Promise<boolean> {
     try {
+      this.intentionalClose = false;
       this.transport = new StdioClientTransport({
         command: this.config.command,
         args: this.config.args ?? [],
@@ -147,6 +149,16 @@ export class MCPClient {
         name: "psycheros",
         version: "0.1.0",
       });
+
+      // Listen for unexpected transport closes to keep state consistent
+      this.transport.onclose = () => {
+        if (!this.intentionalClose) {
+          console.error("[MCP] Transport closed unexpectedly — marking as disconnected");
+        }
+        this.client = null;
+        this.transport = null;
+        this.intentionalClose = false;
+      };
 
       await this.client.connect(this.transport);
 
@@ -192,12 +204,21 @@ export class MCPClient {
 
     // Push any pending changes
     if (this.pendingIdentityChanges.length > 0 || this.pendingMemoryChanges.length > 0) {
-      await this.push();
+      try {
+        await this.push();
+      } catch {
+        // Push failed, but we're disconnecting anyway
+      }
     }
 
     // Close connection
     if (this.client) {
-      await this.client.close();
+      this.intentionalClose = true;
+      try {
+        await this.client.close();
+      } catch {
+        // Ignore close errors
+      }
       this.client = null;
       this.transport = null;
     }
@@ -219,8 +240,13 @@ export class MCPClient {
       this.config.env = { ...this.config.env, ...newEnv };
     }
 
-    // Disconnect (triggers final sync)
-    await this.disconnect();
+    // Disconnect (marks as intentional so onclose doesn't log an error)
+    this.intentionalClose = true;
+    try {
+      await this.disconnect();
+    } catch {
+      // Ignore disconnect errors during restart
+    }
 
     // Reconnect
     return await this.connect();

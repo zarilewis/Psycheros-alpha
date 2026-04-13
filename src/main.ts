@@ -11,6 +11,7 @@ initLogCapture();
 import { Server } from "./server/mod.ts";
 import { createMCPClient, type MCPClient } from "./mcp-client/mod.ts";
 import { initialize } from "./init/mod.ts";
+import { prepareVectorExtension } from "./db/mod.ts";
 import { getDefaultWebSearchSettings } from "./llm/web-search-settings.ts";
 import { loadEntityCoreLLMSettings } from "./llm/entity-core-settings.ts";
 import { join } from "@std/path";
@@ -146,6 +147,9 @@ if (mcpEnabled) {
     console.log("[MCP] Running in offline mode");
   }
 }
+
+// Ensure sqlite-vec extension is available before database initialization
+await prepareVectorExtension(config.projectRoot);
 
 const server = new Server({
   ...config,

@@ -1989,7 +1989,8 @@ export async function handleMemoriesEditorFragment(
   }
 
   // Significant memories use slug-based filenames (e.g., 2026-04-06_first-conversation.md)
-  // Other granularities use date-based filenames (e.g., 2026-04-06.md)
+  // Other granularities use date-based filenames, optionally with instance suffix
+  // (e.g., 2026-04-06.md or 2026-04-06_psycheros.md)
   let filePath: string;
   if (granularity === "significant") {
     const filename = `${date}.md`;
@@ -2001,39 +2002,45 @@ export async function handleMemoriesEditorFragment(
     }
     filePath = `significant/${filename}`;
   } else {
-    // Sanitize date to prevent path traversal
-    const sanitizedDate = date.replace(/[^0-9W\-]/g, "");
-    if (!DATE_REGEX.test(sanitizedDate)) {
-      return new Response("Invalid date format", {
+    // Validate as a safe filename (alphanumeric, underscores, hyphens)
+    const filename = `${date}.md`;
+    if (!isValidFilename(filename)) {
+      return new Response("Invalid filename", {
         status: 400,
         headers: { "Content-Type": "text/plain" },
       });
     }
-    filePath = `${granularity}/${sanitizedDate}.md`;
-    date = sanitizedDate;
+    filePath = `${granularity}/${filename}`;
   }
 
   try {
     let content: string | null = null;
     let metadata: { sourceInstance?: string; createdAt?: string; updatedAt?: string; version?: number; editedBy?: string } | undefined;
 
-    // For MCP lookup, significant memories use the date portion of the filename
-    const mcpDate = granularity === "significant" ? date.split("_")[0] : date;
+    // For MCP lookup, extract the date portion (before any instance suffix)
+    const mcpDate = date.split("_")[0];
 
     // Try MCP first for richer metadata
     if (ctx.mcpClient?.isConnected()) {
-      const entry = await ctx.mcpClient.readMemory(
-        granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
-        mcpDate,
-      );
-      if (entry) {
-        content = entry.content;
-        metadata = {
-          sourceInstance: entry.sourceInstance,
-          createdAt: entry.createdAt,
-          updatedAt: entry.updatedAt,
-          version: entry.version,
-        };
+      try {
+        const entry = await Promise.race([
+          ctx.mcpClient.readMemory(
+            granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
+            mcpDate,
+          ),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        ]);
+        if (entry) {
+          content = entry.content;
+          metadata = {
+            sourceInstance: entry.sourceInstance,
+            createdAt: entry.createdAt,
+            updatedAt: entry.updatedAt,
+            version: entry.version,
+          };
+        }
+      } catch {
+        // MCP read failed, fall through to local file
       }
     }
 
@@ -2085,6 +2092,8 @@ export async function handleSaveMemory(
   }
 
   // Significant memories use slug-based filenames (e.g., 2026-04-06_first-conversation.md)
+  // Other granularities use date-based filenames, optionally with instance suffix
+  // (e.g., 2026-04-06.md or 2026-04-06_psycheros.md)
   let filePath: string;
   let mcpDate: string;
   if (granularity === "significant") {
@@ -2098,16 +2107,17 @@ export async function handleSaveMemory(
     filePath = `significant/${filename}`;
     mcpDate = date.split("_")[0];
   } else {
-    // Sanitize date
-    const sanitizedDate = date.replace(/[^0-9W\-]/g, "");
-    if (!DATE_REGEX.test(sanitizedDate)) {
-      return new Response(renderSaveError("Invalid date format"), {
+    // Validate as a safe filename (alphanumeric, underscores, hyphens)
+    const filename = `${date}.md`;
+    if (!isValidFilename(filename)) {
+      return new Response(renderSaveError("Invalid filename"), {
         status: 400,
         headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
-    filePath = `${granularity}/${sanitizedDate}.md`;
-    mcpDate = sanitizedDate;
+    filePath = `${granularity}/${filename}`;
+    // Extract the date portion for MCP lookup (before any instance suffix)
+    mcpDate = date.split("_")[0];
   }
 
   try {

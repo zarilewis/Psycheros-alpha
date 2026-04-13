@@ -84,11 +84,14 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3
 
 ## sqlite-vec
 
-Psycheros ships pre-built sqlite-vec native extensions for both platforms:
-- **Linux/Docker**: `lib/vec0.so` (x86-64, v0.1.6) — loads natively in the container
-- **macOS**: `lib/vec0.dylib` (aarch64, v0.1.6) — loads natively during local development
+Psycheros ships pre-built sqlite-vec native extensions for common platforms:
+- **Linux**: `lib/vec0.so` (x86-64, aarch64)
+- **macOS**: `lib/vec0.dylib` (aarch64, x86-64)
+- **Windows**: `lib/vec0.dll` (x86-64)
 
-The `.dockerignore` excludes `vec0.dylib` from the Docker build context. The code passes `lib/vec0` (no file extension) to `load_extension()` — SQLite auto-appends the platform suffix. On unsupported architectures, the system falls back to in-memory cosine similarity. There is no npm fallback — the npm `sqlite-vec` package was removed as dead code.
+If no matching extension is found in `lib/` at startup, Psycheros automatically downloads the correct prebuilt binary from the [sqlite-vec GitHub releases](https://github.com/asg017/sqlite-vec/releases/tag/v0.1.9) (v0.1.9) and caches it in `lib/`. This covers Linux, macOS, and Windows on both x86-64 and aarch64. The download requires internet access on first run; subsequent runs use the cached file.
+
+The `.dockerignore` excludes non-Linux extensions from the Docker build context. On unsupported architectures, the system falls back to in-memory cosine similarity.
 
 ## Graceful Shutdown
 
