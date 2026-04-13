@@ -135,6 +135,9 @@ export class LLMClient {
     const MAX_CONSECUTIVE_MALFORMED = 5;
     // Track whether we've received any data yet (first chunk gets a longer timeout)
     let receivedFirstChunk = false;
+    // Collect raw SSE data lines for diagnostics when stream produces 0 content
+    const rawSSELines: string[] = [];
+    const MAX_RAW_LINES = 10; // Keep last N lines to avoid unbounded memory
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -166,6 +169,13 @@ export class LLMClient {
         buffer = lines.pop() || ""; // Keep incomplete line in buffer
 
         for (const line of lines) {
+          const trimmed = line.trim();
+          // Collect non-empty data lines for diagnostics
+          if (trimmed.startsWith("data:")) {
+            if (rawSSELines.length >= MAX_RAW_LINES) rawSSELines.shift();
+            rawSSELines.push(trimmed);
+          }
+
           const chunk = this.parseSSELine(line);
 
           if (chunk === null) {
@@ -202,6 +212,23 @@ export class LLMClient {
           }
 
           consecutiveMalformed = 0; // Reset on valid parsed chunk
+
+          // Detect upstream error responses in the SSE stream.
+          // Some providers (e.g. OpenRouter) return errors with HTTP 200 in the
+          // stream body: {"error":{"message":"...","code":"..."}} instead of the
+          // normal {"choices":[...]} format. Without this check, error responses
+          // are silently dropped by processChunk (which returns early on missing
+          // choices), resulting in 0 content chunks and no visible error.
+          const rawChunk = chunk as unknown as Record<string, unknown>;
+          if ("error" in rawChunk && rawChunk.error && typeof rawChunk.error === "object") {
+            const err = rawChunk.error as Record<string, unknown>;
+            const errMsg = typeof err.message === "string"
+              ? err.message
+              : JSON.stringify(err);
+            const errCode = typeof err.code === "string" ? err.code : "UPSTREAM_STREAM_ERROR";
+            console.error(`[LLM] Upstream error in SSE stream: ${errMsg} (code=${errCode})`);
+            throw new LLMError(`Upstream API error: ${errMsg}`, errCode);
+          }
 
           // Process the chunk
           for (const streamChunk of this.processChunk(
@@ -261,6 +288,15 @@ export class LLMClient {
           `[LLM] Stream ended without [DONE] signal — ${contentChunkCount} content chunks (${thinkingChunkCount} thinking) in ${elapsed}ms, ` +
           `finish_reason=${lastFinishReason || "unknown"}`,
         );
+        // When 0 content chunks were received, dump raw SSE lines for diagnosis.
+        // This catches upstream errors, unexpected response formats, or empty streams
+        // that would otherwise be invisible.
+        if (contentChunkCount === 0 && rawSSELines.length > 0) {
+          console.error(
+            "[LLM] Raw SSE data received (0 content chunks — possible upstream error or format mismatch):\n" +
+            rawSSELines.map((l) => `  ${l}`).join("\n"),
+          );
+        }
         // Emit any remaining tool calls
         yield* emitAccumulatedToolCalls(toolCallAccumulators);
         yield { type: "done", finishReason: lastFinishReason || "stop" };
