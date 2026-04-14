@@ -54,6 +54,9 @@ export interface DiagnosticsSnapshot {
   mcp: {
     enabled: boolean;
     connected: boolean;
+    alive: boolean;
+    lastPingSuccess: string | null;
+    lastPingAttempt: string | null;
     lastSync: string | null;
     pendingIdentity: number;
     pendingMemories: number;
@@ -179,9 +182,13 @@ export async function collectDiagnostics(ctx: RouteContext): Promise<Diagnostics
 
   // MCP
   const mcpEnabled = !!ctx.mcpClient;
+  const pingHealth = mcpEnabled ? ctx.mcpClient?.getPingHealth() : null;
   const mcp: DiagnosticsSnapshot["mcp"] = {
     enabled: mcpEnabled,
     connected: ctx.mcpClient?.isConnected() ?? false,
+    alive: ctx.mcpClient?.isAlive() ?? false,
+    lastPingSuccess: pingHealth?.lastPingSuccess ?? null,
+    lastPingAttempt: pingHealth?.lastPingAttempt ?? null,
     lastSync: mcpEnabled
       // deno-lint-ignore no-explicit-any
       ? ((ctx.mcpClient as any)?.cache?.lastSync as string | null) ?? null

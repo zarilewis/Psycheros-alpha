@@ -345,7 +345,7 @@ Aggregates health data from 7 subsystems into a single view:
 - **Vector System**: sqlite-vec availability/version, sync status between main tables and vec0 virtual tables
 - **RAG**: Enabled status, indexed file count, chunk count
 - **Memory Consolidation**: Enabled status, summary counts by granularity (daily/weekly/monthly/yearly), summarized chat count
-- **MCP (entity-core)**: Connection status, last sync timestamp, pending identity/memory count
+- **MCP (entity-core)**: Transport connection status, ping-based liveness (30s interval, detects hung subprocesses), last sync timestamp, pending identity/memory count, last ping success/attempt timestamps
 - **Knowledge Graph**: Node and edge counts
 
 Data cached for 5 seconds to avoid hammering SQLite on rapid refreshes. Manual refresh via button.

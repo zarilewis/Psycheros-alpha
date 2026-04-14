@@ -6282,15 +6282,19 @@ export function handleEntityCoreFragment(_ctx: RouteContext): Response {
  * Handle GET /fragments/settings/entity-core/overview — Overview tab.
  */
 export async function handleEntityCoreOverview(ctx: RouteContext): Promise<Response> {
-  const connected = ctx.mcpClient?.isConnected() ?? false;
+  const connected = ctx.mcpClient?.isAlive() ?? false;
 
   let stats = null;
   let pendingIdentity = 0;
   let pendingMemories = 0;
   let lastSyncTime = null;
+  let extraction = null;
 
   if (connected && ctx.mcpClient) {
-    stats = await ctx.mcpClient.getGraphStats();
+    [stats, extraction] = await Promise.all([
+      ctx.mcpClient.getGraphStats(),
+      ctx.mcpClient.getExtractionHealth(),
+    ]);
     const pending = ctx.mcpClient.getPendingCount();
     pendingIdentity = pending.identity;
     pendingMemories = pending.memories;
@@ -6303,6 +6307,7 @@ export async function handleEntityCoreOverview(ctx: RouteContext): Promise<Respo
     pendingIdentity,
     pendingMemories,
     lastSyncTime,
+    extraction,
   };
 
   const html = renderEntityCoreOverview(data);

@@ -69,6 +69,20 @@ export interface MemoryEntry {
 }
 
 /**
+ * Extraction health diagnostics from entity-core.
+ */
+export interface ExtractionHealth {
+  llmAvailable: boolean;
+  lastAttempt: string | null;
+  lastSuccess: string | null;
+  lastError: string | null;
+  attemptsTotal: number;
+  successesTotal: number;
+  nodesCreatedTotal: number;
+  edgesCreatedTotal: number;
+}
+
+/**
  * Configuration for the MCP client.
  */
 export interface MCPClientConfig {
@@ -129,6 +143,11 @@ export class MCPClient {
   private pendingMemoryChanges: MemoryEntry[] = [];
   private syncTimer: number | null = null;
   private intentionalClose = false;
+  private lastPingSuccess: Date | null = null;
+  private lastPingAttempt: Date | null = null;
+  private pingTimer: number | null = null;
+  private pingInterval = 30000; // 30 seconds
+  private wasAlive = true;
 
   constructor(config: MCPClientConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config } as MCPClientConfig;
@@ -175,6 +194,9 @@ export class MCPClient {
         this.startPeriodicSync();
       }
 
+      // Start health pings
+      this.startHealthPing(30000);
+
       return true;
     } catch (error) {
       console.error("[MCP] Failed to connect:", error);
@@ -202,6 +224,15 @@ export class MCPClient {
       clearInterval(this.syncTimer);
       this.syncTimer = null;
     }
+
+    // Stop health pings
+    if (this.pingTimer !== null) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
+    }
+    this.lastPingSuccess = null;
+    this.lastPingAttempt = null;
+    this.wasAlive = true;
 
     // Push any pending changes
     if (this.pendingIdentityChanges.length > 0 || this.pendingMemoryChanges.length > 0) {
@@ -258,6 +289,67 @@ export class MCPClient {
    */
   isConnected(): boolean {
     return this.client !== null;
+  }
+
+  /**
+   * Check if entity-core is alive (responding to pings).
+   * Falls back to transport check if no ping has been sent yet.
+   * Allows up to 2 missed pings before considering dead.
+   */
+  isAlive(): boolean {
+    if (!this.client) return false;
+    if (!this.lastPingAttempt) return true; // no ping yet, trust transport
+    if (!this.lastPingSuccess) return false; // attempted but never succeeded
+    const age = Date.now() - this.lastPingSuccess.getTime();
+    return age < this.pingInterval * 2;
+  }
+
+  /**
+   * Send a lightweight ping to entity-core by calling sync_status.
+   * Returns true if entity-core responded, false otherwise.
+   */
+  async ping(): Promise<boolean> {
+    if (!this.client) return false;
+    try {
+      await this.client.callTool({ name: "sync_status", arguments: {} });
+      this.lastPingSuccess = new Date();
+      return true;
+    } catch {
+      return false;
+    } finally {
+      this.lastPingAttempt = new Date();
+    }
+  }
+
+  /**
+   * Start periodic health pings to entity-core.
+   * Only logs state transitions to avoid flooding the log ring buffer.
+   */
+  private startHealthPing(intervalMs = 30000): void {
+    this.pingInterval = intervalMs;
+    if (this.pingTimer !== null) clearInterval(this.pingTimer);
+
+    this.pingTimer = setInterval(async () => {
+      const ok = await this.ping();
+      if (ok && !this.wasAlive) {
+        this.wasAlive = true;
+        console.error("[MCP] Entity-core is responsive again");
+      } else if (!ok && this.wasAlive) {
+        this.wasAlive = false;
+        console.error("[MCP] Entity-core is not responding to pings");
+      }
+    }, intervalMs);
+  }
+
+  /**
+   * Get ping health data for diagnostics.
+   */
+  getPingHealth(): { lastPingSuccess: string | null; lastPingAttempt: string | null; alive: boolean } {
+    return {
+      lastPingSuccess: this.lastPingSuccess?.toISOString() ?? null,
+      lastPingAttempt: this.lastPingAttempt?.toISOString() ?? null,
+      alive: this.isAlive(),
+    };
   }
 
   /**
@@ -1219,6 +1311,33 @@ export class MCPClient {
       return null;
     } catch (error) {
       console.error("[MCP] Graph stats failed:", error);
+      return null;
+    }
+  }
+
+  /**
+   * Get extraction health diagnostics from entity-core.
+   * Calls sync_status and returns the extraction sub-object.
+   */
+  async getExtractionHealth(): Promise<ExtractionHealth | null> {
+    if (!this.client) {
+      return null;
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "sync_status",
+        arguments: {},
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return response.extraction ?? null;
+      }
+      return null;
+    } catch (error) {
+      console.error("[MCP] Get extraction health failed:", error);
       return null;
     }
   }

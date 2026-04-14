@@ -22,6 +22,7 @@ import { TOOL_CATEGORIES } from "../tools/mod.ts";
 import type { Tool } from "../tools/mod.ts";
 import { renderMarkdown } from "./markdown.ts";
 import { pulseIconSvg } from "../pulse/templates.ts";
+import type { ExtractionHealth } from "../mcp-client/mod.ts";
 
 // =============================================================================
 // Utilities
@@ -2769,6 +2770,7 @@ export interface EntityCoreOverviewData {
   pendingIdentity: number;
   pendingMemories: number;
   lastSyncTime: string | null;
+  extraction: ExtractionHealth | null;
 }
 
 /**
@@ -2838,6 +2840,61 @@ export function renderEntityCoreOverview(data: EntityCoreOverviewData): string {
       <span class="ec-stat-label">Pending Changes</span>
     </div>
   </div>
+
+  ${data.extraction ? (() => {
+    const ex = data.extraction;
+    const llmBadge = ex.llmAvailable
+      ? '<span class="ec-badge ec-badge--ok">LLM Ready</span>'
+      : '<span class="ec-badge ec-badge--warn">No LLM</span>';
+    const successRate = ex.attemptsTotal > 0
+      ? Math.round((ex.successesTotal / ex.attemptsTotal) * 100)
+      : null;
+    const lastAttemptStr = ex.lastAttempt
+      ? new Date(ex.lastAttempt).toLocaleString([], { timeZone: getDisplayTZ() })
+      : "Never";
+    const lastSuccessStr = ex.lastSuccess
+      ? new Date(ex.lastSuccess).toLocaleString([], { timeZone: getDisplayTZ() })
+      : "Never";
+
+    return `
+  <div class="ec-section">
+    <h3 class="ec-section-title">Extraction Pipeline ${llmBadge}</h3>
+    <div class="ec-stats-grid ec-stats-grid--compact">
+      <div class="ec-stat-card">
+        <span class="ec-stat-value">${ex.attemptsTotal}</span>
+        <span class="ec-stat-label">Attempts</span>
+      </div>
+      <div class="ec-stat-card">
+        <span class="ec-stat-value">${ex.successesTotal}</span>
+        <span class="ec-stat-label">Successes</span>
+      </div>
+      <div class="ec-stat-card">
+        <span class="ec-stat-value">${ex.nodesCreatedTotal}</span>
+        <span class="ec-stat-label">Nodes</span>
+      </div>
+      <div class="ec-stat-card">
+        <span class="ec-stat-value">${ex.edgesCreatedTotal}</span>
+        <span class="ec-stat-label">Edges</span>
+      </div>
+    </div>
+    ${successRate !== null ? `<div class="ec-detail">
+      <span class="ec-detail-label">Success rate:</span>
+      <span class="ec-detail-value">${successRate}%</span>
+    </div>` : ""}
+    <div class="ec-detail">
+      <span class="ec-detail-label">Last attempt:</span>
+      <span class="ec-detail-value">${escapeHtml(lastAttemptStr)}</span>
+    </div>
+    <div class="ec-detail">
+      <span class="ec-detail-label">Last success:</span>
+      <span class="ec-detail-value">${escapeHtml(lastSuccessStr)}</span>
+    </div>
+    ${ex.lastError ? `<div class="ec-detail ec-detail--error">
+      <span class="ec-detail-label">Last error:</span>
+      <span class="ec-detail-value">${escapeHtml(ex.lastError)}</span>
+    </div>` : ""}
+  </div>`;
+  })() : ""}
 
   ${topNodeTypes ? `<div class="ec-detail">
     <span class="ec-detail-label">Top node types:</span>

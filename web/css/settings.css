@@ -2078,6 +2078,56 @@
   color: var(--c-fg-dim);
 }
 
+.ec-detail--error .ec-detail-value {
+  color: var(--c-danger, #e5484d);
+}
+
+/* Section title with inline badge */
+.ec-section-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--c-fg-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.ec-section {
+  margin-bottom: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--c-border);
+}
+
+/* Badges */
+.ec-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+.ec-badge--ok {
+  background: rgba(46, 160, 67, 0.15);
+  color: var(--c-success, #30a46c);
+}
+
+.ec-badge--warn {
+  background: rgba(227, 137, 52, 0.15);
+  color: var(--c-warn, #e38934);
+}
+
+/* Compact stats grid (4 columns) */
+.ec-stats-grid--compact {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 /* Actions area */
 .ec-actions {
   margin-top: var(--sp-4);

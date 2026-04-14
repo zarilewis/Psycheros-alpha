@@ -311,7 +311,8 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `GET` | `/fragments/settings/vault` | Data Vault management fragment |
 | `GET` | `/fragments/settings/vault/:id` | Vault document detail/edit fragment |
 | `GET` | `/fragments/settings/entity-core` | Entity Core hub with tab navigation |
-| `GET` | `/fragments/settings/entity-core/overview` | Entity Core overview tab (connection status, stats, sync) |
+| `GET` | `/fragments/settings/entity-core/overview` | Entity Core overview tab (ping-based connection status, graph stats, extraction pipeline health, sync) |
+| `GET` | `/fragments/settings/entity-core/llm` | Entity Core LLM settings tab |
 | `GET` | `/fragments/settings/entity-core/graph` | Knowledge Graph visualization tab |
 | `GET` | `/fragments/settings/entity-core/maintenance` | Entity Core maintenance tab (consolidation, batch populate, embed) |
 | `GET` | `/fragments/settings/entity-core/snapshots` | Snapshot browser tab |
