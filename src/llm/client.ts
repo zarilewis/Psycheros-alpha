@@ -120,6 +120,18 @@ export class LLMClient {
       throw new LLMError("Response body is null", "NO_BODY");
     }
 
+    // Validate response content-type — if the upstream didn't return SSE,
+    // the stream parser will silently produce 0 content chunks.
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("text/event-stream") && !contentType.includes("text/plain")) {
+      throw new LLMError(
+        `Upstream returned non-streaming response (content-type: ${contentType || "missing"}) — ` +
+        "check that the base URL points to the chat completions endpoint " +
+        "(e.g. https://openrouter.ai/api/v1/chat/completions)",
+        "INVALID_RESPONSE_TYPE",
+      );
+    }
+
     // Track tool calls being accumulated across chunks
     const toolCallAccumulators = new Map<number, ToolCallAccumulator>();
 
@@ -135,9 +147,11 @@ export class LLMClient {
     const MAX_CONSECUTIVE_MALFORMED = 5;
     // Track whether we've received any data yet (first chunk gets a longer timeout)
     let receivedFirstChunk = false;
-    // Collect raw SSE data lines for diagnostics when stream produces 0 content
-    const rawSSELines: string[] = [];
-    const MAX_RAW_LINES = 10; // Keep last N lines to avoid unbounded memory
+    // Collect raw lines for diagnostics when stream produces 0 content.
+    // Captures ALL non-empty lines (not just data: lines) so non-SSE
+    // responses (e.g. JSON errors, HTML pages) are also visible.
+    const rawLines: string[] = [];
+    const MAX_RAW_LINES = 20;
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -170,10 +184,10 @@ export class LLMClient {
 
         for (const line of lines) {
           const trimmed = line.trim();
-          // Collect non-empty data lines for diagnostics
-          if (trimmed.startsWith("data:")) {
-            if (rawSSELines.length >= MAX_RAW_LINES) rawSSELines.shift();
-            rawSSELines.push(trimmed);
+          // Collect non-empty lines for diagnostics
+          if (trimmed.length > 0) {
+            if (rawLines.length >= MAX_RAW_LINES) rawLines.shift();
+            rawLines.push(trimmed);
           }
 
           const chunk = this.parseSSELine(line);
@@ -288,14 +302,18 @@ export class LLMClient {
           `[LLM] Stream ended without [DONE] signal — ${contentChunkCount} content chunks (${thinkingChunkCount} thinking) in ${elapsed}ms, ` +
           `finish_reason=${lastFinishReason || "unknown"}`,
         );
-        // When 0 content chunks were received, dump raw SSE lines for diagnosis.
-        // This catches upstream errors, unexpected response formats, or empty streams
-        // that would otherwise be invisible.
-        if (contentChunkCount === 0 && rawSSELines.length > 0) {
-          console.error(
-            "[LLM] Raw SSE data received (0 content chunks — possible upstream error or format mismatch):\n" +
-            rawSSELines.map((l) => `  ${l}`).join("\n"),
-          );
+        // When 0 content chunks were received, dump all raw lines for diagnosis.
+        // This catches non-SSE responses, upstream errors, or format mismatches
+        // that would otherwise be completely invisible.
+        if (contentChunkCount === 0) {
+          if (rawLines.length > 0) {
+            console.error(
+              "[LLM] Raw response data (0 content chunks — possible non-SSE response or upstream error):\n" +
+              rawLines.map((l) => `  ${l}`).join("\n"),
+            );
+          } else {
+            console.error("[LLM] Stream ended with 0 content chunks and received no parseable data at all");
+          }
         }
         // Emit any remaining tool calls
         yield* emitAccumulatedToolCalls(toolCallAccumulators);
