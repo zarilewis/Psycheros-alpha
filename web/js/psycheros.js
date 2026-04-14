@@ -730,6 +730,14 @@ async function newConversation() {
         </div>
         <div class="input-area">
           <div class="input-container">
+            <button class="attach-btn" onclick="document.getElementById('attach-input').click()" title="Attach image">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+            </button>
+            <input type="file" id="attach-input" accept="image/*" style="display:none" onchange="Psycheros.handleAttachment(this)">
             <textarea
               class="input-field"
               id="message-input"
@@ -738,15 +746,9 @@ async function newConversation() {
               onkeydown="Psycheros.handleKeyDown(event)"
               oninput="Psycheros.autoResize(this)"
             ></textarea>
-            <button class="attach-btn" onclick="document.getElementById('attach-input').click()" title="Attach image">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
+            <button class="send-btn" id="send-btn" onclick="Psycheros.sendMessage()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
             </button>
-            <input type="file" id="attach-input" accept="image/*" style="display:none" onchange="Psycheros.handleAttachment(this)">
-            <button class="send-btn" id="send-btn" onclick="Psycheros.sendMessage()">Send</button>
           </div>
           <div id="attachment-preview" class="attachment-preview" style="display:none;"></div>
         </div>
@@ -798,7 +800,7 @@ function selectConversation(id) {
   const sendBtn = document.getElementById('send-btn');
   if (input) input.disabled = false;
   if (sendBtn) {
-    sendBtn.textContent = 'Send';
+    sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
     sendBtn.onclick = Psycheros.sendMessage;
     sendBtn.classList.remove('stop-btn');
     sendBtn.classList.add('send-btn');
@@ -864,14 +866,14 @@ function requestStopGeneration() {
   } else {
     // First tap - show confirmation state (orange warning)
     stopConfirmed = true;
-    sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Tap again';
+    sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
     sendBtn.classList.add('stop-confirm');
 
     // Reset confirmation after 3 seconds if not tapped again
     setTimeout(() => {
       if (stopConfirmed && isStreaming) {
         stopConfirmed = false;
-        sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Stop';
+        sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
         sendBtn.classList.remove('stop-confirm');
       }
     }, 3000);
@@ -906,7 +908,7 @@ async function enterPulseStreamingMode() {
 
   if (sendBtn) {
     stopConfirmed = false;
-    sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Stop';
+    sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
     sendBtn.onclick = requestStopPulseGeneration;
     sendBtn.classList.add('stop-btn');
     sendBtn.classList.remove('send-btn', 'stop-confirm');
@@ -937,7 +939,7 @@ function exitPulseStreamingMode() {
   input?.removeAttribute('disabled');
 
   if (sendBtn) {
-    sendBtn.textContent = 'Send';
+    sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
     sendBtn.onclick = Psycheros.sendMessage;
     sendBtn.classList.remove('stop-btn', 'stop-confirm');
     sendBtn.classList.add('send-btn');
@@ -958,13 +960,13 @@ function requestStopPulseGeneration() {
     stopPulseGeneration();
   } else {
     stopConfirmed = true;
-    sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Tap again';
+    sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
     sendBtn.classList.add('stop-confirm');
     // Reset confirmation after 3 seconds if not confirmed
     setTimeout(() => {
       if (stopConfirmed && pulseStreamingPulseId) {
         stopConfirmed = false;
-        sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Stop';
+        sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
         sendBtn.classList.remove('stop-confirm');
       }
     }, 3000);
@@ -1065,7 +1067,7 @@ async function sendMessage() {
 
   // Switch send button to stop button (requires double-tap)
   stopConfirmed = false;
-  sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Stop';
+  sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
   sendBtn.onclick = Psycheros.requestStopGeneration;
   sendBtn.classList.add('stop-btn');
   sendBtn.classList.remove('send-btn', 'stop-confirm');
@@ -1266,7 +1268,7 @@ async function sendMessage() {
 
     // Restore send button from stop button
     if (sendBtn) {
-      sendBtn.textContent = 'Send';
+      sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
       sendBtn.onclick = Psycheros.sendMessage;
       sendBtn.classList.remove('stop-btn', 'stop-confirm');
       sendBtn.classList.add('send-btn');
@@ -1321,7 +1323,7 @@ async function retryFailedTurn(failedAssistantEl) {
   streamingConversationId = conversationId;
   input && (input.disabled = true);
   stopConfirmed = false;
-  sendBtn.innerHTML = '<span class="stop-icon">&#9888;</span> Stop';
+  sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
   sendBtn.onclick = Psycheros.requestStopGeneration;
   sendBtn.classList.add('stop-btn');
   sendBtn.classList.remove('send-btn', 'stop-confirm');
@@ -1423,7 +1425,7 @@ async function retryFailedTurn(failedAssistantEl) {
 
     if (input) input.disabled = false;
     if (sendBtn) {
-      sendBtn.textContent = 'Send';
+      sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
       sendBtn.onclick = Psycheros.sendMessage;
       sendBtn.classList.remove('stop-btn', 'stop-confirm');
       sendBtn.classList.add('send-btn');
@@ -2552,6 +2554,14 @@ async function confirmDelete() {
           </div>
           <div class="input-area">
             <div class="input-container">
+              <button class="attach-btn" onclick="document.getElementById('attach-input').click()" title="Attach image">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+              </button>
+              <input type="file" id="attach-input" accept="image/*" style="display:none" onchange="Psycheros.handleAttachment(this)">
               <textarea
                 class="input-field"
                 id="message-input"
@@ -2560,15 +2570,9 @@ async function confirmDelete() {
                 onkeydown="Psycheros.handleKeyDown(event)"
                 oninput="Psycheros.autoResize(this)"
               ></textarea>
-              <button class="attach-btn" onclick="document.getElementById('attach-input').click()" title="Attach image">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
+              <button class="send-btn" id="send-btn" onclick="Psycheros.sendMessage()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
               </button>
-              <input type="file" id="attach-input" accept="image/*" style="display:none" onchange="Psycheros.handleAttachment(this)">
-              <button class="send-btn" id="send-btn" onclick="Psycheros.sendMessage()">Send</button>
             </div>
             <div id="attachment-preview" class="attachment-preview" style="display:none;"></div>
           </div>

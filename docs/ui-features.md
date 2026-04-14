@@ -78,11 +78,11 @@ Implemented in `src/entity/loop.ts` via `formatMessageTimestamp()`. XML strippin
 
 ## Stop Generation
 
-During streaming, the Send button transforms into a Stop button with two-tap confirmation to prevent accidental cancellation.
+During streaming, the Send button transforms into a Stop button (square icon) with two-tap confirmation to prevent accidental cancellation.
 
 **States:**
-1. **Stop** (orange with warning icon) — initial state during streaming
-2. **Tap again** (pulsing amber) — confirmation required, resets after 3 seconds
+1. **Stop** (red square icon) — initial state during streaming
+2. **Stop again** (pulsing amber square icon) — confirmation required, resets after 3 seconds
 3. **[Stopped]** — shown in the message when generation is halted
 
 **Behavior:**
@@ -265,7 +265,7 @@ Implemented in `web/js/psycheros.js` (SSE handler), `src/server/templates.ts` (s
 Users can attach images to chat messages for the entity to reference in generation or conversation.
 
 **Features:**
-- Clip icon button next to the chat input
+- Clip icon button to the left of the chat input
 - File picker accepts images (JPEG, PNG, GIF, WebP)
 - Thumbnail preview shown below the input after selecting a file
 - Remove button to cancel the attachment before sending

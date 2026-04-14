@@ -555,7 +555,8 @@
 
 .input-container {
   display: flex;
-  gap: var(--sp-2);
+  align-items: flex-end;
+  gap: var(--sp-1);
 }
 
 .input-field {
@@ -589,17 +590,17 @@
 }
 
 .send-btn {
-  font-family: var(--font-mono);
-  padding: 0 var(--sp-6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-color: var(--c-accent);
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   color: #000;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  min-width: 80px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  padding: 0;
+  width: 38px;
+  height: var(--input-height);
+  flex-shrink: 0;
   transition: background-color var(--transition), transform var(--transition), box-shadow var(--transition);
 }
 
@@ -619,17 +620,17 @@
 
 /* Stop button - replaces send button during streaming */
 .stop-btn {
-  font-family: var(--font-mono);
-  padding: 0 var(--sp-6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background-color: var(--c-error);
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   color: #fff;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  min-width: 80px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  padding: 0;
+  width: 38px;
+  height: var(--input-height);
+  flex-shrink: 0;
   transition: background-color var(--transition), transform var(--transition), box-shadow var(--transition);
 }
 
@@ -658,11 +659,6 @@
 @keyframes pulse-warning {
   from { opacity: 1; }
   to { opacity: 0.7; }
-}
-
-/* Stop icon styling */
-.stop-icon {
-  margin-right: var(--sp-1);
 }
 
 /* ==========================================================================
@@ -1923,8 +1919,10 @@
   border: none;
   color: var(--c-fg-muted);
   cursor: pointer;
-  padding: var(--sp-2);
+  padding: var(--sp-1);
   border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  align-self: center;
   transition: color var(--transition), background var(--transition);
 }
 
