@@ -2,9 +2,9 @@
 
 ## Tool System Overview
 
-Tools are registered in `src/tools/registry.ts` via `AVAILABLE_TOOLS`. Each tool implements the `Tool` interface and can be enabled via the `PSYCHEROS_TOOLS` environment variable or the Settings > Tools UI.
+Tools are registered in `src/tools/registry.ts` via `AVAILABLE_TOOLS`. Each tool implements the `Tool` interface. All tools are enabled by default — no configuration is required on a fresh install.
 
-Tool enable/disable state persists to `.psycheros/tools-settings.json`. When this file exists, user overrides take precedence over the env var. Some tools are auto-enabled regardless (e.g., `web_search` when a web search provider is configured).
+Tool enable/disable state can be overridden via the `PSYCHEROS_TOOLS` environment variable or the Settings > Tools UI. When `.psycheros/tools-settings.json` exists, user overrides take precedence over the env var. Some tools are auto-enabled regardless (e.g., `web_search` when a web search provider is configured).
 
 ### Adding a New Built-in Tool
 
@@ -44,6 +44,7 @@ Accessible via Settings > Tools in the sidebar. Provides a web interface for man
 1. User override (from settings file) — explicit toggle
 2. Auto-enabled tools (e.g., `web_search` when provider configured)
 3. `PSYCHEROS_TOOLS` environment variable
+4. **Default: all tools enabled** (when no overrides, no env var, and no auto-only config)
 
 **API Endpoints:**
 - `GET /api/tools-settings` — get all tools metadata, categories, and current overrides

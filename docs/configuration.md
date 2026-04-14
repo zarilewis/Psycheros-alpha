@@ -15,7 +15,7 @@ All Psycheros configuration is via environment variables. Copy `.env.example` to
 \* `ZAI_*` variables are only used to create a default profile on first run. LLM connections are configured via **Settings > LLM Connections** in the web UI. Multiple named profiles can be created for different providers (OpenRouter, OpenAI, Alibaba/Qwen, NanoGPT, custom). Once profiles are saved to `.psycheros/llm-settings.json`, the UI settings take precedence over env vars.
 | `PSYCHEROS_HOST` | No | `0.0.0.0` | Server hostname |
 | `PSYCHEROS_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
-| `PSYCHEROS_TOOLS` | No | (none) | Comma-separated list of enabled tools |
+| `PSYCHEROS_TOOLS` | No | (all) | Comma-separated list of enabled tools. Default: all tools enabled. Use `none` to disable all non-auto tools, or list specific tools to limit access. |
 | `PSYCHEROS_MEMORY_HOUR` | No | `4` | Fallback UTC hour for daily summarization (0-23). Only used when `PSYCHEROS_DISPLAY_TZ` is not set. |
 | `PSYCHEROS_SNAPSHOT_HOUR` | No | `3` | Hour to run daily identity snapshots (0-23) |
 | `PSYCHEROS_SNAPSHOT_RETENTION_DAYS` | No | `30` | Days to retain snapshots before cleanup |
@@ -29,7 +29,7 @@ All Psycheros configuration is via environment variables. Copy `.env.example` to
 
 ## Available Tools
 
-Tools are enabled via the `PSYCHEROS_TOOLS` environment variable or the Settings > Tools UI. When the Tools settings file (`.psycheros/tools-settings.json`) exists, user overrides take precedence over the env var. The env var serves as a fallback when no settings file exists.
+All tools are enabled by default on a fresh install. No configuration is needed. Tools can be disabled via the `PSYCHEROS_TOOLS` environment variable or the Settings > Tools UI. When the Tools settings file (`.psycheros/tools-settings.json`) exists, user overrides take precedence over the env var. The env var serves as a fallback when no settings file exists.
 
 Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. Changes hot-reload the tool registry without a restart.
 

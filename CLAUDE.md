@@ -21,7 +21,7 @@ deno lint              # Lint
 ## Setup
 
 ```bash
-cp .env.example .env   # Then set LLM API key and PSYCHEROS_TOOLS
+cp .env.example .env   # Then set LLM API key
 ```
 
 LLM connections are configured via **Settings > LLM Settings** in the web UI. Multiple named connection profiles can be created (OpenRouter, OpenAI, Alibaba/Qwen, NanoGPT, or custom endpoints). One profile is marked active for chat. On first run, a default profile is created from `ZAI_*` environment variables if set.

@@ -196,8 +196,8 @@ export function getEnabledToolNames(
   const autoSet = new Set(autoEnabledToolNames.map((t) => t.toLowerCase()));
   const overrides = settings.toolOverrides;
 
-  // If env says "all" and no overrides exist, enable everything
-  if (envSet.has("all") && Object.keys(overrides).length === 0) {
+  // If env says "all" (or is unconfigured) and no overrides exist, enable everything
+  if ((envSet.has("all") || envToolNames.length === 0) && Object.keys(overrides).length === 0) {
     return allToolNames;
   }
 
