@@ -532,17 +532,12 @@ export class IdentityFileManager {
     const validation = this.validateFile(category, filename);
     if (validation) return validation;
 
-    // Read existing content for snapshot
+    // Read existing content for potential snapshot
     let existingContent: string;
     try {
       existingContent = await this.readFile(category, filename);
     } catch {
       existingContent = "";
-    }
-
-    // Create snapshot if requested
-    if (createSnapshot && existingContent) {
-      await this.createSnapshot(category, filename, existingContent, reason);
     }
 
     // Try MCP first
@@ -556,7 +551,7 @@ export class IdentityFileManager {
         );
 
         if (success) {
-          console.log(`[Identity] Replaced ${category}/${filename} via MCP`);
+          console.log(`[Identity] Replaced ${category}/${filename} via MCP (snapshot created by entity-core)`);
           return {
             success: true,
             message: `I've replaced my ${category}/${filename} file. A snapshot was saved.`,
@@ -567,7 +562,11 @@ export class IdentityFileManager {
       }
     }
 
-    // Fallback to local write
+    // Fallback to local write — create local snapshot since MCP isn't handling it
+    if (createSnapshot && existingContent) {
+      await this.createSnapshot(category, filename, existingContent, reason);
+    }
+
     try {
       await this.writeFile(category, filename, content);
 
@@ -674,6 +673,63 @@ ${content}
       return snapshots;
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Restore an identity file from a local snapshot.
+   * Strips the snapshot header (lines starting with #) and writes the content.
+   */
+  async restoreFromSnapshot(snapshotPath: string): Promise<IdentityOperationResult> {
+    try {
+      const snapshotContent = await Deno.readTextFile(snapshotPath);
+
+      // Parse the snapshot header to extract category and filename
+      const headerMatch = snapshotContent.match(/^# Snapshot: (.+)\/(.+)$/m);
+      if (!headerMatch) {
+        return { success: false, message: "Invalid snapshot file: missing header", error: "invalid_snapshot" };
+      }
+
+      const category = headerMatch[1] as IdentityCategory;
+      const filename = headerMatch[2];
+
+      // Strip header lines and extract actual content
+      const lines = snapshotContent.split("\n");
+      let contentStart = 0;
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() === "" && i > 2) {
+          contentStart = i + 1;
+          break;
+        }
+      }
+      const content = lines.slice(contentStart).join("\n");
+
+      // Create a snapshot of the current file before restoring
+      const currentContent = await this.readFile(category, filename).catch(() => "");
+      if (currentContent) {
+        await this.createSnapshot(category, filename, currentContent, "pre-restore");
+      }
+
+      // Write restored content
+      await this.writeFile(category, filename, content);
+
+      // Queue for MCP sync if connected
+      if (this.mcpClient) {
+        this.mcpClient.queueIdentityChange(category, filename, content);
+      }
+
+      console.log(`[Identity] Restored ${category}/${filename} from local snapshot`);
+      return {
+        success: true,
+        message: `I've restored my ${category}/${filename} file from a local snapshot.`,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return {
+        success: false,
+        message: `Failed to restore snapshot: ${errorMessage}`,
+        error: "restore_failed",
+      };
     }
   }
 

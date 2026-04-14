@@ -185,6 +185,8 @@ Tool called → MCP connected?
          manipulation
 ```
 
+**Snapshot behavior:** When `replace` is used and MCP succeeds, entity-core creates the snapshot (via `sync_push`'s targeted per-file snapshot). When MCP fails, a local snapshot is created at `.snapshots/` as a fallback. The Entity Core snapshots UI shows local snapshots when entity-core has none, enabling recovery even when MCP is unavailable.
+
 Changes preserve XML tag structure in identity files. Content is added cleanly without metadata comments — core prompts load every turn, so token efficiency matters.
 
 ### Related Source Files
@@ -192,7 +194,7 @@ Changes preserve XML tag structure in identity files. Content is added cleanly w
 | File | Purpose |
 |------|---------|
 | `src/tools/registry.ts` | Tool registration and default registry |
-| `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback) |
+| `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback, local snapshot restore) |
 | `src/tools/identity-casual.ts` | `identity_append` — Tier 1 append-only identity tool |
 | `src/tools/identity-maintain.ts` | Tier 2 maintenance identity tools |
 | `src/tools/identity-custom.ts` | Custom identity file tool (create, append, replace) |

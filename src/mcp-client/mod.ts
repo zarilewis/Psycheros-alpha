@@ -454,6 +454,8 @@ export class MCPClient {
       modifiedBy: this.config.instanceId,
     };
 
+    let pushSucceeded = false;
+
     // Try to push to entity-core if connected
     if (this.client) {
       try {
@@ -479,7 +481,11 @@ export class MCPClient {
             this.queueIdentityChange(category, filename, content);
           } else {
             console.log(`[MCP] Pushed ${category}/${filename} to entity-core`);
+            pushSucceeded = true;
           }
+        } else {
+          console.error("[MCP] Push returned empty response, queuing change");
+          this.queueIdentityChange(category, filename, content);
         }
       } catch (error) {
         console.error("[MCP] Push failed, queuing change:", error);
@@ -505,7 +511,7 @@ export class MCPClient {
       // Don't fail - the MCP push/queue is more important
     }
 
-    return true;
+    return pushSucceeded;
   }
 
   /**

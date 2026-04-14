@@ -23,6 +23,7 @@ import { AVAILABLE_TOOLS, TOOL_CATEGORIES, loadCustomTools } from "../tools/mod.
 import type { Retriever, RAGConfig } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
+import { IdentityFileManager } from "../tools/identity-helpers.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
 import type { VaultManager } from "../vault/mod.ts";
 import type { MemoryIndexer } from "../rag/indexer.ts";
@@ -2764,7 +2765,37 @@ export async function handleRestoreSnapshot(
   // Decode URL-encoded snapshot ID (e.g., custom%2Fmy_facets -> custom/my_facets)
   const decodedId = decodeURIComponent(snapshotId);
 
-  // Snapshots are centralized in entity-core - require MCP connection
+  // Local snapshot: ID is a filesystem path
+  if (decodedId.startsWith("/")) {
+    const manager = new IdentityFileManager(ctx.mcpClient ?? null, ctx.projectRoot);
+    const result = await manager.restoreFromSnapshot(decodedId);
+
+    if (!result.success) {
+      const errorHtml = `<div class="snapshot-error">Local restore failed: ${escapeHtml(result.message || "Unknown error")}</div>`;
+      return new Response(errorHtml, {
+        status: 500,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Return entity-core snapshots view after restore
+    const localSnapshots = await manager.listSnapshots();
+    const snapshots = localSnapshots.map((s) => ({
+      id: s.path,
+      category: s.category,
+      filename: s.filename,
+      timestamp: s.date,
+      date: s.date,
+      reason: "local",
+      source: "local" as const,
+    }));
+    const html = renderEntityCoreSnapshots(snapshots);
+    return new Response(html, {
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  // Entity-core snapshot
   if (!ctx.mcpClient) {
     return new Response(
       `<div class="snapshot-error">Snapshots require entity-core connection. Please enable MCP.</div>`,
@@ -6339,18 +6370,37 @@ export function handleEntityCoreMaintenance(ctx: RouteContext): Response {
  * Handle GET /fragments/settings/entity-core/snapshots — Snapshots tab.
  */
 export async function handleEntityCoreSnapshots(ctx: RouteContext): Promise<Response> {
-  if (!ctx.mcpClient) {
-    return new Response(
-      `<div class="error">Snapshots require entity-core connection.</div>`,
-      {
-        status: 503,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      }
-    );
+  let snapshots: Array<{
+    id: string;
+    category: string;
+    filename: string;
+    timestamp: string;
+    date: string;
+    reason: string;
+    source?: string;
+  }> = [];
+
+  // Try entity-core snapshots first
+  if (ctx.mcpClient) {
+    const result = await ctx.mcpClient.listSnapshots();
+    snapshots = result.snapshots ?? [];
   }
 
-  const result = await ctx.mcpClient.listSnapshots();
-  const snapshots = result.snapshots ?? [];
+  // Fall back to local snapshots if entity-core has none
+  if (snapshots.length === 0) {
+    const manager = new IdentityFileManager(ctx.mcpClient ?? null, ctx.projectRoot);
+    const localSnapshots = await manager.listSnapshots();
+    snapshots = localSnapshots.map((s) => ({
+      id: s.path, // Use filesystem path as ID for local snapshots
+      category: s.category,
+      filename: s.filename,
+      timestamp: s.date, // Only have date, not full timestamp
+      date: s.date,
+      reason: "local",
+      source: "local",
+    }));
+  }
+
   const html = renderEntityCoreSnapshots(snapshots);
   return new Response(html, {
     headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -6361,6 +6411,41 @@ export async function handleEntityCoreSnapshots(ctx: RouteContext): Promise<Resp
  * Handle GET /fragments/entity-core/snapshots/:id — Snapshot preview.
  */
 export async function handleEntityCoreSnapshotPreview(ctx: RouteContext, snapshotId: string): Promise<Response> {
+  const decodedId = decodeURIComponent(snapshotId);
+
+  // Local snapshot: ID is a filesystem path
+  if (decodedId.startsWith("/")) {
+    try {
+      const content = await Deno.readTextFile(decodedId);
+
+      // Parse metadata from snapshot header
+      const lines = content.split("\n");
+      let category = "self";
+      let filename = "unknown";
+      for (const line of lines.slice(0, 10)) {
+        const catMatch = line.match(/^# Snapshot: (.+)\/(.+)$/);
+        if (catMatch) {
+          category = catMatch[1];
+          filename = catMatch[2];
+        }
+      }
+
+      const html = renderEntityCoreSnapshotPreview(category, filename, content, snapshotId);
+      return new Response(html, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    } catch {
+      return new Response(
+        `<div class="error">Local snapshot not found.</div>`,
+        {
+          status: 404,
+          headers: { "Content-Type": "text/html; charset=utf-8" },
+        }
+      );
+    }
+  }
+
+  // Entity-core snapshot
   if (!ctx.mcpClient) {
     return new Response(
       `<div class="error">Snapshots require entity-core connection.</div>`,
@@ -6371,7 +6456,7 @@ export async function handleEntityCoreSnapshotPreview(ctx: RouteContext, snapsho
     );
   }
 
-  const result = await ctx.mcpClient.getSnapshotContent(snapshotId);
+  const result = await ctx.mcpClient.getSnapshotContent(decodedId);
   if (!result.success || !result.content) {
     return new Response(
       `<div class="error">${escapeHtml(result.error || "Snapshot not found")}</div>`,
