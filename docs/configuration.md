@@ -41,9 +41,9 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 | `create_significant_memory` | Create permanent memory files |
 | `sync_mcp` | Sync with entity-core |
 | `identity_append` | Add knowledge to identity files (Tier 1 — append-only) |
-| `maintain_identity` | Full identity file maintenance (Tier 2 — includes replace) |
+| `maintain_identity` | Full identity file maintenance (Tier 2 — append, prepend, update_section, rewrite_section) |
 | `list_identity_snapshots` | View available backups (Tier 2) |
-| `custom_file` | Create and modify custom identity files (create, append, prepend, update_section, replace) |
+| `custom_file` | Create and modify custom identity files (create, append, prepend, update_section, rewrite_section) |
 | `graph_query` | Query knowledge graph (search, get_node, get_edges, traverse, subgraph, stats) |
 | `graph_mutate` | Mutate knowledge graph (create_node, create_edge, update_node, update_edge, delete_node, delete_edge) |
 | `graph_write_batch` | Batch create multiple nodes and edges |

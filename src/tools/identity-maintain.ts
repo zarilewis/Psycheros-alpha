@@ -2,7 +2,7 @@
  * Identity Maintenance Tools
  *
  * Tier 2: Full suite of tools for intentional identity reorganization.
- * Includes prepend, section updates, and full replacement with snapshots.
+ * Includes prepend, section updates, and section rewriting.
  */
 
 import type { ToolResult } from "../types.ts";
@@ -31,7 +31,7 @@ export const maintainIdentityTool: Tool = {
     function: {
       name: "maintain_identity",
       description:
-        "Comprehensive tool for maintaining my identity files. Use this for intentional reorganization - adding high-priority context (prepend), updating specific sections, or full file replacement. For everyday additions, prefer the simpler append_to_* tools instead.",
+        "Comprehensive tool for maintaining my identity files. Use this for intentional reorganization - adding high-priority context (prepend), updating specific sections, or rewriting a section's content. For everyday additions, prefer the simpler append_to_* tools instead.",
       parameters: {
         type: "object",
         properties: {
@@ -48,8 +48,8 @@ export const maintainIdentityTool: Tool = {
           operation: {
             type: "string",
             description:
-              "The operation to perform: 'append' (add to end), 'prepend' (add to beginning), 'update_section' (append content under a heading), 'replace' (full file replacement)",
-            enum: ["append", "prepend", "update_section", "replace"],
+              "The operation to perform: 'append' (add to end), 'prepend' (add to beginning), 'update_section' (append content under a heading), 'rewrite_section' (replace a section's content entirely)",
+            enum: ["append", "prepend", "update_section", "rewrite_section"],
           },
           content: {
             type: "string",
@@ -58,17 +58,12 @@ export const maintainIdentityTool: Tool = {
           section: {
             type: "string",
             description:
-              "Required for update_section: the heading name (without ##) of the section to append to",
+              "Required for update_section and rewrite_section: the heading name (without ##) of the section to modify",
           },
           reason: {
             type: "string",
             description:
-              "Why I'm making this change. Required for 'replace' operations. Used for snapshot metadata.",
-          },
-          createSnapshot: {
-            type: "boolean",
-            description:
-              "Whether to create a backup snapshot before replacing. Default: true for replace operations",
+              "Why I'm making this change. Optional but encouraged for significant modifications.",
           },
         },
         required: ["category", "filename", "operation", "content"],
@@ -86,7 +81,6 @@ export const maintainIdentityTool: Tool = {
     const content = args.content as string;
     const section = args.section as string | undefined;
     const reason = args.reason as string | undefined;
-    const createSnapshot = args.createSnapshot as boolean | undefined ?? true;
 
     // Validate required args
     if (!category || !CATEGORIES.includes(category as never)) {
@@ -122,18 +116,10 @@ export const maintainIdentityTool: Tool = {
     }
 
     // Validate operation-specific requirements
-    if (operation === "update_section" && !section) {
+    if ((operation === "update_section" || operation === "rewrite_section") && !section) {
       return {
         toolCallId: ctx.toolCallId,
-        content: "Error: 'section' is required when operation is 'update_section'",
-        isError: true,
-      };
-    }
-
-    if (operation === "replace" && !reason) {
-      return {
-        toolCallId: ctx.toolCallId,
-        content: "Error: 'reason' is required when operation is 'replace' (to document why)",
+        content: `Error: 'section' is required when operation is '${operation}'`,
         isError: true,
       };
     }
@@ -176,20 +162,19 @@ export const maintainIdentityTool: Tool = {
         );
         break;
 
-      case "replace":
-        result = await manager.replace(
+      case "rewrite_section":
+        result = await manager.rewriteSection(
           category,
           filename,
-          content.trim(),
-          reason!,
-          createSnapshot
+          section!,
+          content.trim()
         );
         break;
 
       default:
         return {
           toolCallId: ctx.toolCallId,
-          content: `Error: Unknown operation '${operation}'. Valid operations: append, prepend, update_section, replace`,
+          content: `Error: Unknown operation '${operation}'. Valid operations: append, prepend, update_section, rewrite_section`,
           isError: true,
         };
     }
@@ -215,7 +200,7 @@ export const listIdentitySnapshotsTool: Tool = {
     function: {
       name: "list_identity_snapshots",
       description:
-        "View available snapshots of my identity files. Snapshots are created automatically when I use the 'replace' operation. I can use this to see what backups exist before making major changes, or to find a previous version I might want to reference.",
+        "View available snapshots of my identity files. Snapshots are created automatically by entity-core when identity files are written via MCP. I can use this to see what backups exist, or to find a previous version I might want to reference.",
       parameters: {
         type: "object",
         properties: {
@@ -258,7 +243,7 @@ export const listIdentitySnapshotsTool: Tool = {
           : "";
         return {
           toolCallId: ctx.toolCallId,
-          content: `No snapshots found${filterDesc}. Snapshots are created when I use the 'replace' operation in maintain_identity.`,
+          content: `No snapshots found${filterDesc}. Snapshots are created automatically by entity-core when identity files are written.`,
           isError: false,
         };
       }

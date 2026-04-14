@@ -58,7 +58,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/llm/image-gen-settings.ts` | Image generator + captioning config type, load/save, masking |
 | `src/llm/entity-core-settings.ts` | Entity-core LLM override settings type, load/save (model, temperature, maxTokens) |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback, local snapshot restore) |
-| `src/tools/identity-custom.ts` | Custom identity file tool (create, append, prepend, update_section, replace) |
+| `src/tools/identity-custom.ts` | Custom identity file tool (create, append, prepend, update_section, rewrite_section) |
 | `src/memory/mod.ts` | Hierarchical memory system (daily summarization only; weekly/monthly/yearly consolidation moved to entity-core) |
 | `src/rag/mod.ts` | RAG retrieval system |
 | `src/mcp-client/mod.ts` | MCP client for entity-core connection |

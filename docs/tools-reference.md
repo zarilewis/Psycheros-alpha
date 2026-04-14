@@ -155,12 +155,12 @@ Safe for everyday use — can only add content, never modify or delete existing 
 
 ### Tier 2: Maintenance Tools (Full Suite)
 
-For intentional reorganization — includes prepend, section updates, and full replacement.
+For intentional reorganization — includes prepend, section updates, and section rewriting.
 
 | Tool | Description |
 |------|-------------|
-| `maintain_identity` | Full file maintenance with operations: append, prepend, update_section, replace |
-| `list_identity_snapshots` | View available backups created during replace operations |
+| `maintain_identity` | Full file maintenance with operations: append, prepend, update_section, rewrite_section |
+| `list_identity_snapshots` | View available backups created automatically by entity-core |
 
 ### Custom File Tool
 
@@ -170,7 +170,7 @@ For managing freeform custom files in `identity/custom/` — topics that don't f
 |------|-------------|
 | `custom_file` | Create and modify custom identity files |
 
-Operations: `create` (new file, content auto-wrapped in XML tags), `append` (add to end), `prepend` (add to beginning), `update_section` (append content under a markdown heading, preserves existing content), `replace` (overwrite with snapshot). Filenames use `.md` extension with letters, numbers, and underscores only. Deletion is user-only via the Core Prompts UI.
+Operations: `create` (new file, content auto-wrapped in XML tags), `append` (add to end), `prepend` (add to beginning), `update_section` (append content under a markdown heading, preserves existing content), `rewrite_section` (replace a section's content entirely). Filenames use `.md` extension with letters, numbers, and underscores only. Deletion is user-only via the Core Prompts UI.
 
 ### MCP Fallback Pattern
 
@@ -185,7 +185,7 @@ Tool called → MCP connected?
          manipulation
 ```
 
-**Snapshot behavior:** When `replace` is used and MCP succeeds, entity-core creates the snapshot (via `sync_push`'s targeted per-file snapshot). When MCP fails, a local snapshot is created at `.snapshots/` as a fallback. The Entity Core snapshots UI shows local snapshots when entity-core has none, enabling recovery even when MCP is unavailable.
+**Snapshot behavior:** When identity files are written via MCP (including rewrite_section and other write operations), entity-core creates snapshots automatically (via `sync_push`'s targeted per-file snapshot). Local snapshots at `.snapshots/` are available as a fallback. The Entity Core snapshots UI shows local snapshots when entity-core has none, enabling recovery even when MCP is unavailable.
 
 Changes preserve XML tag structure in identity files. Content is added cleanly without metadata comments — core prompts load every turn, so token efficiency matters.
 
@@ -197,7 +197,7 @@ Changes preserve XML tag structure in identity files. Content is added cleanly w
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback, local snapshot restore) |
 | `src/tools/identity-casual.ts` | `identity_append` — Tier 1 append-only identity tool |
 | `src/tools/identity-maintain.ts` | Tier 2 maintenance identity tools |
-| `src/tools/identity-custom.ts` | Custom identity file tool (create, append, replace) |
+| `src/tools/identity-custom.ts` | Custom identity file tool (create, append, rewrite_section) |
 
 ## Push Notification Tool
 

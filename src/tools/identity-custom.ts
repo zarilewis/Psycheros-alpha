@@ -14,7 +14,7 @@ import { IdentityFileManager } from "./identity-helpers.ts";
 // custom_file Tool
 // =============================================================================
 
-const VALID_OPERATIONS = ["create", "append", "prepend", "update_section", "replace"];
+const VALID_OPERATIONS = ["create", "append", "prepend", "update_section", "rewrite_section"];
 
 export const customFileTool: Tool = {
   definition: {
@@ -29,7 +29,7 @@ export const customFileTool: Tool = {
           operation: {
             type: "string",
             description:
-              "The operation to perform: 'create' (new file, auto-wraps in XML tags), 'append' (add to end), 'prepend' (add to beginning), 'update_section' (append content under a heading), 'replace' (overwrite entire file, creates snapshot)",
+              "The operation to perform: 'create' (new file, auto-wraps in XML tags), 'append' (add to end), 'prepend' (add to beginning), 'update_section' (append content under a heading), 'rewrite_section' (replace a section's content entirely)",
             enum: VALID_OPERATIONS,
           },
           filename: {
@@ -40,12 +40,12 @@ export const customFileTool: Tool = {
           content: {
             type: "string",
             description:
-              "The content to add or replace with. Write concisely — these files load every turn. For create, content is auto-wrapped in XML tags. For replace, provide the complete file content including XML tags.",
+              "The content to add or replace with. Write concisely — these files load every turn. For create, content is auto-wrapped in XML tags.",
           },
           section: {
             type: "string",
             description:
-              "Required for update_section: the heading name (without ##) of the section to append to.",
+              "Required for update_section and rewrite_section: the heading name (without ##) of the section to modify.",
           },
         },
         required: ["operation", "filename"],
@@ -89,11 +89,11 @@ export const customFileTool: Tool = {
       };
     }
 
-    // Validate section for update_section
-    if (operation === "update_section" && !section) {
+    // Validate section for update_section and rewrite_section
+    if ((operation === "update_section" || operation === "rewrite_section") && !section) {
       return {
         toolCallId: ctx.toolCallId,
-        content: "Error: 'section' is required when operation is 'update_section'",
+        content: `Error: 'section' is required when operation is '${operation}'`,
         isError: true,
       };
     }
@@ -133,12 +133,12 @@ export const customFileTool: Tool = {
         return { toolCallId: ctx.toolCallId, content: result.message, isError: !result.success };
       }
 
-      case "replace": {
-        const result = await manager.replace(
+      case "rewrite_section": {
+        const result = await manager.rewriteSection(
           "custom",
           filename,
-          content!.trim(),
-          "Entity-initiated replace"
+          section!,
+          content!.trim()
         );
         return { toolCallId: ctx.toolCallId, content: result.message, isError: !result.success };
       }

@@ -204,6 +204,69 @@ export function updateSection(
 }
 
 /**
+ * Rewrite content within a specific markdown section.
+ * Replaces everything between the heading and the next same/higher-level heading
+ * with the new content. The heading line itself is preserved.
+ */
+export function rewriteSectionContent(
+  existingContent: string,
+  sectionName: string,
+  newSectionContent: string,
+): { content: string; found: boolean } {
+  // Parse XML content
+  const { tag, innerContent } = parseXmlContent(existingContent);
+
+  // Look for the section heading (## or ###)
+  const headingPattern = new RegExp(
+    `^(#{2,3})\\s*${escapeRegex(sectionName)}\\s*$`,
+    "m"
+  );
+  const match = innerContent.match(headingPattern);
+
+  if (!match) {
+    return { content: existingContent, found: false };
+  }
+
+  const headingLevel = match[1];
+  const startIndex = match.index!;
+  const headingEndIndex = startIndex + match[0].length;
+
+  // Find the next heading of same or higher level, or end of content
+  const nextHeadingPattern = new RegExp(
+    `^${headingLevel}\\s+.+$`,
+    "gm"
+  );
+
+  // Search from after the current heading
+  let endIndex = innerContent.length;
+  const remainingContent = innerContent.slice(headingEndIndex);
+  const nextMatch = remainingContent.match(nextHeadingPattern);
+
+  if (nextMatch && nextMatch.index !== undefined) {
+    endIndex = headingEndIndex + nextMatch.index;
+  }
+
+  // Replace section content (keep the heading, replace everything after it up to next heading)
+  const newSection = `${match[0]}\n${newSectionContent.trim()}`;
+
+  // Reconstruct the content
+  const newInnerContent =
+    innerContent.slice(0, headingEndIndex) +
+    newSection +
+    innerContent.slice(endIndex);
+
+  // Wrap in XML tags if they existed
+  if (tag) {
+    return {
+      content: `<${tag}>\n${newInnerContent.trim()}\n</${tag}>\n`,
+      found: true,
+    };
+  }
+
+  return { content: newInnerContent.trim() + "\n", found: true };
+}
+
+/**
  * Escape special regex characters in a string.
  */
 function escapeRegex(str: string): string {
@@ -518,73 +581,88 @@ export class IdentityFileManager {
   }
 
   /**
-   * Replace an entire identity file.
-   * Creates a snapshot before replacing.
+   * Rewrite a specific section within an identity file.
+   * Replaces the section's content entirely while preserving the heading.
    */
-  async replace(
+  async rewriteSection(
     category: IdentityCategory,
     filename: string,
+    sectionName: string,
     content: string,
-    reason: string,
-    createSnapshot: boolean = true
   ): Promise<IdentityOperationResult> {
     // Validate first
     const validation = this.validateFile(category, filename);
     if (validation) return validation;
 
-    // Read existing content for potential snapshot
-    let existingContent: string;
-    try {
-      existingContent = await this.readFile(category, filename);
-    } catch {
-      existingContent = "";
-    }
-
-    // Try MCP first
+    // Try MCP first: read file, rewrite section locally, write full file back
     if (this.mcpClient?.isConnected()) {
       try {
+        const existingContent = await this.readFile(category, filename);
+        const { content: newContent, found } = rewriteSectionContent(
+          existingContent,
+          sectionName,
+          content
+        );
+
+        if (!found) {
+          return {
+            success: false,
+            message: `Section "${sectionName}" not found in ${category}/${filename}.`,
+            error: "section_not_found",
+          };
+        }
+
         const success = await this.mcpClient.writeIdentityFile(
           category,
           filename,
-          content,
+          newContent,
           this.projectRoot
         );
 
         if (success) {
-          console.log(`[Identity] Replaced ${category}/${filename} via MCP (snapshot created by entity-core)`);
-          return {
-            success: true,
-            message: `I've replaced my ${category}/${filename} file. A snapshot was saved.`,
-          };
+          console.log(`[Identity] Rewrote section "${sectionName}" in ${category}/${filename} via MCP (snapshot created by entity-core)`);
+          return { success: true, message: `I've rewritten the "${sectionName}" section in my ${category}/${filename} file.` };
         }
+        console.warn(`[Identity] MCP rewrite failed, falling back to local`);
       } catch (e) {
-        console.warn(`[Identity] MCP replace failed, falling back to local:`, e);
+        console.warn(`[Identity] MCP rewrite error, falling back to local:`, e);
       }
     }
 
-    // Fallback to local write — create local snapshot since MCP isn't handling it
-    if (createSnapshot && existingContent) {
-      await this.createSnapshot(category, filename, existingContent, reason);
+    // Fallback: local manipulation
+    const existingContent = await this.readFile(category, filename);
+    const { content: newContent, found } = rewriteSectionContent(
+      existingContent,
+      sectionName,
+      content
+    );
+
+    if (!found) {
+      return {
+        success: false,
+        message: `Section "${sectionName}" not found in ${category}/${filename}.`,
+        error: "section_not_found",
+      };
     }
 
     try {
-      await this.writeFile(category, filename, content);
+      await this.writeFile(category, filename, newContent);
 
       // Queue for later MCP sync
       if (this.mcpClient) {
-        this.mcpClient.queueIdentityChange(category, filename, content);
+        this.mcpClient.queueIdentityChange(category, filename, newContent);
       }
 
-      console.log(`[Identity] Replaced ${category}/${filename} locally`);
+      console.log(`[Identity] Rewrote section "${sectionName}" in ${category}/${filename} locally`);
       return {
         success: true,
-        message: `I've replaced my ${category}/${filename} file (saved locally). A snapshot was saved.`,
+        message: `I've rewritten the "${sectionName}" section in my ${category}/${filename} file (saved locally).`,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         success: false,
-        message: `Failed to replace ${category}/${filename}: ${errorMessage}`,
+        message: `Failed to update ${category}/${filename}: ${errorMessage}`,
         error: "write_failed",
       };
     }
@@ -761,7 +839,7 @@ ${content}
     if (await this.exists(category, filename)) {
       return {
         success: false,
-        message: `File ${category}/${filename} already exists. Use replace to overwrite it.`,
+        message: `File ${category}/${filename} already exists. Use append, prepend, update_section, or rewrite_section to modify it.`,
         error: "already_exists",
       };
     }
