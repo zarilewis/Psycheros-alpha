@@ -346,7 +346,6 @@ export class PulseEngine {
 
     // Use cached timestamp (updated when user messages arrive)
     if (!this.lastGlobalUserMessage) {
-      console.debug(`[Pulse] Inactivity tick for "${pulse.name}": no user message history, skipping`);
       return;
     }
 
@@ -360,8 +359,6 @@ export class PulseEngine {
     const elapsedMs = Date.now() - effectiveStartMs;
     const thresholdMs = pulse.inactivityThresholdSeconds * 1000;
 
-    console.debug(`[Pulse] Inactivity check "${pulse.name}": ${Math.round(elapsedMs / 1000)}s elapsed, threshold: ${pulse.inactivityThresholdSeconds}s`);
-
     // Hard threshold: must be inactive for at least the set duration
     if (elapsedMs < thresholdMs) return;
 
@@ -371,7 +368,6 @@ export class PulseEngine {
     if (pulse.lastRunAt) {
       const sinceLastRunMs = Date.now() - new Date(pulse.lastRunAt).getTime();
       if (sinceLastRunMs < thresholdMs) {
-        console.debug(`[Pulse] Inactivity "${pulse.name}": cooldown (${Math.round(sinceLastRunMs / 1000)}s since last run)`);
         return;
       }
     }

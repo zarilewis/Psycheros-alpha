@@ -241,6 +241,7 @@ export function renderPulseSettings(pulses: PulseRow[]): string {
         hx-swap="innerHTML">+ New Pulse</button>
     </div>
   </div>
+  <div class="settings-content" id="settings-content">
   <div id="pulse-prompts" class="tab-content">
     ${renderPulseList(pulses)}
   </div>
@@ -248,6 +249,7 @@ export function renderPulseSettings(pulses: PulseRow[]): string {
     <div id="pulse-log-content"
       hx-get="/fragments/settings/pulse/log"
       hx-trigger="load"></div>
+  </div>
   </div>
 </div>`;
 }
@@ -352,7 +354,7 @@ export function renderPulseEditor(
     </a>
     <h1 class="settings-title">${isEdit ? "Edit" : "New"} Pulse</h1>
   </div>
-  <div class="settings-content">
+  <div class="settings-content" id="settings-content">
     <form id="pulse-editor-form"
       onsubmit="Psycheros.savePulse(event, ${isEdit ? `'${pulse!.id}'` : 'null'})">
 

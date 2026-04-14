@@ -59,7 +59,7 @@ export class EventBroadcaster {
       controller,
       conversationId,
     });
-    console.log(
+    console.debug(
       `EventBroadcaster: Client ${clientId} connected (conversation: ${conversationId || "global"})`
     );
     return clientId;
@@ -74,7 +74,7 @@ export class EventBroadcaster {
     const client = this.clients.get(clientId);
     if (client) {
       this.clients.delete(clientId);
-      console.log(`EventBroadcaster: Client ${clientId} disconnected`);
+      console.debug(`EventBroadcaster: Client ${clientId} disconnected`);
     }
   }
 
@@ -111,7 +111,7 @@ export class EventBroadcaster {
         const event = `event: ${eventType}\ndata: ${JSON.stringify(data)}\n\n`;
         client.controller.enqueue(event);
       } catch (error) {
-        console.log(
+        console.debug(
           `EventBroadcaster: Failed to send to ${clientId}, marking for removal:`,
           error instanceof Error ? error.message : String(error)
         );
@@ -156,7 +156,7 @@ export class EventBroadcaster {
         }
       } catch (error) {
         // Client likely disconnected
-        console.log(
+        console.debug(
           `EventBroadcaster: Failed to send to ${clientId}, marking for removal:`,
           error instanceof Error ? error.message : String(error)
         );

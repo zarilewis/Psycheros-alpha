@@ -283,13 +283,13 @@ export class EntityTurn {
     // Retrieve relevant memories using RAG if available
     let memoriesContent: string | undefined;
     if (this.config.ragRetriever) {
-      console.log("[RAG] Retrieving memories for query:", userMessage.substring(0, 50));
+      console.debug("[RAG] Retrieving memories for query:", userMessage.substring(0, 50));
       try {
         const memories = await this.config.ragRetriever.retrieve(userMessage);
-        console.log("[RAG] Found", memories.length, "memories");
+        console.debug("[RAG] Found", memories.length, "memories");
         memoriesContent = buildRAGContext(memories);
         if (memoriesContent) {
-          console.log("[RAG] Injected memories into context (", memoriesContent.length, "chars)");
+          console.debug("[RAG] Injected memories into context (", memoriesContent.length, "chars)");
         }
       } catch (error) {
         // Non-fatal: log and continue without memories
@@ -299,13 +299,13 @@ export class EntityTurn {
         );
       }
     } else {
-      console.log("[RAG] No retriever configured - skipping RAG");
+      console.debug("[RAG] No retriever configured - skipping RAG");
     }
 
     // Retrieve relevant chat history using Chat RAG if available
     let chatHistoryContent: string | undefined;
     if (this.config.chatRAG) {
-      console.log("[ChatRAG] Searching chat history for:", userMessage.substring(0, 50));
+      console.debug("[ChatRAG] Searching chat history for:", userMessage.substring(0, 50));
       try {
         const chatMessages = await this.config.chatRAG.searchTiered({
           query: userMessage,
@@ -314,10 +314,10 @@ export class EntityTurn {
           minScore: 0.3,
           currentThreshold: 0.5,
         });
-        console.log("[ChatRAG] Found", chatMessages.length, "relevant messages");
+        console.debug("[ChatRAG] Found", chatMessages.length, "relevant messages");
         chatHistoryContent = formatChatHistoryForContext(chatMessages);
         if (chatHistoryContent) {
-          console.log("[ChatRAG] Injected chat history into context (", chatHistoryContent.length, "chars)");
+          console.debug("[ChatRAG] Injected chat history into context (", chatHistoryContent.length, "chars)");
         }
       } catch (error) {
         // Non-fatal: log and continue without chat history
@@ -347,7 +347,7 @@ export class EntityTurn {
 
         if (result.context) {
           lorebookContent = result.context;
-          console.log(
+          console.debug(
             "[Lorebook] Triggered",
             result.entries.length,
             "entries (",
@@ -367,7 +367,7 @@ export class EntityTurn {
     // Retrieve relevant knowledge graph context if MCP client is available
     let graphContent: string | undefined;
     if (this.config.mcpClient) {
-      console.log("[Graph] Searching knowledge graph for:", userMessage.substring(0, 50));
+      console.debug("[Graph] Searching knowledge graph for:", userMessage.substring(0, 50));
       try {
         const graphResult = await buildGraphContext(
           userMessage,
@@ -381,7 +381,7 @@ export class EntityTurn {
         );
         if (graphResult.context) {
           graphContent = graphResult.context;
-          console.log(
+          console.debug(
             "[Graph] Found",
             graphResult.nodeCount,
             "nodes and",
@@ -427,7 +427,7 @@ export class EntityTurn {
     // Search vault for relevant documents if manager is available
     let vaultContent: string | undefined;
     if (this.config.vaultManager) {
-      console.log("[Vault] Searching for:", userMessage.substring(0, 50));
+      console.debug("[Vault] Searching for:", userMessage.substring(0, 50));
       try {
         const vaultResults = await this.config.vaultManager.search(userMessage, {
           conversationId, maxChunks: 5, minScore: 0.3
@@ -435,7 +435,7 @@ export class EntityTurn {
         if (vaultResults.length > 0) {
           const { formatVaultContext } = await import("../vault/retriever.ts");
           vaultContent = formatVaultContext(vaultResults);
-          console.log(
+          console.debug(
             "[Vault] Found",
             vaultResults.length,
             "chunks (",
