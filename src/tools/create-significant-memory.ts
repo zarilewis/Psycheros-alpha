@@ -178,10 +178,11 @@ export const createSignificantMemoryTool: Tool = {
         }
       }
 
-      // Sync to entity-core via MCP
+      // Sync to entity-core via MCP (pass slug so entity-core uses matching filename)
       if (ctx.config.mcpClient?.isConnected()) {
         try {
-          await ctx.config.mcpClient.createMemory("significant", getCurrentDate(), formattedContent);
+          const slug = slugify(title.trim());
+          await ctx.config.mcpClient.createMemory("significant", getCurrentDate(), formattedContent, [], slug || undefined);
         } catch (error) {
           console.error("[Memory] MCP sync failed (non-fatal):", error instanceof Error ? error.message : String(error));
         }

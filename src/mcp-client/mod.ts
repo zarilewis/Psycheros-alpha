@@ -65,6 +65,7 @@ export interface MemoryEntry {
   version: number;
   createdAt: string;
   updatedAt: string;
+  slug?: string;
 }
 
 /**
@@ -781,6 +782,7 @@ export class MCPClient {
     date: string,
     content: string,
     chatIds: string[] = [],
+    slug?: string,
   ): Promise<boolean> {
     if (!this.client) {
       // Queue for later sync
@@ -795,6 +797,7 @@ export class MCPClient {
         version: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        slug,
       });
       return true;
     }
@@ -808,6 +811,7 @@ export class MCPClient {
           content,
           chatIds,
           instanceId: this.config.instanceId,
+          ...(slug ? { slug } : {}),
         },
       });
 
@@ -845,6 +849,7 @@ export class MCPClient {
         version: 1,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
+        slug,
       });
 
       return true;

@@ -2260,10 +2260,10 @@ ${content.trim()}
 
     await writeMemoryFile(memory, ctx.db, ctx.projectRoot);
 
-    // Push to entity-core via MCP
+    // Push to entity-core via MCP (pass slug so entity-core uses matching filename)
     if (ctx.mcpClient?.isConnected()) {
       try {
-        await ctx.mcpClient.createMemory("significant", date, formattedContent);
+        await ctx.mcpClient.createMemory("significant", date, formattedContent, [], slug);
       } catch (error) {
         console.error("[Routes] MCP memory_create for significant failed (local save succeeded):", error instanceof Error ? error.message : String(error));
       }
@@ -2303,8 +2303,10 @@ export async function handleDeleteSignificantMemory(
   filename: string,
 ): Promise<Response> {
   // Validate filename — must end with .md, no path separators
+  // Frontend sends displayName (without .md), so append if missing
   const decoded = decodeURIComponent(filename);
-  if (!isValidFilename(decoded)) {
+  const filenameWithExt = decoded.endsWith(".md") ? decoded : `${decoded}.md`;
+  if (!isValidFilename(filenameWithExt)) {
     return new Response(
       JSON.stringify({ error: "Invalid filename" }),
       {
@@ -2314,7 +2316,7 @@ export async function handleDeleteSignificantMemory(
     );
   }
 
-  const filePath = `significant/${decoded}`;
+  const filePath = `significant/${filenameWithExt}`;
   const fullPath = `${ctx.projectRoot}/memories/${filePath}`;
 
   try {

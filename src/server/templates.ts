@@ -2221,17 +2221,6 @@ export function renderMemoryList(
         const filename = parts[parts.length - 1];
         const displayName = filename.replace(/\.md$/, "");
 
-        const deleteBtn = isSignificant
-          ? `<button class="btn btn--sm btn--danger settings-file-delete"
-              hx-delete="/api/memories/significant/${encodeURIComponent(displayName)}"
-              hx-confirm="Delete this memory? This cannot be undone."
-              hx-on::after-request="if(event.detail.successful) htmx.ajax('GET','/fragments/settings/memories/significant',{target:'#settings-content',swap:'innerHTML'})"
-              onclick="event.stopPropagation()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-              Delete
-            </button>`
-          : "";
-
         return `<button
           class="settings-file-item"
           hx-get="/fragments/settings/memories/${granularity}/${encodeURIComponent(displayName)}"
@@ -2243,7 +2232,6 @@ export function renderMemoryList(
             <polyline points="14 2 14 8 20 8"/>
           </svg>
           <span class="settings-file-name">${escapeHtml(displayName)}</span>
-          ${deleteBtn}
         </button>`;
       }).join("")}
     </div>`;
@@ -2294,6 +2282,17 @@ export function renderMemoryEditor(
     }
   }
 
+  const deleteBtnHtml = granularity === "significant"
+    ? `<button class="btn btn--sm btn--danger"
+        hx-delete="/api/memories/significant/${encodeURIComponent(date)}"
+        hx-confirm="Delete this memory? This cannot be undone."
+        hx-on::after-request="if(event.detail.successful) htmx.ajax('GET','/fragments/settings/memories/significant',{target:'#settings-content',swap:'innerHTML'})"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Delete
+      </button>`
+    : "";
+
   return `<div class="settings-editor">
   <div class="settings-editor-header">
     <button
@@ -2306,6 +2305,7 @@ export function renderMemoryEditor(
     </button>
     <span class="settings-editor-filename">${escapeHtml(date)}</span>
     <span class="settings-editor-tokens" id="settings-editor-tokens">...</span>
+    ${deleteBtnHtml}
   </div>
   ${metaHtml}
   <form
