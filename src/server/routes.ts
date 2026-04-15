@@ -20,13 +20,12 @@ import { uint8ToBase64, getMediaType as getImageMediaType } from "../tools/gener
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { ToolsSettings } from "../tools/mod.ts";
 import { AVAILABLE_TOOLS, TOOL_CATEGORIES, loadCustomTools } from "../tools/mod.ts";
-import type { Retriever, RAGConfig } from "../rag/mod.ts";
+import type { RAGConfig } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import { IdentityFileManager } from "../tools/identity-helpers.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
 import type { VaultManager } from "../vault/mod.ts";
-import type { MemoryIndexer } from "../rag/indexer.ts";
 import { EntityTurn, type EntityYield, generateAndSetTitle } from "../entity/mod.ts";
 import { createSSEEncoder, createSSEResponse } from "./sse.ts";
 import {
@@ -104,8 +103,6 @@ export interface RouteContext {
   projectRoot: string;
   /** Pulse engine for autonomous entity prompts */
   pulseEngine?: import("../pulse/mod.ts").PulseEngine;
-  /** Optional RAG retriever for memory search */
-  ragRetriever?: Retriever;
   /** Optional chat RAG for searching conversation history */
   chatRAG?: ConversationRAG;
   /** RAG configuration */
@@ -118,8 +115,6 @@ export interface RouteContext {
   lorebookManager?: LorebookManager;
   /** Optional vault manager for document storage */
   vaultManager?: VaultManager;
-  /** Optional memory indexer for reindexing after edits */
-  memoryIndexer?: MemoryIndexer;
   /** Get current LLM settings (derived from active profile) */
   getLLMSettings: () => LLMSettings;
   /** Update LLM settings and hot-reload */
@@ -993,10 +988,8 @@ export async function handleChat(
           ctx.tools,
           {
             projectRoot: ctx.projectRoot,
-            ragRetriever: ctx.ragRetriever,
             chatRAG: ctx.chatRAG,
             mcpClient: ctx.mcpClient,
-            memoryIndexer: ctx.memoryIndexer,
             lorebookManager: ctx.lorebookManager,
             vaultManager: ctx.vaultManager,
             webSearchSettings: ctx.getWebSearchSettings(),
@@ -1173,10 +1166,8 @@ export async function handleChatRetry(
           ctx.tools,
           {
             projectRoot: ctx.projectRoot,
-            ragRetriever: ctx.ragRetriever,
             chatRAG: ctx.chatRAG,
             mcpClient: ctx.mcpClient,
-            memoryIndexer: ctx.memoryIndexer,
             lorebookManager: ctx.lorebookManager,
             vaultManager: ctx.vaultManager,
             webSearchSettings: ctx.getWebSearchSettings(),
@@ -2153,15 +2144,6 @@ export async function handleSaveMemory(
       }
     }
 
-    // Reindex the specific file in RAG
-    if (ctx.memoryIndexer) {
-      try {
-        await ctx.memoryIndexer.reindexFile(filePath);
-      } catch (error) {
-        console.error("[Routes] Memory reindex failed (non-fatal):", error instanceof Error ? error.message : String(error));
-      }
-    }
-
     return new Response(renderSaveSuccess(), {
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
@@ -2270,15 +2252,6 @@ ${content.trim()}
       }
     }
 
-    // Reindex
-    if (ctx.memoryIndexer) {
-      try {
-        await ctx.memoryIndexer.reindexFile(`significant/${fileName}`);
-      } catch (error) {
-        console.error("[Routes] Memory reindex failed (non-fatal):", error instanceof Error ? error.message : String(error));
-      }
-    }
-
     // Return redirect to refresh the significant tab
     return new Response("", {
       status: 200,
@@ -2335,15 +2308,6 @@ export async function handleDeleteSignificantMemory(
   try {
     await Deno.remove(fullPath);
     console.log(`[Routes] Deleted significant memory: ${filePath}`);
-
-    // Remove from RAG index
-    if (ctx.memoryIndexer) {
-      try {
-        ctx.memoryIndexer.removeFile(filePath);
-      } catch (error) {
-        console.error("[Routes] RAG remove failed (non-fatal):", error instanceof Error ? error.message : String(error));
-      }
-    }
 
     return new Response(
       JSON.stringify({ success: true }),

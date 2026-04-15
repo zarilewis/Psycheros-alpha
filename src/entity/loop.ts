@@ -32,13 +32,12 @@ import { LLMError } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
 import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics, LLMContextSnapshot } from "../types.ts";
-import type { Retriever, Indexer } from "../rag/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
 import type { VaultManager } from "../vault/mod.ts";
 import { loadBaseInstructions, loadSelfContent, loadUserContent, loadRelationshipContent, loadCustomContent, buildSystemMessage } from "./context.ts";
-import { buildRAGContext, formatChatHistoryForContext, buildGraphContext } from "../rag/mod.ts";
+import { formatChatHistoryForContext, buildGraphContext } from "../rag/mod.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
 import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
 
@@ -94,14 +93,10 @@ export interface EntityConfig {
   projectRoot: string;
   /** Maximum tool iterations before stopping (prevents infinite loops) */
   maxToolIterations?: number;
-  /** Optional RAG retriever for memory search */
-  ragRetriever?: Retriever;
   /** Optional chat RAG for searching conversation history */
   chatRAG?: ConversationRAG;
   /** Optional MCP client for syncing with entity-core */
   mcpClient?: MCPClient;
-  /** Optional memory indexer for RAG reindexing after writes */
-  memoryIndexer?: Indexer;
   /** Optional lorebook manager for world info/triggered content */
   lorebookManager?: LorebookManager;
   /** Optional vault manager for document storage and eager RAG */
@@ -280,26 +275,25 @@ export class EntityTurn {
     const relationshipContent = await loadRelationshipContent(this.config.projectRoot, this.config.mcpClient);
     const customContent = await loadCustomContent(this.config.projectRoot, this.config.mcpClient);
 
-    // Retrieve relevant memories using RAG if available
+    // Retrieve relevant memories via MCP search
     let memoriesContent: string | undefined;
-    if (this.config.ragRetriever) {
-      console.debug("[RAG] Retrieving memories for query:", userMessage.substring(0, 50));
+    if (this.config.mcpClient) {
+      console.debug("[Memory] Searching memories for query:", userMessage.substring(0, 50));
       try {
-        const memories = await this.config.ragRetriever.retrieve(userMessage);
-        console.debug("[RAG] Found", memories.length, "memories");
-        memoriesContent = buildRAGContext(memories);
-        if (memoriesContent) {
-          console.debug("[RAG] Injected memories into context (", memoriesContent.length, "chars)");
+        const results = await this.config.mcpClient.searchMemories(userMessage);
+        if (results.length > 0) {
+          memoriesContent = results.map((r, i) =>
+            `[${i + 1}] (${r.granularity}/${r.date}, ${Math.round(r.score * 100)}% relevant)\n${r.excerpt}`
+          ).join("\n\n");
+          memoriesContent = `\n\n---\nRelevant Memories:\n\n${memoriesContent}`;
+          console.debug("[Memory] Found", results.length, "memories (", memoriesContent.length, "chars)");
         }
       } catch (error) {
-        // Non-fatal: log and continue without memories
         console.error(
-          "EntityTurn: RAG retrieval failed:",
+          "EntityTurn: Memory search failed:",
           error instanceof Error ? error.message : String(error)
         );
       }
-    } else {
-      console.debug("[RAG] No retriever configured - skipping RAG");
     }
 
     // Retrieve relevant chat history using Chat RAG if available

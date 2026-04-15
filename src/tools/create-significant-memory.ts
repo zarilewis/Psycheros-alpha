@@ -169,15 +169,6 @@ export const createSignificantMemoryTool: Tool = {
 
       console.log(`[Memory] Created significant memory: ${fileName}`);
 
-      // Reindex the file in RAG so it's immediately searchable
-      if (ctx.config.memoryIndexer) {
-        try {
-          await ctx.config.memoryIndexer.reindexFile(`significant/${fileName}`);
-        } catch (error) {
-          console.error("[Memory] RAG reindex failed (non-fatal):", error instanceof Error ? error.message : String(error));
-        }
-      }
-
       // Sync to entity-core via MCP (pass slug so entity-core uses matching filename)
       if (ctx.config.mcpClient?.isConnected()) {
         try {

@@ -10,8 +10,7 @@
 import { DBClient } from "../db/mod.ts";
 import { createClientFromProfile, createDefaultClient, type LLMClient, type LLMSettings, type LLMProfileSettings, type LLMConnectionProfile, type WebSearchSettings, type DiscordSettings, type HomeSettings, type ImageGenSettings, type EntityCoreLLMSettings, loadProfileSettings, saveProfileSettings, getActiveProfile, profileToLLMSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings, loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings, loadEntityCoreLLMSettings, saveEntityCoreLLMSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSettings, getEnabledToolNames, loadCustomTools, ToolRegistry, type ToolsSettings } from "../tools/mod.ts";
-import { createIndexer, createRetriever, getConversationRAG, type Retriever, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
-import type { MemoryIndexer } from "../rag/indexer.ts";
+import { getConversationRAG, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import { catchUpSummarization, repairOrphanedSummaries } from "../memory/mod.ts";
 import { DEFAULT_CUTOFF_HOUR } from "../memory/date-utils.ts";
 import { initTracker, registerJob, registerTrigger, tracked } from "./cron-tracker.ts";
@@ -244,10 +243,8 @@ export class Server {
   private db: DBClient;
   private llm: LLMClient;
   private tools: ToolRegistry;
-  private ragRetriever: Retriever | null = null;
   private chatRAG: ConversationRAG | null = null;
   private ragConfig: RAGConfig;
-  private memoryIndexer: MemoryIndexer | null = null;
   private abortController: AbortController;
   private config: ServerConfig;
   private keepaliveInterval: number | null = null;
@@ -319,11 +316,8 @@ export class Server {
       memoriesDir: join(config.projectRoot, config.ragConfig?.memoriesDir ?? DEFAULT_RAG_CONFIG.memoriesDir),
     };
 
-    // Initialize RAG retriever if enabled
+    // Initialize chat RAG if enabled
     if (this.ragConfig.enabled) {
-      this.ragRetriever = createRetriever(this.db.getRawDb(), this.ragConfig);
-
-      // Initialize chat RAG for conversation history search
       this.chatRAG = getConversationRAG(this.db.getRawDb());
     }
 
@@ -669,22 +663,6 @@ export class Server {
       }
     }
 
-    // Index memories on startup if RAG is enabled
-    if (this.ragConfig.enabled && this.ragRetriever) {
-      try {
-        const indexer = createIndexer(this.db.getRawDb(), this.ragConfig.memoriesDir);
-        await indexer.indexAll();
-        this.memoryIndexer = indexer;
-      } catch (error) {
-        console.error(
-          "[RAG] Failed to index memories on startup:",
-          error instanceof Error ? error.message : String(error)
-        );
-        // Continue without RAG if indexing fails
-        this.ragRetriever = null;
-      }
-    }
-
     // Initialize cron tracker with DB for persistent execution history
     initTracker(this.db);
 
@@ -783,10 +761,8 @@ export class Server {
       () => this.tools,
       {
         projectRoot: this.config.projectRoot,
-        ragRetriever: this.ragRetriever ?? undefined,
         chatRAG: this.chatRAG ?? undefined,
         mcpClient: this.mcpClient ?? undefined,
-        memoryIndexer: this.memoryIndexer ?? undefined,
         lorebookManager: this.lorebookManager,
         vaultManager: this.vaultManager,
         webSearchSettings: () => this.webSearchSettings,
@@ -842,14 +818,12 @@ export class Server {
       llm: this.llm,
       tools: () => this.tools,
       projectRoot: this.config.projectRoot,
-      ragRetriever: this.ragRetriever ?? undefined,
       chatRAG: this.chatRAG ?? undefined,
       ragConfig: this.ragConfig,
       memoryEnabled: this.config.memoryEnabled ?? true,
       mcpClient: this.mcpClient ?? undefined,
       lorebookManager: this.lorebookManager,
       vaultManager: this.vaultManager,
-      memoryIndexer: this.memoryIndexer ?? undefined,
       pulseEngine: this.pulseEngine ?? undefined,
       getLLMSettings: () => this.getLLMSettings(),
       updateLLMSettings: (settings) => this.updateLLMSettings(settings),
