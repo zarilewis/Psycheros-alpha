@@ -84,8 +84,8 @@ export const syncMcpTool: Tool = {
         parts.push("Push returned false (may have conflicts).");
       }
 
-      if (pending.identity > 0 || pending.memories > 0) {
-        parts.push(`Still pending: ${pending.identity} identity changes, ${pending.memories} memory changes.`);
+      if (pending.identity > 0) {
+        parts.push(`Still pending: ${pending.identity} identity changes.`);
       }
 
       return {

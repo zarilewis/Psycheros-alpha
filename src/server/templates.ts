@@ -2768,7 +2768,6 @@ export interface EntityCoreOverviewData {
     vectorSearchAvailable: boolean;
   } | null;
   pendingIdentity: number;
-  pendingMemories: number;
   lastSyncTime: string | null;
   extraction: ExtractionHealth | null;
 }
@@ -2836,7 +2835,7 @@ export function renderEntityCoreOverview(data: EntityCoreOverviewData): string {
       <span class="ec-stat-label">Vector Search</span>
     </div>
     <div class="ec-stat-card">
-      <span class="ec-stat-value">${data.pendingIdentity + data.pendingMemories}</span>
+      <span class="ec-stat-value">${data.pendingIdentity}</span>
       <span class="ec-stat-label">Pending Changes</span>
     </div>
   </div>

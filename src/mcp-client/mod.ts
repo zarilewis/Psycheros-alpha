@@ -140,7 +140,6 @@ export class MCPClient {
     filename: string;
     content: string;
   }> = [];
-  private pendingMemoryChanges: MemoryEntry[] = [];
   private syncTimer: number | null = null;
   private intentionalClose = false;
   private lastPingSuccess: Date | null = null;
@@ -235,7 +234,7 @@ export class MCPClient {
     this.wasAlive = true;
 
     // Push any pending changes
-    if (this.pendingIdentityChanges.length > 0 || this.pendingMemoryChanges.length > 0) {
+    if (this.pendingIdentityChanges.length > 0) {
       try {
         await this.push();
       } catch {
@@ -454,7 +453,7 @@ export class MCPClient {
       throw new Error("[MCP] Not connected to entity-core");
     }
 
-    if (this.pendingIdentityChanges.length === 0 && this.pendingMemoryChanges.length === 0) {
+    if (this.pendingIdentityChanges.length === 0) {
       return true; // Nothing to push
     }
 
@@ -473,10 +472,6 @@ export class MCPClient {
             lastModified: new Date().toISOString(),
             modifiedBy: this.config.instanceId,
           })),
-          memoryChanges: this.pendingMemoryChanges.map((memory) => ({
-            ...memory,
-            version: 1,
-          })),
         },
       });
 
@@ -487,7 +482,6 @@ export class MCPClient {
         if (response.success) {
           // Clear pending changes
           this.pendingIdentityChanges = [];
-          this.pendingMemoryChanges = [];
           this.cache.lastSync = new Date().toISOString();
 
           console.log("[MCP] Pushed changes to entity-core");
@@ -860,19 +854,6 @@ export class MCPClient {
   }
 
   /**
-   * Queue a memory entry for sync.
-   */
-  queueMemoryChange(memory: MemoryEntry): void {
-    // Set instance info
-    memory.sourceInstance = this.config.instanceId;
-    if (!memory.participatingInstances) {
-      memory.participatingInstances = [this.config.instanceId];
-    }
-
-    this.pendingMemoryChanges.push(memory);
-  }
-
-  /**
    * Create a memory entry via MCP.
    */
   async createMemory(
@@ -883,21 +864,8 @@ export class MCPClient {
     slug?: string,
   ): Promise<boolean> {
     if (!this.client) {
-      // Queue for later sync
-      this.queueMemoryChange({
-        id: `${granularity}-${date}`,
-        granularity,
-        date,
-        content,
-        chatIds,
-        sourceInstance: this.config.instanceId,
-        participatingInstances: [this.config.instanceId],
-        version: 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        slug,
-      });
-      return true;
+      console.error("[MCP] Not connected, cannot create memory");
+      return false;
     }
 
     try {
@@ -934,23 +902,7 @@ export class MCPClient {
       return false;
     } catch (error) {
       console.error("[MCP] Create memory failed:", error instanceof Error ? error.message : String(error));
-
-      // Queue for later sync
-      this.queueMemoryChange({
-        id: `${granularity}-${date}`,
-        granularity,
-        date,
-        content,
-        chatIds,
-        sourceInstance: this.config.instanceId,
-        participatingInstances: [this.config.instanceId],
-        version: 1,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        slug,
-      });
-
-      return true;
+      return false;
     }
   }
 
@@ -997,64 +949,50 @@ export class MCPClient {
 
   /**
    * Update (overwrite) a memory entry via MCP.
-   * If MCP is not connected, queues for later sync.
    */
   async updateMemory(
     granularity: Granularity,
     date: string,
     content: string,
   ): Promise<boolean> {
-    if (this.client) {
-      try {
-        const result = await this.client.callTool({
-          name: "memory_update",
-          arguments: {
-            granularity,
-            date,
-            content,
-            editedBy: this.config.instanceId,
-            instanceId: this.config.instanceId,
-          },
-        });
-
-        const r = result as Record<string, unknown>;
-        if (r.isError) {
-          const errorText = extractTextContent(result) || "Unknown MCP error";
-          throw new Error(errorText);
-        }
-
-        const textContent = extractTextContent(result);
-        if (textContent) {
-          try {
-            const response = JSON.parse(textContent);
-            return response.success;
-          } catch {
-            throw new Error(textContent);
-          }
-        }
-
-        return false;
-      } catch (error) {
-        console.error("[MCP] memory_update failed:", error instanceof Error ? error.message : String(error));
-        // Queue for later sync
-      }
+    if (!this.client) {
+      console.error("[MCP] Not connected, cannot update memory");
+      return false;
     }
 
-    // Not connected or failed — queue as a memory change for later
-    this.queueMemoryChange({
-      id: `${granularity}-${date}`,
-      granularity,
-      date,
-      content,
-      chatIds: [],
-      sourceInstance: this.config.instanceId,
-      participatingInstances: [this.config.instanceId],
-      version: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
+    try {
+      const result = await this.client.callTool({
+        name: "memory_update",
+        arguments: {
+          granularity,
+          date,
+          content,
+          editedBy: this.config.instanceId,
+          instanceId: this.config.instanceId,
+        },
+      });
 
-    return true;
+      const r = result as Record<string, unknown>;
+      if (r.isError) {
+        const errorText = extractTextContent(result) || "Unknown MCP error";
+        throw new Error(errorText);
+      }
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        try {
+          const response = JSON.parse(textContent);
+          return response.success;
+        } catch {
+          throw new Error(textContent);
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error("[MCP] memory_update failed:", error instanceof Error ? error.message : String(error));
+      return false;
+    }
   }
 
   /**
@@ -1102,12 +1040,73 @@ export class MCPClient {
   }
 
   /**
+   * List memories via MCP, optionally filtered by granularity.
+   */
+  async listMemories(
+    granularity?: Granularity,
+    limit: number = 50,
+  ): Promise<Array<{ granularity: string; date: string; preview: string }>> {
+    if (!this.client) {
+      console.error("[MCP] Not connected, cannot list memories");
+      return [];
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "memory_list",
+        arguments: {
+          ...(granularity ? { granularity } : {}),
+          limit,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return response.memories ?? [];
+      }
+
+      return [];
+    } catch (error) {
+      console.error("[MCP] Memory list failed:", error);
+      return [];
+    }
+  }
+
+  /**
+   * Delete a memory entry via MCP.
+   */
+  async deleteMemory(granularity: Granularity, date: string): Promise<boolean> {
+    if (!this.client) {
+      console.error("[MCP] Not connected, cannot delete memory");
+      return false;
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "memory_delete",
+        arguments: { granularity, date },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return response.success;
+      }
+
+      return false;
+    } catch (error) {
+      console.error("[MCP] Memory delete failed:", error);
+      return false;
+    }
+  }
+
+  /**
    * Get pending changes count.
    */
-  getPendingCount(): { identity: number; memories: number } {
+  getPendingCount(): { identity: number } {
     return {
       identity: this.pendingIdentityChanges.length,
-      memories: this.pendingMemoryChanges.length,
     };
   }
 

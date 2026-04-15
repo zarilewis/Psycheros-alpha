@@ -59,7 +59,6 @@ export interface DiagnosticsSnapshot {
     lastPingAttempt: string | null;
     lastSync: string | null;
     pendingIdentity: number;
-    pendingMemories: number;
   };
 
   sse: {
@@ -194,13 +193,11 @@ export async function collectDiagnostics(ctx: RouteContext): Promise<Diagnostics
       ? ((ctx.mcpClient as any)?.cache?.lastSync as string | null) ?? null
       : null,
     pendingIdentity: 0,
-    pendingMemories: 0,
   };
   if (mcpEnabled && ctx.mcpClient) {
     try {
       const pending = ctx.mcpClient.getPendingCount();
       mcp.pendingIdentity = pending.identity;
-      mcp.pendingMemories = pending.memories;
     } catch {
       // Leave as 0
     }

@@ -2612,7 +2612,6 @@ export async function handleMcpSync(ctx: RouteContext): Promise<Response> {
       pushed: boolean;
       pending: {
         identity: number;
-        memories: number;
       };
     } = {
       success: true,
@@ -6387,7 +6386,6 @@ export async function handleEntityCoreOverview(ctx: RouteContext): Promise<Respo
 
   let stats = null;
   let pendingIdentity = 0;
-  let pendingMemories = 0;
   let lastSyncTime = null;
   let extraction = null;
 
@@ -6398,7 +6396,6 @@ export async function handleEntityCoreOverview(ctx: RouteContext): Promise<Respo
     ]);
     const pending = ctx.mcpClient.getPendingCount();
     pendingIdentity = pending.identity;
-    pendingMemories = pending.memories;
     lastSyncTime = ctx.mcpClient.getLastSyncTime();
   }
 
@@ -6406,7 +6403,6 @@ export async function handleEntityCoreOverview(ctx: RouteContext): Promise<Respo
     connected,
     stats,
     pendingIdentity,
-    pendingMemories,
     lastSyncTime,
     extraction,
   };

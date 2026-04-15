@@ -262,8 +262,8 @@ export function renderAdminDiagnostics(snapshot: DiagnosticsSnapshot): string {
         <span class="admin-stat-value">${snapshot.mcp.pendingIdentity}</span>
       </div>
       <div class="admin-stat">
-        <span class="admin-stat-label">Pending Memories</span>
-        <span class="admin-stat-value">${snapshot.mcp.pendingMemories}</span>
+        <span class="admin-stat-label">Pending Identity Changes</span>
+        <span class="admin-stat-value">${snapshot.mcp.pendingIdentity}</span>
       </div>
     </div>
   </div>
