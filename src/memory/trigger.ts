@@ -7,7 +7,7 @@
  */
 
 import type { DBClient } from "../db/mod.ts";
-import type { OnMemoryCreated } from "./file-writer.ts";
+import type { MCPClient } from "../mcp-client/mod.ts";
 import type { SummarizerConfig } from "./types.ts";
 import { summarizeDay } from "./summarizer.ts";
 import { getTimezoneModifier, getLogicalDateNow, DEFAULT_CUTOFF_HOUR } from "./date-utils.ts";
@@ -18,43 +18,42 @@ import { getTimezoneModifier, getLogicalDateNow, DEFAULT_CUTOFF_HOUR } from "./d
 export interface MemoryTriggerConfig {
   /** Whether memory summarization is enabled */
   enabled: boolean;
-  /** Root directory of the project */
-  projectRoot: string;
 }
 
 /**
  * Check integrity of memory system on startup.
  *
  * Detects orphaned DB records where memory_summaries entries exist
- * but the corresponding files are missing on disk. Clears these records
- * so catchUpSummarization() can regenerate the missing memories.
- *
- * This handles the case where the memories directory wasn't volume-mounted
- * and files were lost on container restart while the DB persisted.
+ * but the corresponding memories are missing from entity-core.
+ * Clears these records so catchUpSummarization() can regenerate them.
  *
  * @param db - Database client
- * @param projectRoot - Root directory of the project
+ * @param mcpClient - MCP client to verify memories exist in entity-core
  * @returns Number of orphaned records cleared
  */
-export function repairOrphanedSummaries(
+export async function repairOrphanedSummaries(
   db: DBClient,
-  projectRoot: string
-): number {
-  const orphaned = db.findOrphanedSummaries(projectRoot);
+  mcpClient: MCPClient,
+): Promise<number> {
+  // Find all summary records
+  const summaries = db.getAllMemorySummaries();
+  let cleared = 0;
 
-  if (orphaned.length === 0) {
-    return 0;
+  for (const record of summaries) {
+    // Verify the memory exists in entity-core
+    const memory = await mcpClient.readMemory(record.granularity as "daily" | "weekly" | "monthly" | "yearly", record.date);
+    if (!memory) {
+      db.deleteMemorySummary(record.id);
+      console.log(`[Memory] Cleared orphaned record: ${record.date} (${record.granularity})`);
+      cleared++;
+    }
   }
 
-  console.log(`[Memory] Found ${orphaned.length} orphaned summary record(s) — files missing on disk`);
-
-  for (const record of orphaned) {
-    db.deleteMemorySummary(record.id);
-    console.log(`[Memory] Cleared orphaned record: ${record.date} (${record.granularity}) → ${record.filePath}`);
+  if (cleared > 0) {
+    console.log(`[Memory] Integrity repair complete: ${cleared} record(s) cleared for regeneration`);
   }
 
-  console.log(`[Memory] Integrity repair complete: ${orphaned.length} record(s) cleared for regeneration`);
-  return orphaned.length;
+  return cleared;
 }
 
 /**
@@ -62,15 +61,14 @@ export function repairOrphanedSummaries(
  * Called on startup and by the daily cron job.
  *
  * @param db - Database client
- * @param projectRoot - Root directory of the project
- * @param onCreated - Optional callback fired after memory creation
+ * @param mcpClient - MCP client for writing memories to entity-core
  * @param config - Optional summarizer config (timezone/cutoffHour for logical date grouping)
  * @returns Number of days summarized
  */
 export async function catchUpSummarization(
   db: DBClient,
+  mcpClient: MCPClient,
   projectRoot: string,
-  onCreated?: OnMemoryCreated,
   config?: Partial<SummarizerConfig>,
 ): Promise<number> {
   const tz = config?.timezone || "";
@@ -91,11 +89,11 @@ export async function catchUpSummarization(
     if (date === today) continue;
 
     console.log(`[Memory] Catching up on ${date}...`);
-    const memoryFile = await summarizeDay(new Date(date), db, projectRoot, config, onCreated);
+    const memoryFile = await summarizeDay(new Date(date), db, mcpClient, projectRoot, config);
 
     if (memoryFile) {
       summarized++;
-      console.log(`[Memory] Created memory for ${date}: ${memoryFile.path}`);
+      console.log(`[Memory] Created memory for ${date}: ${memoryFile.date}`);
     }
   }
 

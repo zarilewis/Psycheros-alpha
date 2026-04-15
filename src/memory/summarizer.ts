@@ -11,6 +11,7 @@ import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, ChatMessage } from "../llm/mod.ts";
 import { createDefaultClient, createClientFromProfile } from "../llm/mod.ts";
 import type { LLMConnectionProfile } from "../llm/mod.ts";
+import type { MCPClient } from "../mcp-client/mod.ts";
 import type {
   MemoryFile,
   ConversationForSummary,
@@ -18,7 +19,7 @@ import type {
   MessageWithContext,
 } from "./types.ts";
 import { getDateFormatInfo } from "./types.ts";
-import { writeMemoryFile, formatMemoryContent, extractChatIds, type OnMemoryCreated } from "./file-writer.ts";
+import { formatMemoryContent, extractChatIds } from "./file-writer.ts";
 import { buildIdentitySystemMessage } from "../entity/context.ts";
 import { getTimezoneModifier } from "./date-utils.ts";
 
@@ -195,9 +196,9 @@ async function generateDailySummary(
 export async function summarizeDay(
   date: Date,
   db: DBClient,
+  mcpClient: MCPClient,
   projectRoot: string,
   config?: Partial<SummarizerConfig>,
-  onCreated?: OnMemoryCreated,
   options?: { llm?: LLMClient; activeProfile?: LLMConnectionProfile },
 ): Promise<MemoryFile | null> {
   const cfg = { ...DEFAULT_CONFIG, ...config };
@@ -269,11 +270,23 @@ export async function summarizeDay(
       date: dateInfo.dateStr,
     };
 
-    // Write the file and notify external systems
-    const success = await writeMemoryFile(memoryFile, db, projectRoot, onCreated);
+    // Record in database for local tracking (which chats have been summarized)
+    const summaryId = db.upsertMemorySummary(
+      memoryFile.date,
+      "daily",
+      `entity-core://${memoryFile.date}`,
+      finalChatIds,
+    );
+    for (const chatId of finalChatIds) {
+      db.markChatSummarized(chatId, memoryFile.date, summaryId);
+    }
+
+    // Write to entity-core via MCP
+    const success = await mcpClient.createMemory("daily", dateInfo.dateStr, content, finalChatIds);
 
     if (!success) {
-      return null;
+      console.error(`[Memory] MCP write failed for ${dateInfo.dateStr}, DB record created — will need manual sync`);
+      return memoryFile;
     }
 
     return memoryFile;

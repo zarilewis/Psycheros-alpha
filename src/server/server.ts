@@ -667,17 +667,7 @@ export class Server {
     initTracker(this.db);
 
     // Set up memory summarization cron job and catch-up on startup
-    if (this.config.memoryEnabled !== false) {
-      // MCP sync callback — pushes generated memories to entity-core
-      const syncMemoryToMCP = this.mcpClient
-        ? (memory: import("../memory/mod.ts").MemoryFile) => {
-            const granularity = memory.granularity as "daily" | "weekly" | "monthly" | "yearly";
-            this.mcpClient!.createMemory(granularity, memory.date, memory.content, memory.chatIds).catch((error) => {
-              console.error("[Memory] MCP sync failed:", error instanceof Error ? error.message : String(error));
-            });
-          }
-        : undefined;
-
+    if (this.config.memoryEnabled !== false && this.mcpClient) {
       // Memory timezone config: use display timezone for local-timezone-aware
       // message grouping and cron scheduling. Falls back to PSYCHEROS_MEMORY_HOUR at UTC.
       const memoryTz = getDisplayTimezone();
@@ -687,14 +677,15 @@ export class Server {
 
       // Repair orphaned DB records then catch up on missed summarizations.
       // Repair must complete first so cleared records become eligible for regeneration.
+      const mcp = this.mcpClient;
       (async () => {
         try {
-          await repairOrphanedSummaries(this.db, this.config.projectRoot);
+          await repairOrphanedSummaries(this.db, mcp);
         } catch (error) {
           console.error("[Memory] Integrity check failed:", error instanceof Error ? error.message : String(error));
         }
         try {
-          await catchUpSummarization(this.db, this.config.projectRoot, syncMemoryToMCP, memoryConfig);
+          await catchUpSummarization(this.db, mcp, this.config.projectRoot, memoryConfig);
         } catch (error) {
           console.error("[Memory] Startup catch-up failed:", error instanceof Error ? error.message : String(error));
         }
@@ -716,7 +707,7 @@ export class Server {
 
       // Shared handler for daily summarization (used by both cron and manual trigger)
       const dailySummarizationHandler = async (): Promise<string> => {
-        const count = await catchUpSummarization(this.db, this.config.projectRoot, syncMemoryToMCP, memoryConfig);
+        const count = await catchUpSummarization(this.db, mcp, this.config.projectRoot, memoryConfig);
         return count > 0 ? `Summarized ${count} day(s)` : "No unsummarized dates found";
       };
 

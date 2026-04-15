@@ -1007,6 +1007,20 @@ export class DBClient {
   }
 
   /**
+   * Get all memory summary records.
+   *
+   * @returns Array of all summary records
+   */
+  getAllMemorySummaries(): Array<{ id: string; date: string; granularity: string; filePath: string }> {
+    const stmt = this.db.prepare(
+      `SELECT id, date, granularity, file_path FROM memory_summaries ORDER BY date ASC`
+    );
+    const rows = stmt.all<{ id: string; date: string; granularity: string; file_path: string }>();
+    stmt.finalize();
+    return rows.map(r => ({ ...r, filePath: r.file_path }));
+  }
+
+  /**
    * Delete a memory summary record and its associated summarized_chats entries.
    * Used by the integrity check to clear orphaned records for regeneration.
    *
