@@ -11,41 +11,18 @@
  * written in the entity's voice (first-person), with the user in third-person.
  * The entity decides what's worth remembering.
  *
+ * ## Storage
+ *
+ * All memories are stored in entity-core via MCP. Psycheros tracks which
+ * daily chats have been summarized locally (memory_summaries, summarized_chats
+ * DB tables) to avoid re-processing.
+ *
  * ## Trigger
  *
  * On first message of a new day (detected by date change from last message),
  * the previous day's conversations are summarized and stored.
  *
  * Note: Weekly/monthly/yearly consolidation has been moved to entity-core.
- *
- * ## Usage
- *
- * ```typescript
- * import { initializeFromDatabase, checkAndTriggerSummarization } from "./memory/mod.ts";
- *
- * // At server startup:
- * initializeFromDatabase(db);
- *
- * // On each incoming message:
- * checkAndTriggerSummarization(db, projectRoot);
- * ```
- *
- * ## Directory Structure
- *
- * ```
- * memories/
- * ├── daily/
- * │   └── 2026-02-22.md        # Daily summaries
- * ├── weekly/
- * │   └── 2026-W08.md          # Weekly summaries (managed by entity-core)
- * ├── monthly/
- * │   └── 2026-02.md           # Monthly summaries (managed by entity-core)
- * ├── yearly/
- * │   └── 2026.md              # Yearly summaries (managed by entity-core)
- * └── archive/
- *     └── daily/
- *         └── 2026-02-22.md    # Archived dailies
- * ```
  *
  * @module
  */
@@ -68,14 +45,10 @@ export {
   summarizeDay,
 } from "./summarizer.ts";
 
-// File operations
+// Content utilities
 export {
-  writeMemoryFile,
   extractChatIds,
   formatMemoryContent,
-  readMemoryFile,
-  listMemoryFiles,
-  type OnMemoryCreated,
 } from "./file-writer.ts";
 
 // Trigger, catch-up, and integrity

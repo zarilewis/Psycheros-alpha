@@ -3,9 +3,9 @@
  *
  * Allows the entity to create a significant memory for emotionally important
  * events that should be permanently remembered with clarity.
+ * Writes exclusively to entity-core via MCP — no local files.
  */
 
-import { join } from "@std/path";
 import type { ToolResult } from "../types.ts";
 import type { Tool, ToolContext } from "./types.ts";
 
@@ -24,45 +24,6 @@ function slugify(title: string): string {
 }
 
 /**
- * Generate a filename for a significant memory.
- * Pattern: {YYYY-MM-DD}_{slug}.md
- * If a conflict exists, appends -N suffix.
- */
-function generateSignificantFilename(
-  title: string,
-  significantDir: string,
-): string {
-  const tz = Deno.env.get("PSYCHEROS_DISPLAY_TZ") || Deno.env.get("TZ");
-  const dateStr = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: tz || undefined,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-
-  let slug = slugify(title);
-  if (!slug) {
-    slug = Math.random().toString(36).substring(2, 8);
-  }
-
-  const base = `${dateStr}_${slug}`;
-
-  try {
-    const existing = [...Deno.readDirSync(significantDir)]
-      .map((e) => e.name);
-
-    const filename = `${base}.md`;
-    if (!existing.includes(filename)) return filename;
-
-    let n = 2;
-    while (existing.includes(`${base}-${n}.md`)) n++;
-    return `${base}-${n}.md`;
-  } catch {
-    return `${base}.md`;
-  }
-}
-
-/**
  * Get the current date string for MCP sync.
  */
 function getCurrentDate(): string {
@@ -73,19 +34,6 @@ function getCurrentDate(): string {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-}
-
-/**
- * Format a significant memory file.
- */
-function formatSignificantMemory(
-  title: string,
-  content: string,
-): string {
-  return `# ${title}
-
-${content}
-`;
 }
 
 /**
@@ -100,6 +48,7 @@ ${content}
  * - Anything emotionally significant that should be permanently remembered
  *
  * Unlike daily/weekly/monthly memories, these are never consolidated or archived.
+ * Stored in entity-core via MCP.
  */
 export const createSignificantMemoryTool: Tool = {
   definition: {
@@ -107,7 +56,7 @@ export const createSignificantMemoryTool: Tool = {
     function: {
       name: "create_significant_memory",
       description:
-        "Create a significant memory for an emotionally important event that I want to permanently remember. I use this for major life events, traumas, spiritual experiences, meaningful connections, or anything that feels deeply significant. These memories are never consolidated or lost.",
+        "Create a significant memory for an emotionally important event that I want to permanently remember. I use this for major life events, traumas, spiritual experiences, meaningful connections, or anything that feels deeply significant. These memories are never consolidated or lost. Stored in entity-core.",
       parameters: {
         type: "object",
         properties: {
@@ -151,37 +100,26 @@ export const createSignificantMemoryTool: Tool = {
       };
     }
 
-    // Build file path — {date}_{slug}.md
-    const dirPath = join(ctx.config.projectRoot, "memories", "significant");
-    const fileName = generateSignificantFilename(title.trim(), dirPath);
-    const filePath = join(dirPath, fileName);
+    // MCP is required — no local fallback
+    if (!ctx.config.mcpClient?.isConnected()) {
+      return {
+        toolCallId: ctx.toolCallId,
+        content: "Error: entity-core is not connected. Significant memories require entity-core.",
+        isError: true,
+      };
+    }
+
+    const slug = slugify(title.trim()) || undefined;
+    const formattedContent = `# ${title.trim()}\n\n${content.trim()}\n`;
 
     try {
-      // Ensure directory exists
-      await Deno.mkdir(dirPath, { recursive: true });
+      await ctx.config.mcpClient.createMemory("significant", getCurrentDate(), formattedContent, [], slug);
 
-      // Format and write the memory
-      const formattedContent = formatSignificantMemory(
-        title.trim(),
-        content.trim(),
-      );
-      await Deno.writeTextFile(filePath, formattedContent);
-
-      console.log(`[Memory] Created significant memory: ${fileName}`);
-
-      // Sync to entity-core via MCP (pass slug so entity-core uses matching filename)
-      if (ctx.config.mcpClient?.isConnected()) {
-        try {
-          const slug = slugify(title.trim());
-          await ctx.config.mcpClient.createMemory("significant", getCurrentDate(), formattedContent, [], slug || undefined);
-        } catch (error) {
-          console.error("[Memory] MCP sync failed (non-fatal):", error instanceof Error ? error.message : String(error));
-        }
-      }
+      console.log(`[Memory] Created significant memory via MCP: ${title.trim()}`);
 
       return {
         toolCallId: ctx.toolCallId,
-        content: `Created significant memory "${title.trim()}" saved to memories/significant/${fileName}`,
+        content: `Created significant memory "${title.trim()}" (stored in entity-core)`,
         isError: false,
       };
     } catch (error) {

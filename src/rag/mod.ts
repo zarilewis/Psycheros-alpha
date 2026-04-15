@@ -2,26 +2,10 @@
  * RAG Module
  *
  * Retrieval-Augmented Generation system for Psycheros.
- * Provides local-first semantic search over the memories directory
- * and conversational history.
+ * Provides local semantic search over chat history, data vault,
+ * and lorebook. Memory retrieval is delegated to entity-core via MCP.
  *
  * @module
- *
- * @example
- * ```typescript
- * import { createIndexer, createRetriever, buildRAGContext } from "./rag/mod.ts";
- *
- * // Index memories on startup
- * const indexer = createIndexer(db, "memories");
- * await indexer.indexAll();
- *
- * // Retrieve relevant memories for a query
- * const retriever = createRetriever(db);
- * const results = await retriever.retrieve("Tell me about apples");
- *
- * // Format for context
- * const context = buildRAGContext(results);
- * ```
  */
 
 // Types
@@ -32,8 +16,6 @@ export type {
   RetrievalResult,
   Embedder,
   Chunker,
-  Indexer,
-  Retriever,
   IndexedMemory,
   VectorSearchResult,
 } from "./types.ts";
@@ -45,12 +27,6 @@ export { LocalEmbedder, getEmbedder } from "./embedder.ts";
 
 // Chunker
 export { MemoryChunker, getChunker, estimateTokens } from "./chunker.ts";
-
-// Indexer
-export { MemoryIndexer, createIndexer } from "./indexer.ts";
-
-// Retriever
-export { MemoryRetriever, createRetriever } from "./retriever.ts";
 
 // Context Builder
 export {
