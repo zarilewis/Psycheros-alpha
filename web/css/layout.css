@@ -77,6 +77,8 @@ body.glass-enabled .input-area {
   grid-template-columns: 1fr;
   height: 100dvh;
   overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* Header row spans full width */
@@ -95,7 +97,7 @@ body.glass-enabled .input-area {
 /* Sidebar - always slide-out overlay */
 .sidebar {
   position: fixed;
-  top: var(--header-height);
+  top: calc(var(--header-height) + env(safe-area-inset-top));
   left: 0;
   bottom: 0;
   width: var(--sidebar-width);
@@ -118,7 +120,7 @@ body.glass-enabled .input-area {
   display: none;
   position: fixed;
   inset: 0;
-  top: var(--header-height);
+  top: calc(var(--header-height) + env(safe-area-inset-top));
   background-color: rgba(0, 0, 0, 0.85);
   z-index: 99;
 }
