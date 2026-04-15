@@ -83,6 +83,9 @@ Retrieves relevant memories from entity-core's memory store via the `memory_sear
 2. **Results**: Entity-core returns scored excerpts with granularity, date, and relevance percentage
 3. **Context**: Retrieved memories are injected into the system prompt with relevance scores
 4. **No local indexing**: All memory embeddings and vector search happen in entity-core
+5. **Excerpt behavior**: Short memories (<2000 chars) are returned in full; longer memories get the most relevant section with context (~512 tokens). No truncation markers.
+
+**Known limitation**: entity-core embeds each memory file as a single blob truncated to 3000 chars. Daily and weekly memories are typically under 3KB, but monthly/yearly/significant memories may grow beyond this over time, making content past the 3000-char mark unsearchable. The old Psycheros chunker split files into ~512-token pieces and embedded each independently — entity-core does not currently do this.
 
 ### Chat RAG
 
