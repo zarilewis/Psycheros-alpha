@@ -1452,7 +1452,7 @@ export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics, enti
     let contentHtml = renderMarkdown(msg.content);
     if (/\[IMAGE:\{/.test(msg.content)) {
       contentHtml = contentHtml.replace(
-        /<p>(?:[^\[]*?)?\[IMAGE:(\{[^}]+\})\]<\/p>/g,
+        /\[IMAGE:(\{.*?\})\]/g,
         (_match, jsonStr) => {
           try {
             const img = JSON.parse(decodeHTMLEntities(jsonStr));
@@ -1670,7 +1670,7 @@ export function renderToolResult(result: ToolResult): string {
   }
 
   // Detect [IMAGE:...] markers and render them inline
-  const imagePattern = /\[IMAGE:(\{[^}]+\})\]/g;
+  const imagePattern = /\[IMAGE:(\{.*?\})\]/g;
   if (imagePattern.test(content)) {
     content = content.replace(imagePattern, (_match, jsonStr) => {
       try {

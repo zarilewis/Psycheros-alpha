@@ -68,14 +68,6 @@ export const generateImageTool: Tool = {
 // OpenRouter Provider
 // =============================================================================
 
-/** Map configured width/height to an OpenRouter-compatible size string. */
-function mapToOpenRouterSize(width: number, height: number): string {
-  const w = Math.min(width, 4096);
-  const h = Math.min(height, 4096);
-  // Round to nearest supported dimension
-  return `${w}x${h}`;
-}
-
 /**
  * Extract image data from an OpenRouter chat completions response.
  * The response `content` may be:
@@ -149,7 +141,7 @@ async function generateViaOpenRouter(
   const settings = config.settings.openrouter;
   if (!settings) throw new Error("OpenRouter settings not configured for this generator");
 
-  const baseUrl = settings.baseUrl || "https://openrouter.ai/api/v1";
+  const baseUrl = (settings.baseUrl || "https://openrouter.ai/api/v1").replace(/\/+$/, "");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Authorization": `Bearer ${settings.apiKey}`,
@@ -187,13 +179,20 @@ async function generateViaOpenRouter(
   messageContent.push({ type: "text", text: textPrompt });
 
   const params = config.settings.params;
-  const size = mapToOpenRouterSize(params.width, params.height);
+  const imageSize = mapToImageSize(params.width);
+
+  const imageConfig: Record<string, string> = {
+    aspect_ratio: mapToAspectRatio(params.width, params.height),
+  };
+  if (imageSize !== "1K") {
+    imageConfig.image_size = imageSize;
+  }
 
   const body: Record<string, unknown> = {
     model: settings.model,
     messages: [{ role: "user", content: messageContent }],
-    modalities: ["text", "image"],
-    size,
+    modalities: ["image", "text"],
+    image_config: imageConfig,
   };
 
   const response = await fetch(`${baseUrl}/chat/completions`, {
@@ -237,6 +236,17 @@ async function generateViaOpenRouter(
 
   // Fallback: check message.content (some models/providers may return it there)
   const content = message?.content;
+
+  // Log what we received for debugging when image extraction fails
+  console.error(
+    `[ImageGen] OpenRouter: no image in message.images[]. ` +
+    `content type=${typeof content}, hasImages=${!!images && images.length > 0}. ` +
+    `message keys=${message ? Object.keys(message).join(",") : "undefined"}`,
+  );
+  if (typeof content === "string") {
+    console.error(`[ImageGen] OpenRouter content (first 200 chars): ${content.slice(0, 200)}`);
+  }
+
   try {
     return extractImageFromContent(content);
   } catch (err) {

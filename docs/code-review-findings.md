@@ -1,6 +1,6 @@
 # Code Review Findings
 
-Status: **Complete** — all critical and high-severity issues fixed.
+Status: **Complete** — all critical and high-severity issues fixed. Post-alpha fixes below.
 
 ## Scope
 
@@ -132,6 +132,19 @@ Full code review covering code quality, error handling, input validation, SQLite
 - Background upload generates safe filenames server-side
 - Background delete handler regex blocks traversal after URL decoding
 - Prepared statements wrapped in try/finally for guaranteed finalization
+
+## Post-Alpha Fixes
+
+### OpenRouter image generation payload incorrect (High — functionality)
+- **Problem**: Sent `size` (DALL-E parameter) which OpenRouter doesn't support on `/chat/completions`. Used wrong `modalities` ordering. Base URL trailing slash produced double-slash 404s.
+- **Locations**: `src/tools/generate-image.ts:192-199`
+- **Fix**: Replaced `size` with `image_config` (`aspect_ratio`, `image_size`); changed `modalities` to `["image", "text"]`; strip trailing slash from base URL.
+
+### `[IMAGE:...]` marker regex fragile (Medium — rendering)
+- **Problem**: Four locations used `[^}]+` which fails when prompt/description contains `}` characters. Also, server-side template regex required `<p>` wrapper that markdown render doesn't always produce.
+- **Locations**: `src/entity/loop.ts:788`, `src/server/templates.ts:1455,1673`, `src/server/routes.ts:6672`
+- **Fix**: Changed to `.*` (lazy) pattern, consistent with existing `fadeImageMarker` regex. Removed `<p>` wrapper requirement from template regex.
+
 - Tool execution serialized across concurrent turns via promise mutex in `ToolRegistry.executeAll()`, preventing race conditions on shared resources (identity files, knowledge graph, memories) when multiple turns run simultaneously (e.g., background stream + new conversation, Pulse + user chat)
 
 See also: [security-audit.md](security-audit.md) for the full security assessment.

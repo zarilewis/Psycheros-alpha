@@ -6669,7 +6669,7 @@ async function scanGalleryImages(ctx: RouteContext, offset: number, limit: numbe
       if (row) {
         createdAt = row.created_at;
         // Parse [IMAGE:{...}] metadata
-        const match = row.content.match(/\[IMAGE:\s*(\{[^}]+\})\]/);
+        const match = row.content.match(/\[IMAGE:\s*(\{.*?\})\]/);
         if (match) {
           try {
             const meta = JSON.parse(match[1]);

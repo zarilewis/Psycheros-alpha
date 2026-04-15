@@ -309,7 +309,7 @@ The entity can generate images using configured provider slots (OpenRouter or Go
 
 | Provider | Models | Notes |
 |----------|--------|-------|
-| OpenRouter | Any image-capable model on OpenRouter (e.g. `openai/gpt-5-image-mini`) | Requires API key; uses `modalities: ["text", "image"]` via chat completions; images returned in `message.images[]`; supports `size` parameter |
+| OpenRouter | Any image-capable model on OpenRouter (e.g. `openai/gpt-5-image-mini`, `google/gemini-2.5-flash-image`) | Requires API key; uses `modalities: ["image", "text"]` via chat completions; images returned in `message.images[]`; uses `image_config` for `aspect_ratio` and `image_size` |
 | Google AI Studio | `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`, `gemini-2.5-flash-image` | Requires Google API key; supports aspect ratio selection |
 
 **Anchor Images:** Reference images stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table. The entity sees available anchor IDs in its system context and can reference them by ID for style/character consistency.

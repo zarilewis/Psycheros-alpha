@@ -785,7 +785,7 @@ export class EntityTurn {
         yield { type: "tool_result", result };
 
         // Detect [IMAGE:...] markers in tool results for inline image display
-        const imageMatch = result.content.match(/\[IMAGE:(\{[^}]+\})\]/);
+        const imageMatch = result.content.match(/\[IMAGE:(\{.*\})\]/);
         if (imageMatch) {
           try {
             const img = JSON.parse(imageMatch[1]);
