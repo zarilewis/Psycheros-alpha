@@ -262,6 +262,25 @@ export async function summarizeDay(
     // If no chat IDs were extracted, use all conversation IDs
     const finalChatIds = chatIds.length > 0 ? chatIds : conversations.map((c) => c.id);
 
+    // Write to entity-core via MCP first — only record in DB if it succeeds
+    const success = await mcpClient.createMemory("daily", dateInfo.dateStr, content, finalChatIds);
+
+    if (!success) {
+      console.error(`[Memory] MCP write failed for ${dateInfo.dateStr} — will retry on next catch-up`);
+      return null;
+    }
+
+    // Record in database for local tracking (which chats have been summarized)
+    const summaryId = db.upsertMemorySummary(
+      dateInfo.dateStr,
+      "daily",
+      `entity-core://${dateInfo.dateStr}`,
+      finalChatIds,
+    );
+    for (const chatId of finalChatIds) {
+      db.markChatSummarized(chatId, dateInfo.dateStr, summaryId);
+    }
+
     const memoryFile: MemoryFile = {
       path: dateInfo.filePath,
       content,
@@ -269,25 +288,6 @@ export async function summarizeDay(
       granularity: "daily",
       date: dateInfo.dateStr,
     };
-
-    // Record in database for local tracking (which chats have been summarized)
-    const summaryId = db.upsertMemorySummary(
-      memoryFile.date,
-      "daily",
-      `entity-core://${memoryFile.date}`,
-      finalChatIds,
-    );
-    for (const chatId of finalChatIds) {
-      db.markChatSummarized(chatId, memoryFile.date, summaryId);
-    }
-
-    // Write to entity-core via MCP
-    const success = await mcpClient.createMemory("daily", dateInfo.dateStr, content, finalChatIds);
-
-    if (!success) {
-      console.error(`[Memory] MCP write failed for ${dateInfo.dateStr}, DB record created — will need manual sync`);
-      return memoryFile;
-    }
 
     return memoryFile;
   } finally {
