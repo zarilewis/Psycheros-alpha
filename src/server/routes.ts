@@ -81,7 +81,6 @@ import { updateConversationTitle, deleteConversation, deleteConversations, updat
 import { generateUIUpdates, renderAsOobSwaps } from "./ui-updates.ts";
 import { MAX_SSE_MESSAGE_SIZE, SSE_TRUNCATION_SUFFIX } from "../constants.ts";
 import { getBroadcaster } from "./broadcaster.ts";
-import { readMemoryFile, writeMemoryFile, listMemoryFiles } from "../memory/file-writer.ts";
 import {
   loadOrGenerateKeys,
   saveSubscription,
@@ -1943,14 +1942,23 @@ export async function handleMemoriesListFragment(
   }
 
   try {
-    const files = await listMemoryFiles(
+    if (!ctx.mcpClient?.isConnected()) {
+      const html = renderMemoryList(
+        granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
+        [],
+      );
+      return new Response(html, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    const items = await ctx.mcpClient.listMemories(
       granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
-      ctx.projectRoot,
     );
 
     const html = renderMemoryList(
       granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
-      files,
+      items,
     );
 
     return new Response(html, {
@@ -1983,75 +1991,48 @@ export async function handleMemoriesEditorFragment(
   // Significant memories use slug-based filenames (e.g., 2026-04-06_first-conversation.md)
   // Other granularities use date-based filenames, optionally with instance suffix
   // (e.g., 2026-04-06.md or 2026-04-06_psycheros.md)
-  let filePath: string;
-  if (granularity === "significant") {
-    const filename = `${date}.md`;
-    if (!isValidFilename(filename)) {
-      return new Response("Invalid filename", {
-        status: 400,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }
-    filePath = `significant/${filename}`;
-  } else {
-    // Validate as a safe filename (alphanumeric, underscores, hyphens)
-    const filename = `${date}.md`;
-    if (!isValidFilename(filename)) {
-      return new Response("Invalid filename", {
-        status: 400,
-        headers: { "Content-Type": "text/plain" },
-      });
-    }
-    filePath = `${granularity}/${filename}`;
+  const filename = `${date}.md`;
+  if (!isValidFilename(filename)) {
+    return new Response("Invalid filename", {
+      status: 400,
+      headers: { "Content-Type": "text/plain" },
+    });
+  }
+
+  // For MCP lookup, extract the date portion (before any instance suffix)
+  const mcpDate = date.split("_")[0];
+
+  if (!ctx.mcpClient?.isConnected()) {
+    return new Response(renderSaveError("MCP not connected — cannot load memory"), {
+      status: 503,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
   }
 
   try {
-    let content: string | null = null;
-    let metadata: { sourceInstance?: string; createdAt?: string; updatedAt?: string; version?: number; editedBy?: string } | undefined;
+    const entry = await ctx.mcpClient.readMemory(
+      granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
+      mcpDate,
+    );
 
-    // For MCP lookup, extract the date portion (before any instance suffix)
-    const mcpDate = date.split("_")[0];
-
-    // Try MCP first for richer metadata
-    if (ctx.mcpClient?.isConnected()) {
-      try {
-        const entry = await Promise.race([
-          ctx.mcpClient.readMemory(
-            granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
-            mcpDate,
-          ),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
-        ]);
-        if (entry) {
-          content = entry.content;
-          metadata = {
-            sourceInstance: entry.sourceInstance,
-            createdAt: entry.createdAt,
-            updatedAt: entry.updatedAt,
-            version: entry.version,
-          };
-        }
-      } catch {
-        // MCP read failed, fall through to local file
-      }
-    }
-
-    // Fall back to local file
-    if (content === null) {
-      content = await readMemoryFile(filePath, ctx.projectRoot);
-    }
-
-    if (content === null) {
-      return new Response("Memory not found", {
+    if (!entry) {
+      return new Response(renderSaveError("Memory not found"), {
         status: 404,
-        headers: { "Content-Type": "text/plain" },
+        headers: { "Content-Type": "text/html; charset=utf-8" },
       });
     }
+
+    const metadata = {
+      sourceInstance: entry.sourceInstance,
+      createdAt: entry.createdAt,
+      updatedAt: entry.updatedAt,
+      version: entry.version,
+    };
 
     const html = renderMemoryEditor(
       granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
       date,
-      content,
+      entry.content,
       metadata,
     );
 
@@ -2086,30 +2067,22 @@ export async function handleSaveMemory(
   // Significant memories use slug-based filenames (e.g., 2026-04-06_first-conversation.md)
   // Other granularities use date-based filenames, optionally with instance suffix
   // (e.g., 2026-04-06.md or 2026-04-06_psycheros.md)
-  let filePath: string;
-  let mcpDate: string;
-  if (granularity === "significant") {
-    const filename = `${date}.md`;
-    if (!isValidFilename(filename)) {
-      return new Response(renderSaveError("Invalid filename"), {
-        status: 400,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
-    }
-    filePath = `significant/${filename}`;
-    mcpDate = date.split("_")[0];
-  } else {
-    // Validate as a safe filename (alphanumeric, underscores, hyphens)
-    const filename = `${date}.md`;
-    if (!isValidFilename(filename)) {
-      return new Response(renderSaveError("Invalid filename"), {
-        status: 400,
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
-    }
-    filePath = `${granularity}/${filename}`;
-    // Extract the date portion for MCP lookup (before any instance suffix)
-    mcpDate = date.split("_")[0];
+  const filename = `${date}.md`;
+  if (!isValidFilename(filename)) {
+    return new Response(renderSaveError("Invalid filename"), {
+      status: 400,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  // Extract the date portion for MCP lookup (before any instance suffix)
+  const mcpDate = date.split("_")[0];
+
+  if (!ctx.mcpClient?.isConnected()) {
+    return new Response(renderSaveError("MCP not connected — cannot save memory"), {
+      status: 503,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
   }
 
   try {
@@ -2124,25 +2097,11 @@ export async function handleSaveMemory(
       });
     }
 
-    // Write local file
-    const fullPath = `${ctx.projectRoot}/memories/${filePath}`;
-
-    // Ensure directory exists
-    await Deno.mkdir(`${ctx.projectRoot}/memories/${granularity}`, { recursive: true });
-    await Deno.writeTextFile(fullPath, content);
-
-    // Push to entity-core via MCP (overwrite path)
-    if (ctx.mcpClient?.isConnected()) {
-      try {
-        await ctx.mcpClient.updateMemory(
-          granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
-          mcpDate,
-          content,
-        );
-      } catch (error) {
-        console.error("[Routes] MCP memory_update failed (local save succeeded):", error instanceof Error ? error.message : String(error));
-      }
-    }
+    await ctx.mcpClient.updateMemory(
+      granularity as "daily" | "weekly" | "monthly" | "yearly" | "significant",
+      mcpDate,
+      content,
+    );
 
     return new Response(renderSaveSuccess(), {
       headers: { "Content-Type": "text/html; charset=utf-8" },
@@ -2210,20 +2169,11 @@ export async function handleCreateSignificantMemory(
       });
     }
 
-    // Generate filename: {date}_{slug}.md with conflict resolution
-    const significantDir = `${ctx.projectRoot}/memories/significant`;
-    const base = `${date}_${slug}`;
-    let fileName = `${base}.md`;
-    try {
-      const existing = [...Deno.readDirSync(significantDir)]
-        .map((e) => e.name);
-      if (existing.includes(fileName)) {
-        let n = 2;
-        while (existing.includes(`${base}-${n}.md`)) n++;
-        fileName = `${base}-${n}.md`;
-      }
-    } catch {
-      // Directory may not exist yet
+    if (!ctx.mcpClient?.isConnected()) {
+      return new Response(renderSaveError("MCP not connected — cannot create significant memory"), {
+        status: 503,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
     }
 
     const formattedContent = `# ${displayTitle}
@@ -2231,26 +2181,7 @@ export async function handleCreateSignificantMemory(
 ${content.trim()}
 `;
 
-    // Write local file using writeMemoryFile (handles DB tracking for non-significant;
-    // significant skips DB tracking per file-writer.ts)
-    const memory = {
-      path: `significant/${fileName}`,
-      content: formattedContent,
-      chatIds: [],
-      granularity: "significant" as const,
-      date,
-    };
-
-    await writeMemoryFile(memory, ctx.db, ctx.projectRoot);
-
-    // Push to entity-core via MCP (pass slug so entity-core uses matching filename)
-    if (ctx.mcpClient?.isConnected()) {
-      try {
-        await ctx.mcpClient.createMemory("significant", date, formattedContent, [], slug);
-      } catch (error) {
-        console.error("[Routes] MCP memory_create for significant failed (local save succeeded):", error instanceof Error ? error.message : String(error));
-      }
-    }
+    await ctx.mcpClient.createMemory("significant", date, formattedContent, [], slug);
 
     // Return redirect to refresh the significant tab
     return new Response("", {
@@ -2276,38 +2207,23 @@ export async function handleDeleteSignificantMemory(
   ctx: RouteContext,
   filename: string,
 ): Promise<Response> {
-  // Validate filename — must end with .md, no path separators
-  // Frontend sends displayName (without .md), so append if missing
+  // Extract date from the URL filename (e.g., "2026-04-06_some-slug" -> "2026-04-06")
   const decoded = decodeURIComponent(filename);
-  const filenameWithExt = decoded.endsWith(".md") ? decoded : `${decoded}.md`;
-  if (!isValidFilename(filenameWithExt)) {
-    return new Response(
-      JSON.stringify({ error: "Invalid filename" }),
-      {
-        status: 400,
-        headers: { "Content-Type": "application/json" },
-      },
-    );
-  }
+  const date = decoded.split("_")[0];
 
-  const filePath = `significant/${filenameWithExt}`;
-  const fullPath = `${ctx.projectRoot}/memories/${filePath}`;
-
-  try {
-    await Deno.stat(fullPath);
-  } catch {
+  if (!ctx.mcpClient?.isConnected()) {
     return new Response(
-      JSON.stringify({ error: "Memory not found" }),
+      JSON.stringify({ error: "MCP not connected — cannot delete memory" }),
       {
-        status: 404,
+        status: 503,
         headers: { "Content-Type": "application/json" },
       },
     );
   }
 
   try {
-    await Deno.remove(fullPath);
-    console.log(`[Routes] Deleted significant memory: ${filePath}`);
+    await ctx.mcpClient.deleteMemory("significant", date);
+    console.log(`[Routes] Deleted significant memory via MCP: ${decoded}`);
 
     return new Response(
       JSON.stringify({ success: true }),

@@ -2174,7 +2174,7 @@ function renderMemoryTabActiveState(activeGranularity: string): string {
  */
 export function renderMemoryList(
   granularity: MemoryGranularity,
-  files: string[],
+  items: Array<{ date: string; preview: string }>,
 ): string {
   const isSignificant = granularity === "significant";
 
@@ -2212,21 +2212,16 @@ export function renderMemoryList(
       </div>`;
   }
 
-  // Sort files newest first
-  const sortedFiles = [...files].reverse();
+  // Sort items newest first
+  const sortedItems = [...items].reverse();
 
-  const fileListHtml = sortedFiles.length === 0
+  const fileListHtml = sortedItems.length === 0
     ? `<div class="settings-empty">${isSignificant ? "No significant memories yet. Create one above!" : "No memories in this category"}</div>`
     : `<div class="settings-file-list">
-      ${sortedFiles.map((file) => {
-        // Extract date from filename (e.g., "daily/2026-03-25.md" -> "2026-03-25")
-        const parts = file.split("/");
-        const filename = parts[parts.length - 1];
-        const displayName = filename.replace(/\.md$/, "");
-
+      ${sortedItems.map((item) => {
         return `<button
           class="settings-file-item"
-          hx-get="/fragments/settings/memories/${granularity}/${encodeURIComponent(displayName)}"
+          hx-get="/fragments/settings/memories/${granularity}/${encodeURIComponent(item.date)}"
           hx-target="#settings-content"
           hx-swap="innerHTML"
         >
@@ -2234,7 +2229,8 @@ export function renderMemoryList(
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
             <polyline points="14 2 14 8 20 8"/>
           </svg>
-          <span class="settings-file-name">${escapeHtml(displayName)}</span>
+          <span class="settings-file-name">${escapeHtml(item.date)}</span>
+          ${item.preview ? `<span class="settings-file-preview">${escapeHtml(item.preview)}</span>` : ""}
         </button>`;
       }).join("")}
     </div>`;
