@@ -1,15 +1,30 @@
 # Memory System & RAG
 
-Psycheros implements a hierarchical memory system where the entity writes their own memories from conversations. Three RAG systems work together to provide contextual recall.
+Psycheros implements a hierarchical memory system where the entity writes their own memories from conversations. Memory storage and retrieval are delegated entirely to [entity-core](https://github.com/zarilewis/entity-core) via MCP — Psycheros maintains no local memory files. Three RAG systems provide contextual recall.
+
+## Memory Architecture
+
+**Entity-core is the sole authority for all memories.** Psycheros reads, writes, searches, and deletes memories exclusively through MCP tool calls. This eliminates sync issues, stale local copies, and duplicate indexing.
+
+What Psycheros still manages locally:
+- **Chat history** — conversations and messages in SQLite
+- **Chat RAG** — vector search over conversation history
+- **Data Vault RAG** — document storage and eager search
+- **Memory summary tracking** — `memory_summaries` and `summarized_chats` DB tables record which days have been summarized (prevents re-processing)
+
+What entity-core manages:
+- **Memory storage** — all memory files (daily, weekly, monthly, yearly, significant)
+- **Memory RAG** — vector indexing and semantic search over memories
+- **Consolidation** — weekly/monthly/yearly summarization via cron jobs with catch-up
 
 ## Memory Hierarchy
 
-Memories are written in the entity's voice (first-person), referring to the user by their actual name and preferred pronouns. All summarization LLM calls receive the entity's full identity context (base instructions, self, user, relationship, and custom files) as a system message, so memories reflect the entity's personality and knowledge of the user. They are organized hierarchically and consolidated over time.
+Memories are written in the entity's voice (first-person), referring to the user by their actual name and preferred pronouns. All summarization LLM calls receive the entity's full identity context as a system message, so memories reflect the entity's personality and knowledge of the user. They are organized hierarchically and consolidated over time.
 
-Daily summarization runs locally in Psycheros (triggered by day-change detection). When `PSYCHEROS_DISPLAY_TZ` is configured, the cron fires at 5 AM in the user's local timezone and messages are grouped by logical local date (a 5 AM cutoff means messages from 5 AM today to 4:59 AM tomorrow are the same "day"). Without a configured timezone, it falls back to `PSYCHEROS_MEMORY_HOUR` at UTC (default: 4 AM). Weekly, monthly, and yearly consolidation runs in [entity-core](https://github.com/zarilewis/entity-core) via its own cron jobs, independently of whether any Psycheros instance is connected. Consolidation and catch-up can be triggered from the Entity Core card (Settings → Entity Core → Maintenance).
+Daily summarization runs in Psycheros (it has conversation context) but writes the result to entity-core via MCP. When `PSYCHEROS_DISPLAY_TZ` is configured, the cron fires at 5 AM in the user's local timezone and messages are grouped by logical local date (a 5 AM cutoff means messages from 5 AM today to 4:59 AM tomorrow are the same "day"). Without a configured timezone, it falls back to `PSYCHEROS_MEMORY_HOUR` at UTC (default: 4 AM). Weekly, monthly, and yearly consolidation runs in entity-core via its own cron jobs, independently of whether any Psycheros instance is connected.
 
 ```
-memories/
+entity-core/data/memories/        (canonical storage — managed by entity-core)
 ├── daily/           # Daily summaries (auto-generated, per-instance)
 │   └── 2026-02-22_psycheros.md
 ├── weekly/          # Weekly consolidation (Sundays)
@@ -18,56 +33,56 @@ memories/
 │   └── 2026-02.md
 ├── yearly/          # Yearly consolidation (Jan 1st)
 │   └── 2026.md
-├── significant/     # Permanently remembered events (never consolidated)
-│   └── 2026-04-13_first-conversation.md
-└── archive/
-    └── daily/       # Archived daily files after weekly consolidation
+└── significant/     # Permanently remembered events (never consolidated)
+    └── 2026-04-13_first-conversation.md
 ```
 
 ### Memory Types
 
-| Type | Description | Created By |
-|------|-------------|------------|
-| **Daily** | Auto-generated conversation summaries | Psycheros day-change trigger |
-| **Weekly** | Consolidated from daily entries | entity-core cron (Sunday 5 AM) |
-| **Monthly** | Consolidated from weekly entries | entity-core cron (1st of month 5 AM) |
-| **Yearly** | Consolidated from monthly entries | entity-core cron (January 1st 5 AM) |
-| **Significant** | Emotionally important events, permanently remembered | Entity via `create_significant_memory` tool |
+| Type | Description | Created By | Stored In |
+|------|-------------|------------|-----------|
+| **Daily** | Auto-generated conversation summaries | Psycheros via MCP | entity-core |
+| **Weekly** | Consolidated from daily entries | entity-core cron (Sunday 5 AM) | entity-core |
+| **Monthly** | Consolidated from weekly entries | entity-core cron (1st of month 5 AM) | entity-core |
+| **Yearly** | Consolidated from monthly entries | entity-core cron (January 1st 5 AM) | entity-core |
+| **Significant** | Emotionally important events, permanently remembered | Entity via `create_significant_memory` tool | entity-core |
 
 ### Trigger
 
-On first message of a new day (detected by date change), the previous day's conversations are summarized into a daily memory. The cron fires at 5 AM in the user's local timezone (when `PSYCHEROS_DISPLAY_TZ` is set), or at `PSYCHEROS_MEMORY_HOUR` UTC (default: 4 AM) as a fallback.
+On startup and via daily cron, Psycheros checks for unsummarized dates (days with messages not yet recorded in `memory_summaries`). The cron fires at 5 AM in the user's local timezone (when `PSYCHEROS_DISPLAY_TZ` is set), or at `PSYCHEROS_MEMORY_HOUR` UTC (default: 4 AM) as a fallback. On startup, `repairOrphanedSummaries()` detects DB records where the corresponding memory doesn't exist in entity-core (e.g., from a failed MCP write), clears them, and re-summarizes.
 
 ### Consolidation Schedule
 
-- **Daily summarization**: Psycheros cron at 5 AM local time (or `PSYCHEROS_MEMORY_HOUR` UTC fallback) — runs locally
-- **Weekly**: entity-core cron (Sunday 5 AM UTC) — runs in entity-core
-- **Monthly**: entity-core cron (1st of month 5 AM UTC) — runs in entity-core
-- **Yearly**: entity-core cron (January 1st 5 AM UTC) — runs in entity-core
+- **Daily summarization**: Psycheros cron at 5 AM local time (or `PSYCHEROS_MEMORY_HOUR` UTC fallback) — generated in Psycheros, stored in entity-core
+- **Weekly**: entity-core cron (Sunday 5 AM UTC) — runs in entity-core with catch-up
+- **Monthly**: entity-core cron (1st of month 5 AM UTC) — runs in entity-core with catch-up
+- **Yearly**: entity-core cron (January 1st 5 AM UTC) — runs in entity-core with catch-up
 
-Weekly, monthly, and yearly consolidation run independently in entity-core regardless of whether Psycheros is connected. Entity-core uses the `memory_consolidate` MCP tool and `Deno.cron` jobs to manage this.
-
-### Catch-up Consolidation
-
-If entity-core was offline when a consolidation was scheduled, missed periods can be backfilled via the `memory_consolidate` MCP tool (with `all=true`). The Maintenance tab in Settings → Entity Core delegates to entity-core via MCP when available. A double-run guard prevents concurrent consolidation.
+Weekly, monthly, and yearly consolidation run independently in entity-core regardless of whether Psycheros is connected. Entity-core's cron jobs include catch-up logic that finds and processes any missed periods.
 
 ### Instance Tagging
 
-Memories are tagged with `sourceInstance` to track which embodiment created them. Each bullet point in memory content includes inline `[chat:id]` and `[via:instanceId]` tags so the entity can identify the source of individual memories when multiple embodiments contribute to the same file. This enables instance-aware RAG retrieval.
+Memories are tagged with `sourceInstance` to track which embodiment created them. Each bullet point in memory content includes inline `[chat:id]` and `[via:instanceId]` tags so the entity can identify the source of individual memories when multiple embodiments contribute to the same file.
+
+### MCP Requirements
+
+Memory operations require entity-core to be connected (`PSYCHEROS_MCP_ENABLED=true`). If MCP is unavailable:
+- Daily summarization does not run (no point — memories can't be stored)
+- Memory browser UI returns 503 errors
+- `create_significant_memory` tool fails with an error message
 
 ## RAG Systems
 
 Three RAG systems provide contextual information before each LLM call, plus the Data Vault for user/entity-uploaded documents.
 
-### Memory RAG
+### Memory RAG (via MCP)
 
-Retrieves relevant memories from the hierarchical memory store.
+Retrieves relevant memories from entity-core's memory store via the `memory_search` MCP tool.
 
-1. **Indexing**: On startup, all memory files are chunked and embedded using HuggingFace `all-MiniLM-L6-v2` (384 dimensions)
-2. **Retrieval**: Before processing each message, top-k chunks are retrieved by similarity
-3. **Instance Boost**: Memories from the same embodiment get +0.1 to similarity score
-4. **Context**: Retrieved memories are injected into the system prompt, explicitly labeled "via RAG" so the entity understands their retrieval mechanism
-5. **Auto-repair**: Startup verification detects vector table sync issues and forces reindex
+1. **Query**: Before processing each message, the user's message is sent to entity-core's semantic memory search
+2. **Results**: Entity-core returns scored excerpts with granularity, date, and relevance percentage
+3. **Context**: Retrieved memories are injected into the system prompt with relevance scores
+4. **No local indexing**: All memory embeddings and vector search happen in entity-core
 
 ### Chat RAG
 
@@ -147,21 +162,22 @@ Eager RAG over user-uploaded and entity-created reference documents. Documents a
   - macOS: `lib/vec0.dylib` (aarch64)
 - **Fallback**: In-memory cosine similarity calculation when extension is unavailable
 - **Embeddings**: HuggingFace `all-MiniLM-L6-v2` model (384 dimensions)
+- **Used for**: Chat RAG, Vault RAG, Graph RAG (all local to Psycheros)
+- **Memory RAG**: Handled by entity-core via MCP (not local)
 
 ## Related Source Files
 
 | File | Purpose |
 |------|---------|
-| `src/memory/mod.ts` | Hierarchical memory system (daily only) |
+| `src/memory/mod.ts` | Memory module barrel — daily summarization, trigger, catch-up, orphan repair |
+| `src/memory/summarizer.ts` | Daily summarization with identity context, writes to entity-core via MCP |
+| `src/memory/trigger.ts` | Startup catch-up, orphan repair, cron setup |
+| `src/memory/file-writer.ts` | Content formatting utilities (extractChatIds, formatMemoryContent) |
+| `src/memory/types.ts` | Memory types, date formatting, instance tagging |
 | `src/memory/date-utils.ts` | Timezone-aware logical date helpers for message grouping |
-| `src/memory/types.ts` | Memory types with instance tagging |
-| `src/memory/summarizer.ts` | Daily summarization with identity context |
-| `src/memory/trigger.ts` | Day-change detection, catch-up, orphan repair |
-| `src/memory/file-writer.ts` | Memory file operations |
-| `src/rag/mod.ts` | RAG retrieval system |
+| `src/mcp-client/mod.ts` | MCP client — createMemory, readMemory, searchMemories, listMemories, deleteMemory, updateMemory |
+| `src/rag/mod.ts` | RAG retrieval system (chat, vault, graph — memory RAG removed) |
 | `src/rag/embedder.ts` | HuggingFace transformer embeddings |
-| `src/rag/indexer.ts` | Memory indexing with sqlite-vec sync |
-| `src/rag/retriever.ts` | Similarity search with instance boost |
 | `src/rag/conversation.ts` | ChatRAG for chat history |
 | `src/rag/context-builder.ts` | Formats retrieved memories for context |
 | `src/db/vector.ts` | sqlite-vec helpers, serialization, search |

@@ -38,7 +38,7 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 | `shell` | Execute shell commands |
 | `update_title` | Update conversation titles |
 | `get_metrics` | Retrieve streaming performance metrics |
-| `create_significant_memory` | Create permanent memory files |
+| `create_significant_memory` | Create permanent memory (stored in entity-core via MCP) |
 | `sync_mcp` | Sync with entity-core |
 | `identity_append` | Add knowledge to identity files (Tier 1 — append-only) |
 | `maintain_identity` | Full identity file maintenance (Tier 2 — append, prepend, update_section, rewrite_section) |
@@ -67,10 +67,12 @@ PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,iden
 
 ## RAG Settings
 
+These settings control Chat RAG and Vault RAG (local to Psycheros). Memory RAG is handled by entity-core via MCP.
+
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PSYCHEROS_RAG_ENABLED` | `true` | Enable RAG memory retrieval |
-| `PSYCHEROS_RAG_MAX_CHUNKS` | `8` | Max memory chunks to retrieve |
+| `PSYCHEROS_RAG_ENABLED` | `true` | Enable Chat and Vault RAG |
+| `PSYCHEROS_RAG_MAX_CHUNKS` | `8` | Max chat/vault chunks to retrieve |
 | `PSYCHEROS_RAG_MAX_TOKENS` | `2000` | Max tokens in retrieved context |
 | `PSYCHEROS_RAG_MIN_SCORE` | `0.3` | Minimum similarity score |
 
@@ -98,8 +100,9 @@ When MCP is enabled, Psycheros:
 - Dynamically restarts entity-core when the active profile changes
 - Entity-core-specific `ENTITY_CORE_LLM_*` vars take priority if set
 - Pulls identity files (self, user, relationship, custom) from entity-core
-- Queues changes and syncs back periodically (every 5 minutes)
-- Falls back to local files if MCP is unavailable
+- Queues identity changes and syncs back periodically (every 5 minutes)
+- All memory operations (read, write, search, delete) go through entity-core via MCP
+- Falls back to local identity files if MCP is unavailable (memory operations require MCP)
 
 ## Migration to entity-core
 

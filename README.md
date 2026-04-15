@@ -93,17 +93,14 @@ src/
 ├── rag/              # Retrieval-Augmented Generation
 │   ├── mod.ts
 │   ├── embedder.ts   # HuggingFace transformer embeddings
-│   ├── indexer.ts    # SQLite FTS5 with sqlite-vec
-│   ├── retriever.ts  # Similarity search with instance boost
 │   ├── conversation.ts  # ChatRAG for chat history
 │   └── context-builder.ts
-├── memory/           # Hierarchical memory system
+├── memory/           # Hierarchical memory system (delegates to entity-core via MCP)
 │   ├── mod.ts
 │   ├── types.ts
-│   ├── summarizer.ts # Daily summarization
-│   ├── consolidator.ts # Weekly/monthly/yearly
-│   ├── file-writer.ts
-│   └── trigger.ts    # Day-change detection
+│   ├── summarizer.ts # Daily summarization → writes to entity-core
+│   ├── file-writer.ts # Content formatting utilities
+│   └── trigger.ts    # Startup catch-up, orphan repair
 ├── lorebook/         # Lorebook/world info system
 │   ├── mod.ts
 │   ├── manager.ts    # CRUD operations
@@ -153,8 +150,8 @@ Psycheros/
 ├── templates/identity/ # Default identity templates (tracked in git)
 ├── templates/custom-tools/ # Custom tools README template (tracked in git)
 ├── custom-tools/      # User-written custom tools (gitignored)
-├── identity/          # Live identity files (gitignored)
-├── memories/          # Hierarchical memory storage (gitignored)
+├── identity/          # Live identity files (gitignored, cached from entity-core)
+├── memories/          # Local memory cache (gitignored, canonical copies in entity-core)
 ├── .snapshots/        # Identity file backups (gitignored)
 └── .psycheros/        # Runtime data — SQLite DB (gitignored)
 ```
@@ -196,7 +193,7 @@ For detailed Docker strategy, CI/CD pipeline, and UnRAID setup, see the parent w
 - **[Entity Philosophy](docs/entity-philosophy.md)** — First-person convention, ownership, embodiment concept
 - **[Configuration](docs/configuration.md)** — All env vars, tools list, RAG/MCP settings
 - **[Tools & Identity](docs/tools-reference.md)** — Tool system, identity tiers, MCP fallback, core prompts
-- **[Memory & RAG](docs/memory-and-rag.md)** — Memory hierarchy, 3 RAG systems, vector search
+- **[Memory & RAG](docs/memory-and-rag.md)** — Memory hierarchy (entity-core authority), RAG systems, vector search
 - **[UI Features](docs/ui-features.md)** — Context viewer, stop generation, editing, appearance, graph viz
 - **[API Reference](docs/api-reference.md)** — 45+ endpoints, dual SSE architecture
 

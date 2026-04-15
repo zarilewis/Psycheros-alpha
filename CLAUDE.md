@@ -59,8 +59,8 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/llm/entity-core-settings.ts` | Entity-core LLM override settings type, load/save (model, temperature, maxTokens) |
 | `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback, local snapshot restore) |
 | `src/tools/identity-custom.ts` | Custom identity file tool (create, append, prepend, update_section, rewrite_section) |
-| `src/memory/mod.ts` | Hierarchical memory system (daily summarization only; weekly/monthly/yearly consolidation moved to entity-core) |
-| `src/rag/mod.ts` | RAG retrieval system |
+| `src/memory/mod.ts` | Memory system — daily summarization, writes to entity-core via MCP |
+| `src/rag/mod.ts` | RAG retrieval system (chat, vault, graph — memory RAG via MCP) |
 | `src/mcp-client/mod.ts` | MCP client for entity-core connection |
 | `src/lorebook/mod.ts` | Lorebook/world info system |
 | `src/vault/mod.ts` | Data Vault — document storage and eager RAG |
@@ -148,9 +148,9 @@ Image generation and visual analysis configured via Settings > Vision (top-level
 **Tool execution concurrency**: `ToolRegistry.executeAll()` uses a promise mutex to serialize tool execution across concurrent turns, preventing race conditions on shared resources (identity files, knowledge graph, memories).
 
 **User data protection**:
-- `identity/`, `memories/`, `.snapshots/`, `data/vault/` are **runtime-only directories** — gitignored, never committed
+- `identity/`, `.snapshots/`, `data/vault/` are **runtime-only directories** — gitignored, never committed
 - To change identity defaults, edit `templates/identity/` (committed). `src/init/mod.ts` seeds `identity/` from templates on first run if empty. Vault documents in `templates/vault/` are seeded into the global Data Vault on first startup. **Never `git add` files from `identity/`** — they contain user-specific entity data.
-- Entity-core is canonical source; local `identity/` is a cache when MCP is enabled
+- Entity-core is canonical source for identity and memories; local `identity/` is a cache when MCP is enabled. Memories are stored exclusively in entity-core via MCP.
 
 ## Documentation Index
 

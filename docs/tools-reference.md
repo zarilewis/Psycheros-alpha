@@ -439,6 +439,7 @@ The `identity/custom/` directory allows creating arbitrary identity files:
 - `identity/`, `memories/`, `.snapshots/` are in `.gitignore` — protected from git overwrites
 - Fresh installations get default files from `templates/identity/` via `src/init/mod.ts`
 - When MCP is enabled, identity files are loaded from entity-core (local `identity/` is a cache)
+- All memory storage is in entity-core via MCP (local `memories/` directory is unused when MCP is enabled)
 
 ### Core Prompts UI
 
