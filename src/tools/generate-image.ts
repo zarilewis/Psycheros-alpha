@@ -68,6 +68,76 @@ export const generateImageTool: Tool = {
 // OpenRouter Provider
 // =============================================================================
 
+/** Map configured width/height to an OpenRouter-compatible size string. */
+function mapToOpenRouterSize(width: number, height: number): string {
+  const w = Math.min(width, 4096);
+  const h = Math.min(height, 4096);
+  // Round to nearest supported dimension
+  return `${w}x${h}`;
+}
+
+/**
+ * Extract image data from an OpenRouter chat completions response.
+ * The response `content` may be:
+ *   - An array of content parts: [{ type: "image_url", image_url: { url: "data:..." } }, ...]
+ *   - A string containing a data URI or markdown image
+ *   - A string with no image (error)
+ */
+function extractImageFromContent(
+  content: unknown,
+): { imageData: string; mediaType: string } {
+  // Handle content as array of parts (standard for image-generating models)
+  if (Array.isArray(content)) {
+    for (const part of content) {
+      if (part?.type === "image_url" && part.image_url?.url) {
+        const url = part.image_url.url;
+        // Base64 data URI
+        const dataMatch = url.match(/^data:(image\/\w+);base64,(.+)$/);
+        if (dataMatch) {
+          return { imageData: dataMatch[2], mediaType: dataMatch[1] };
+        }
+        // Remote URL — download it
+        // (handled after the loop below)
+      }
+      // Also handle inlineData (some providers return this format through OpenRouter)
+      if (part?.inlineData && !part.thought) {
+        return {
+          imageData: (part.inlineData as { data: string }).data,
+          mediaType: (part.inlineData as { mimeType?: string }).mimeType || "image/png",
+        };
+      }
+    }
+    // If no base64 data URI found, check for remote URLs in image_url parts
+    for (const part of content) {
+      if (part?.type === "image_url" && part.image_url?.url) {
+        const url = String(part.image_url.url);
+        if (url.startsWith("http")) {
+          // Return a marker that the caller should fetch
+          throw new Error(`OpenRouter returned a remote image URL: ${url}`);
+        }
+      }
+    }
+    throw new Error("OpenRouter response content array contained no image");
+  }
+
+  // Handle content as string
+  if (typeof content === "string") {
+    // Check for base64 data URI
+    const base64Match = content.match(/data:image\/(\w+);base64,([A-Za-z0-9+/=]+)/);
+    if (base64Match) {
+      return { imageData: base64Match[2], mediaType: `image/${base64Match[1]}` };
+    }
+    // Check for markdown image syntax
+    const urlMatch = content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+    if (urlMatch) {
+      throw new Error(`OpenRouter returned a remote image URL: ${urlMatch[1]}`);
+    }
+    throw new Error("OpenRouter response text did not contain an image");
+  }
+
+  throw new Error("OpenRouter returned no content in the response");
+}
+
 async function generateViaOpenRouter(
   config: ImageGenConfig,
   prompt: string,
@@ -79,81 +149,54 @@ async function generateViaOpenRouter(
   const settings = config.settings.openrouter;
   if (!settings) throw new Error("OpenRouter settings not configured for this generator");
 
-  const baseUrl = settings.baseUrl || "https://openrouter.ai/api";
+  const baseUrl = settings.baseUrl || "https://openrouter.ai/api/v1";
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "Authorization": `Bearer ${settings.apiKey}`,
   };
 
-  // Build messages — include reference images inline
-  const imageContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
+  // Build user message content — include reference images inline
+  const messageContent: Array<{ type: string; text?: string; image_url?: { url: string } }> = [];
 
   for (const img of anchorImages) {
-    imageContent.push({
+    messageContent.push({
       type: "image_url",
       image_url: { url: `data:${img.mediaType};base64,${img.data}` },
     });
   }
 
   if (userImage) {
-    imageContent.push({
+    messageContent.push({
       type: "image_url",
       image_url: { url: `data:${userImage.mediaType};base64,${userImage.data}` },
     });
   }
 
   if (inputImage) {
-    imageContent.push({
+    messageContent.push({
       type: "image_url",
       image_url: { url: `data:${inputImage.mediaType};base64,${inputImage.data}` },
     });
   }
 
-  imageContent.push({ type: "text", text: prompt });
+  // Build text part — fold in negative prompt if present
+  let textPrompt = prompt;
+  if (negativePrompt) {
+    textPrompt += `\n\nStyle requirements: avoid ${negativePrompt}.`;
+  }
+  messageContent.push({ type: "text", text: textPrompt });
+
+  const params = config.settings.params;
+  const size = mapToOpenRouterSize(params.width, params.height);
 
   const body: Record<string, unknown> = {
     model: settings.model,
-    messages: [{ role: "user", content: imageContent }],
+    messages: [{ role: "user", content: messageContent }],
+    modalities: ["text", "image"],
+    size,
   };
 
-  if (negativePrompt) {
-    body.negative_prompt = negativePrompt;
-  }
-
-  // Try the images/generations endpoint first (some OpenRouter models support it)
-  let response = await fetch(`${baseUrl}/api/v1/images/generations`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model: settings.model,
-      prompt,
-      n: 1,
-      negative_prompt: negativePrompt || undefined,
-    }),
-  });
-
-  if (response.ok) {
-    const data = await response.json() as { data?: Array<{ url?: string; b64_json?: string }> };
-    if (data.data && data.data[0]) {
-      const item = data.data[0];
-      if (item.b64_json) {
-        return { imageData: item.b64_json, mediaType: "image/png" };
-      }
-      if (item.url) {
-        // Download the image from URL
-        const imgResponse = await fetch(item.url);
-        if (imgResponse.ok) {
-          const buffer = await imgResponse.arrayBuffer();
-          const base64 = uint8ToBase64(new Uint8Array(buffer));
-          const contentType = imgResponse.headers.get("content-type") || "image/png";
-          return { imageData: base64, mediaType: contentType };
-        }
-      }
-    }
-  }
-
-  // Fallback: use chat completions endpoint (models like DALL-E via OpenRouter)
-  response = await fetch(`${baseUrl}/chat/completions`, {
+  const response = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -164,38 +207,52 @@ async function generateViaOpenRouter(
     throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
   }
 
-  const chatData = await response.json() as {
-    choices?: Array<{
-      message?: {
-        content?: string;
-      };
-    }>;
-  };
+  const chatData = await response.json() as Record<string, unknown>;
 
-  const content = chatData.choices?.[0]?.message?.content;
-  if (!content) {
-    throw new Error("OpenRouter returned no content in the response");
-  }
+  const choices = chatData.choices as Array<Record<string, unknown>> | undefined;
+  const message = choices?.[0]?.message as Record<string, unknown> | undefined;
 
-  // Check if the response contains a base64 image or a markdown image
-  const base64Match = content.match(/data:image\/(\w+);base64,([A-Za-z0-9+/=]+)/);
-  if (base64Match) {
-    return { imageData: base64Match[2], mediaType: `image/${base64Match[1]}` };
-  }
-
-  // Check for URL in markdown image syntax
-  const urlMatch = content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-  if (urlMatch) {
-    const imgResponse = await fetch(urlMatch[1]);
-    if (imgResponse.ok) {
-      const buffer = await imgResponse.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-      const contentType = imgResponse.headers.get("content-type") || "image/png";
-      return { imageData: base64, mediaType: contentType };
+  // OpenRouter returns images in message.images[] (not message.content)
+  // Format: [{ type: "image_url", image_url: { url: "data:image/png;base64,..." } }]
+  const images = message?.images as Array<Record<string, unknown>> | undefined;
+  if (images && images.length > 0) {
+    const imgUrl = images[0]?.image_url as Record<string, string> | undefined;
+    if (imgUrl?.url) {
+      const url = imgUrl.url;
+      const dataMatch = url.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (dataMatch) {
+        return { imageData: dataMatch[2], mediaType: dataMatch[1] };
+      }
+      if (url.startsWith("http")) {
+        const imgResponse = await fetch(url);
+        if (imgResponse.ok) {
+          const buffer = await imgResponse.arrayBuffer();
+          const base64 = uint8ToBase64(new Uint8Array(buffer));
+          const contentType = imgResponse.headers.get("content-type") || "image/png";
+          return { imageData: base64, mediaType: contentType };
+        }
+      }
     }
   }
 
-  throw new Error("OpenRouter response did not contain an image");
+  // Fallback: check message.content (some models/providers may return it there)
+  const content = message?.content;
+  try {
+    return extractImageFromContent(content);
+  } catch (err) {
+    // If the error message contains a remote URL, try to download it
+    const urlMatch = err instanceof Error && err.message.match(/remote image URL: (https?:\/\/[^\s]+)/);
+    if (urlMatch) {
+      const imgResponse = await fetch(urlMatch[1]);
+      if (imgResponse.ok) {
+        const buffer = await imgResponse.arrayBuffer();
+        const base64 = uint8ToBase64(new Uint8Array(buffer));
+        const contentType = imgResponse.headers.get("content-type") || "image/png";
+        return { imageData: base64, mediaType: contentType };
+      }
+    }
+    throw err;
+  }
 }
 
 // =============================================================================

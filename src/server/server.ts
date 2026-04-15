@@ -141,6 +141,8 @@ import {
   handleSaveHomeSettings,
   handleGetImageGenSettings,
   handleSaveImageGenSettings,
+  handleSaveImageGenSlot,
+  handleDeleteImageGenSlot,
   handleListAnchorImages,
   handleUploadAnchorImage,
   handleUpdateAnchorImage,
@@ -1396,6 +1398,16 @@ export class Server {
     // POST /api/image-gen-settings - Save image gen settings
     if (method === "POST" && path === "/api/image-gen-settings") {
       return await handleSaveImageGenSettings(ctx, request);
+    }
+
+    // POST /api/image-gen-settings/slot - Save a single generator slot (preserves API keys)
+    if (method === "POST" && path === "/api/image-gen-settings/slot") {
+      return await handleSaveImageGenSlot(ctx, request);
+    }
+
+    // POST /api/image-gen-settings/delete - Delete a single generator slot
+    if (method === "POST" && path === "/api/image-gen-settings/delete") {
+      return await handleDeleteImageGenSlot(ctx, request);
     }
 
     // POST /api/image-gen-settings/reset - Reset to defaults

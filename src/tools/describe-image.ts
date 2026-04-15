@@ -268,7 +268,7 @@ async function captionViaOpenRouter(
   const orSettings = settings.openrouter;
   if (!orSettings) throw new Error("OpenRouter captioning settings not configured");
 
-  const baseUrl = orSettings.baseUrl || "https://openrouter.ai/api";
+  const baseUrl = orSettings.baseUrl || "https://openrouter.ai/api/v1";
   const url = `${baseUrl}/chat/completions`;
 
   const body = {
@@ -320,7 +320,7 @@ async function captionViaOpenRouterDual(
   const orSettings = settings.openrouter;
   if (!orSettings) throw new Error("OpenRouter captioning settings not configured");
 
-  const baseUrl = orSettings.baseUrl || "https://openrouter.ai/api";
+  const baseUrl = orSettings.baseUrl || "https://openrouter.ai/api/v1";
   const url = `${baseUrl}/chat/completions`;
 
   const body = {

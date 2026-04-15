@@ -5317,7 +5317,7 @@ function renderVisionCaptioningSection(
       <div class="llm-field">
         <label for="cap-provider">Provider</label>
         <select id="cap-provider" class="input-field llm-input" onchange="toggleCaptioningProvider()">
-          <option value="gemini" ${provider === "gemini" ? "selected" : ""}>Google Gemini</option>
+          <option value="gemini" ${provider === "gemini" ? "selected" : ""}>Google AI Studio</option>
           <option value="openrouter" ${provider === "openrouter" ? "selected" : ""}>OpenRouter</option>
         </select>
       </div>
@@ -5349,7 +5349,7 @@ function renderVisionCaptioningSection(
         </div>
         <div class="llm-field">
           <label for="cap-or-baseurl">Base URL</label>
-          <input type="text" id="cap-or-baseurl" class="input-field llm-input" value="${escapeHtml(c.openrouter?.baseUrl || "")}" placeholder="https://openrouter.ai/api (default)">
+          <input type="text" id="cap-or-baseurl" class="input-field llm-input" value="${escapeHtml(c.openrouter?.baseUrl || "")}" placeholder="https://openrouter.ai/api/v1 (default)">
         </div>
       </div>
 
@@ -5744,7 +5744,7 @@ export function renderImageGenSlotSettings(generator: ImageGenConfig | undefined
           <label for="ig-provider">Provider</label>
           <select id="ig-provider" class="input-field llm-input" onchange="toggleImageGenProvider()">
             <option value="openrouter" ${g.provider === "openrouter" ? "selected" : ""}>OpenRouter</option>
-            <option value="gemini" ${g.provider === "gemini" ? "selected" : ""}>Google Gemini</option>
+            <option value="gemini" ${g.provider === "gemini" ? "selected" : ""}>Google AI Studio</option>
             <option value="comfyui" disabled>ComfyUI (coming soon)</option>
             <option value="native" disabled>Native (coming soon)</option>
           </select>
@@ -5762,12 +5762,12 @@ export function renderImageGenSlotSettings(generator: ImageGenConfig | undefined
           </div>
           <div class="llm-field">
             <label for="ig-or-baseurl">Base URL</label>
-            <input type="text" id="ig-or-baseurl" class="input-field llm-input" value="${escapeHtml(orSettings?.baseUrl || "")}" placeholder="https://openrouter.ai/api (default)">
+            <input type="text" id="ig-or-baseurl" class="input-field llm-input" value="${escapeHtml(orSettings?.baseUrl || "")}" placeholder="https://openrouter.ai/api/v1 (default)">
           </div>
         </div>
 
         <div id="ig-gemini-section" style="${g.provider === "gemini" ? "" : "display:none;"}">
-          <h3 style="margin-top:var(--sp-4);font-size:var(--font-size-sm);color:var(--c-fg-muted);">Google Gemini Settings</h3>
+          <h3 style="margin-top:var(--sp-4);font-size:var(--font-size-sm);color:var(--c-fg-muted);">Google AI Studio Settings</h3>
           <div class="llm-field">
             <label for="ig-gemini-key">API Key</label>
             <input type="password" id="ig-gemini-key" class="input-field llm-input" value="${escapeHtml(g.settings.gemini?.apiKey || "")}" placeholder="AIza...">
@@ -5826,27 +5826,13 @@ async function saveImageGenSlot(id, isNew) {
     };
   }
 
-  let settings;
-  if (!isNew) {
-    const resp = await fetch('/api/image-gen-settings');
-    settings = await resp.json();
-    const idx = settings.generators.findIndex(g => g.id === id);
-    if (idx >= 0) settings.generators[idx] = generator;
-    else settings.generators.push(generator);
-  } else {
-    settings = { generators: [generator] };
-  }
-
-  await fetch('/api/image-gen-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
+  await fetch('/api/image-gen-settings/slot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ generator }) });
   htmx.ajax('GET', '/fragments/settings/vision', '#chat');
 }
 
 async function deleteImageGenSlot(id) {
   if (!confirm('Delete this generator?')) return;
-  const resp = await fetch('/api/image-gen-settings');
-  const settings = await resp.json();
-  settings.generators = settings.generators.filter(g => g.id !== id);
-  await fetch('/api/image-gen-settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) });
+  await fetch('/api/image-gen-settings/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
   htmx.ajax('GET', '/fragments/settings/vision', '#chat');
 }
 </script>

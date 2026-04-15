@@ -13,7 +13,7 @@ import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, LLMSettings, LLMProfileSettings, LLMConnectionProfile } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
 import type { DiscordSettings, HomeSettings } from "../llm/mod.ts";
-import type { ImageGenSettings, EntityCoreLLMSettings } from "../llm/mod.ts";
+import type { ImageGenSettings, ImageGenConfig, EntityCoreLLMSettings } from "../llm/mod.ts";
 import { maskProfileSettings, createDefaultProfile, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings, getDefaultImageGenSettings, maskImageGenSettings } from "../llm/mod.ts";
 import { captionImageDual } from "../tools/describe-image.ts";
 import { uint8ToBase64, getMediaType as getImageMediaType } from "../tools/generate-image.ts";
@@ -4967,6 +4967,68 @@ export async function handleSaveImageGenSettings(
 }
 
 /**
+ * Handle POST /api/image-gen-settings/slot - Save a single generator slot.
+ * Server-side merge that preserves real API keys when masked values are sent.
+ */
+export async function handleSaveImageGenSlot(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as { generator: ImageGenConfig };
+    const generator = body.generator;
+
+    if (!generator || !generator.id) {
+      return new Response(
+        JSON.stringify({ error: "Generator must have an id" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const settings = ctx.getImageGenSettings();
+    const existingIdx = settings.generators.findIndex((g) => g.id === generator.id);
+
+    if (existingIdx >= 0) {
+      // Update existing — preserve real API keys if masked values sent
+      const existing = settings.generators[existingIdx];
+      if (generator.settings.openrouter?.apiKey?.includes("••••")) {
+        generator.settings.openrouter.apiKey = existing.settings.openrouter?.apiKey || generator.settings.openrouter.apiKey;
+      }
+      if (generator.settings.gemini?.apiKey?.includes("••••")) {
+        generator.settings.gemini.apiKey = existing.settings.gemini?.apiKey || generator.settings.gemini.apiKey;
+      }
+      if (generator.settings.comfyui) {
+        generator.settings.comfyui = existing.settings.comfyui || generator.settings.comfyui;
+      }
+      if (generator.settings.native) {
+        generator.settings.native = existing.settings.native || generator.settings.native;
+      }
+      settings.generators[existingIdx] = generator;
+    } else {
+      // New generator — add it
+      settings.generators.push(generator);
+    }
+
+    await ctx.updateImageGenSettings(settings);
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (error) {
+    console.error("[Routes] Failed to save image gen slot:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to save image gen slot" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
+}
+
+/**
  * Handle POST /api/image-gen-settings/reset - Reset to defaults.
  */
 export function handleResetImageGenSettings(ctx: RouteContext): Response {
@@ -4978,6 +5040,45 @@ export function handleResetImageGenSettings(ctx: RouteContext): Response {
       "Access-Control-Allow-Origin": "*",
     },
   });
+}
+
+/**
+ * Handle POST /api/image-gen-settings/delete - Delete a single generator slot.
+ * Server-side operation to avoid clobbering other generators' API keys.
+ */
+export async function handleDeleteImageGenSlot(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as { id: string };
+    if (!body.id) {
+      return new Response(
+        JSON.stringify({ error: "Generator id is required" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const settings = ctx.getImageGenSettings();
+    settings.generators = settings.generators.filter((g) => g.id !== body.id);
+    await ctx.updateImageGenSettings(settings);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (error) {
+    console.error("[Routes] Failed to delete image gen slot:", error);
+    return new Response(
+      JSON.stringify({ error: "Failed to delete image gen slot" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
 }
 
 // =============================================================================

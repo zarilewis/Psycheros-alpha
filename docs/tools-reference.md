@@ -295,7 +295,7 @@ The entity can control smart home devices such as smart plugs. Currently support
 
 ## Image Generation Tool
 
-The entity can generate images using configured provider slots (OpenRouter or Google Gemini). Multiple generators can be configured with different models and settings. Anchor images provide style/character reference, users can attach images to chat messages, and the entity can iterate on previously generated images.
+The entity can generate images using configured provider slots (OpenRouter or Google AI Studio). Multiple generators can be configured with different models and settings. Anchor images provide style/character reference, users can attach images to chat messages, and the entity can iterate on previously generated images.
 
 | Tool | Description |
 |------|-------------|
@@ -309,8 +309,8 @@ The entity can generate images using configured provider slots (OpenRouter or Go
 
 | Provider | Models | Notes |
 |----------|--------|-------|
-| OpenRouter | Any image-capable model on OpenRouter | Requires API key and base URL; model-specific endpoints |
-| Gemini | `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`, `gemini-2.5-flash-image` | Requires Google API key; supports aspect ratio selection |
+| OpenRouter | Any image-capable model on OpenRouter (e.g. `openai/gpt-5-image-mini`) | Requires API key; uses `modalities: ["text", "image"]` via chat completions; images returned in `message.images[]`; supports `size` parameter |
+| Google AI Studio | `gemini-3.1-flash-image-preview`, `gemini-3-pro-image-preview`, `gemini-2.5-flash-image` | Requires Google API key; supports aspect ratio selection |
 
 **Anchor Images:** Reference images stored in `.psycheros/anchors/` with metadata in the `anchor_images` SQLite table. The entity sees available anchor IDs in its system context and can reference them by ID for style/character consistency.
 
