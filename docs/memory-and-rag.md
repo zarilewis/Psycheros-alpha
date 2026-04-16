@@ -53,7 +53,7 @@ On startup and via daily cron, Psycheros checks for unsummarized dates (days wit
 
 ### Consolidation Schedule
 
-- **Daily summarization**: Psycheros cron at 5 AM local time (or `PSYCHEROS_MEMORY_HOUR` UTC fallback) — generated in Psycheros, stored in entity-core
+- **Daily summarization**: Psycheros cron at 5 AM local time (or `PSYCHEROS_MEMORY_HOUR` UTC fallback) — uses the active profile's worker model, stored in entity-core
 - **Weekly**: entity-core cron (Sunday 5 AM UTC) — runs in entity-core with catch-up
 - **Monthly**: entity-core cron (1st of month 5 AM UTC) — runs in entity-core with catch-up
 - **Yearly**: entity-core cron (January 1st 5 AM UTC) — runs in entity-core with catch-up

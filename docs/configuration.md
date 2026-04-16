@@ -9,12 +9,12 @@ All Psycheros configuration is via environment variables. Copy `.env.example` to
 | `ZAI_API_KEY` | No* | — | API key for default LLM profile |
 | `ZAI_BASE_URL` | No | Z.ai endpoint | API endpoint URL for default profile |
 | `ZAI_MODEL` | No | `glm-4.7` | Main model for chat (default profile) |
-| `ZAI_WORKER_MODEL` | No | `GLM-4.5-Air` | Lightweight model for background tasks (title generation) |
+| `ZAI_WORKER_MODEL` | No | `GLM-4.5-Air` | Lightweight model for background tasks (auto-titling, daily memory summarization) |
 | `PSYCHEROS_PORT` | No | `3000` | Server port |
 
 \* `ZAI_*` variables are only used to create a default profile on first run. LLM connections are configured via **Settings > LLM Connections** in the web UI. Multiple named profiles can be created for different providers (OpenRouter, OpenAI, Alibaba/Qwen, NanoGPT, custom). Once profiles are saved to `.psycheros/llm-settings.json`, the UI settings take precedence over env vars.
 | `PSYCHEROS_HOST` | No | `0.0.0.0` | Server hostname |
-| `PSYCHEROS_ACCENT_COLOR` | No | `#39ff14` | UI accent color (hex) |
+| `PSYCHEROS_ACCENT_COLOR` | No | `#a855f7` | UI accent color (hex, overridden by theme preset) |
 | `PSYCHEROS_TOOLS` | No | (all) | Comma-separated list of enabled tools. Default: all tools enabled. Use `none` to disable all non-auto tools, or list specific tools to limit access. |
 | `PSYCHEROS_MEMORY_HOUR` | No | `4` | Fallback UTC hour for daily summarization (0-23). Only used when `PSYCHEROS_DISPLAY_TZ` is not set. |
 | `PSYCHEROS_SNAPSHOT_HOUR` | No | `3` | Hour to run daily identity snapshots (0-23) |

@@ -686,7 +686,7 @@ export class Server {
           console.error("[Memory] Integrity check failed:", error instanceof Error ? error.message : String(error));
         }
         try {
-          await catchUpSummarization(this.db, mcp, this.config.projectRoot, memoryConfig);
+          await catchUpSummarization(this.db, mcp, this.config.projectRoot, memoryConfig, this.getActiveLLMProfile() ?? undefined);
         } catch (error) {
           console.error("[Memory] Startup catch-up failed:", error instanceof Error ? error.message : String(error));
         }
@@ -708,7 +708,7 @@ export class Server {
 
       // Shared handler for daily summarization (used by both cron and manual trigger)
       const dailySummarizationHandler = async (): Promise<string> => {
-        const count = await catchUpSummarization(this.db, mcp, this.config.projectRoot, memoryConfig);
+        const count = await catchUpSummarization(this.db, mcp, this.config.projectRoot, memoryConfig, this.getActiveLLMProfile() ?? undefined);
         return count > 0 ? `Summarized ${count} day(s)` : "No unsummarized dates found";
       };
 

@@ -49,6 +49,8 @@ export interface LLMConfig {
   firstChunkTimeout?: number;
   /** Timeout in ms for silence between stream chunks after first chunk arrives (default: 120000) */
   streamStallTimeout?: number;
+  /** Max retries on transient errors (rate limit, 5xx, network) with exponential backoff (default: 3) */
+  maxRetries?: number;
 }
 
 // =============================================================================

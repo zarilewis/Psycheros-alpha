@@ -8,6 +8,7 @@
 
 import type { DBClient } from "../db/mod.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
+import type { LLMConnectionProfile } from "../llm/mod.ts";
 import type { SummarizerConfig } from "./types.ts";
 import { summarizeDay } from "./summarizer.ts";
 import { getTimezoneModifier, getLogicalDateNow, DEFAULT_CUTOFF_HOUR } from "./date-utils.ts";
@@ -70,6 +71,7 @@ export async function catchUpSummarization(
   mcpClient: MCPClient,
   projectRoot: string,
   config?: Partial<SummarizerConfig>,
+  activeProfile?: LLMConnectionProfile,
 ): Promise<number> {
   const tz = config?.timezone || "";
   const cutoffHour = config?.cutoffHour ?? DEFAULT_CUTOFF_HOUR;
@@ -89,7 +91,7 @@ export async function catchUpSummarization(
     if (date === today) continue;
 
     console.log(`[Memory] Catching up on ${date}...`);
-    const memoryFile = await summarizeDay(new Date(date), db, mcpClient, projectRoot, config);
+    const memoryFile = await summarizeDay(new Date(date), db, mcpClient, projectRoot, config, { activeProfile });
 
     if (memoryFile) {
       summarized++;

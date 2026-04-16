@@ -9,7 +9,7 @@
 
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, ChatMessage } from "../llm/mod.ts";
-import { createDefaultClient, createClientFromProfile } from "../llm/mod.ts";
+import { createWorkerClient, createClientFromProfile } from "../llm/mod.ts";
 import type { LLMConnectionProfile } from "../llm/mod.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type {
@@ -239,9 +239,9 @@ export async function summarizeDay(
 
   console.log(`[Memory] Summarizing ${conversations.length} conversations from ${dateStr}`);
 
-  // Use main model for summarization (quality over cost savings)
+  // Use worker model from active profile (same endpoint and API key, lighter model)
   const llm = options?.llm
-    ?? (options?.activeProfile ? createClientFromProfile(options.activeProfile) : createDefaultClient());
+    ?? (options?.activeProfile ? createClientFromProfile(options.activeProfile, { useWorker: true }) : createWorkerClient());
 
   try {
     // Generate summary

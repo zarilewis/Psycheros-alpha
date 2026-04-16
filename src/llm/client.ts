@@ -53,6 +53,11 @@ function* emitAccumulatedToolCalls(
   }
 }
 
+/** Promise-based delay for retry backoff. */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
  * Client for communicating with the LLM API.
  */
@@ -422,44 +427,91 @@ export class LLMClient {
 
   /**
    * Make the HTTP request to the API with a connection timeout.
+   * Retries on transient errors (rate limit, 5xx, network) with exponential backoff.
    *
-   * @throws LLMError on network failures or timeout
+   * @throws LLMError on permanent failures or after exhausting retries
    */
   private async makeRequest(request: ChatRequest): Promise<Response> {
-    const connectTimeout = this.config.connectTimeout ?? 180_000;
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      console.error(
-        `[LLM] Connection timeout — no HTTP response from API after ${Math.round(connectTimeout / 1000)}s. Aborting request.`,
-      );
-      controller.abort();
-    }, connectTimeout);
+    const maxRetries = this.config.maxRetries ?? 3;
+    const baseDelayMs = 1000;
+    const jitterMs = 500;
 
-    try {
-      const response = await fetch(this.config.baseUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify(request),
-        signal: controller.signal,
-      });
-      return response;
-    } catch (error) {
-      if (error instanceof DOMException && error.name === "AbortError") {
-        throw new LLMError(
-          `LLM API connection timed out after ${connectTimeout}ms — the upstream API may be down or unreachable`,
-          "CONNECT_TIMEOUT",
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const connectTimeout = this.config.connectTimeout ?? 180_000;
+      const controller = new AbortController();
+      const timer = setTimeout(() => {
+        console.error(
+          `[LLM] Connection timeout — no HTTP response from API after ${Math.round(connectTimeout / 1000)}s. Aborting request.`,
         );
+        controller.abort();
+      }, connectTimeout);
+
+      let response: Response;
+      try {
+        response = await fetch(this.config.baseUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.config.apiKey}`,
+          },
+          body: JSON.stringify(request),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        clearTimeout(timer);
+        if (error instanceof DOMException && error.name === "AbortError") {
+          if (attempt < maxRetries) {
+            const delay = baseDelayMs * (2 ** attempt) + Math.random() * jitterMs;
+            console.warn(`[LLM] Connection timeout, retry ${attempt + 1}/${maxRetries} after ${Math.round(delay)}ms`);
+            await sleep(delay);
+            continue;
+          }
+          throw new LLMError(
+            `LLM API connection timed out after ${connectTimeout}ms — the upstream API may be down or unreachable`,
+            "CONNECT_TIMEOUT",
+          );
+        }
+        // Network error
+        if (attempt < maxRetries) {
+          const delay = baseDelayMs * (2 ** attempt) + Math.random() * jitterMs;
+          console.warn(`[LLM] Network error, retry ${attempt + 1}/${maxRetries} after ${Math.round(delay)}ms`);
+          await sleep(delay);
+          continue;
+        }
+        const message = error instanceof Error ? error.message : "Unknown network error";
+        throw new LLMError(`Network error: ${message}`, "NETWORK_ERROR");
       }
-      // Wrap network errors in LLMError for consistent error handling
-      const message =
-        error instanceof Error ? error.message : "Unknown network error";
-      throw new LLMError(`Network error: ${message}`, "NETWORK_ERROR");
-    } finally {
+
       clearTimeout(timer);
+
+      // Check if the response status warrants a retry
+      const status = response.status;
+      if (status === 429 || status >= 500) {
+        if (attempt < maxRetries) {
+          // Parse retry-after header if present (seconds or HTTP date)
+          let retryAfterMs = baseDelayMs * (2 ** attempt) + Math.random() * jitterMs;
+          const retryAfter = response.headers.get("retry-after");
+          if (retryAfter) {
+            const parsed = parseInt(retryAfter, 10);
+            if (!isNaN(parsed)) {
+              retryAfterMs = parsed * 1000 + Math.random() * jitterMs;
+            }
+          }
+          console.warn(`[LLM] HTTP ${status}, retry ${attempt + 1}/${maxRetries} after ${Math.round(retryAfterMs)}ms`);
+          // Consume the body so the connection can be reused
+          await response.body?.cancel();
+          await sleep(retryAfterMs);
+          continue;
+        }
+        // Exhausted retries — return the error response and let the caller handle it
+        return response;
+      }
+
+      return response;
     }
+
+    // Should not reach here, but satisfy the compiler
+    throw new LLMError("Unexpected retry loop exit", "INTERNAL_ERROR");
   }
 
   /**
