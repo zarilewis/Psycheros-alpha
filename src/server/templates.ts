@@ -1197,17 +1197,17 @@ export function renderSidebar(conversations: Conversation[]): string {
     ${renderConversationList(conversations)}
   </nav>
   <div class="sidebar-footer">
-    <a class="sidebar-settings-link"
+    <button class="sidebar-settings-link"
       hx-get="/fragments/settings"
       hx-target="#chat"
       hx-swap="innerHTML"
-      onclick="Psycheros.closeSidebarAfterNav()">
+      hx-on::afterSwap="Psycheros.closeSidebarAfterNav()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
       </svg>
       <span>Settings</span>
-    </a>
+    </button>
   </div>
 </aside>`;
 }
@@ -5453,8 +5453,8 @@ export function renderVisionAnchorsTab(
     <form id="anchor-upload-form" style="display:flex;gap:var(--sp-3);align-items:end;flex-wrap:wrap;">
       <div class="llm-field" style="flex:0 0 auto;">
         <label>File</label>
-        <button type="button" class="btn btn--sm" onclick="document.getElementById('anchor-file').click()">Choose File</button>
-        <input type="file" id="anchor-file" accept="image/*" style="display:none;" onchange="document.getElementById('anchor-file-name').textContent = this.files[0]?.name || ''">
+        <label class="btn btn--sm" for="anchor-file" style="cursor:pointer;">Choose File</label>
+        <input type="file" id="anchor-file" accept="image/*" hidden onchange="document.getElementById('anchor-file-name').textContent = this.files[0]?.name || ''">
         <span id="anchor-file-name" class="anchor-meta"></span>
       </div>
       <div class="llm-field" style="flex:1;min-width:150px;">

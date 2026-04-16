@@ -6054,8 +6054,8 @@ function renderVaultView(
         <div class="form-row">
           <div class="form-group" style="flex:0 0 auto;">
             <label>Document</label>
-            <button type="button" class="btn btn--sm" onclick="document.getElementById('vault-file-input').click()">Choose File</button>
-            <input type="file" id="vault-file-input" name="document" accept=".md,.txt,.pdf,.docx,.xlsx" required style="display:none;" />
+            <label class="btn btn--sm" for="vault-file-input" style="cursor:pointer;">Choose File</label>
+            <input type="file" id="vault-file-input" name="document" accept=".md,.txt,.pdf,.docx,.xlsx" required hidden />
           </div>
           <div class="form-group">
             <label>Title (optional)</label>
