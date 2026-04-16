@@ -29,7 +29,7 @@ export const customFileTool: Tool = {
           operation: {
             type: "string",
             description:
-              "The operation to perform: 'create' (new file, auto-wraps in XML tags), 'append' (add to end), 'prepend' (add to beginning), 'update_section' (append content under a heading), 'rewrite_section' (replace a section's content entirely)",
+              "The operation to perform: 'create' (new file), 'append' (add to end), 'prepend' (add to beginning), 'update_section' (append content under a heading), 'rewrite_section' (replace a section's content entirely). XML wrapper tags are handled automatically by the system.",
             enum: VALID_OPERATIONS,
           },
           filename: {
@@ -40,7 +40,7 @@ export const customFileTool: Tool = {
           content: {
             type: "string",
             description:
-              "The content to add or replace with. Write concisely — these files load every turn. For create, content is auto-wrapped in XML tags.",
+              "The content to add or replace with. Write concisely — these files load every turn. XML wrapper tags are handled automatically by the system.",
           },
           section: {
             type: "string",
@@ -105,11 +105,7 @@ export const customFileTool: Tool = {
 
     switch (operation) {
       case "create": {
-        // Auto-wrap content in XML tags based on filename
-        const tagName = filename.replace(/\.md$/, "");
-        const wrappedContent = `<${tagName}>\n${content!.trim()}\n</${tagName}>\n`;
-
-        const result = await manager.create("custom", filename, wrappedContent);
+        const result = await manager.create("custom", filename, content!.trim());
         return { toolCallId: ctx.toolCallId, content: result.message, isError: !result.success };
       }
 

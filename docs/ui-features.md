@@ -440,6 +440,20 @@ Document storage and search system accessible via Settings → Data Vault in the
 
 **Source files:** `src/vault/manager.ts`, `src/vault/processor.ts`, `src/tools/vault-tools.ts`, `src/server/routes.ts`
 
+## Core Prompts Editor
+
+Review and edit the entity's identity files accessible via Settings -> Core Prompts in the sidebar. The foundational settings UI -- Memories Editor and other tabbed editors follow its pattern.
+
+**Tabs:** Self, User, Relationship, Custom
+
+**Features:**
+- View and edit any identity file with a textarea editor
+- Create/delete custom files
+- **Prompt Label** input field on each file editor -- customize the XML tag name used in the LLM context (e.g., rename `<user_identity>` to `<zari_identity>`). Default is the filename without `.md`. Persisted via `POST /api/settings/prompt-label/:directory/:filename`.
+- Tabbed navigation with file lists per category
+
+**Source files:** `src/server/templates.ts` (render functions), `src/server/routes.ts` (`handleSavePromptLabel`), `web/css/settings.css`
+
 ## Memories Editor
 
 Review and edit the entity's recorded memories accessible via Settings → Memories in the sidebar. Modeled after the Core Prompts UI with the same tabbed navigation pattern.

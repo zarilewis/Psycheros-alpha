@@ -49,6 +49,7 @@ import {
   handleSettingsFragment,
   handleSettingsHubFragment,
   handleSaveSettingsFile,
+  handleSavePromptLabel,
   handleStaticFile,
   handleUpdateTitle,
   handleMemoriesFragment,
@@ -990,6 +991,14 @@ export class Server {
       const directory = settingsFileMatch[1];
       const filename = settingsFileMatch[2];
       return await handleSaveSettingsFile(ctx, directory, filename, request);
+    }
+
+    // POST /api/settings/prompt-label/:directory/:filename - Save prompt label
+    const promptLabelMatch = path.match(/^\/api\/settings\/prompt-label\/([^/]+)\/([^/]+)$/);
+    if (method === "POST" && promptLabelMatch) {
+      const directory = promptLabelMatch[1];
+      const filename = promptLabelMatch[2];
+      return await handleSavePromptLabel(ctx, directory, filename, request);
     }
 
     // POST /api/settings/custom/create - Create custom file

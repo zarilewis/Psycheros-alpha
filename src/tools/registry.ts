@@ -13,7 +13,6 @@ import { getMetricsTool } from "./get_metrics.ts";
 import { createSignificantMemoryTool } from "./create-significant-memory.ts";
 import { syncMcpTool } from "./sync-mcp.ts";
 // Identity tools
-import { identityAppendTool } from "./identity-casual.ts";
 import { maintainIdentityTool } from "./identity-maintain.ts";
 import { listIdentitySnapshotsTool } from "./identity-maintain.ts";
 import { customFileTool } from "./identity-custom.ts";
@@ -53,9 +52,7 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   get_metrics: getMetricsTool,
   create_significant_memory: createSignificantMemoryTool,
   sync_mcp: syncMcpTool,
-  // Tier 1: Casual identity tool (append-only, safe for everyday use)
-  identity_append: identityAppendTool,
-  // Tier 2: Maintenance tools (full suite for intentional reorganization)
+  // Identity tools
   maintain_identity: maintainIdentityTool,
   list_identity_snapshots: listIdentitySnapshotsTool,
   // Custom identity file tool

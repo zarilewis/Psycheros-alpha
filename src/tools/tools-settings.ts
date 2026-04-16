@@ -49,7 +49,6 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     name: "Identity",
     description: "Self, user, and relationship identity management",
     toolNames: [
-      "identity_append",
       "maintain_identity",
       "list_identity_snapshots",
       "custom_file",

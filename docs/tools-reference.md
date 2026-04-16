@@ -144,24 +144,26 @@ The entity can create, trigger, and delete autonomous scheduled prompts (Pulses)
 
 ## Identity Tools
 
-The entity can modify its identity files through two tiers of tools, plus a custom file tool.
+The entity can modify its identity files through a unified maintenance tool and a custom file tool.
 
-### Tier 1: Casual Tool (Append-Only)
+### maintain_identity
 
-Safe for everyday use — can only add content, never modify or delete existing content.
-
-| Tool | Description |
-|------|-------------|
-| `identity_append` | Add new knowledge to identity files via `category` param (`self`, `user`, `relationship`) |
-
-### Tier 2: Maintenance Tools (Full Suite)
-
-For intentional reorganization — includes prepend, section updates, and section rewriting.
+The single identity tool for all predefined file operations. The tool description guides the entity to pick appropriate section headings or create new ones, and emphasizes using actual filenames rather than XML tag names visible in context.
 
 | Tool | Description |
 |------|-------------|
-| `maintain_identity` | Full file maintenance with operations: append, prepend, update_section, rewrite_section |
+| `maintain_identity` | Identity file maintenance with operations: append, prepend, update_section, rewrite_section |
 | `list_identity_snapshots` | View available backups created automatically by entity-core |
+
+**Operations:**
+- `append` — add to the end of a file
+- `prepend` — add to the beginning of a file
+- `update_section` — append content under a `## heading` (existing content preserved). **Auto-creates** the section if the heading doesn't exist.
+- `rewrite_section` — replace all content under a `## heading` (existing content removed). **Auto-creates** the section if the heading doesn't exist.
+
+**Parameters:** `category` (`self`, `user`, `relationship`), `filename`, `operation`, `content`, `section` (required for section operations).
+
+The `reason` parameter has been removed from all identity operations.
 
 ### Custom File Tool
 
@@ -171,7 +173,15 @@ For managing freeform custom files in `identity/custom/` — topics that don't f
 |------|-------------|
 | `custom_file` | Create and modify custom identity files |
 
-Operations: `create` (new file, content auto-wrapped in XML tags), `append` (add to end), `prepend` (add to beginning), `update_section` (append content under a markdown heading, preserves existing content), `rewrite_section` (replace a section's content entirely). Filenames use `.md` extension with letters, numbers, and underscores only. Deletion is user-only via the Core Prompts UI.
+Operations: `create` (new file), `append` (add to end), `prepend` (add to beginning), `update_section` (append content under a markdown heading, preserves existing content; auto-creates if heading not found), `rewrite_section` (replace a section's content entirely; auto-creates if heading not found). Filenames use `.md` extension with letters, numbers, and underscores only. Deletion is user-only via the Core Prompts UI.
+
+### Prompt Label System
+
+XML wrapper tags in identity files are no longer stored on disk. Files store inner content only (plain markdown). XML tags are applied dynamically at context-build time by `wrapContent()` in `src/entity/context.ts`.
+
+Each identity file has an optional **prompt label** that controls its XML tag name in the LLM context. Default is the filename without `.md` (e.g., `user_identity.md` becomes `<user_identity>`). Users can customize this via a **Prompt Label** input field in the Core Prompts editor UI (e.g., rename `<user_identity>` to `<zari_identity>`).
+
+Prompt labels are stored in entity-core metadata and surfaced via the `promptLabel` field on `IdentityFile` objects. When MCP is unavailable, the filename is used as the fallback tag name.
 
 ### MCP Fallback Pattern
 
@@ -188,17 +198,16 @@ Tool called → MCP connected?
 
 **Snapshot behavior:** When identity files are written via MCP (including rewrite_section and other write operations), entity-core creates snapshots automatically (via `sync_push`'s targeted per-file snapshot). Local snapshots at `.snapshots/` are available as a fallback. The Entity Core snapshots UI shows local snapshots when entity-core has none, enabling recovery even when MCP is unavailable.
 
-Changes preserve XML tag structure in identity files. Content is added cleanly without metadata comments — core prompts load every turn, so token efficiency matters.
+Changes preserve markdown structure in identity files. Content is added cleanly without metadata comments -- core prompts load every turn, so token efficiency matters. XML tags are applied at context-build time, not stored on disk.
 
 ### Related Source Files
 
 | File | Purpose |
 |------|---------|
 | `src/tools/registry.ts` | Tool registration and default registry |
-| `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback, local snapshot restore) |
-| `src/tools/identity-casual.ts` | `identity_append` — Tier 1 append-only identity tool |
-| `src/tools/identity-maintain.ts` | Tier 2 maintenance identity tools |
-| `src/tools/identity-custom.ts` | Custom identity file tool (create, append, rewrite_section) |
+| `src/tools/identity-helpers.ts` | Identity file utilities (section manipulation, auto-section-creation, MCP fallback, local snapshot restore) |
+| `src/tools/identity-maintain.ts` | `maintain_identity` — unified identity maintenance tool |
+| `src/tools/identity-custom.ts` | Custom identity file tool (create, append, prepend, update_section, rewrite_section) |
 
 ## Push Notification Tool
 
@@ -420,9 +429,9 @@ identity/
 The `identity/self/base_instructions.md` file holds the entity's core system prompt. It is:
 
 - **Loaded first** into every LLM request, before all other identity files
-- **Wrapped** in `<base_instructions>` and `</base_instructions>` XML tags
-- **Editable** via Settings → Core Prompts → Self in the web UI
-- **Templated** — uses `{{timestamp}}` which is replaced with the current ISO timestamp each turn
+- **Wrapped** in XML tags at context-build time (default: `<base_instructions>`, customizable via prompt label)
+- **Editable** via Settings -> Core Prompts -> Self in the web UI
+- **Templated** -- uses `{{timestamp}}` which is replaced with the current ISO timestamp each turn
 
 On fresh installs, this file is seeded from `templates/identity/self/base_instructions.md`. The file is excluded from the regular self-content loading to avoid duplication, since it's injected separately at the top of the system message.
 
@@ -430,8 +439,8 @@ On fresh installs, this file is seeded from `templates/identity/self/base_instru
 
 The `identity/custom/` directory allows creating arbitrary identity files:
 - Must use single-word filenames (letters, numbers, underscores only)
-- Automatically wrapped in XML tags matching the filename
-- Managed via Settings → Core Prompts in the web UI
+- XML tags applied at context-build time from prompt label (default: filename without `.md`)
+- Managed via Settings -> Core Prompts in the web UI
 - Sorted alphabetically (no predefined order)
 
 ### Data Protection
@@ -450,5 +459,6 @@ Accessible via Settings hub in the sidebar. Provides a web interface for managin
 **Features:**
 - View and edit any identity file
 - Create/delete custom files
+- Customize prompt labels (XML tag names) per file
 
 Snapshots (browse, create, preview, restore) are accessible via Settings → Entity Core → Snapshots.

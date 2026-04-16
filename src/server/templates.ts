@@ -1845,10 +1845,12 @@ function renderTabActiveState(activeDir: PromptDirectory | "snapshots"): string 
 export function renderFileEditor(
   directory: PromptDirectory,
   filename: string,
-  content: string
+  content: string,
+  promptLabel?: string,
 ): string {
   const displayName = filename.replace(/\.md$/, "").replace(/_/g, " ");
   const safeContent = escapeHtml(content);
+  const safeLabel = escapeHtml(promptLabel ?? filename.replace(/\.md$/, ""));
 
   return `<div class="settings-editor">
   <div class="settings-editor-header">
@@ -1862,6 +1864,22 @@ export function renderFileEditor(
     </button>
     <span class="settings-editor-filename">${escapeHtml(displayName)}</span>
     <span class="settings-editor-tokens" id="settings-editor-tokens">...</span>
+  </div>
+  <div class="settings-prompt-label">
+    <label for="prompt-label">Prompt Label</label>
+    <input
+      type="text"
+      id="prompt-label"
+      name="promptLabel"
+      value="${safeLabel}"
+      pattern="[a-zA-Z0-9_]+"
+      class="settings-input settings-input--sm"
+      hx-post="/api/settings/prompt-label/${directory}/${encodeURIComponent(filename)}"
+      hx-trigger="change"
+      hx-target="#prompt-label-status"
+      hx-swap="innerHTML"
+    />
+    <div id="prompt-label-status" class="settings-prompt-label-status"></div>
   </div>
   <form
     class="settings-editor-form"

@@ -58,82 +58,28 @@ export const VALID_FILES: Record<IdentityCategory, readonly string[]> = {
 };
 
 // =============================================================================
-// XML Tag Utilities
+// Content Utilities
 // =============================================================================
 
 /**
- * Get the XML tag name from a filename.
- * E.g., "my_identity.md" -> "my_identity", "user_identity.md" -> "user_identity"
- */
-function getXmlTagFromFilename(filename: string): string {
-  // Extract base name without .md extension
-  return filename.replace(/\.md$/, "");
-}
-
-/**
- * Parse XML-tagged content from a file.
- * Returns the content between <tag>...</tag> or the whole content if no tags found.
- */
-export function parseXmlContent(content: string, expectedTag?: string): {
-  tag: string | null;
-  innerContent: string;
-} {
-  // Match opening and closing tags
-  const match = content.match(/<([^>]+)>([\s\S]*)<\/\1>/);
-
-  if (match) {
-    return {
-      tag: match[1],
-      innerContent: match[2].trim(),
-    };
-  }
-
-  // No XML tags found - return raw content
-  return {
-    tag: expectedTag ?? null,
-    innerContent: content.trim(),
-  };
-}
-
-/**
- * Append content before the closing XML tag.
+ * Append content to the end of existing content.
  */
 export function appendToXmlContent(
   existingContent: string,
   newContent: string,
 ): string {
-  // Parse existing content
-  const { tag, innerContent } = parseXmlContent(existingContent);
-
   const addition = `\n\n${newContent.trim()}`;
-
-  // Reconstruct with XML tags
-  if (tag) {
-    return `<${tag}>\n${innerContent}${addition}\n</${tag}>\n`;
-  }
-
-  // No XML tags - just append
   return existingContent.trim() + addition + "\n";
 }
 
 /**
- * Prepend content after the opening XML tag.
+ * Prepend content to the beginning of existing content.
  */
 export function prependToXmlContent(
   existingContent: string,
   newContent: string,
 ): string {
-  // Parse existing content
-  const { tag, innerContent } = parseXmlContent(existingContent);
-
   const addition = `${newContent.trim()}\n\n`;
-
-  // Reconstruct with XML tags
-  if (tag) {
-    return `<${tag}>\n${addition}${innerContent}\n</${tag}>\n`;
-  }
-
-  // No XML tags - just prepend
   return addition + existingContent.trim() + "\n";
 }
 
@@ -141,129 +87,109 @@ export function prependToXmlContent(
  * Append content within a specific markdown section.
  * Section is identified by a heading (e.g., "## Preferences").
  * New content is added after any existing content in the section.
+ * If the section doesn't exist, it is created at the end of the file.
  */
 export function updateSection(
   existingContent: string,
   sectionName: string,
   newSectionContent: string,
-): { content: string; found: boolean } {
-  // Parse XML content
-  const { tag, innerContent } = parseXmlContent(existingContent);
+): { content: string; found: boolean; created: boolean } {
+  const content = existingContent.trim();
 
-  // Look for the section heading (## or ###)
   const headingPattern = new RegExp(
     `^(#{2,3})\\s*${escapeRegex(sectionName)}\\s*$`,
     "m"
   );
-  const match = innerContent.match(headingPattern);
+  const match = content.match(headingPattern);
 
   if (!match) {
-    return { content: existingContent, found: false };
+    // Section doesn't exist — create it at the end of the file
+    const newSection = `\n\n## ${sectionName}\n${newSectionContent.trim()}`;
+    return { content: (content + newSection).trim() + "\n", found: false, created: true };
   }
 
   const headingLevel = match[1];
   const startIndex = match.index!;
   const headingEndIndex = startIndex + match[0].length;
 
-  // Find the next heading of same or higher level, or end of content
   const nextHeadingPattern = new RegExp(
     `^${headingLevel}\\s+.+$`,
-    "gm"
+    "m"
   );
 
-  // Search from after the current heading
-  let endIndex = innerContent.length;
-  const remainingContent = innerContent.slice(headingEndIndex);
+  let endIndex = content.length;
+  const remainingContent = content.slice(headingEndIndex);
   const nextMatch = remainingContent.match(nextHeadingPattern);
 
   if (nextMatch && nextMatch.index !== undefined) {
     endIndex = headingEndIndex + nextMatch.index;
   }
 
-  // Preserve existing content in the section and append new content after it
-  const existingSectionContent = innerContent.slice(headingEndIndex, endIndex).trim();
+  const existingSectionContent = content.slice(headingEndIndex, endIndex).trim();
   const newSection = existingSectionContent
     ? `${match[0]}\n${existingSectionContent}\n\n${newSectionContent.trim()}`
     : `${match[0]}\n${newSectionContent.trim()}`;
 
-  // Reconstruct the content
-  const newInnerContent =
-    innerContent.slice(0, startIndex) +
+  const newContent =
+    content.slice(0, startIndex) +
     newSection +
-    innerContent.slice(endIndex);
+    "\n\n" +
+    content.slice(endIndex);
 
-  // Wrap in XML tags if they existed
-  if (tag) {
-    return {
-      content: `<${tag}>\n${newInnerContent.trim()}\n</${tag}>\n`,
-      found: true,
-    };
-  }
-
-  return { content: newInnerContent.trim() + "\n", found: true };
+  return { content: newContent.trim() + "\n", found: true, created: false };
 }
 
 /**
  * Rewrite content within a specific markdown section.
  * Replaces everything between the heading and the next same/higher-level heading
  * with the new content. The heading line itself is preserved.
+ * If the section doesn't exist, it is created at the end of the file.
  */
 export function rewriteSectionContent(
   existingContent: string,
   sectionName: string,
   newSectionContent: string,
-): { content: string; found: boolean } {
-  // Parse XML content
-  const { tag, innerContent } = parseXmlContent(existingContent);
+): { content: string; found: boolean; created: boolean } {
+  const content = existingContent.trim();
 
-  // Look for the section heading (## or ###)
   const headingPattern = new RegExp(
     `^(#{2,3})\\s*${escapeRegex(sectionName)}\\s*$`,
     "m"
   );
-  const match = innerContent.match(headingPattern);
+  const match = content.match(headingPattern);
 
   if (!match) {
-    return { content: existingContent, found: false };
+    // Section doesn't exist — create it at the end of the file
+    const newSection = `\n\n## ${sectionName}\n${newSectionContent.trim()}`;
+    return { content: (content + newSection).trim() + "\n", found: false, created: true };
   }
 
   const headingLevel = match[1];
   const startIndex = match.index!;
   const headingEndIndex = startIndex + match[0].length;
 
-  // Find the next heading of same or higher level, or end of content
   const nextHeadingPattern = new RegExp(
     `^${headingLevel}\\s+.+$`,
-    "gm"
+    "m"
   );
 
-  // Search from after the current heading
-  let endIndex = innerContent.length;
-  const remainingContent = innerContent.slice(headingEndIndex);
+  let endIndex = content.length;
+  const remainingContent = content.slice(headingEndIndex);
   const nextMatch = remainingContent.match(nextHeadingPattern);
 
   if (nextMatch && nextMatch.index !== undefined) {
     endIndex = headingEndIndex + nextMatch.index;
   }
 
-  // Replace section content (keep the heading, replace everything after it up to next heading)
   const newSection = `${match[0]}\n${newSectionContent.trim()}`;
 
-  // Reconstruct the content
-  const newInnerContent =
-    innerContent.slice(0, headingEndIndex) +
+  const newContent =
+    content.slice(0, headingEndIndex) +
     newSection +
-    innerContent.slice(endIndex);
+    "\n\n" +
+    content.slice(endIndex);
 
-  // Wrap in XML tags if they existed
-  if (tag) {
-    return {
-      content: `<${tag}>\n${newInnerContent.trim()}\n</${tag}>\n`,
-      found: true,
-    };
-  }
-
-  return { content: newInnerContent.trim() + "\n", found: true };
+  return { content: newContent.trim() + "\n", found: true, created: false };
 }
 
 /**
@@ -355,9 +281,8 @@ export class IdentityFileManager {
       return await Deno.readTextFile(filePath);
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        // Return empty content with appropriate XML tags
-        const tag = getXmlTagFromFilename(filename);
-        return `<${tag}>\n[I am still learning. As I learn more, I will update this file.]\n</${tag}>\n`;
+        // Return placeholder content
+        return "[I am still learning. As I learn more, I will update this file.]";
       }
       throw error;
     }
@@ -388,7 +313,6 @@ export class IdentityFileManager {
     category: IdentityCategory,
     filename: string,
     content: string,
-    reason?: string
   ): Promise<IdentityOperationResult> {
     // Validate first
     const validation = this.validateFile(category, filename);
@@ -401,7 +325,6 @@ export class IdentityFileManager {
           category,
           filename,
           content,
-          reason,
           this.projectRoot
         );
 
@@ -451,7 +374,6 @@ export class IdentityFileManager {
     category: IdentityCategory,
     filename: string,
     content: string,
-    reason?: string
   ): Promise<IdentityOperationResult> {
     // Validate first
     const validation = this.validateFile(category, filename);
@@ -464,7 +386,6 @@ export class IdentityFileManager {
           category,
           filename,
           content,
-          reason,
           this.projectRoot
         );
 
@@ -513,7 +434,6 @@ export class IdentityFileManager {
     filename: string,
     sectionName: string,
     content: string,
-    reason?: string
   ): Promise<IdentityOperationResult> {
     // Validate first
     const validation = this.validateFile(category, filename);
@@ -527,17 +447,12 @@ export class IdentityFileManager {
           filename,
           sectionName,
           content,
-          reason,
           this.projectRoot
         );
 
         if (result.success) {
           console.log(`[Identity] Updated section "${sectionName}" in ${category}/${filename} via MCP`);
           return { success: true, message: result.message ?? `I've updated the "${sectionName}" section in my ${category}/${filename} file.` };
-        }
-        // Section not found on server - return the error
-        if (result.message?.includes("not found")) {
-          return { success: false, message: result.message, error: "section_not_found" };
         }
         console.warn(`[Identity] MCP section update failed: ${result.message}, falling back to local`);
       } catch (e) {
@@ -547,15 +462,7 @@ export class IdentityFileManager {
 
     // Fallback: local manipulation
     const existingContent = await this.readFile(category, filename);
-    const { content: newContent, found } = updateSection(existingContent, sectionName, content);
-
-    if (!found) {
-      return {
-        success: false,
-        message: `Section "${sectionName}" not found in ${category}/${filename}.`,
-        error: "section_not_found",
-      };
-    }
+    const { content: newContent, created } = updateSection(existingContent, sectionName, content);
 
     try {
       await this.writeFile(category, filename, newContent);
@@ -565,10 +472,11 @@ export class IdentityFileManager {
         this.mcpClient.queueIdentityChange(category, filename, newContent);
       }
 
-      console.log(`[Identity] Updated section "${sectionName}" in ${category}/${filename} locally`);
+      const action = created ? "Created" : "Updated";
+      console.log(`[Identity] ${action} section "${sectionName}" in ${category}/${filename} locally`);
       return {
         success: true,
-        message: `I've updated the "${sectionName}" section in my ${category}/${filename} file (saved locally).`,
+        message: `I've ${action.toLowerCase()} the "${sectionName}" section in my ${category}/${filename} file (saved locally).`,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -594,36 +502,22 @@ export class IdentityFileManager {
     const validation = this.validateFile(category, filename);
     if (validation) return validation;
 
-    // Try MCP first: read file, rewrite section locally, write full file back
+    // Try MCP rewrite_section tool first (server-side, atomic)
     if (this.mcpClient?.isConnected()) {
       try {
-        const existingContent = await this.readFile(category, filename);
-        const { content: newContent, found } = rewriteSectionContent(
-          existingContent,
-          sectionName,
-          content
-        );
-
-        if (!found) {
-          return {
-            success: false,
-            message: `Section "${sectionName}" not found in ${category}/${filename}.`,
-            error: "section_not_found",
-          };
-        }
-
-        const success = await this.mcpClient.writeIdentityFile(
+        const result = await this.mcpClient.rewriteIdentitySection(
           category,
           filename,
-          newContent,
+          sectionName,
+          content,
           this.projectRoot
         );
 
-        if (success) {
-          console.log(`[Identity] Rewrote section "${sectionName}" in ${category}/${filename} via MCP (snapshot created by entity-core)`);
-          return { success: true, message: `I've rewritten the "${sectionName}" section in my ${category}/${filename} file.` };
+        if (result.success) {
+          console.log(`[Identity] Rewrote section "${sectionName}" in ${category}/${filename} via MCP`);
+          return { success: true, message: result.message ?? `I've rewritten the "${sectionName}" section in my ${category}/${filename} file.` };
         }
-        console.warn(`[Identity] MCP rewrite failed, falling back to local`);
+        console.warn(`[Identity] MCP rewrite failed: ${result.message}, falling back to local`);
       } catch (e) {
         console.warn(`[Identity] MCP rewrite error, falling back to local:`, e);
       }
@@ -631,19 +525,11 @@ export class IdentityFileManager {
 
     // Fallback: local manipulation
     const existingContent = await this.readFile(category, filename);
-    const { content: newContent, found } = rewriteSectionContent(
+    const { content: newContent, created } = rewriteSectionContent(
       existingContent,
       sectionName,
       content
     );
-
-    if (!found) {
-      return {
-        success: false,
-        message: `Section "${sectionName}" not found in ${category}/${filename}.`,
-        error: "section_not_found",
-      };
-    }
 
     try {
       await this.writeFile(category, filename, newContent);
@@ -653,10 +539,11 @@ export class IdentityFileManager {
         this.mcpClient.queueIdentityChange(category, filename, newContent);
       }
 
-      console.log(`[Identity] Rewrote section "${sectionName}" in ${category}/${filename} locally`);
+      const action = created ? "Created" : "Rewrote";
+      console.log(`[Identity] ${action} section "${sectionName}" in ${category}/${filename} locally`);
       return {
         success: true,
-        message: `I've rewritten the "${sectionName}" section in my ${category}/${filename} file (saved locally).`,
+        message: `I've ${action.toLowerCase()} the "${sectionName}" section in my ${category}/${filename} file (saved locally).`,
       };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

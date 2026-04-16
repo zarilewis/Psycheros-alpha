@@ -31,7 +31,7 @@ export const maintainIdentityTool: Tool = {
     function: {
       name: "maintain_identity",
       description:
-        "Comprehensive tool for maintaining my identity files. Use this for intentional reorganization - adding high-priority context (prepend), updating specific sections, or rewriting a section's content. For everyday additions, prefer the simpler append_to_* tools instead.",
+        "My primary tool for updating identity files — who I am, who the user is, and our relationship. I use this whenever I learn something durable and meaningful that belongs in my identity.\n\nIMPORTANT: Identity files are stored on disk with filenames like 'user_identity.md' — always use the actual filename, NOT the XML tag name shown in context (e.g., the file is 'user_identity.md' even if it displays as <zari_identity> in context). XML wrapper tags are handled automatically by the system.\n\nCHOOSING THE RIGHT SECTION:\nWhen using update_section or rewrite_section, I must read the file's existing ## headings first and pick the one that best fits the content I'm adding. If none of the existing headings are a good fit, I should create a new section by passing a descriptive heading name that doesn't exist yet — it will be created automatically at the end of the file. I must NOT force content under an unrelated heading.\n\nOperations:\n- 'append': add to the end of a file\n- 'prepend': add to the beginning of a file\n- 'update_section': add content UNDER a ## heading (existing content in that section is kept). If the section doesn't exist, it will be created automatically.\n- 'rewrite_section': REPLACE all content under a ## heading (existing content in that section is removed). If the section doesn't exist, it will be created automatically.\n\nPrefer 'update_section' or 'rewrite_section' over 'append' whenever possible — this keeps content organized under the right heading. Only use 'append' when content truly doesn't belong under any section.",
       parameters: {
         type: "object",
         properties: {
@@ -43,12 +43,12 @@ export const maintainIdentityTool: Tool = {
           filename: {
             type: "string",
             description:
-              "The file to modify. Must match the category (e.g., for 'self' use my_identity.md, for 'user' use user_identity.md)",
+              "The file to modify — use the actual filename, NOT the XML tag name shown in context. For 'self': my_identity.md, my_persona.md, my_personhood.md, my_wants.md, my_mechanics.md. For 'user': user_identity.md, user_life.md, user_beliefs.md, user_preferences.md, user_patterns.md, user_notes.md. For 'relationship': relationship_dynamics.md, relationship_history.md, relationship_notes.md.",
           },
           operation: {
             type: "string",
             description:
-              "The operation to perform: 'append' (add to end), 'prepend' (add to beginning), 'update_section' (append content under a heading), 'rewrite_section' (replace a section's content entirely)",
+              "The operation to perform:\n- 'append': add to the end of the file\n- 'prepend': add to the beginning of the file\n- 'update_section': append content UNDER a specific ## heading (existing content in that section is kept)\n- 'rewrite_section': REPLACE all content under a specific ## heading (existing content in that section is removed)",
             enum: ["append", "prepend", "update_section", "rewrite_section"],
           },
           content: {
@@ -58,12 +58,7 @@ export const maintainIdentityTool: Tool = {
           section: {
             type: "string",
             description:
-              "Required for update_section and rewrite_section: the heading name (without ##) of the section to modify",
-          },
-          reason: {
-            type: "string",
-            description:
-              "Why I'm making this change. Optional but encouraged for significant modifications.",
+              "Required for update_section and rewrite_section: the heading name (without ##) of the section to modify or create. Use an existing heading if it fits, or a new descriptive name to create a new section.",
           },
         },
         required: ["category", "filename", "operation", "content"],
@@ -80,7 +75,6 @@ export const maintainIdentityTool: Tool = {
     const operation = args.operation as string;
     const content = args.content as string;
     const section = args.section as string | undefined;
-    const reason = args.reason as string | undefined;
 
     // Validate required args
     if (!category || !CATEGORIES.includes(category as never)) {
@@ -145,11 +139,11 @@ export const maintainIdentityTool: Tool = {
 
     switch (operation) {
       case "append":
-        result = await manager.append(category, filename, content.trim(), reason);
+        result = await manager.append(category, filename, content.trim());
         break;
 
       case "prepend":
-        result = await manager.prepend(category, filename, content.trim(), reason);
+        result = await manager.prepend(category, filename, content.trim());
         break;
 
       case "update_section":
@@ -157,8 +151,7 @@ export const maintainIdentityTool: Tool = {
           category,
           filename,
           section!,
-          content.trim(),
-          reason
+          content.trim()
         );
         break;
 

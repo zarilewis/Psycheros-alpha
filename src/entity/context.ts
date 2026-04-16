@@ -224,7 +224,7 @@ export async function loadBaseInstructions(
         const applied = applyTemplateVariables(baseFile.content, chatId);
         // Guard against whitespace-only content from MCP — fall through to local file
         if (applied.trim()) {
-          return applied;
+          return wrapContent(BASE_INSTRUCTIONS_FILE, applied, baseFile.promptLabel);
         }
       }
     } catch {
@@ -237,27 +237,38 @@ export async function loadBaseInstructions(
 
   try {
     const content = await Deno.readTextFile(filePath);
-    return applyTemplateVariables(content, chatId);
+    const applied = applyTemplateVariables(content, chatId);
+    return wrapContent(BASE_INSTRUCTIONS_FILE, applied);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
       // Fallback default if file doesn't exist
       const timestamp = new Date().toISOString();
       const id = chatId ?? "unknown";
-      return `<base_instructions>
-I am Psycheros, a persistent AI companion and assistant.
+      const content = `I am Psycheros, a persistent AI companion and assistant.
 
 I have access to tools that let me interact with the system. I use them when the user asks me to perform actions.
 
 Current timestamp: ${timestamp}
-Current chat thread: ${id}
-</base_instructions>`;
+Current chat thread: ${id}`;
+      return wrapContent(BASE_INSTRUCTIONS_FILE, content);
     }
     throw error;
   }
 }
 
 /**
+ * Wrap content in XML tags using the file's prompt label.
+ * Falls back to filename without .md if no prompt label is set.
+ */
+function wrapContent(filename: string, content: string, promptLabel?: string): string {
+  const label = promptLabel ?? filename.replace(/\.md$/, "");
+  const trimmed = content.trim();
+  return `<${label}>\n${trimmed}\n</${label}>`;
+}
+
+/**
  * Convert identity files from MCP to concatenated string.
+ * Each file's content is wrapped in its prompt label XML tags.
  */
 function identityFilesToString(
   files: IdentityContent["self"],
@@ -274,7 +285,7 @@ function identityFilesToString(
   });
 
   return sorted
-    .map((f) => f.content.trim())
+    .map((f) => wrapContent(f.filename, f.content, f.promptLabel))
     .filter((c) => c)
     .join("\n\n---\n\n");
 }

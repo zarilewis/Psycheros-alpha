@@ -57,7 +57,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/llm/home-settings.ts` | Home automation settings type, load/save (device list) |
 | `src/llm/image-gen-settings.ts` | Image generator + captioning config type, load/save, masking |
 | `src/llm/entity-core-settings.ts` | Entity-core LLM override settings type, load/save (model, temperature, maxTokens) |
-| `src/tools/identity-helpers.ts` | Identity file utilities (XML parsing, MCP fallback, local snapshot restore) |
+| `src/tools/identity-helpers.ts` | Identity file utilities (section manipulation, MCP fallback, local snapshot restore) |
 | `src/tools/identity-custom.ts` | Custom identity file tool (create, append, prepend, update_section, rewrite_section) |
 | `src/memory/mod.ts` | Memory system — daily summarization, writes to entity-core via MCP |
 | `src/rag/mod.ts` | RAG retrieval system (chat, vault, graph — memory RAG via MCP) |

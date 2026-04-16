@@ -1652,7 +1652,19 @@ export async function handleSettingsFileEditorFragment(
     const filePath = `${ctx.projectRoot}/identity/${directory}/${filename}`;
     const content = await Deno.readTextFile(filePath);
 
-    const html = renderFileEditor(directory as "self" | "user" | "relationship" | "custom", filename, content);
+    // Load prompt label from entity-core
+    let promptLabel: string | undefined;
+    if (ctx.mcpClient) {
+      try {
+        const meta = await ctx.mcpClient.getIdentityMeta(directory as "self" | "user" | "relationship" | "custom");
+        const key = `${directory}/${filename}`;
+        promptLabel = meta[key];
+      } catch {
+        // Use default (filename without .md)
+      }
+    }
+
+    const html = renderFileEditor(directory as "self" | "user" | "relationship" | "custom", filename, content, promptLabel);
     return new Response(html, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
@@ -1736,6 +1748,62 @@ export async function handleSaveSettingsFile(
   } catch (error) {
     console.error("[Routes] handleSaveSettingsFile error:", error);
     return new Response(renderSaveError("Failed to save file"), {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+}
+
+/**
+ * Handle POST /api/settings/prompt-label/:directory/:filename - Save prompt label.
+ * Updates the XML tag name used to wrap the file's content in the context.
+ */
+export async function handleSavePromptLabel(
+  ctx: RouteContext,
+  directory: string,
+  filename: string,
+  request: Request,
+): Promise<Response> {
+  if (!ctx.mcpClient) {
+    return new Response(renderSaveError("MCP not connected"), {
+      status: 500,
+      headers: { "Content-Type": "text/html; charset=utf-8" },
+    });
+  }
+
+  try {
+    const formData = await request.formData();
+    const promptLabel = formData.get("promptLabel");
+
+    if (typeof promptLabel !== "string" || !promptLabel.trim()) {
+      return new Response(renderSaveError("Missing prompt label"), {
+        status: 400,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    const trimmed = promptLabel.trim();
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      return new Response(renderSaveError("Prompt label can only contain letters, numbers, and underscores"), {
+        status: 400,
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    await ctx.mcpClient.setIdentityMeta(
+      directory as "self" | "user" | "relationship" | "custom",
+      filename,
+      trimmed,
+    );
+
+    return new Response(renderSaveSuccess(), {
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+      },
+    });
+  } catch (error) {
+    console.error("[Routes] handleSavePromptLabel error:", error);
+    return new Response(renderSaveError("Failed to save prompt label"), {
       status: 500,
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });

@@ -39,6 +39,7 @@ export interface IdentityFile {
   version: number;
   lastModified: string;
   modifiedBy: string;
+  promptLabel?: string;
 }
 
 /**
@@ -608,7 +609,6 @@ export class MCPClient {
     category: "self" | "user" | "relationship" | "custom",
     filename: string,
     content: string,
-    reason?: string,
     localBasePath?: string,
   ): Promise<{ success: boolean; content?: string; message?: string }> {
     if (!this.client) {
@@ -622,7 +622,6 @@ export class MCPClient {
           category,
           filename,
           content,
-          reason,
           instanceId: this.config.instanceId,
         },
       });
@@ -652,7 +651,6 @@ export class MCPClient {
     category: "self" | "user" | "relationship" | "custom",
     filename: string,
     content: string,
-    reason?: string,
     localBasePath?: string,
   ): Promise<{ success: boolean; content?: string; message?: string }> {
     if (!this.client) {
@@ -666,7 +664,6 @@ export class MCPClient {
           category,
           filename,
           content,
-          reason,
           instanceId: this.config.instanceId,
         },
       });
@@ -696,7 +693,6 @@ export class MCPClient {
     filename: string,
     section: string,
     content: string,
-    reason?: string,
     localBasePath?: string,
   ): Promise<{ success: boolean; content?: string; message?: string }> {
     if (!this.client) {
@@ -711,7 +707,6 @@ export class MCPClient {
           filename,
           section,
           content,
-          reason,
           instanceId: this.config.instanceId,
         },
       });
@@ -728,6 +723,109 @@ export class MCPClient {
       return { success: false, message: "No response from MCP" };
     } catch (error) {
       console.error("[MCP] identity_update_section failed:", error);
+      return { success: false, message: String(error) };
+    }
+  }
+
+  /**
+   * Rewrite a section in an identity file via MCP.
+   * Calls the identity_rewrite_section tool on entity-core.
+   */
+  async rewriteIdentitySection(
+    category: "self" | "user" | "relationship" | "custom",
+    filename: string,
+    section: string,
+    content: string,
+    localBasePath?: string,
+  ): Promise<{ success: boolean; content?: string; message?: string }> {
+    if (!this.client) {
+      return { success: false, message: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "identity_rewrite_section",
+        arguments: {
+          category,
+          filename,
+          section,
+          content,
+          instanceId: this.config.instanceId,
+        },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        if (response.success && localBasePath) {
+          await Deno.writeTextFile(`${localBasePath}/identity/${category}/${filename}`, response.content);
+          this.updateLocalCache(category, filename, response.content, new Date().toISOString());
+        }
+        return response;
+      }
+      return { success: false, message: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] identity_rewrite_section failed:", error);
+      return { success: false, message: String(error) };
+    }
+  }
+
+  /**
+   * Get prompt labels for identity files via MCP.
+   */
+  async getIdentityMeta(
+    category?: "self" | "user" | "relationship" | "custom",
+  ): Promise<Record<string, string>> {
+    if (!this.client) {
+      return {};
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "identity_get_meta",
+        arguments: { category },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        if (response.success) {
+          return response.meta;
+        }
+      }
+      return {};
+    } catch (error) {
+      console.error("[MCP] identity_get_meta failed:", error);
+      return {};
+    }
+  }
+
+  /**
+   * Set the prompt label for an identity file via MCP.
+   */
+  async setIdentityMeta(
+    category: "self" | "user" | "relationship" | "custom",
+    filename: string,
+    promptLabel: string,
+  ): Promise<{ success: boolean; message?: string }> {
+    if (!this.client) {
+      return { success: false, message: "MCP not connected" };
+    }
+
+    try {
+      const result = await this.client.callTool({
+        name: "identity_set_meta",
+        arguments: { category, filename, promptLabel },
+      });
+
+      const textContent = extractTextContent(result);
+      if (textContent) {
+        const response = JSON.parse(textContent);
+        return response;
+      }
+      return { success: false, message: "No response from MCP" };
+    } catch (error) {
+      console.error("[MCP] identity_set_meta failed:", error);
       return { success: false, message: String(error) };
     }
   }

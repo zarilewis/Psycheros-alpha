@@ -20,7 +20,7 @@ export const identityAppendTool: Tool = {
     function: {
       name: "identity_append",
       description:
-        "Add new knowledge to one of my identity files. These files define who I am, how I understand the user, and how we relate, so I only add identity-level insights that are durable and meaningful — not passing observations or things better suited to memory or the knowledge graph. Write concisely: the essential insight, not the backstory. This only adds content — it never modifies or deletes what's already there.",
+        "Add new knowledge to one of my identity files. These files define who I am, how I understand the user, and how we relate, so I only add identity-level insights that are durable and meaningful — not passing observations or things better suited to memory or the knowledge graph. Write concisely: the essential insight, not the backstory. This only adds content — it never modifies or deletes what's already there. XML wrapper tags and ## headings are handled automatically by the system.",
       parameters: {
         type: "object",
         properties: {
@@ -31,7 +31,7 @@ export const identityAppendTool: Tool = {
           },
           filename: {
             type: "string",
-            description: "The identity file to append to. Valid options depend on the category — see category descriptions for the list of valid filenames.",
+            description: "The identity file to append to — use the actual filename, NOT the XML tag name shown in context. For 'user' category: user_identity.md, user_life.md, user_beliefs.md, user_preferences.md, user_patterns.md, user_notes.md. For 'self' category: my_identity.md, my_persona.md, my_personhood.md, my_wants.md, my_mechanics.md. For 'relationship' category: relationship_dynamics.md, relationship_history.md, relationship_notes.md.",
           },
           content: {
             type: "string",
