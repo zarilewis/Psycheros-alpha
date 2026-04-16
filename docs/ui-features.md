@@ -185,7 +185,7 @@ Customizable UI theming. Access via Settings → General Settings → Theme tab.
 
 ### Color Themes
 
-8 preset themes: Cosmic, Ocean, Forest, Sunset, Lavender, Midnight, Ember, Frost. Each has distinct accent colors. Custom accent color also available via color picker.
+8 preset themes: Violet Dream (default), Phosphor Green, Ocean Blue, Sunset Orange, Rose, Amber, Mint, Slate. Each has distinct accent colors. Custom accent color also available via color picker.
 
 ### Background Images
 

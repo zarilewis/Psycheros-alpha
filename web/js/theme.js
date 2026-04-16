@@ -20,7 +20,7 @@ const THEMES = {
 
 // Default theme configuration
 const DEFAULT_THEME = {
-  preset: 'phosphor',
+  preset: 'violet',
   customAccent: null,
   bgImage: null,
   bgBlur: 0,
