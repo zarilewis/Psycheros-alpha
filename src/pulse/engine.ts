@@ -526,6 +526,7 @@ export class PulseEngine {
 
     let errorMessage: string | null = null;
     let conversationId: string | null = pulse.conversationId;
+    let runId: string | undefined;
     try {
 
       // For visible mode with no assigned conversation, create a dedicated one
@@ -543,7 +544,7 @@ export class PulseEngine {
       }
 
       // Create run record
-      const runId = this.db.addPulseRun({
+      runId = this.db.addPulseRun({
         pulseId,
         conversationId,
         triggerSource,
@@ -695,7 +696,13 @@ export class PulseEngine {
         }
       }
 
-      // Complete run with error status
+      // Complete run record with error status so it doesn't stay stuck as "running"
+      if (runId) {
+        this.db.completePulseRun(runId, {
+          status: "error",
+          errorMessage,
+        });
+      }
       this.db.updatePulseRunStats(pulseId, "error");
     } finally {
       this.runningPulses.delete(pulseId);

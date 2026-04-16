@@ -272,9 +272,76 @@ function initPersistentSSE() {
     }
   });
 
+  persistentSSE.addEventListener('status', (event) => {
+    try {
+      const status = JSON.parse(event.data);
+      if (status.error) {
+        // If we have an active assistant element, inject the error there
+        if (pulseAssistantEl) {
+          handleSSEEvent('status', event.data, pulseAssistantEl, {
+            getThinking: () => pulseThinking,
+            setThinking: (el) => pulseThinking = el,
+            getContent: () => pulseContent,
+            setContent: (el) => pulseContent = el,
+            getSegmentRaw: () => pulseSegmentRaw,
+            setSegmentRaw: (text) => pulseSegmentRaw = text,
+            appendSegmentRaw: (text) => pulseSegmentRaw += text,
+          });
+        } else {
+          // No assistant element exists yet — create an error indicator
+          // directly in the messages area so the user sees what happened.
+          const messages = document.getElementById('messages');
+          if (messages) {
+            const errorEl = document.createElement('div');
+            errorEl.className = 'msg msg--assistant';
+            errorEl.innerHTML = `
+              <div class="msg-header">
+                <span>${globalThis.PsycherosSettings.entityName || 'Assistant'}</span>
+              </div>
+              <div class="msg-content"></div>
+            `;
+            const errorText = errorEl.querySelector('.msg-content');
+            if (errorText) {
+              const statusDiv = document.createElement('div');
+              statusDiv.className = 'status error';
+              statusDiv.style.color = 'var(--c-error)';
+              statusDiv.textContent = status.error;
+              errorText.appendChild(statusDiv);
+            }
+            messages.appendChild(errorEl);
+            AutoScroll.jumpToBottom();
+          }
+        }
+      } else if (status.retry) {
+        // Transient retry during Pulse streaming
+        if (pulseAssistantEl) {
+          handleSSEEvent('status', event.data, pulseAssistantEl, {
+            getThinking: () => pulseThinking,
+            setThinking: (el) => pulseThinking = el,
+            getContent: () => pulseContent,
+            setContent: (el) => pulseContent = el,
+            getSegmentRaw: () => pulseSegmentRaw,
+            setSegmentRaw: (text) => pulseSegmentRaw = text,
+            appendSegmentRaw: (text) => pulseSegmentRaw += text,
+          });
+          showToast(status.message, 'warning');
+        }
+      }
+    } catch (e) {
+      console.error('Failed to handle persistent status:', e);
+    }
+  });
+
   persistentSSE.addEventListener('done', (event) => {
     try {
-      if (!pulseAssistantEl) return;
+      if (!pulseAssistantEl) {
+        // No assistant element — the Pulse may have errored before producing content.
+        // If the done data signals an error, exit streaming mode so the UI isn't stuck.
+        if (event.data === 'error') {
+          exitPulseStreamingMode();
+        }
+        return;
+      }
       handleSSEEvent('done', event.data, pulseAssistantEl, {
         getThinking: () => pulseThinking,
         setThinking: (el) => pulseThinking = el,
