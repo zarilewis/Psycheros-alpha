@@ -181,15 +181,15 @@ See also: [security-audit.md](security-audit.md) for the full security assessmen
 - **Location**: `src/pulse/engine.ts` — `executePulse()`; `web/js/psycheros.js` — persistent SSE handlers
 - **Fix**: Added `pulse_complete` event broadcast after Pulse execution (success or error). Client-side handler detects if streaming was missed (`pulseAssistantEl === null`) and reloads the conversation from the server.
 
-### File inputs broken on iOS PWA (High — functionality)
-- **Problem**: Vault upload and anchor image upload used `<button onclick="document.getElementById('input').click()">` to trigger a hidden file input. iOS Safari in PWA (standalone) mode blocks programmatic `.click()` on file inputs because it doesn't consider that a direct user gesture — the file picker never opens.
-- **Locations**: `src/server/routes.ts:6057` (vault), `src/server/templates.ts:5456` (anchor)
-- **Fix**: Replaced `<button>` + `onclick` with `<label for="input-id">` which is always treated as a direct user gesture by iOS. Matches the existing pattern used by background image upload.
+### File inputs broken on cross-platform (High — functionality)
+- **Problem**: All file inputs used `<button onclick="document.getElementById('input').click()">` to trigger a hidden file input, or `<label for>` with a separate hidden input. Both patterns fail on iOS Safari PWA, Android Chrome, Windows desktop browsers, and macOS Safari — the file picker never opens. Programmatic `.click()` and `<label for>` with `display:none`/`hidden` inputs don't reliably trigger native file pickers across browsers.
+- **Locations**: `src/server/routes.ts` (vault), `src/server/templates.ts` (anchor, chat attachment, custom tool import, background upload)
+- **Fix**: Placed `<input type="file">` inside a `<label>` wrapper with `position:relative;overflow:hidden` on the label and `position:absolute;inset:0;opacity:0` on the input. Clicking anywhere on the label directly clicks the file input element — no JavaScript, no `for` attribute. This is the only pattern that reliably works across all platforms including iOS PWA standalone mode. Applied to all five file inputs in the app.
 
 ### Settings link closes sidebar without navigating on Safari (High — functionality)
 - **Problem**: Sidebar settings link was `<a>` without `href` with `onclick="Psycheros.closeSidebarAfterNav()"`. In Safari, `<a>` without `href` is not an interactive element — the inline `onclick` fires (closing the sidebar) but HTMX's `addEventListener`-based handler never fires, so no navigation occurs.
 - **Location**: `src/server/templates.ts:1200`
-- **Fix**: Changed `<a>` to `<button>` (always interactive) and replaced `onclick` with `hx-on::afterSwap="Psycheros.closeSidebarAfterNav()"` so the sidebar closes only after settings content loads successfully.
+- **Fix**: Changed `<a>` to `<button>` (always interactive in all browsers) with `onclick="Psycheros.closeSidebarAfterNav()"`. The `<button>` element ensures HTMX's addEventListener handler fires on Safari, so the `hx-get` request navigates to settings and the sidebar closes.
 
 ## Multi-Provider LLM Profiles
 

@@ -1201,7 +1201,7 @@ export function renderSidebar(conversations: Conversation[]): string {
       hx-get="/fragments/settings"
       hx-target="#chat"
       hx-swap="innerHTML"
-      hx-on::afterSwap="Psycheros.closeSidebarAfterNav()">
+      onclick="Psycheros.closeSidebarAfterNav()">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="3"/>
         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
@@ -1572,13 +1572,14 @@ export function renderEmptyState(): string {
 export function renderInputArea(): string {
   return `<div class="input-area">
   <div class="input-container">
-    <button class="attach-btn" onclick="document.getElementById('attach-input').click()" title="Attach image">
+    <label class="attach-btn" title="Attach image" style="position:relative;overflow:hidden;cursor:pointer;">
+      <input type="file" id="attach-input" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
         <circle cx="8.5" cy="8.5" r="1.5"/>
         <polyline points="21 15 16 10 5 21"/>
       </svg>
-    </button>
+    </label>
     <input type="file" id="attach-input" accept="image/*" style="display:none" onchange="Psycheros.handleAttachment(this)">
     <textarea
       class="input-field"
@@ -4920,15 +4921,15 @@ export function renderToolsSettings(
     <div id="tools-tab-custom" class="tools-tab-panel" style="display:none;">
       <!-- Import -->
       <div class="tools-import">
-        <input type="file" id="custom-tool-file" accept=".js" style="display:none" onchange="importCustomTool(this)">
-        <button class="btn btn--ghost btn--xs" onclick="document.getElementById('custom-tool-file').click()">
+        <label class="btn btn--ghost btn--xs" style="position:relative;overflow:hidden;cursor:pointer;">
+          <input type="file" id="custom-tool-file" accept=".js" style="position:absolute;inset:0;opacity:0;cursor:pointer;" onchange="importCustomTool(this)" />
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
           Import Tool
-        </button>
+        </label>
         <span class="tools-import-hint">Upload a .js file to add a custom tool</span>
       </div>
 
@@ -5453,8 +5454,10 @@ export function renderVisionAnchorsTab(
     <form id="anchor-upload-form" style="display:flex;gap:var(--sp-3);align-items:end;flex-wrap:wrap;">
       <div class="llm-field" style="flex:0 0 auto;">
         <label>File</label>
-        <label class="btn btn--sm" for="anchor-file" style="cursor:pointer;">Choose File</label>
-        <input type="file" id="anchor-file" accept="image/*" hidden onchange="document.getElementById('anchor-file-name').textContent = this.files[0]?.name || ''">
+        <label class="btn btn--sm" style="position:relative;overflow:hidden;cursor:pointer;">
+          Choose File
+          <input type="file" id="anchor-file" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" onchange="document.getElementById('anchor-file-name').textContent = this.files[0]?.name || ''" />
+        </label>
         <span id="anchor-file-name" class="anchor-meta"></span>
       </div>
       <div class="llm-field" style="flex:1;min-width:150px;">
