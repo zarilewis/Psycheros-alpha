@@ -1965,3 +1965,14 @@
   justify-content: center;
   line-height: 1;
 }
+
+.attachment-in-message {
+  max-width: 300px;
+  max-height: 300px;
+  width: auto;
+  height: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--c-border);
+  margin-bottom: var(--sp-2);
+  display: block;
+}

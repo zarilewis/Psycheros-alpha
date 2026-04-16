@@ -1100,7 +1100,7 @@ async function sendMessage() {
   const sendBtn = document.getElementById('send-btn');
   const message = input?.value.trim();
 
-  if (!message || isStreaming || pulseStreamingPulseId) return;
+  if ((!message && !pendingAttachmentId) || isStreaming || pulseStreamingPulseId) return;
 
   // Create conversation if needed
   if (!currentConversationId) {
@@ -1127,6 +1127,7 @@ async function sendMessage() {
 
   // Save and clear attachment before sending
   const attachmentId = pendingAttachmentId || undefined;
+  const attachmentUrl = pendingAttachmentUrl || undefined;
   pendingAttachmentId = null;
   pendingAttachmentUrl = null;
   const preview = document.getElementById('attachment-preview');
@@ -1150,14 +1151,17 @@ async function sendMessage() {
   const messages = document.getElementById('messages');
   const userTime = formatChatTimestamp(new Date());
   if (messages) {
-    const userHtml = DOMPurify.sanitize(marked.parse(message));
+    const userHtml = message ? DOMPurify.sanitize(marked.parse(message)) : '';
+    const attachmentHtml = attachmentUrl
+      ? `<img src="${escapeHtml(attachmentUrl)}" class="attachment-in-message" alt="Attached image" loading="lazy"/>`
+      : '';
     messages.insertAdjacentHTML('beforeend', `
       <div class="msg msg--user">
         <div class="msg-header">
           <span class="msg-timestamp">${userTime}</span>
           <span>${globalThis.PsycherosSettings.userName || 'You'}</span>
         </div>
-        <div class="msg-content user-text">${userHtml}</div>
+        <div class="msg-content user-text">${attachmentHtml}${userHtml}</div>
       </div>
     `);
   }
@@ -1194,7 +1198,7 @@ async function sendMessage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         conversationId: currentConversationId,
-        message: message,
+        message: message || '(image attached)',
         attachmentId: attachmentId,
         deviceType: isMobileDevice() ? 'mobile' : 'desktop'
       }),

@@ -1362,6 +1362,20 @@ export function renderUserMessage(
   const timeEl = timeStr ? `<span class="msg-timestamp">${escapeHtml(timeStr)}</span>` : "";
   const displayName = escapeHtml(userName || "You");
 
+  // Extract [USER_IMAGE: path | ...] markers and render as images
+  let imageHtml = "";
+  let textContent = content;
+  const userImageMatch = content.match(/^\[USER_IMAGE:\s*(\/[^\s\]]+)(?:\s*\|[^]]*)?\]\s*([\s\S]*)$/);
+  if (userImageMatch) {
+    const imagePath = userImageMatch[1];
+    textContent = userImageMatch[2].trim();
+    // Suppress the fallback placeholder text for image-only messages
+    if (textContent === "(image attached)") textContent = "";
+    imageHtml = `<img src="${escapeHtml(imagePath)}" class="attachment-in-message" alt="Attached image" loading="lazy"/>`;
+  }
+
+  const contentHtml = textContent ? renderMarkdown(textContent) : "";
+
   return `<div class="msg msg--user" ${dataAttr}>
   <div class="msg-header">
     ${timeEl}
@@ -1369,7 +1383,7 @@ export function renderUserMessage(
     ${editedIndicator}
     ${editBtn}
   </div>
-  <div class="msg-content user-text" data-raw-content="${escapeHtml(content)}">${renderMarkdown(content)}</div>
+  <div class="msg-content user-text" data-raw-content="${escapeHtml(content)}">${imageHtml}${contentHtml}</div>
 </div>`;
 }
 
@@ -1573,14 +1587,13 @@ export function renderInputArea(): string {
   return `<div class="input-area">
   <div class="input-container">
     <label class="attach-btn" title="Attach image" style="position:relative;overflow:hidden;cursor:pointer;">
-      <input type="file" id="attach-input" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+      <input type="file" id="attach-input" accept="image/*" style="position:absolute;inset:0;opacity:0;cursor:pointer;" onchange="Psycheros.handleAttachment(this)" />
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
         <circle cx="8.5" cy="8.5" r="1.5"/>
         <polyline points="21 15 16 10 5 21"/>
       </svg>
     </label>
-    <input type="file" id="attach-input" accept="image/*" style="display:none" onchange="Psycheros.handleAttachment(this)">
     <textarea
       class="input-field"
       id="message-input"
