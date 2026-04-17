@@ -215,7 +215,6 @@ See also: [security-audit.md](security-audit.md) for the full security assessmen
 - **Location**: `src/tools/create-significant-memory.ts` — `execute()`; `src/entity/loop.ts` — `EntityConfig`
 - **Fix**: Added `memoryIndexer` to `EntityConfig` (threaded from server through routes and pulse engine). The tool now calls `memoryIndexer.reindexFile()` and `mcpClient.createMemory()` after writing, both with non-fatal error handling. Existing significant memories on disk are unaffected — `indexAll()` on startup already indexes them.
 
-<<<<<<< HEAD
 ## Chat Image Upload Bug Fixes
 
 ### Chat attachment file input had duplicate inputs with same ID (High — functionality)
