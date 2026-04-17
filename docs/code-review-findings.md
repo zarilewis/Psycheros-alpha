@@ -236,3 +236,8 @@ See also: [security-audit.md](security-audit.md) for the full security assessmen
 - **Problem**: The regex to match `[USER_IMAGE:...]` markers used `[^]]*` intending "any character except `]`". However, JavaScript parses `[^]]` as `[^]` (match any character including newline) followed by a literal `]` — not as a negated character class. This caused the regex to never match messages with long captions, displaying raw `[USER_IMAGE: ... | Caption: long text | Short: short]` instead of the image.
 - **Location**: `src/server/templates.ts` — `renderUserMessage()`
 - **Fix**: Changed `[^]]*` to `[^\]]*` (properly escaped `]` inside the character class).
+
+### Image captioning ByteString error on Windows (High — functionality)
+- **Problem**: The `describe_image` tool and auto-captioning path failed with `"headers of RequestInit is not valid ByteString"` when using OpenRouter on Windows. Main chat worked fine — failure was isolated to the captioning request construction. Copying/pasting API keys or base URLs on Windows can inject invisible non-ASCII characters (zero-width spaces, BOM, smart quotes, `\r\n`). The Fetch API rejects header values containing non-ASCII as invalid ByteString.
+- **Location**: `src/tools/describe-image.ts` — `captionViaOpenRouter()`, `captionViaOpenRouterDual()`, `captionViaGemini()`, `captionViaGeminiDual()`; `src/tools/generate-image.ts` — `generateViaOpenRouter()`, `generateViaGemini()`
+- **Fix**: Applied `.trim()` to all `baseUrl` and `apiKey` values read from settings before constructing HTTP requests. Added `.trim()` before existing `.replace(/\/+$/, "")` on base URLs. Applied across all 6 request construction sites (2 OpenRouter + 2 Gemini per file).

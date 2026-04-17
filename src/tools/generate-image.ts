@@ -141,10 +141,10 @@ async function generateViaOpenRouter(
   const settings = config.settings.openrouter;
   if (!settings) throw new Error("OpenRouter settings not configured for this generator");
 
-  const baseUrl = (settings.baseUrl || "https://openrouter.ai/api/v1").replace(/\/+$/, "");
+  const baseUrl = (settings.baseUrl || "https://openrouter.ai/api/v1").trim().replace(/\/+$/, "");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${settings.apiKey}`,
+    "Authorization": `Bearer ${settings.apiKey.trim()}`,
   };
 
   // Build user message content — include reference images inline
@@ -386,7 +386,7 @@ async function generateViaGemini(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-goog-api-key": settings.apiKey,
+      "x-goog-api-key": settings.apiKey.trim(),
     },
     body: JSON.stringify(body),
   });

@@ -159,7 +159,7 @@ async function captionViaGemini(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-goog-api-key": geminiSettings.apiKey,
+      "x-goog-api-key": geminiSettings.apiKey.trim(),
     },
     body: JSON.stringify(body),
   });
@@ -222,7 +222,7 @@ async function captionViaGeminiDual(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-goog-api-key": geminiSettings.apiKey,
+      "x-goog-api-key": geminiSettings.apiKey.trim(),
     },
     body: JSON.stringify(body),
   });
@@ -268,8 +268,9 @@ async function captionViaOpenRouter(
   const orSettings = settings.openrouter;
   if (!orSettings) throw new Error("OpenRouter captioning settings not configured");
 
-  const baseUrl = orSettings.baseUrl || "https://openrouter.ai/api/v1";
+  const baseUrl = (orSettings.baseUrl || "https://openrouter.ai/api/v1").trim().replace(/\/+$/, "");
   const url = `${baseUrl}/chat/completions`;
+  const apiKey = orSettings.apiKey.trim();
 
   const body = {
     model: orSettings.model,
@@ -286,7 +287,7 @@ async function captionViaOpenRouter(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${orSettings.apiKey}`,
+      "Authorization": `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   });
@@ -320,8 +321,9 @@ async function captionViaOpenRouterDual(
   const orSettings = settings.openrouter;
   if (!orSettings) throw new Error("OpenRouter captioning settings not configured");
 
-  const baseUrl = orSettings.baseUrl || "https://openrouter.ai/api/v1";
+  const baseUrl = (orSettings.baseUrl || "https://openrouter.ai/api/v1").trim().replace(/\/+$/, "");
   const url = `${baseUrl}/chat/completions`;
+  const apiKey = orSettings.apiKey.trim();
 
   const body = {
     model: orSettings.model,
@@ -338,7 +340,7 @@ async function captionViaOpenRouterDual(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${orSettings.apiKey}`,
+      "Authorization": `Bearer ${apiKey}`,
     },
     body: JSON.stringify(body),
   });
