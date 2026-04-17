@@ -33,7 +33,7 @@ export const generateImageTool: Tool = {
         properties: {
           generator_id: {
             type: "string",
-            description: "The ID of the image generator to use",
+            description: "The ID (not the display name) of the image generator to use. The ID is the alphanumeric string shown after 'ID:' in the generators list (e.g. 'a1b2c3d4').",
           },
           prompt: {
             type: "string",
