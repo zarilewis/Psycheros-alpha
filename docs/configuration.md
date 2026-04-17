@@ -50,7 +50,6 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 | `vault` | Manage vault documents (write, read, append, list, search) |
 | `web_search` | Search the web via Tavily or Brave (auto-enabled when web search provider is set) |
 | `pulse` | Manage Pulses (create, trigger, delete) |
-| `send_notification` | Send a push notification to the user's device |
 | `send_discord_dm` | Send a Discord DM to the user (auto-enabled when bot token is configured) |
 | `control_device` | Control a smart home device — on/off/status (auto-enabled when devices are configured) |
 | `generate_image` | Generate an image or iterate on a previous one (auto-enabled when a generator is configured) |

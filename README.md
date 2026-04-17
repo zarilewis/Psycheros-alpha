@@ -88,8 +88,7 @@ src/
 │   ├── identity-casual.ts   # Tier 1: append-only
 │   └── identity-maintain.ts # Tier 2: maintenance
 │   └── pulse-tools.ts        # Entity-facing Pulse tools
-├── push/             # Web Push notifications
-│   └── mod.ts        # VAPID keys, subscription CRUD, send
+├── push/             # Push notifications (disabled — tool commented out)
 ├── rag/              # Retrieval-Augmented Generation
 │   ├── mod.ts
 │   ├── embedder.ts   # HuggingFace transformer embeddings

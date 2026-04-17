@@ -278,16 +278,6 @@ The custom tools upload endpoint accepts a `multipart/form-data` request with a 
 |--------|------|-------------|
 | `POST` | `/api/mcp/sync` | Manually trigger MCP sync |
 
-### Push Notifications
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/api/push/vapid-key` | Get VAPID public key for push subscription |
-| `POST` | `/api/push/subscribe` | Store a push subscription (`{ endpoint, keys: { p256dh, auth } }`) |
-| `POST` | `/api/push/unsubscribe` | Remove a push subscription (`{ endpoint }`) |
-
-Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID keys are auto-generated on first use and persisted to `.psycheros/push-vapid-keys.json`.
-
 ### System Admin
 
 | Method | Path | Description |
@@ -370,7 +360,6 @@ Push subscriptions are stored in the `push_subscriptions` SQLite table. VAPID ke
 | `src/pulse/engine.ts` | Pulse scheduling and execution engine |
 | `src/pulse/routes.ts` | Pulse CRUD and trigger API handlers |
 | `src/pulse/templates.ts` | Pulse settings UI rendering |
-| `src/push/mod.ts` | VAPID key management, subscription CRUD, push sending |
 | `src/llm/discord-settings.ts` | Discord settings type, persistence, token masking |
 | `src/llm/home-settings.ts` | Home automation settings type, persistence |
 | `src/tools/control-device.ts` | Home automation tool (Shelly Plug local HTTP API) |

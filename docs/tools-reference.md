@@ -210,33 +210,9 @@ Changes preserve markdown structure in identity files. Content is added cleanly 
 | `src/tools/identity-maintain.ts` | `maintain_identity` — unified identity maintenance tool |
 | `src/tools/identity-custom.ts` | Custom identity file tool (create, append, prepend, update_section, rewrite_section) |
 
-## Push Notification Tool
-
-The entity can send push notifications to the user's device. This works even when the app is closed — tapping the notification opens Psycheros directly to the conversation. Uses the Web Push protocol with VAPID keys.
-
-| Tool | Description |
-|------|-------------|
-| `send_notification` | Send a push notification with a title and body; optionally link to a conversation |
-| `send_discord_dm` | Send a Discord DM to the user |
-
-**Parameters:** `title` (required, short title), `body` (required, up to ~200 chars), `conversation_id` (optional, opens Psycheros to this conversation on tap).
-
-**Setup:** The user must grant notification permission via Settings > General > Enable Push Notifications. VAPID keys are auto-generated on first use and stored in `.psycheros/push-vapid-keys.json` (gitignored). Subscriptions are stored in the `push_subscriptions` SQLite table. Expired subscriptions are automatically cleaned up when the entity sends a notification.
-
-**Data flow:** Entity calls `send_notification` → server encrypts payload with VAPID keys → push service (FCCM) delivers to browser → service worker receives `push` event → calls `showNotification()` → user taps notification → service worker's `notificationclick` opens Psycheros at `/c/{conversationId}`.
-
-### Related Source Files
-
-| File | Purpose |
-|------|---------|
-| `src/tools/send-notification.ts` | `send_notification` tool implementation |
-| `src/push/mod.ts` | VAPID key management, subscription CRUD, `web-push` integration |
-| `web/sw.js` | `push` and `notificationclick` event handlers |
-| `web/js/psycheros.js` | Client-side subscription logic, `requestNotificationPermission()` |
-
 ## Discord DM Tool
 
-The entity can send Discord DMs to the user as an alternative notification channel. This is useful when push notifications are unreliable (e.g., on Android web apps). Uses a Discord bot token to open a DM channel and send messages via the Discord REST API. The entity can also attach images (e.g., generated via `generate_image`) to DMs.
+The entity can send Discord DMs to the user as a notification channel. Uses a Discord bot token to open a DM channel and send messages via the Discord REST API. The entity can also attach images (e.g., generated via `generate_image`) to DMs.
 
 | Tool | Description |
 |------|-------------|

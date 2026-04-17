@@ -25,8 +25,8 @@ import { vaultTool } from "./vault-tools.ts";
 import { webSearchTool } from "./web-search.ts";
 // Pulse tools
 import { pulseTool } from "./pulse-tools.ts";
-// Push notification tool
-import { sendNotificationTool } from "./send-notification.ts";
+// Push notification tool (disabled — buggy with Android webapp)
+// import { sendNotificationTool } from "./send-notification.ts";
 // Discord DM tool
 import { sendDiscordDmTool } from "./send-discord-dm.ts";
 // Home automation tool
@@ -67,8 +67,8 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   web_search: webSearchTool,
   // Pulse tools (autonomous entity prompts)
   pulse: pulseTool,
-  // Push notification tool
-  send_notification: sendNotificationTool,
+  // Push notification tool (disabled — buggy with Android webapp)
+  // send_notification: sendNotificationTool,
   // Discord DM tool
   send_discord_dm: sendDiscordDmTool,
   // Home automation tool

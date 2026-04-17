@@ -89,10 +89,10 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     toolNames: ["create_significant_memory"],
   },
   {
-    id: "notification",
-    name: "Notification",
-    description: "Send push notifications to the user's device",
-    toolNames: ["send_notification", "send_discord_dm"],
+    id: "discord",
+    name: "Discord",
+    description: "Send Discord direct messages to the user",
+    toolNames: ["send_discord_dm"],
   },
   {
     id: "home-automation",

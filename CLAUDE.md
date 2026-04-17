@@ -72,7 +72,6 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/pulse/templates.ts` | Pulse UI — settings hub card, editor, execution log |
 | `src/pulse/timezone.ts` | Timezone conversion for local↔UTC Pulse scheduling |
 | `src/tools/pulse-tools.ts` | Entity-facing Pulse tools (create, trigger, delete) |
-| `src/push/mod.ts` | Push notification manager (VAPID keys, subscriptions, sending) |
 
 ## Situational Awareness
 
