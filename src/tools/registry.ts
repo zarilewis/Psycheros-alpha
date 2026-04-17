@@ -16,9 +16,9 @@ import { syncMcpTool } from "./sync-mcp.ts";
 import { maintainIdentityTool } from "./identity-maintain.ts";
 import { listIdentitySnapshotsTool } from "./identity-maintain.ts";
 import { customFileTool } from "./identity-custom.ts";
-// Graph tools
-import { graphQueryTool } from "./graph-read.ts";
-import { graphMutateTool, graphWriteBatchTool } from "./graph-write.ts";
+// Graph tools (disabled — entity-core handles graph automatically via memory extraction + eager RAG)
+// import { graphQueryTool } from "./graph-read.ts";
+// import { graphMutateTool, graphWriteBatchTool } from "./graph-write.ts";
 // Vault tools
 import { vaultTool } from "./vault-tools.ts";
 // Web search tool
@@ -57,10 +57,10 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   list_identity_snapshots: listIdentitySnapshotsTool,
   // Custom identity file tool
   custom_file: customFileTool,
-  // Graph tools (query, build, and maintain the knowledge graph)
-  graph_query: graphQueryTool,
-  graph_mutate: graphMutateTool,
-  graph_write_batch: graphWriteBatchTool,
+  // Graph tools (disabled — entity-core handles graph automatically via memory extraction + eager RAG)
+  // graph_query: graphQueryTool,
+  // graph_mutate: graphMutateTool,
+  // graph_write_batch: graphWriteBatchTool,
   // Vault tools (entity document management)
   vault: vaultTool,
   // Web search tool (Tavily / Brave)

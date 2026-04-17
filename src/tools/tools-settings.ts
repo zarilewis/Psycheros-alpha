@@ -55,16 +55,6 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     ],
   },
   {
-    id: "graph",
-    name: "Knowledge Graph",
-    description: "Query and modify the entity knowledge graph",
-    toolNames: [
-      "graph_query",
-      "graph_mutate",
-      "graph_write_batch",
-    ],
-  },
-  {
     id: "vault",
     name: "Data Vault",
     description: "Document storage and retrieval",

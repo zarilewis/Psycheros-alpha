@@ -65,23 +65,6 @@ Accessible via Settings > Tools in the sidebar. Provides a web interface for man
 
 See [configuration.md](configuration.md) for the full list of available tools.
 
-## Knowledge Graph Tools
-
-The entity can read and write to its knowledge graph. Write tools auto-generate vector embeddings for semantic search.
-
-### Query Tool (omni read)
-
-| Tool | Description |
-|------|-------------|
-| `graph_query` | Unified read tool with `query_type` discriminator: `search` (semantic node search), `get_node` (by ID), `get_edges` (relationships), `traverse` (walk from a node), `subgraph` (full neighborhood), `stats` (counts) |
-
-### Mutate Tool (omni write)
-
-| Tool | Description |
-|------|-------------|
-| `graph_mutate` | Unified write tool with `operation` discriminator: `create_node`, `create_edge`, `update_node`, `update_edge`, `delete_node`, `delete_edge` |
-| `graph_write_batch` | Batch create nodes and edges (edges can reference existing nodes by label) |
-
 ## Web Search Tool
 
 The entity can search the web for current information using either Tavily or Brave Search. The provider and API key are configured via the Settings UI or environment variables — the tool is auto-enabled when a provider is selected.
@@ -140,8 +123,6 @@ The entity can create, trigger, and delete autonomous scheduled prompts (Pulses)
 
 | File | Purpose |
 |------|---------|
-| `src/tools/graph-read.ts` | `graph_query` — unified read tool for graph queries |
-| `src/tools/graph-write.ts` | `graph_mutate` + `graph_write_batch` — graph write tools with auto-embedding |
 
 ## Identity Tools
 

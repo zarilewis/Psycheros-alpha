@@ -44,9 +44,6 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 | `maintain_identity` | Full identity file maintenance (Tier 2 — append, prepend, update_section, rewrite_section) |
 | `list_identity_snapshots` | View available backups (Tier 2) |
 | `custom_file` | Create and modify custom identity files (create, append, prepend, update_section, rewrite_section) |
-| `graph_query` | Query knowledge graph (search, get_node, get_edges, traverse, subgraph, stats) |
-| `graph_mutate` | Mutate knowledge graph (create_node, create_edge, update_node, update_edge, delete_node, delete_edge) |
-| `graph_write_batch` | Batch create multiple nodes and edges |
 | `vault` | Manage vault documents (write, read, append, list, search) |
 | `web_search` | Search the web via Tavily or Brave (auto-enabled when web search provider is set) |
 | `pulse` | Manage Pulses (create, trigger, delete) |
@@ -61,7 +58,7 @@ Tools can also be toggled on/off at runtime via Settings > Tools in the web UI. 
 PSYCHEROS_TOOLS=identity_append
 
 # All tools except shell
-PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,identity_append,maintain_identity,list_identity_snapshots,graph_query,graph_mutate,graph_write_batch,vault,pulse
+PSYCHEROS_TOOLS=update_title,get_metrics,create_significant_memory,sync_mcp,identity_append,maintain_identity,list_identity_snapshots,vault,pulse
 ```
 
 ## RAG Settings

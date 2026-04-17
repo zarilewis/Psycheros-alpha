@@ -228,10 +228,8 @@ export async function collectDiagnostics(ctx: RouteContext): Promise<Diagnostics
     }
   }
 
-  // Check if graph write tools are enabled
-  const writeToolNames = ["graph_mutate", "graph_write_batch"];
-  const enabledTools = (Deno.env.get("PSYCHEROS_TOOLS") ?? "").split(",").map(t => t.trim().toLowerCase());
-  const graphWriteToolsEnabled = enabledTools.includes("all") || writeToolNames.every(t => enabledTools.includes(t));
+  // Graph write tools are no longer exposed — entity-core handles graph automatically
+  const graphWriteToolsEnabled = false;
 
   const snapshot: DiagnosticsSnapshot = {
     timestamp: new Date().toISOString(),
