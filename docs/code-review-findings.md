@@ -214,3 +214,25 @@ See also: [security-audit.md](security-audit.md) for the full security assessmen
 - **Problem**: When the entity created a significant memory via the `create_significant_memory` tool, the file was written to disk but never indexed into RAG or synced to entity-core. The web UI path correctly called `reindexFile()` and `createMemory()` after writing, but the tool path only wrote the file. Significant memories were invisible to RAG search until the next server restart.
 - **Location**: `src/tools/create-significant-memory.ts` — `execute()`; `src/entity/loop.ts` — `EntityConfig`
 - **Fix**: Added `memoryIndexer` to `EntityConfig` (threaded from server through routes and pulse engine). The tool now calls `memoryIndexer.reindexFile()` and `mcpClient.createMemory()` after writing, both with non-fatal error handling. Existing significant memories on disk are unaffected — `indexAll()` on startup already indexes them.
+
+## Chat Image Upload Bug Fixes
+
+### Chat attachment file input had duplicate inputs with same ID (High — functionality)
+- **Problem**: The Safari file input fix (`ed9892a`) wrapped the file input inside a `<label>` for cross-platform compatibility but left the old `display:none` file input with `onchange="Psycheros.handleAttachment(this)"` in place. The `<label>`-wrapped input had no `onchange` handler, and the orphaned input was never triggered by clicking the attach button. Selecting a file did nothing — no preview, no error, no upload.
+- **Location**: `src/server/templates.ts` — `renderInputArea()`
+- **Fix**: Removed the orphaned second file input and added the `onchange` handler to the `<label>`-wrapped input.
+
+### [USER_IMAGE:...] markers not rendered as images in user messages (High — UX)
+- **Problem**: When a conversation was loaded from the server, user messages containing `[USER_IMAGE: path | Caption: ... | Short: ...]` markers displayed the raw marker text instead of an inline image. The `renderUserMessage()` function passed content straight through `renderMarkdown()` without parsing user image markers (unlike `renderAssistantMessage()` which handled `[IMAGE:{...}]` markers). Additionally, the client-side `sendMessage()` function didn't render the attachment image in the user message bubble, and blocked sending image-only messages (no text).
+- **Location**: `src/server/templates.ts` — `renderUserMessage()`; `web/js/psycheros.js` — `sendMessage()`
+- **Fix**: Added `[USER_IMAGE:...]` marker parsing in `renderUserMessage()` to render inline images. Added client-side attachment rendering in `sendMessage()`. Changed guard to allow image-only sends with a fallback placeholder text.
+
+### User image description fading never triggered (Medium — token waste)
+- **Problem**: `buildFadeMap()` in the agentic loop only tracked `[IMAGE:{...}]` markers (generated images) for fading, missing `[USER_IMAGE:...]` markers entirely. User-uploaded images kept both longform Caption and shortform Short in context indefinitely, wasting tokens on verbose descriptions that the entity no longer needs.
+- **Location**: `src/entity/loop.ts` — `buildFadeMap()`
+- **Fix**: Added `\[USER_IMAGE:` check alongside the existing `\[IMAGE:\{` check in the first pass.
+
+### renderUserMessage regex `[^]]` parsed incorrectly by JavaScript (High — rendering)
+- **Problem**: The regex to match `[USER_IMAGE:...]` markers used `[^]]*` intending "any character except `]`". However, JavaScript parses `[^]]` as `[^]` (match any character including newline) followed by a literal `]` — not as a negated character class. This caused the regex to never match messages with long captions, displaying raw `[USER_IMAGE: ... | Caption: long text | Short: short]` instead of the image.
+- **Location**: `src/server/templates.ts` — `renderUserMessage()`
+- **Fix**: Changed `[^]]*` to `[^\]]*` (properly escaped `]` inside the character class).
