@@ -917,7 +917,7 @@ export class EntityTurn {
       const msg = history[i];
       if (msg.role === "user" || msg.role === "assistant") {
         turnCount++;
-        if (/\[IMAGE:\{/.test(msg.content)) {
+        if (/\[IMAGE:\{/.test(msg.content) || /\[USER_IMAGE:/.test(msg.content)) {
           imageTurns.set(i, turnCount);
         }
       }
