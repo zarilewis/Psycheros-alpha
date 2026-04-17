@@ -144,7 +144,7 @@ async function generateViaOpenRouter(
   const baseUrl = (settings.baseUrl || "https://openrouter.ai/api/v1").trim().replace(/\/+$/, "");
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${settings.apiKey.trim()}`,
+    "Authorization": `Bearer ${sanitizeHeaderValue(settings.apiKey)}`,
   };
 
   // Build user message content — include reference images inline
@@ -386,7 +386,7 @@ async function generateViaGemini(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-goog-api-key": settings.apiKey.trim(),
+      "x-goog-api-key": sanitizeHeaderValue(settings.apiKey),
     },
     body: JSON.stringify(body),
   });
@@ -599,7 +599,7 @@ async function execute(
     // Auto-caption the generated image if captioning is configured
     let description: string | undefined;
     let shortDescription: string | undefined;
-    const captioningSettings = ctx.config.captioningSettings;
+    const captioningSettings = ctx.config.imageGenSettings?.captioning;
     if (captioningSettings?.provider) {
       try {
         const caption = await captionImageDual(result.imageData, result.mediaType, captioningSettings);
@@ -640,6 +640,18 @@ async function execute(
 // =============================================================================
 // Helpers (exported for reuse by captioning)
 // =============================================================================
+
+/**
+ * Ensure a string is valid for use as an HTTP header value.
+ * Strips characters outside the Latin-1 range (code points > 255) that cause
+ * "headers of RequestInit is not valid ByteString" Fetch API errors.
+ * Also strips control characters that shouldn't appear in header values.
+ * This typically catches invisible Unicode characters (zero-width spaces, BOM, etc.)
+ * that get accidentally pasted in when copying API keys.
+ */
+export function sanitizeHeaderValue(value: string): string {
+  return value.replace(/[^\x20-\x7E\x80-\xFF]/g, "");
+}
 
 /**
  * Encode a Uint8Array to base64 without blowing the call stack.

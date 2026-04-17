@@ -113,8 +113,6 @@ export interface EntityConfig {
   homeSettings?: HomeSettings;
   /** Optional image generation settings */
   imageGenSettings?: ImageGenSettings;
-  /** Optional captioning settings (accessed by describe_image tool) */
-  captioningSettings?: import("../llm/image-gen-settings.ts").CaptioningSettings;
 }
 
 /**

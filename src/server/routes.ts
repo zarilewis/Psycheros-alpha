@@ -995,7 +995,6 @@ export async function handleChat(
             discordSettings: ctx.getDiscordSettings(),
             homeSettings: ctx.getHomeSettings(),
             imageGenSettings: ctx.getImageGenSettings(),
-            captioningSettings: ctx.getImageGenSettings().captioning,
           }
         );
 
@@ -1173,7 +1172,6 @@ export async function handleChatRetry(
             discordSettings: ctx.getDiscordSettings(),
             homeSettings: ctx.getHomeSettings(),
             imageGenSettings: ctx.getImageGenSettings(),
-            captioningSettings: ctx.getImageGenSettings().captioning,
           }
         );
 

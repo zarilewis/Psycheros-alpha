@@ -7,7 +7,7 @@
  */
 
 import { join } from "@std/path";
-import { uint8ToBase64, getMediaType } from "./generate-image.ts";
+import { uint8ToBase64, getMediaType, sanitizeHeaderValue } from "./generate-image.ts";
 import type { ToolResult } from "../types.ts";
 import type { Tool, ToolContext } from "./types.ts";
 import type { CaptioningSettings } from "../llm/image-gen-settings.ts";
@@ -159,7 +159,7 @@ async function captionViaGemini(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-goog-api-key": geminiSettings.apiKey.trim(),
+      "x-goog-api-key": sanitizeHeaderValue(geminiSettings.apiKey),
     },
     body: JSON.stringify(body),
   });
@@ -222,7 +222,7 @@ async function captionViaGeminiDual(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-goog-api-key": geminiSettings.apiKey.trim(),
+      "x-goog-api-key": sanitizeHeaderValue(geminiSettings.apiKey),
     },
     body: JSON.stringify(body),
   });
@@ -287,7 +287,7 @@ async function captionViaOpenRouter(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
+      "Authorization": `Bearer ${sanitizeHeaderValue(apiKey)}`,
     },
     body: JSON.stringify(body),
   });
@@ -340,7 +340,7 @@ async function captionViaOpenRouterDual(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${apiKey}`,
+      "Authorization": `Bearer ${sanitizeHeaderValue(apiKey)}`,
     },
     body: JSON.stringify(body),
   });
