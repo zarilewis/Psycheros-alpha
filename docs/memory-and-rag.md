@@ -153,6 +153,25 @@ Eager RAG over user-uploaded and entity-created reference documents. Documents a
 
 **Context injection order:** base instructions → identity → lorebook → **vault** → memories → chat history → graph
 
+### Lorebook RAG (Context Books)
+
+Keyword-triggered content injection from configurable entries organized into lorebooks. Entries can be sticky (persist across multiple turns) with configurable duration and re-trigger behavior.
+
+**Evaluation pipeline** (runs every turn):
+1. Scan user message for trigger matches
+2. Scan recent history respecting each entry's `scanDepth`
+3. Process sticky entries — decrement turn counter, check re-triggers
+4. Recursion pass — entry content can trigger other entries (unless prevented)
+5. Sort by priority and build context string
+
+**Sticky behavior:**
+- Sticky entries remain active for `stickyDuration` user turns after triggering
+- Turn counters are scoped per conversation — activity in other threads doesn't affect sticky state
+- Pulse/automated turns do NOT consume sticky duration (counters are preserved)
+- Fresh triggers from Pulse messages still work (e.g., trigger word in Pulse text re-triggers the entry)
+- `reTriggerResetsTimer`: when true (default), re-triggering resets the counter to `stickyDuration - 1`
+- State persisted in `lorebook_state` table, keyed by `(conversation_id, entry_id)`
+
 **Entity tools:**
 | Tool | Description |
 |------|-------------|

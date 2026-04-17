@@ -83,6 +83,10 @@ export interface ProcessOptions {
   retry?: boolean;
   /** Device type of the user for this turn (from frontend detection) */
   deviceType?: "desktop" | "mobile";
+  /** When true, sticky lorebook entries are not decremented.
+   *  Set automatically for Pulse turns so automated messages
+   *  don't consume sticky duration earned by real user conversation. */
+  skipStickyDecrement?: boolean;
 }
 
 /**
@@ -336,7 +340,8 @@ export class EntityTurn {
         const result = this.config.lorebookManager.evaluate(
           userMessage,
           historyForLorebook,
-          conversationId
+          conversationId,
+          { skipStickyDecrement: options?.skipStickyDecrement }
         );
 
         if (result.context) {

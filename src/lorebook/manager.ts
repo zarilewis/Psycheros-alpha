@@ -410,12 +410,14 @@ export class LorebookManager {
    * @param userMessage - The current user message
    * @param history - Recent conversation history
    * @param conversationId - The conversation ID
+   * @param options - Optional evaluation options
    * @returns The formatted lorebook context and evaluated entries
    */
   evaluate(
     userMessage: string,
     history: Array<{ role: string; content: string }>,
     conversationId: string,
+    options?: { skipStickyDecrement?: boolean },
   ): { context: string; entries: EvaluatedEntry[]; totalTokens: number } {
     // Load all enabled entries
     const entries = this.getAllEnabledEntries();
@@ -434,16 +436,19 @@ export class LorebookManager {
         userMessage,
         history,
         conversationId,
+        skipStickyDecrement: options?.skipStickyDecrement,
       },
       state
     );
 
-    // Save new state if changed
+    // Save new state if changed, or clear expired state
     if (result.newState) {
       console.log(`[Lorebook] Saving state with ${result.newState.activeEntries.size} active entries`);
       saveState(this.db, result.newState);
     } else {
       console.log(`[Lorebook] No new state to save (all entries expired or none triggered)`);
+      // Clean up any stale state rows for this conversation
+      clearState(this.db, conversationId);
     }
 
     // Build context string

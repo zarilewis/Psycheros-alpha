@@ -108,6 +108,22 @@ export function evaluateLorebook(
           triggeredAt: new Date().toISOString(),
         });
         // Entry is already in activeEntries from step 1 or 2
+      } else if (options.skipStickyDecrement) {
+        // Pulse or automated turn — don't consume sticky duration
+        console.log(`[Lorebook] Skipping sticky decrement (automated turn) for "${entry.name}" — turnsRemaining stays ${stickyState.turnsRemaining}`);
+        newState.activeEntries.set(entryId, {
+          ...stickyState,
+        });
+
+        // Add to active if not already there
+        if (!triggeredEntryIds.has(entryId)) {
+          console.log(`[Lorebook] Adding "${entry.name}" to active entries from sticky (no decrement)`);
+          activeEntries.push({
+            entry,
+            recursiveTrigger: false,
+            fromSticky: true,
+          });
+        }
       } else {
         // Decrement the counter
         const turnsRemaining = stickyState.turnsRemaining - 1;

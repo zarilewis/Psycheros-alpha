@@ -598,7 +598,7 @@ export class PulseEngine {
       let fullContent = "";
       let toolCallsCount = 0;
 
-      for await (const chunk of turn.process(conversationId!, pulse.promptText, { pulseId: pulse.id, pulseName: pulse.name })) {
+      for await (const chunk of turn.process(conversationId!, pulse.promptText, { pulseId: pulse.id, pulseName: pulse.name, skipStickyDecrement: true })) {
         // Check if this Pulse was aborted by the user
         if (this.abortedPulses.has(pulseId)) {
           console.log(`[Pulse] "${pulse.name}" aborted by user`);

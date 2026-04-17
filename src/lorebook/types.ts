@@ -126,6 +126,10 @@ export interface EvaluationOptions {
   conversationId: string;
   /** Maximum depth for recursive triggering (default: 3) */
   maxRecursionDepth?: number;
+  /** When true, sticky entry turn counters are NOT decremented.
+   *  Use for Pulse turns so automated messages don't consume
+   *  sticky duration that was earned by real user conversation. */
+  skipStickyDecrement?: boolean;
 }
 
 /**
