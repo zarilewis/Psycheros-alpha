@@ -13,6 +13,7 @@ import { queryLogs, getLogComponents, getLogLevelCounts, type LogLevel } from ".
 import { collectDiagnostics } from "./diagnostics.ts";
 import { getAllJobs, triggerJob } from "./cron-tracker.ts";
 import { renderAdminHub, renderAdminLogs, renderLogEntries, renderAdminDiagnostics, renderAdminJobs, renderAdminJobRows, renderAdminActions } from "./admin-templates.ts";
+import { getActiveProfile } from "../llm/settings.ts";
 
 const HTML_HEADERS = { "Content-Type": "text/html; charset=utf-8" };
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -150,7 +151,10 @@ export async function handleAdminBatchPopulate(_ctx: RouteContext, body: Record<
   const verbose = body.verbose === true;
 
   const entityCoreRoot = Deno.env.get("PSYCHEROS_ENTITY_CORE_PATH") ||
-    new URL("../../entity-core", import.meta.url).pathname;
+    join(_ctx.projectRoot, "..", "entity-core");
+
+  const profileSettings = _ctx.getLLMProfileSettings();
+  const activeProfile = getActiveProfile(profileSettings);
 
   const args = [
     "run", "-A",
@@ -165,10 +169,11 @@ export async function handleAdminBatchPopulate(_ctx: RouteContext, body: Record<
     const cmd = new Deno.Command("deno", {
       args,
       env: {
+        ...Deno.env.toObject(),
         ENTITY_CORE_DATA_DIR: Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${entityCoreRoot}/data`,
-        ENTITY_CORE_LLM_API_KEY: Deno.env.get("ENTITY_CORE_LLM_API_KEY") || Deno.env.get("ZAI_API_KEY") || "",
-        ENTITY_CORE_LLM_BASE_URL: Deno.env.get("ENTITY_CORE_LLM_BASE_URL") || Deno.env.get("ZAI_BASE_URL") || "",
-        ENTITY_CORE_LLM_MODEL: Deno.env.get("ENTITY_CORE_LLM_MODEL") || Deno.env.get("ZAI_MODEL") || "",
+        ENTITY_CORE_LLM_API_KEY: Deno.env.get("ENTITY_CORE_LLM_API_KEY") || activeProfile?.apiKey || Deno.env.get("ZAI_API_KEY") || "",
+        ENTITY_CORE_LLM_BASE_URL: Deno.env.get("ENTITY_CORE_LLM_BASE_URL") || activeProfile?.baseUrl || Deno.env.get("ZAI_BASE_URL") || "",
+        ENTITY_CORE_LLM_MODEL: Deno.env.get("ENTITY_CORE_LLM_MODEL") || activeProfile?.model || Deno.env.get("ZAI_MODEL") || "",
         ZAI_API_KEY: Deno.env.get("ZAI_API_KEY") || "",
         ZAI_BASE_URL: Deno.env.get("ZAI_BASE_URL") || "",
         ZAI_MODEL: Deno.env.get("ZAI_MODEL") || "",

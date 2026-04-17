@@ -15,6 +15,8 @@ import type { WebSearchSettings } from "../llm/mod.ts";
 import type { DiscordSettings, HomeSettings } from "../llm/mod.ts";
 import type { ImageGenSettings, ImageGenConfig, EntityCoreLLMSettings } from "../llm/mod.ts";
 import { maskProfileSettings, createDefaultProfile, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings, getDefaultImageGenSettings, maskImageGenSettings } from "../llm/mod.ts";
+import { getActiveProfile } from "../llm/settings.ts";
+import { join } from "@std/path";
 import { captionImageDual } from "../tools/describe-image.ts";
 import { uint8ToBase64, getMediaType as getImageMediaType } from "../tools/generate-image.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
@@ -6373,7 +6375,7 @@ export function handleEntityCoreLLM(ctx: RouteContext): Response {
     resolved: {
       model: settings.model || activeProfile?.model || "",
       temperature: settings.temperature ?? 0.3,
-      maxTokens: settings.maxTokens ?? 4000,
+      maxTokens: settings.maxTokens ?? 8000,
       profileName: activeProfile?.name || null,
     },
   };
@@ -6631,7 +6633,10 @@ export async function handleEmbedMemories(_ctx: RouteContext, body: Record<strin
   const verbose = body.verbose === true;
 
   const entityCoreRoot = Deno.env.get("PSYCHEROS_ENTITY_CORE_PATH") ||
-    new URL("../../entity-core", import.meta.url).pathname;
+    join(_ctx.projectRoot, "..", "entity-core");
+
+  const profileSettings = _ctx.getLLMProfileSettings();
+  const activeProfile = getActiveProfile(profileSettings);
 
   const args = [
     "run", "-A",
@@ -6644,7 +6649,14 @@ export async function handleEmbedMemories(_ctx: RouteContext, body: Record<strin
     const cmd = new Deno.Command("deno", {
       args,
       env: {
+        ...Deno.env.toObject(),
         ENTITY_CORE_DATA_DIR: Deno.env.get("PSYCHEROS_ENTITY_CORE_DATA_DIR") || `${entityCoreRoot}/data`,
+        ENTITY_CORE_LLM_API_KEY: Deno.env.get("ENTITY_CORE_LLM_API_KEY") || activeProfile?.apiKey || Deno.env.get("ZAI_API_KEY") || "",
+        ENTITY_CORE_LLM_BASE_URL: Deno.env.get("ENTITY_CORE_LLM_BASE_URL") || activeProfile?.baseUrl || Deno.env.get("ZAI_BASE_URL") || "",
+        ENTITY_CORE_LLM_MODEL: Deno.env.get("ENTITY_CORE_LLM_MODEL") || activeProfile?.model || Deno.env.get("ZAI_MODEL") || "",
+        ZAI_API_KEY: Deno.env.get("ZAI_API_KEY") || "",
+        ZAI_BASE_URL: Deno.env.get("ZAI_BASE_URL") || "",
+        ZAI_MODEL: Deno.env.get("ZAI_MODEL") || "",
       },
       stdout: "piped",
       stderr: "piped",
@@ -6864,7 +6876,7 @@ export function handleGetEntityCoreLLMSettings(ctx: RouteContext): Response {
   const resolved = {
     model: settings.model || activeProfile?.model || "",
     temperature: settings.temperature ?? 0.3,
-    maxTokens: settings.maxTokens ?? 4000,
+    maxTokens: settings.maxTokens ?? 8000,
     profileName: activeProfile?.name || null,
   };
 
@@ -6904,7 +6916,7 @@ export async function handleSaveEntityCoreLLMSettings(
     const resolved = {
       model: updated.model || activeProfile?.model || "",
       temperature: updated.temperature ?? 0.3,
-      maxTokens: updated.maxTokens ?? 4000,
+      maxTokens: updated.maxTokens ?? 8000,
       profileName: activeProfile?.name || null,
     };
 

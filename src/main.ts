@@ -109,7 +109,7 @@ if (mcpEnabled) {
   // Load entity-core LLM overrides (model/temperature/maxTokens independent of chat model)
   const ecLLMSettings = await loadEntityCoreLLMSettings(config.projectRoot);
   const ecTemperature = ecLLMSettings.temperature ?? 0.3;
-  const ecMaxTokens = ecLLMSettings.maxTokens ?? 4000;
+  const ecMaxTokens = ecLLMSettings.maxTokens ?? 8000;
 
   mcpClient = createMCPClient({
     command: mcpCommand,

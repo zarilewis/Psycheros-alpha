@@ -2955,10 +2955,10 @@ export function renderEntityCoreLLM(data: EntityCoreLLMData): string {
     <div class="form-group">
       <label for="ec-llm-max-tokens">Max Tokens</label>
       <div class="ec-llm-field-row">
-        <input type="number" id="ec-llm-max-tokens" step="256" min="256" placeholder="4000" value="${settings.maxTokens !== undefined ? settings.maxTokens : ""}" />
+        <input type="number" id="ec-llm-max-tokens" step="256" min="256" placeholder="8000" value="${settings.maxTokens !== undefined ? settings.maxTokens : ""}" />
         ${isOverridden("maxTokens") ? '<button type="button" class="btn btn--sm btn--ghost" onclick="document.getElementById(\'ec-llm-max-tokens\').value=\'\'">Reset</button>' : ''}
       </div>
-      <span class="ec-llm-resolved">Default: <strong>4000</strong></span>
+      <span class="ec-llm-resolved">Default: <strong>8000</strong></span>
     </div>
   </div>
 

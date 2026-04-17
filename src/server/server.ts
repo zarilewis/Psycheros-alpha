@@ -432,7 +432,7 @@ export class Server {
         // Apply entity-core LLM overrides on top of the active profile
         const ecSettings = await loadEntityCoreLLMSettings(this.config.projectRoot);
         const ecTemperature = ecSettings.temperature ?? 0.3;
-        const ecMaxTokens = ecSettings.maxTokens ?? 4000;
+        const ecMaxTokens = ecSettings.maxTokens ?? 8000;
 
         console.log("[Server] Restarting entity-core with updated LLM credentials...");
         try {
@@ -534,7 +534,7 @@ export class Server {
       const active = getActiveProfile(this.llmProfileSettings);
       if (active) {
         const ecTemperature = settings.temperature ?? 0.3;
-        const ecMaxTokens = settings.maxTokens ?? 4000;
+        const ecMaxTokens = settings.maxTokens ?? 8000;
 
         console.log("[Server] Restarting entity-core with updated LLM settings...");
         try {

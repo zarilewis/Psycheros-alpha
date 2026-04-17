@@ -23,7 +23,7 @@ export interface EntityCoreLLMSettings {
   model?: string;
   /** Override temperature for entity-core tasks (empty = use 0.3 default) */
   temperature?: number;
-  /** Override max tokens for entity-core tasks (empty = use 4000 default) */
+  /** Override max tokens for entity-core tasks (empty = use 8000 default) */
   maxTokens?: number;
 }
 

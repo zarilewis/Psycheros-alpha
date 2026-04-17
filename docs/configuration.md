@@ -84,7 +84,7 @@ These settings control Chat RAG and Vault RAG (local to Psycheros). Memory RAG i
 | `ENTITY_CORE_LLM_BASE_URL` | — | Override LLM endpoint for entity-core. Falls back to active profile's base URL, then `ZAI_BASE_URL` |
 | `ENTITY_CORE_LLM_MODEL` | — | Override model for entity-core extraction. Falls back to active profile's model, then `ZAI_MODEL` |
 | `ENTITY_CORE_LLM_TEMPERATURE` | — | Override temperature for entity-core extraction. Falls back to `0.3` |
-| `ENTITY_CORE_LLM_MAX_TOKENS` | — | Override max tokens for entity-core extraction. Falls back to `4000` |
+| `ENTITY_CORE_LLM_MAX_TOKENS` | — | Override max tokens for entity-core extraction. Falls back to `8000` |
 
 Psycheros automatically forwards the **active LLM profile's** credentials to entity-core so that knowledge graph extraction works out of the box. When the active profile changes, entity-core is dynamically restarted with the new credentials. Set the `ENTITY_CORE_LLM_*` variants if entity-core needs different LLM settings than Psycheros (e.g., a cheaper model for extraction).
 
