@@ -13,6 +13,7 @@ Tool enable/disable state can be overridden via the `PSYCHEROS_TOOLS` environmen
 3. Add the tool name to the appropriate category in `TOOL_CATEGORIES` in `src/tools/tools-settings.ts`
 4. For UI updates: use a state-change function, return `affectedRegions`
 5. Tool descriptions use first-person: "I use this to..."
+6. If the tool requires persistent settings (API keys, endpoint config, etc.): create a settings type in `src/llm/`, add a getter to `PsycherosServer` in `src/server/server.ts`, then wire the settings into **both** the chat handler (`src/server/routes.ts`) and the Pulse engine (`src/pulse/engine.ts`). Specifically: add a property to `EntityConfig` in `src/entity/loop.ts`, a getter to `PulseEngineConfig` in `src/pulse/engine.ts`, pass it when constructing `EntityConfig` in `executePulse()`, and provide the getter when constructing `PulseEngine` in `server.ts`. If any of these are missed, the tool will work in normal chat but fail when called autonomously by a Pulse.
 
 ### Adding a Custom Tool
 

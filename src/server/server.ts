@@ -760,6 +760,7 @@ export class Server {
         webSearchSettings: () => this.webSearchSettings,
         discordSettings: () => this.discordSettings,
         homeSettings: () => this.homeSettings,
+        imageGenSettings: () => this.imageGenSettings,
       }
     );
     this.pulseEngine.start();

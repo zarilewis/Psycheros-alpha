@@ -18,6 +18,7 @@ import type { MCPClient } from "../mcp-client/mod.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
 import type { VaultManager } from "../vault/mod.ts";
 import type { EntityConfig } from "../entity/mod.ts";
+import type { ImageGenSettings } from "../llm/image-gen-settings.ts";
 import { EntityTurn } from "../entity/mod.ts";
 import { getBroadcaster } from "../server/broadcaster.ts";
 import { renderMessage } from "../server/templates.ts";
@@ -83,6 +84,8 @@ export interface PulseEngineConfig {
   discordSettings?: () => DiscordSettings | undefined;
   /** Getter for Home settings (read fresh each pulse execution) */
   homeSettings?: () => HomeSettings | undefined;
+  /** Getter for image generation settings (read fresh each pulse execution) */
+  imageGenSettings?: () => ImageGenSettings | undefined;
 }
 
 /**
@@ -564,6 +567,7 @@ export class PulseEngine {
         webSearchSettings: this.config.webSearchSettings?.(),
         discordSettings: this.config.discordSettings?.(),
         homeSettings: this.config.homeSettings?.(),
+        imageGenSettings: this.config.imageGenSettings?.(),
       };
 
       const turn = new EntityTurn(this.llm, this.db, this.tools, entityConfig);

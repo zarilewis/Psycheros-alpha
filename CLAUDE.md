@@ -129,6 +129,7 @@ Image generation and visual analysis configured via Settings > Vision (top-level
 3. Add tool name to the appropriate category in `TOOL_CATEGORIES` in `src/tools/tools-settings.ts`
 4. For auto-enablement: add to `autoEnabled` array in `src/server/server.ts`
 5. For UI updates: use state-change function, return `affectedRegions`
+6. If the tool needs persistent settings (API keys, config): add a settings type in `src/llm/`, a getter on `PsycherosServer`, and wire it into **both** `EntityConfig` (`src/entity/loop.ts`) and `PulseEngineConfig` (`src/pulse/engine.ts`) — the Pulse engine must pass the settings through or the tool will fail when called autonomously
 
 **Adding a custom tool** (no core code changes needed):
 1. Create `custom-tools/my-tool.js` exporting a default `Tool` object
