@@ -1365,7 +1365,7 @@ export function renderUserMessage(
   // Extract [USER_IMAGE: path | ...] markers and render as images
   let imageHtml = "";
   let textContent = content;
-  const userImageMatch = content.match(/^\[USER_IMAGE:\s*(\/[^\s\]]+)(?:\s*\|[^]]*)?\]\s*([\s\S]*)$/);
+  const userImageMatch = content.match(/^\[USER_IMAGE:\s*(\/[^\s\]]+)(?:\s*\|[^\]]*)?\]\s*([\s\S]*)$/);
   if (userImageMatch) {
     const imagePath = userImageMatch[1];
     textContent = userImageMatch[2].trim();
