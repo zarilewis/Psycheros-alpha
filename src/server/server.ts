@@ -750,7 +750,7 @@ export class Server {
     // Initialize Pulse engine for autonomous entity prompts
     this.pulseEngine = new PulseEngine(
       this.db,
-      this.llm,
+      () => this.llm,
       () => this.tools,
       {
         projectRoot: this.config.projectRoot,

@@ -107,7 +107,7 @@ export class PulseEngine {
 
   constructor(
     private db: DBClient,
-    private llm: LLMClient,
+    private getLlm: () => LLMClient,
     private tools: () => ToolRegistry,
     private config: PulseEngineConfig,
   ) {
@@ -580,7 +580,7 @@ export class PulseEngine {
         imageGenSettings: this.config.imageGenSettings?.(),
       };
 
-      const turn = new EntityTurn(this.llm, this.db, this.tools, entityConfig);
+      const turn = new EntityTurn(this.getLlm(), this.db, this.tools, entityConfig);
 
       // Broadcast the Pulse prompt message to the chat in real time
       if (pulse.chatMode === "visible" && conversationId) {
