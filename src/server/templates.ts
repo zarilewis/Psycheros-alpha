@@ -815,6 +815,7 @@ function switchGeneralTab(tab) {
   if (sel && window.PsycherosSettings && window.PsycherosSettings.timezone) {
     sel.value = window.PsycherosSettings.timezone;
   }
+})();
 
 async function saveGeneralSettings() {
   const entityName = document.getElementById('general-entity-name').value.trim();
