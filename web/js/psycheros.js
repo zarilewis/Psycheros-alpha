@@ -1696,6 +1696,9 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         const toolCard = pendingToolCalls.get(result.toolCallId);
         if (toolCard) {
           addToolResult(toolCard, result.content, result.isError);
+          // Re-expand the card so the result is visible (the done event
+          // collapsed it while tools were still executing)
+          toolCard.classList.add('expanded');
           pendingToolCalls.delete(result.toolCallId);
           AutoScroll.streamTick();
         }
@@ -1821,14 +1824,20 @@ function handleSSEEvent(eventType, data, messageEl, state) {
         renderFinalContent(doneContentEl, doneSegmentRaw);
       }
 
-      // Remove any lingering cursors and streaming indicators
+      // Remove any lingering cursors and streaming-active markers
       contentContainer.querySelectorAll('.typing-cursor').forEach(el => el.remove());
       contentContainer.querySelectorAll('.streaming-active').forEach(el => {
         el.classList.remove('streaming-active');
       });
-      const header = messageEl.querySelector('.msg-header');
-      header?.querySelector('.streaming')?.remove();
-      AutoScroll.streamEnd();
+
+      // When finish_reason is tool_calls, the agentic loop continues —
+      // keep the streaming indicator and auto-scroll alive so the user
+      // sees tool results and the next LLM iteration.
+      if (data !== 'tool_calls') {
+        const header = messageEl.querySelector('.msg-header');
+        header?.querySelector('.streaming')?.remove();
+        AutoScroll.streamEnd();
+      }
       break;
     }
 

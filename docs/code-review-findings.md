@@ -84,6 +84,11 @@ Full code review covering code quality, error handling, input validation, SQLite
 - **Location**: `src/llm/client.ts`
 - **Fix**: Added `[LLM]` tagged logging: request send (model, message count, tools), connect timing, stream completion stats, abnormal stream termination warnings.
 
+### Tool results invisible after finish_reason=tool_calls (High — UX)
+- **Problem**: The entity loop yields a `done` SSE event after every LLM call, including when `finish_reason=tool_calls`. The client's `done` handler unconditionally tore down the streaming UI — removing the streaming indicator, collapsing all thinking/tool sections, and calling `AutoScroll.streamEnd()`. Since tools hadn't executed yet, the user saw the interface go quiet with no visual feedback. Tool results, when they arrived, were appended to now-collapsed tool cards (invisible unless manually expanded). Auto-scroll was deactivated (`_streaming = false`), so subsequent content from the next LLM iteration never scrolled into view. This was most visible with tools like `maintain_identity` and `web_search` where the model reasons then calls a tool with no intermediate text content (e.g., "54 thinking chunks, 0 content").
+- **Locations**: `web/js/psycheros.js` — `done` event handler (line ~1811), `tool_result` event handler (line ~1693)
+- **Fix**: The `done` handler now checks `data` (the `finishReason` string). When `finishReason === "tool_calls"`, sections are still collapsed but the streaming indicator is kept and `AutoScroll.streamEnd()` is not called — keeping auto-scroll active for tool results and the next LLM iteration. The `tool_result` handler now re-expands the tool card after adding the result, so the output is visible to the user. The final `done` event (with `finishReason: "stop"`, `"length"`, etc.) still triggers full teardown as before.
+
 ## Known Issues (deferred)
 
 ### Type errors in `src/tools/graph-read.ts`
