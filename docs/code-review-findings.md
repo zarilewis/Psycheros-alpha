@@ -246,3 +246,26 @@ See also: [security-audit.md](security-audit.md) for the full security assessmen
 - **Problem**: Sticky lorebook entry turn counters were decremented on every evaluation, including Pulse/automated turns. When a Pulse fired in the same conversation (or in its own conversation assigned to the user's thread), it consumed sticky duration that was earned by real user conversation. A Pulse firing 4+ times could exhaust a `stickyDuration: 5` entry before the user returned to the thread. Additionally, when all sticky entries expired, stale `lorebook_state` rows were not cleaned up from the database — they persisted until the next evaluate call for that conversation.
 - **Location**: `src/lorebook/evaluator.ts` — Step 3 (sticky processing); `src/lorebook/manager.ts` — `evaluate()`; `src/pulse/engine.ts` — `executePulse()`; `src/entity/loop.ts` — `ProcessOptions`
 - **Fix**: Added `skipStickyDecrement` flag to `EvaluationOptions`, `LorebookManager.evaluate()`, and `ProcessOptions`. When set (automatically for Pulse turns), sticky entries are preserved with their current `turnsRemaining` unchanged and still appear in context, but the counter is not decremented. Pulse turns can still trigger entries and re-trigger resets the timer normally. Also added `clearState()` call in `evaluate()` when all entries expire, to clean up stale database rows.
+
+### Entity-created Pulses never fire (Critical — functionality)
+- **Problem**: Three interacting bugs prevented entity-created Pulses from working at all:
+  1. `setPulseEngine()` was exported from `pulse-tools.ts` but never imported or called anywhere. The `pulseEngine` variable was always `null`, so `registerTriggers()` and `executePulse()` were silently no-ops.
+  2. Even if wired up, `executeCreate()` saved the Pulse to the database but never called `pulseEngine.registerTriggers()`. The engine only loaded Pulses at startup, so Pulses created mid-session were invisible to the scheduler.
+  3. No `run_at` parameter existed — entities could only use `interval_seconds` for "in N minutes" prompts, but the engine interpreted this as a recurring schedule (`*/30 * * * *`), producing wrong fire times.
+- **Location**: `src/tools/pulse-tools.ts` — `executeCreate()`; `src/server/server.ts` — startup
+- **Fix**: Added `setPulseEngine(this.pulseEngine)` call in server startup. Added `registerTriggers()` call after `createPulse()` in the tool. Added `run_at` parameter for one-shot scheduling. Added timezone conversion (display TZ → UTC) for `run_at`, `cron_expression` (daily/weekly/monthly patterns).
+
+### One-shot Pulses disable before executing (Critical — functionality)
+- **Problem**: `handleCronTick()` called `updatePulse({ enabled: false, runAt: null })` before `executePulse()`. Since `executePulse()` re-reads the Pulse from the DB and checks `pulse.enabled`, it immediately returned without executing. The one-shot Pulse was disabled but never ran.
+- **Location**: `src/pulse/engine.ts` — `handleCronTick()`
+- **Fix**: Only clear `runAt` before execution (to prevent re-fire). Disable the Pulse after `executePulse()` completes (unless auto-deleted).
+
+### Pulse sidebar indicator missing on entity tool calls (Medium — UX)
+- **Problem**: When an entity created or deleted a Pulse via the tool, the sidebar conversation list never refreshed to show/hide the Pulse icon indicator. The tool returned a plain string result without specifying `affectedRegions`.
+- **Location**: `src/tools/pulse-tools.ts` — `executeCreate()`, `executeDelete()`
+- **Fix**: Added `affectedRegions: ["conv-list"]` to create and delete tool results, triggering a sidebar refresh.
+
+### Pulse messages rendered as user messages after reload (Medium — rendering)
+- **Problem**: `renderMessage()` checked only `msg.pulseId` to decide whether to use Pulse styling. Entity-created Pulse messages had `pulse_name` set but `pulse_id` was null (legacy artifact), so they rendered as regular user messages after page reload.
+- **Location**: `src/server/templates.ts` — `renderMessage()`
+- **Fix**: Changed condition to `if (msg.pulseId || msg.pulseName)`.

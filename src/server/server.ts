@@ -21,6 +21,7 @@ import type { ConversationRAG } from "../rag/conversation.ts";
 import { LorebookManager } from "../lorebook/mod.ts";
 import { VaultManager } from "../vault/mod.ts";
 import { PulseEngine } from "../pulse/mod.ts";
+import { setPulseEngine } from "../tools/pulse-tools.ts";
 import { join } from "@std/path";
 import { MAX_REQUEST_BODY_SIZE, MAX_UPLOAD_BODY_SIZE } from "../constants.ts";
 import {
@@ -764,6 +765,9 @@ export class Server {
       }
     );
     this.pulseEngine.start();
+
+    // Wire pulse engine into the entity-facing pulse tool
+    setPulseEngine(this.pulseEngine);
 
     await Deno.serve(
       {

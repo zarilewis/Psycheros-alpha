@@ -1274,7 +1274,7 @@ export function renderMessages(messages: Message[], metricsMap?: MetricsMap, dis
  */
 export function renderMessage(msg: Message, metrics?: TurnMetrics, displayNames?: { entityName: string; userName: string }): string {
   if (msg.role === "user") {
-    if (msg.pulseId) {
+    if (msg.pulseId || msg.pulseName) {
       return renderPulseMessage(msg);
     }
     return renderUserMessage(msg.content, msg.id, msg.editedAt, msg.createdAt, displayNames?.userName);

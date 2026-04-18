@@ -296,13 +296,23 @@ export class PulseEngine {
     }
 
     // One-shot run_at check
-    if (pulse.runAt) {
-      if (Date.now() < new Date(pulse.runAt).getTime()) return;
-      // Disable after one-shot fires
-      this.db.updatePulse(pulse.id, { enabled: false, runAt: null });
+    const isOneshot = !!pulse.runAt;
+    if (isOneshot) {
+      if (Date.now() < new Date(pulse.runAt!).getTime()) return;
+      // Clear runAt to prevent re-firing on the next cron tick.
+      // Do NOT disable here — executePulse re-reads from DB and checks enabled.
+      this.db.updatePulse(pulse.id, { runAt: null });
     }
 
     await this.executePulse(pulseId, "cron", 0, null);
+
+    // Disable one-shot pulses after execution (auto-delete already handled inside executePulse)
+    if (isOneshot) {
+      const stillExists = this.db.getPulse(pulseId);
+      if (stillExists && stillExists.enabled) {
+        this.db.updatePulse(pulseId, { enabled: false });
+      }
+    }
   }
 
   // ===========================================================================

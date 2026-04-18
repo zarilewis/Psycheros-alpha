@@ -103,11 +103,19 @@ The entity can create, read, append, list, and search documents stored in the Da
 
 ## Pulse Tool
 
-The entity can create, trigger, and delete autonomous scheduled prompts (Pulses). Entity-created Pulses default to silent mode and auto-delete after execution. When a visible-mode Pulse fires, the entity perceives the prompt as system-initiated via a `[System — Pulse "name"]` prefix rather than a user message.
+The entity can create, trigger, and delete autonomous scheduled prompts (Pulses). Entity-created Pulses default to visible mode and auto-delete after execution. All scheduling times use the user's display timezone (same as `<t>` timestamps in context) and are converted to UTC automatically. When a visible-mode Pulse fires, the entity perceives the prompt as system-initiated via a `[System — Pulse "name"]` prefix rather than a user message.
 
 | Tool | Description |
 |------|-------------|
 | `pulse` | Unified Pulse tool with `operation` discriminator: `create` (schedule a new Pulse), `trigger` (fire immediately), `delete` (remove permanently) |
+
+### Scheduling Options
+
+| Parameter | Use Case | Example |
+|-----------|----------|---------|
+| `run_at` | One-shot: fire once at a specific time | `2026-04-17T14:30` (display TZ) |
+| `cron_expression` | Recurring: daily/weekly/monthly schedule | `0 9 * * 2` (Tuesdays at 9 AM) |
+| `interval_seconds` | Recurring: every N seconds | `3600` (every hour) |
 
 ### Related Source Files
 
