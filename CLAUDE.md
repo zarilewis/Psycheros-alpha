@@ -49,6 +49,8 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/tools/web-search.ts` | Web search tool (Tavily / Brave) |
 | `src/tools/send-discord-dm.ts` | Discord DM tool (sends DMs via Discord bot API) |
 | `src/tools/control-device.ts` | Home automation tool (smart plug control via Shelly API) |
+| `src/tools/control-lovense.ts` | Lovense device control tool (state-based patterns, speed, presets via LAN) |
+| `src/llm/lovense-settings.ts` | Lovense settings type, load/save, connection config |
 | `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini), auto-captioning (dual short/long) |
 | `src/tools/describe-image.ts` | Image captioning tool (Gemini, OpenRouter), shared caption logic (dual short/long) |
 | `src/tools/look-closer.ts` | Re-examine images for detailed descriptions after context fade |
@@ -110,6 +112,10 @@ Psycheros supports third-party integrations organized under three tabs in Settin
 ### Home
 
 - **Smart Devices** — Entity controls smart plugs (Shelly Plug) via local HTTP API. Configured via Settings > External Connections > Home. Auto-enables the `control_device` tool when at least one device is enabled. Settings persist to `.psycheros/home-settings.json`.
+
+### Lovense
+
+- **Device Control** — Entity controls Lovense devices (vibrators, thrusting machines, etc.) via the Lovense Connect app over LAN. Supports state-based control: fire-and-forget patterns that persist between entity responses, constant speed with loop timing, built-in presets, and immediate stop. Auto-enables the `control_lovense` tool when enabled with a domain configured. Settings persist to `.psycheros/lovense-settings.json`. Requires Lovense Connect app running on the same LAN (phone or PC with Game Mode/LAN enabled). **Note: WSL2 cannot reach LAN devices — must run on native Linux or Windows for LAN integrations to work.**
 
 ## Vision
 Image generation and visual analysis configured via Settings > Vision (top-level settings card with Generators, Anchors, and Gallery tabs).

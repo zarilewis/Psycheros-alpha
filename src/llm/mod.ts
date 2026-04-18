@@ -62,3 +62,7 @@ export { loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings,
 // Re-export Entity-Core LLM settings
 export type { EntityCoreLLMSettings } from "./entity-core-settings.ts";
 export { loadEntityCoreLLMSettings, saveEntityCoreLLMSettings, getDefaultEntityCoreLLMSettings } from "./entity-core-settings.ts";
+
+// Re-export Lovense settings
+export type { LovenseSettings } from "./lovense-settings.ts";
+export { loadLovenseSettings, saveLovenseSettings, getDefaultLovenseSettings } from "./lovense-settings.ts";

@@ -8,7 +8,7 @@
  */
 
 import { DBClient } from "../db/mod.ts";
-import { createClientFromProfile, createDefaultClient, type LLMClient, type LLMSettings, type LLMProfileSettings, type LLMConnectionProfile, type WebSearchSettings, type DiscordSettings, type HomeSettings, type ImageGenSettings, type EntityCoreLLMSettings, loadProfileSettings, saveProfileSettings, getActiveProfile, profileToLLMSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings, loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings, loadEntityCoreLLMSettings, saveEntityCoreLLMSettings } from "../llm/mod.ts";
+import { createClientFromProfile, createDefaultClient, type LLMClient, type LLMSettings, type LLMProfileSettings, type LLMConnectionProfile, type WebSearchSettings, type DiscordSettings, type HomeSettings, type ImageGenSettings, type EntityCoreLLMSettings, type LovenseSettings, loadProfileSettings, saveProfileSettings, getActiveProfile, profileToLLMSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings, loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings, loadEntityCoreLLMSettings, saveEntityCoreLLMSettings, loadLovenseSettings, saveLovenseSettings, getDefaultLovenseSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSettings, getEnabledToolNames, loadCustomTools, ToolRegistry, type ToolsSettings } from "../tools/mod.ts";
 import { getConversationRAG, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import { catchUpSummarization, repairOrphanedSummaries } from "../memory/mod.ts";
@@ -133,6 +133,7 @@ import {
   handleConnectionsSettingsFragment,
   handleConnectionsDiscordFragment,
   handleConnectionsHomeFragment,
+  handleConnectionsLovenseFragment,
   handleVisionSettingsFragment,
   handleVisionGeneratorsFragment,
   handleVisionAnchorsFragment,
@@ -140,6 +141,9 @@ import {
   handleVisionImageGenSlotFragment,
   handleGetHomeSettings,
   handleSaveHomeSettings,
+  handleGetLovenseSettings,
+  handleSaveLovenseSettings,
+  handleTestLovenseConnection,
   handleGetImageGenSettings,
   handleSaveImageGenSettings,
   handleSaveImageGenSlot,
@@ -257,6 +261,7 @@ export class Server {
   private webSearchSettings: WebSearchSettings;
   private discordSettings: DiscordSettings;
   private homeSettings: HomeSettings;
+  private lovenseSettings: LovenseSettings;
   private imageGenSettings: ImageGenSettings;
   private toolSettings: ToolsSettings;
   private entityCoreLLMSettings: EntityCoreLLMSettings;
@@ -295,6 +300,9 @@ export class Server {
 
     // Initialize Home settings (will be reloaded from settings in init())
     this.homeSettings = { devices: [] };
+
+    // Initialize Lovense settings (will be reloaded from settings in init())
+    this.lovenseSettings = getDefaultLovenseSettings();
 
     // Initialize Image Gen settings (will be reloaded from settings in init())
     this.imageGenSettings = getDefaultImageGenSettings();
@@ -344,6 +352,7 @@ export class Server {
     this.webSearchSettings = await loadWebSearchSettings(this.config.projectRoot);
     this.discordSettings = await loadDiscordSettings(this.config.projectRoot);
     this.homeSettings = await loadHomeSettings(this.config.projectRoot);
+    this.lovenseSettings = await loadLovenseSettings(this.config.projectRoot);
     this.imageGenSettings = await loadImageGenSettings(this.config.projectRoot);
     this.entityCoreLLMSettings = await loadEntityCoreLLMSettings(this.config.projectRoot);
     this.toolSettings = await loadToolsSettings(this.config.projectRoot);
@@ -501,6 +510,22 @@ export class Server {
   }
 
   /**
+   * Get the current Lovense settings.
+   */
+  getLovenseSettings(): LovenseSettings {
+    return this.lovenseSettings;
+  }
+
+  /**
+   * Update Lovense settings, persist to disk, and reload tool registry.
+   */
+  async updateLovenseSettings(settings: LovenseSettings): Promise<void> {
+    this.lovenseSettings = settings;
+    await saveLovenseSettings(this.config.projectRoot, settings);
+    this.reloadToolRegistry();
+  }
+
+  /**
    * Get the current image gen settings.
    */
   getImageGenSettings(): ImageGenSettings {
@@ -602,6 +627,9 @@ export class Server {
     }
     if (this.homeSettings.devices.some((d) => d.enabled)) {
       autoEnabled.push("control_device");
+    }
+    if (this.lovenseSettings.enabled && this.lovenseSettings.connection.domain) {
+      autoEnabled.push("control_lovense");
     }
     if (this.imageGenSettings.generators.some((g) => g.enabled)) {
       autoEnabled.push("generate_image");
@@ -761,6 +789,7 @@ export class Server {
         webSearchSettings: () => this.webSearchSettings,
         discordSettings: () => this.discordSettings,
         homeSettings: () => this.homeSettings,
+        lovenseSettings: () => this.lovenseSettings,
         imageGenSettings: () => this.imageGenSettings,
       }
     );
@@ -834,6 +863,8 @@ export class Server {
       updateDiscordSettings: (settings) => this.updateDiscordSettings(settings),
       getHomeSettings: () => this.homeSettings,
       updateHomeSettings: (settings) => this.updateHomeSettings(settings),
+      getLovenseSettings: () => this.lovenseSettings,
+      updateLovenseSettings: (settings) => this.updateLovenseSettings(settings),
       getImageGenSettings: () => this.imageGenSettings,
       updateImageGenSettings: (settings) => this.updateImageGenSettings(settings),
       getToolSettings: () => this.toolSettings,
@@ -1366,6 +1397,25 @@ export class Server {
     }
 
     // ========================================
+    // Lovense Settings API Routes
+    // ========================================
+
+    // GET /api/lovense-settings - Get current Lovense settings
+    if (method === "GET" && path === "/api/lovense-settings") {
+      return handleGetLovenseSettings(ctx);
+    }
+
+    // POST /api/lovense-settings - Save Lovense settings
+    if (method === "POST" && path === "/api/lovense-settings") {
+      return await handleSaveLovenseSettings(ctx, request);
+    }
+
+    // POST /api/lovense-settings/test - Test Lovense connection
+    if (method === "POST" && path === "/api/lovense-settings/test") {
+      return await handleTestLovenseConnection(ctx, request);
+    }
+
+    // ========================================
     // Image Gen Settings API Routes
     // ========================================
 
@@ -1848,6 +1898,11 @@ export class Server {
     // GET /fragments/settings/connections/home - Home automation settings fragment
     if (path === "/fragments/settings/connections/home") {
       return handleConnectionsHomeFragment(ctx);
+    }
+
+    // GET /fragments/settings/connections/lovense - Lovense settings fragment
+    if (path === "/fragments/settings/connections/lovense") {
+      return handleConnectionsLovenseFragment(ctx);
     }
 
     // GET /fragments/settings/vision - Vision settings fragment

@@ -31,6 +31,8 @@ import { pulseTool } from "./pulse-tools.ts";
 import { sendDiscordDmTool } from "./send-discord-dm.ts";
 // Home automation tool
 import { controlDeviceTool } from "./control-device.ts";
+// Lovense device control tool
+import { controlLovenseTool } from "./control-lovense.ts";
 // Image generation tool
 import { generateImageTool } from "./generate-image.ts";
 // Image captioning tool
@@ -73,6 +75,8 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   send_discord_dm: sendDiscordDmTool,
   // Home automation tool
   control_device: controlDeviceTool,
+  // Lovense device control tool
+  control_lovense: controlLovenseTool,
   // Image generation tool
   generate_image: generateImageTool,
   describe_image: describeImageTool,

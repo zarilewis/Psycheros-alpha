@@ -4101,10 +4101,11 @@ function renderToolItem(tool: { name: string; description: string; enabled: bool
  * Render External Connections page with tabbed navigation.
  * Tabs: Channels (Discord, etc.), Home (smart devices), and Web Search.
  */
-export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings, webSearchSettings?: import("../llm/web-search-settings.ts").WebSearchSettings): string {
+export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings, webSearchSettings?: import("../llm/web-search-settings.ts").WebSearchSettings, lovenseSettings?: import("../llm/lovense-settings.ts").LovenseSettings): string {
   const channelsContent = renderChannelsTab(discordSettings);
   const homeContent = renderHomeTab(homeSettings);
   const wsSettings = webSearchSettings ?? { provider: "disabled" as const, tavilyApiKey: "", braveApiKey: "" };
+  const lvSettings = lovenseSettings ?? { enabled: false, connection: { domain: "", httpsPort: 34568 } };
 
   return `<div class="settings-view">
   <div class="settings-header">
@@ -4139,6 +4140,12 @@ export function renderConnectionsSettings(discordSettings: DiscordSettings, home
           <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
         </svg>
         Web Search
+      </button>
+      <button class="connections-nav-tab" data-tab="lovense" onclick="switchConnectionsTab('lovense')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+        </svg>
+        Lovense
       </button>
     </nav>
 
@@ -4205,6 +4212,10 @@ export function renderConnectionsSettings(discordSettings: DiscordSettings, home
     <!-- Status -->
     <div id="ws-status" class="llm-status" style="display:none;"></div>
 
+    </div>
+
+    <div id="connections-tab-lovense" class="connections-tab-panel" style="display:none;">
+      ${renderLovenseTab(lvSettings)}
     </div>
 
   </div>
@@ -4511,6 +4522,210 @@ async function resetDiscordDefaults(event) {
   }
 }
 </script>`;
+}
+
+/**
+ * Render the Lovense settings tab content (embedded in External Connections).
+ */
+function renderLovenseTab(settings: import("../llm/lovense-settings.ts").LovenseSettings): string {
+  const { domain, httpsPort } = settings.connection;
+
+  return `
+    <!-- Enable -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Enable Lovense Control</h3>
+      <p class="theme-section-desc">Allow the entity to control Lovense devices via the local Lovense Connect app</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label class="toggle-label">
+            <input type="checkbox" id="lovense-enabled" ${settings.enabled ? "checked" : ""}>
+            <span class="toggle-text">Enabled</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Connection -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Connection</h3>
+      <p class="theme-section-desc">Connect to the Lovense Connect app running on your phone</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="lovense-domain">Bridge Address</label>
+          <input type="text" id="lovense-domain" class="input-field llm-input" value="${escapeHtml(domain)}" placeholder="192-168-1-44.lovense.club">
+        </div>
+        <div class="llm-field">
+          <label for="lovense-port">HTTPS Port</label>
+          <input type="number" id="lovense-port" class="input-field llm-input" value="${httpsPort}" min="1" max="65535" placeholder="34568">
+        </div>
+      </div>
+      <p class="theme-section-hint">Open Lovense Connect &gt; Discover &gt; Game Mode &gt; Enable LAN. Enter the local address shown there (format: 192-168-X-X.lovense.club).</p>
+    </section>
+
+    <!-- Test Connection -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Test Connection</h3>
+      <p class="theme-section-desc">Verify the connection to Lovense Connect and discover connected toys</p>
+      <button class="btn btn--secondary" id="lovense-test-btn" onclick="testLovenseConnection()">Test Connection</button>
+      <div id="lovense-test-status" class="llm-status" style="display:none; margin-top: var(--sp-2);"></div>
+      <div id="lovense-toys-list" style="display:none; margin-top: var(--sp-2);">
+        <div class="lovense-toys-grid"></div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <div class="llm-actions">
+      <div class="llm-actions-left">
+        <button class="btn btn--primary" onclick="saveLovenseSettings(event)">Save Settings</button>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div id="lovense-status" class="llm-status" style="display:none;"></div>
+
+    <style>
+      .theme-section-hint { color: var(--text-dim); font-size: 0.85rem; margin-top: var(--sp-1); line-height: 1.4; }
+      .lovense-toys-grid { display: flex; flex-direction: column; gap: var(--sp-2); }
+      .lovense-toy-card { background: var(--c-bg); border: 1px solid var(--c-border); border-radius: var(--radius-md); padding: var(--sp-3); display: flex; justify-content: space-between; align-items: center; }
+      .lovense-toy-name { font-weight: 500; }
+      .lovense-toy-id { color: var(--text-dim); font-size: 0.8rem; font-family: monospace; }
+      .lovense-toy-battery { color: var(--c-fg-muted); font-size: 0.85rem; }
+      .lovense-toy-status { font-size: 0.8rem; padding: 2px 8px; border-radius: var(--radius-sm); }
+      .lovense-toy-status.connected { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+      .lovense-toy-status.disconnected { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+    </style>
+
+    <script>
+    function showLovenseStatus(type, message) {
+      const el = document.getElementById('lovense-status');
+      if (!el) return;
+      el.style.display = 'block';
+      el.className = 'llm-status ' + type;
+      el.textContent = message;
+    }
+
+    function saveLovenseSettings(e) {
+      e.preventDefault();
+      const enabled = document.getElementById('lovense-enabled')?.checked ?? false;
+      const domain = document.getElementById('lovense-domain')?.value?.trim() ?? '';
+      const httpsPort = parseInt(document.getElementById('lovense-port')?.value ?? '34568') || 34568;
+
+      fetch('/api/lovense-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, connection: { domain, httpsPort } }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            showLovenseStatus('success', 'Settings saved. Reload the page to apply tool changes.');
+          } else {
+            showLovenseStatus('error', data.error || 'Failed to save settings.');
+          }
+        })
+        .catch(err => showLovenseStatus('error', 'Network error: ' + err.message));
+    }
+
+    function testLovenseConnection() {
+      const btn = document.getElementById('lovense-test-btn');
+      const statusEl = document.getElementById('lovense-test-status');
+      const toysEl = document.getElementById('lovense-toys-list');
+
+      if (!btn || !statusEl || !toysEl) return;
+      btn.disabled = true;
+      btn.textContent = 'Testing...';
+      statusEl.style.display = 'block';
+      statusEl.className = 'llm-status info';
+      statusEl.textContent = 'Connecting to Lovense Connect via server...';
+      toysEl.style.display = 'none';
+
+      const domain = document.getElementById('lovense-domain')?.value?.trim() ?? '';
+      const httpsPort = parseInt(document.getElementById('lovense-port')?.value ?? '34568') || 34568;
+
+      if (!domain) {
+        statusEl.className = 'llm-status error';
+        statusEl.textContent = 'Enter a bridge address first.';
+        btn.disabled = false;
+        btn.textContent = 'Test Connection';
+        return;
+      }
+
+      // Route through server to avoid browser TLS restrictions
+      fetch('/api/lovense-settings/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, httpsPort }),
+        signal: AbortSignal.timeout(10000),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) {
+            statusEl.className = 'llm-status error';
+            statusEl.textContent = data.error;
+            btn.disabled = false;
+            btn.textContent = 'Test Connection';
+            return;
+          }
+
+          const toys = data.toys || [];
+          const grid = toysEl.querySelector('.lovense-toys-grid');
+
+          if (toys.length === 0) {
+            statusEl.className = 'llm-status warning';
+            statusEl.textContent = 'Connected, but no toys found. Ensure your toy is powered on and paired.';
+            btn.disabled = false;
+            btn.textContent = 'Test Connection';
+            return;
+          }
+
+          statusEl.className = 'llm-status success';
+          statusEl.textContent = 'Connected! Found ' + toys.length + ' toy(s).';
+          if (grid) {
+            grid.innerHTML = toys.map(t => {
+              const label = t.nickname || t.name;
+              const connected = t.connected;
+              return '<div class="lovense-toy-card">' +
+                '<div><div class="lovense-toy-name">' + label + '</div>' +
+                '<div class="lovense-toy-id">' + t.id + '</div></div>' +
+                '<div style="display:flex;align-items:center;gap:var(--sp-2);">' +
+                '<span class="lovense-toy-battery">' + t.battery + '%</span>' +
+                '<span class="lovense-toy-status ' + (connected ? 'connected' : 'disconnected') + '">' +
+                (connected ? 'Connected' : 'Disconnected') + '</span></div></div>';
+            }).join('');
+          }
+          toysEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Test Connection';
+        })
+        .catch(err => {
+          statusEl.className = 'llm-status error';
+          statusEl.textContent = 'Connection failed. Is Lovense Connect running? Error: ' + err.message;
+          btn.disabled = false;
+          btn.textContent = 'Test Connection';
+        });
+    }
+    </script>
+  `;
+}
+
+/**
+ * Render Lovense settings sub-page (standalone, with page chrome).
+ */
+export function renderLovenseSettings(settings: import("../llm/lovense-settings.ts").LovenseSettings): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Lovense</h1>
+        <p class="settings-desc">Configure Lovense device control for the entity</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+    ${renderLovenseTab(settings)}
+  </div>
+</div>`;
 }
 
 /**

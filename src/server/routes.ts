@@ -12,7 +12,7 @@ import type { SSEEvent, TurnMetrics } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, LLMSettings, LLMProfileSettings, LLMConnectionProfile } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
-import type { DiscordSettings, HomeSettings } from "../llm/mod.ts";
+import type { DiscordSettings, HomeSettings, LovenseSettings } from "../llm/mod.ts";
 import type { ImageGenSettings, ImageGenConfig, EntityCoreLLMSettings } from "../llm/mod.ts";
 import { maskProfileSettings, createDefaultProfile, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings, getDefaultImageGenSettings, maskImageGenSettings } from "../llm/mod.ts";
 import { getActiveProfile } from "../llm/settings.ts";
@@ -58,6 +58,7 @@ import {
   renderConnectionsSettings,
   renderConnectionsDiscordSettings,
   renderHomeSettings,
+  renderLovenseSettings,
   renderVisionSettings,
   renderVisionGeneratorsTab,
   renderVisionAnchorsTab,
@@ -140,6 +141,10 @@ export interface RouteContext {
   getHomeSettings: () => HomeSettings;
   /** Update Home settings and hot-reload tool registry */
   updateHomeSettings: (settings: HomeSettings) => Promise<void>;
+  /** Get current Lovense settings */
+  getLovenseSettings: () => LovenseSettings;
+  /** Update Lovense settings and hot-reload tool registry */
+  updateLovenseSettings: (settings: LovenseSettings) => Promise<void>;
   /** Get current image gen settings */
   getImageGenSettings: () => ImageGenSettings;
   /** Update image gen settings and hot-reload tool registry */
@@ -996,6 +1001,7 @@ export async function handleChat(
             webSearchSettings: ctx.getWebSearchSettings(),
             discordSettings: ctx.getDiscordSettings(),
             homeSettings: ctx.getHomeSettings(),
+            lovenseSettings: ctx.getLovenseSettings(),
             imageGenSettings: ctx.getImageGenSettings(),
           }
         );
@@ -1173,6 +1179,7 @@ export async function handleChatRetry(
             webSearchSettings: ctx.getWebSearchSettings(),
             discordSettings: ctx.getDiscordSettings(),
             homeSettings: ctx.getHomeSettings(),
+            lovenseSettings: ctx.getLovenseSettings(),
             imageGenSettings: ctx.getImageGenSettings(),
           }
         );
@@ -4760,6 +4767,7 @@ export function handleConnectionsSettingsFragment(ctx: RouteContext): Response {
     maskDiscordSettings(ctx.getDiscordSettings()),
     ctx.getHomeSettings(),
     maskWebSearchSettings(ctx.getWebSearchSettings()),
+    ctx.getLovenseSettings(),
   );
   return new Response(html, {
     headers: {
@@ -4785,6 +4793,18 @@ export function handleConnectionsDiscordFragment(ctx: RouteContext): Response {
  */
 export function handleConnectionsHomeFragment(ctx: RouteContext): Response {
   const html = renderHomeSettings(ctx.getHomeSettings());
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
+}
+
+/**
+ * Handle GET /fragments/settings/connections/lovense - Lovense settings fragment.
+ */
+export function handleConnectionsLovenseFragment(ctx: RouteContext): Response {
+  const html = renderLovenseSettings(ctx.getLovenseSettings());
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
@@ -4840,6 +4860,152 @@ export async function handleSaveHomeSettings(
       JSON.stringify({ error: "Failed to save settings" }),
       {
         status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
+}
+
+// =============================================================================
+// Lovense Settings API Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/lovense-settings - Return current Lovense settings.
+ */
+export function handleGetLovenseSettings(ctx: RouteContext): Response {
+  const settings = ctx.getLovenseSettings();
+  return new Response(JSON.stringify(settings), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/lovense-settings - Save Lovense settings.
+ */
+export async function handleSaveLovenseSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<import("../llm/lovense-settings.ts").LovenseSettings>;
+
+    if (typeof body.enabled !== "boolean") {
+      return new Response(
+        JSON.stringify({ error: "Invalid settings: 'enabled' must be a boolean" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const updated: import("../llm/lovense-settings.ts").LovenseSettings = {
+      enabled: body.enabled,
+      connection: {
+        domain: body.connection?.domain ?? "",
+        httpsPort: body.connection?.httpsPort ?? 34568,
+      },
+    };
+
+    await ctx.updateLovenseSettings(updated);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (_error) {
+    return new Response(
+      JSON.stringify({ error: "Failed to save settings" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
+}
+
+/**
+ * Handle POST /api/lovense-settings/test - Test connection to Lovense Connect.
+ * Runs server-side to avoid browser TLS restrictions on self-signed certs.
+ */
+export async function handleTestLovenseConnection(
+  _ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as { domain: string; httpsPort: number };
+    const domain = body.domain?.trim();
+    const httpsPort = body.httpsPort ?? 34568;
+
+    if (!domain) {
+      return new Response(
+        JSON.stringify({ error: "No bridge address configured" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const baseUrl = `https://${domain}:${httpsPort}`;
+
+    const resp = await fetch(`${baseUrl}/command`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command: "GetToys" }),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!resp.ok) {
+      return new Response(
+        JSON.stringify({ error: `HTTP ${resp.status}: ${resp.statusText}` }),
+        {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const data = await resp.json() as {
+      code: number;
+      data?: { toys: string };
+    };
+
+    if (data.code !== 200 || !data.data?.toys) {
+      return new Response(
+        JSON.stringify({ error: `API returned code ${data.code}` }),
+        {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const toysMap = JSON.parse(data.data.toys) as Record<
+      string,
+      { id: string; status: string; name: string; battery: number; nickName: string }
+    >;
+
+    const toys = Object.values(toysMap).map((t) => ({
+      id: t.id,
+      name: t.name,
+      nickname: t.nickName || "",
+      battery: t.battery,
+      connected: t.status === "1",
+    }));
+
+    return new Response(
+      JSON.stringify({ success: true, toys }),
+      {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return new Response(
+      JSON.stringify({ error: `Connection failed: ${msg}` }),
+      {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       },
     );

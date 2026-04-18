@@ -91,6 +91,12 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     toolNames: ["control_device"],
   },
   {
+    id: "lovense",
+    name: "Lovense",
+    description: "Control Lovense devices",
+    toolNames: ["control_lovense"],
+  },
+  {
     id: "image-gen",
     name: "Image Generation",
     description: "Generate images using configured providers",

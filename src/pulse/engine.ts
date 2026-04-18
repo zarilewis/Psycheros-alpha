@@ -12,6 +12,7 @@ import type { LLMClient } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/web-search-settings.ts";
 import type { DiscordSettings } from "../llm/discord-settings.ts";
 import type { HomeSettings } from "../llm/home-settings.ts";
+import type { LovenseSettings } from "../llm/lovense-settings.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
@@ -86,6 +87,8 @@ export interface PulseEngineConfig {
   homeSettings?: () => HomeSettings | undefined;
   /** Getter for image generation settings (read fresh each pulse execution) */
   imageGenSettings?: () => ImageGenSettings | undefined;
+  /** Getter for Lovense settings (read fresh each pulse execution) */
+  lovenseSettings?: () => LovenseSettings | undefined;
 }
 
 /**
@@ -578,6 +581,7 @@ export class PulseEngine {
         discordSettings: this.config.discordSettings?.(),
         homeSettings: this.config.homeSettings?.(),
         imageGenSettings: this.config.imageGenSettings?.(),
+        lovenseSettings: this.config.lovenseSettings?.(),
       };
 
       const turn = new EntityTurn(this.getLlm(), this.db, this.tools, entityConfig);

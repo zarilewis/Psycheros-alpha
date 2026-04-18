@@ -113,6 +113,8 @@ export interface EntityConfig {
   homeSettings?: HomeSettings;
   /** Optional image generation settings */
   imageGenSettings?: ImageGenSettings;
+  /** Optional Lovense device control settings */
+  lovenseSettings?: import("../llm/lovense-settings.ts").LovenseSettings;
 }
 
 /**
