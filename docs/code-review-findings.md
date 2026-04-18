@@ -269,3 +269,8 @@ See also: [security-audit.md](security-audit.md) for the full security assessmen
 - **Problem**: `renderMessage()` checked only `msg.pulseId` to decide whether to use Pulse styling. Entity-created Pulse messages had `pulse_name` set but `pulse_id` was null (legacy artifact), so they rendered as regular user messages after page reload.
 - **Location**: `src/server/templates.ts` — `renderMessage()`
 - **Fix**: Changed condition to `if (msg.pulseId || msg.pulseName)`.
+
+### Captioning API key overwritten by masked value on save (High — functionality)
+- **Problem**: The Vision settings page renders captioning API keys in masked form (`sk-••••••••b0a3`) via `maskImageGenSettings()`. When the user saved captioning settings, the browser sent the masked value back to the server. The `handleSaveImageGenSettings()` captioning-only path (`!body.generators && body.captioning`) blindly wrote the masked key back to disk, overwriting the real API key. Subsequent captioning requests sent the masked key as the `Authorization` header — after `sanitizeHeaderValue()` stripped the Unicode `•` characters, the result was a truncated invalid key, causing 401 errors. The generator save path (`handleSaveImageGenSlot`) already had mask-detection logic, but the captioning path did not.
+- **Location**: `src/server/routes.ts` — `handleSaveImageGenSettings()`
+- **Fix**: Added masked key detection before writing — if the incoming `apiKey` contains `••••`, the existing real key from current settings is preserved instead. Matches the pattern already used by the generator save handler.

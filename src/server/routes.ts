@@ -4877,7 +4877,17 @@ export async function handleSaveImageGenSettings(
     // to avoid overwriting actual API keys with masked versions
     if (!body.generators && body.captioning) {
       const current = ctx.getImageGenSettings();
-      current.captioning = body.captioning;
+      const captioning = body.captioning;
+
+      // Preserve real API keys if masked values were sent from the UI
+      if (captioning.gemini?.apiKey?.includes("••••")) {
+        captioning.gemini.apiKey = current.captioning?.gemini?.apiKey || captioning.gemini.apiKey;
+      }
+      if (captioning.openrouter?.apiKey?.includes("••••")) {
+        captioning.openrouter.apiKey = current.captioning?.openrouter?.apiKey || captioning.openrouter.apiKey;
+      }
+
+      current.captioning = captioning;
       await ctx.updateImageGenSettings(current as ImageGenSettings);
       return new Response(JSON.stringify({ success: true }), {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
