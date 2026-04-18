@@ -41,22 +41,6 @@ export function escapeHtml(text: string): string {
     .replace(/'/g, "&#039;");
 }
 
-/**
- * Decode HTML entities (e.g. &quot; &amp; &lt; &gt;) back to literal characters.
- * Needed because marked escapes " to &quot; in text content, but our [IMAGE:...]
- * markers contain JSON that must be parsed with literal quote characters.
- */
-function decodeHTMLEntities(text: string): string {
-  return text
-    .replace(/&quot;/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#39;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&apos;/g, "'");
-}
 
 /**
  * Safely parse JSON with a fallback value.
@@ -1412,21 +1396,23 @@ export function renderAssistantMessage(msg: Message, metrics?: TurnMetrics, enti
 
   // Main content - render markdown for assistant messages
   if (msg.content) {
-    // Detect [IMAGE:...] markers and render them as actual images
-    // Note: marked escapes " to &quot; in the HTML output, so we must
-    // decode HTML entities before JSON.parse-ing the captured marker.
-    let contentHtml = renderMarkdown(msg.content);
-    if (/\[IMAGE:\{/.test(msg.content)) {
-      contentHtml = contentHtml.replace(
-        /\[IMAGE:(\{.*?\})\]/g,
-        (_match, jsonStr) => {
-          try {
-            const img = JSON.parse(decodeHTMLEntities(jsonStr));
-            return `<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div></div>`;
-          } catch { return _match; }
+    // Extract [IMAGE:...] markers from raw content BEFORE markdown rendering.
+    // marked would corrupt JSON values containing markdown syntax (*, _, `, etc.)
+    // causing JSON.parse to fail on page reload.
+    let preprocessed = msg.content;
+    preprocessed = preprocessed.replace(
+      /\[IMAGE:\{[\s\S]*\}\]/g,
+      (match) => {
+        try {
+          const jsonStr = match.slice(7, -1); // Strip "[IMAGE:" and "]"
+          const img = JSON.parse(jsonStr);
+          return `\n\n<div class="generated-image-container"><img src="${escapeHtml(img.path)}" alt="${escapeHtml(img.prompt)}" class="generated-image" loading="lazy"/><div class="generated-image-meta">${escapeHtml(img.generator)}</div></div>\n\n`;
+        } catch {
+          return match;
         }
-      );
-    }
+      }
+    );
+    const contentHtml = renderMarkdown(preprocessed);
     html += `<div class="assistant-text" data-raw-content="${escapeHtml(msg.content)}">${contentHtml}</div>`;
   }
 
