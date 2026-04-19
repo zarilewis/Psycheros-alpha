@@ -1345,6 +1345,28 @@
   margin-left: auto;
 }
 
+.header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--c-accent);
+  transition: all var(--transition);
+  cursor: default;
+}
+
+.header-icon.connected {
+  color: var(--c-accent);
+}
+
+.header-icon.disconnected {
+  color: var(--c-accent-muted);
+}
+
 .context-toggle {
   display: flex;
   align-items: center;

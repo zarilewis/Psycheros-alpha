@@ -144,6 +144,7 @@ import {
   handleGetLovenseSettings,
   handleSaveLovenseSettings,
   handleTestLovenseConnection,
+  handleLovenseStatus,
   handleGetImageGenSettings,
   handleSaveImageGenSettings,
   handleSaveImageGenSlot,
@@ -1413,6 +1414,11 @@ export class Server {
     // POST /api/lovense-settings/test - Test Lovense connection
     if (method === "POST" && path === "/api/lovense-settings/test") {
       return await handleTestLovenseConnection(ctx, request);
+    }
+
+    // GET /api/lovense-status - Quick Lovense connection check for header icon
+    if (method === "GET" && path === "/api/lovense-status") {
+      return await handleLovenseStatus(ctx);
     }
 
     // ========================================

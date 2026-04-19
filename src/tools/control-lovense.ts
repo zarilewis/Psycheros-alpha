@@ -61,13 +61,13 @@ interface LovenseCommandResponse {
  * `*.lovense.club` domain, which provides valid TLS certificates.
  */
 function createLovenseClient(settings: LovenseSettings) {
-  const { domain, httpsPort } = settings.connection;
+  const { domain, port, secure } = settings.connection;
 
   if (!domain) {
     return null;
   }
 
-  const baseUrl = `https://${domain}:${httpsPort}`;
+  const baseUrl = `${secure ? "https" : "http"}://${domain}:${port}`;
 
   async function sendCommand(command: Record<string, unknown>): Promise<LovenseCommandResponse> {
     const resp = await fetch(`${baseUrl}/command`, {
@@ -400,7 +400,7 @@ export const controlLovenseTool: Tool = {
           console.error(`[Lovense] discover failed: ${error}`);
           return {
             toolCallId: ctx.toolCallId,
-            content: `Could not reach Lovense Connect at ${settings.connection.domain}:${settings.connection.httpsPort}. Is the Lovense Connect app running? Error: ${error}`,
+            content: `Could not reach Lovense Connect at ${settings.connection.domain}:${settings.connection.port}. Is the Lovense Connect app running? Error: ${error}`,
             isError: true,
           };
         }

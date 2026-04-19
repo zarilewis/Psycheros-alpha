@@ -277,8 +277,10 @@ function normalizePath(path: string): string {
  * @param _ctx - Route context (unused, kept for consistency)
  * @returns HTTP Response with the app shell HTML
  */
-export function handleIndex(_ctx: RouteContext): Response {
-  const html = renderAppShell();
+export function handleIndex(ctx: RouteContext): Response {
+  const lovenseSettings = ctx.getLovenseSettings();
+  const lovenseEnabled = lovenseSettings.enabled && !!lovenseSettings.connection.domain;
+  const html = renderAppShell(lovenseEnabled);
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",
@@ -4907,7 +4909,8 @@ export async function handleSaveLovenseSettings(
       enabled: body.enabled,
       connection: {
         domain: body.connection?.domain ?? "",
-        httpsPort: body.connection?.httpsPort ?? 34568,
+        port: body.connection?.port ?? 34568,
+        secure: body.connection?.secure ?? true,
       },
     };
 
@@ -4936,9 +4939,10 @@ export async function handleTestLovenseConnection(
   request: Request,
 ): Promise<Response> {
   try {
-    const body = await request.json() as { domain: string; httpsPort: number };
+    const body = await request.json() as { domain: string; port: number; secure: boolean };
     const domain = body.domain?.trim();
-    const httpsPort = body.httpsPort ?? 34568;
+    const port = body.port ?? 34568;
+    const secure = body.secure ?? true;
 
     if (!domain) {
       return new Response(
@@ -4950,7 +4954,7 @@ export async function handleTestLovenseConnection(
       );
     }
 
-    const baseUrl = `https://${domain}:${httpsPort}`;
+    const baseUrl = `${secure ? "https" : "http"}://${domain}:${port}`;
 
     const resp = await fetch(`${baseUrl}/command`, {
       method: "POST",
@@ -5008,6 +5012,78 @@ export async function handleTestLovenseConnection(
       {
         headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       },
+    );
+  }
+}
+
+/**
+ * Handle GET /api/lovense-status - Quick connection check for header icon.
+ * Returns whether a toy is connected and basic info about it.
+ */
+export async function handleLovenseStatus(ctx: RouteContext): Promise<Response> {
+  const settings = ctx.getLovenseSettings();
+
+  if (!settings.enabled || !settings.connection.domain) {
+    return new Response(
+      JSON.stringify({ connected: false }),
+      { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  }
+
+  try {
+    const { domain, port, secure } = settings.connection;
+    const baseUrl = `${secure ? "https" : "http"}://${domain}:${port}`;
+
+    const resp = await fetch(`${baseUrl}/command`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ command: "GetToys" }),
+      signal: AbortSignal.timeout(3000),
+    });
+
+    if (!resp.ok) {
+      return new Response(
+        JSON.stringify({ connected: false }),
+        { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+      );
+    }
+
+    const data = await resp.json() as {
+      code: number;
+      data?: { toys: string };
+    };
+
+    if (data.code !== 200 || !data.data?.toys) {
+      return new Response(
+        JSON.stringify({ connected: false }),
+        { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+      );
+    }
+
+    const toysMap = JSON.parse(data.data.toys) as Record<
+      string,
+      { id: string; status: string; name: string; battery: number; nickName: string }
+    >;
+
+    const connected = Object.values(toysMap).find((t) => t.status === "1");
+    if (!connected) {
+      return new Response(
+        JSON.stringify({ connected: false }),
+        { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({
+        connected: true,
+        toy: { name: connected.name, battery: connected.battery, nickname: connected.nickName || "" },
+      }),
+      { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  } catch {
+    return new Response(
+      JSON.stringify({ connected: false }),
+      { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
     );
   }
 }

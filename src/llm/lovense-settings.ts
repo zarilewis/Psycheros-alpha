@@ -21,8 +21,10 @@ import { join } from "@std/path";
 export interface LovenseConnection {
   /** Bridge domain in lovense.club format, e.g. "192-168-1-44.lovense.club" */
   domain: string;
-  /** HTTPS port (34568 for mobile, 30010 for PC) */
-  httpsPort: number;
+  /** Port (20010 for LAN mode, 34568 for mobile Game Mode, 30010 for PC Game Mode) */
+  port: number;
+  /** Whether to use HTTPS. Game Mode uses HTTPS; LAN Mode uses HTTP. */
+  secure: boolean;
 }
 
 /**
@@ -47,7 +49,8 @@ export function getDefaultLovenseSettings(): LovenseSettings {
     enabled: false,
     connection: {
       domain: "",
-      httpsPort: 34568,
+      port: 34568,
+      secure: true,
     },
   };
 }
@@ -67,12 +70,17 @@ export async function loadLovenseSettings(projectRoot: string): Promise<LovenseS
   try {
     const text = await Deno.readTextFile(settingsPath);
     const saved = JSON.parse(text) as Partial<LovenseSettings>;
+    const savedConn = saved.connection as Partial<LovenseConnection> | undefined;
     return {
       ...defaults,
       ...saved,
       connection: {
         ...defaults.connection,
-        ...saved.connection,
+        ...savedConn,
+        // Migrate legacy httpsPort field
+        ...(savedConn && "httpsPort" in savedConn && !("port" in savedConn)
+          ? { port: (savedConn as Record<string, unknown>).httpsPort as number }
+          : {}),
       },
     };
   } catch {

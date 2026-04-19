@@ -213,6 +213,17 @@ Settings stored in `.psycheros/discord-settings.json`. Shape: `{ "enabled": bool
 
 Settings stored in `.psycheros/home-settings.json`. Shape: `{ "devices": Array<{ name: string, type: string, address: string, enabled: boolean }> }`. The `control_device` tool is auto-enabled when any device has `enabled: true`.
 
+### Lovense Settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/lovense-settings` | Get current Lovense connection settings |
+| `POST` | `/api/lovense-settings` | Save Lovense settings and hot-reload tool registry |
+| `POST` | `/api/lovense-settings/test` | Test connection to Lovense Connect bridge, returns connected toys |
+| `GET` | `/api/lovense-status` | Quick connection check for header icon (3s timeout), returns `{ connected, toy? }` |
+
+Settings stored in `.psycheros/lovense-settings.json`. Shape: `{ "enabled": boolean, "connection": { "domain": string, "port": number, "secure": boolean } }`. Supports two modes: LAN Mode (port 20010, HTTP) and Game Mode (port 34568 mobile / 30010 PC, HTTPS). Domain format: `192-168-X-X.lovense.club` (dashes, not dots). The `control_lovense` tool is auto-enabled when `enabled: true` and domain is set. Settings page auto-reloads after save.
+
 ### Image Gen Settings
 
 | Method | Path | Description |
@@ -363,6 +374,8 @@ The custom tools upload endpoint accepts a `multipart/form-data` request with a 
 | `src/llm/discord-settings.ts` | Discord settings type, persistence, token masking |
 | `src/llm/home-settings.ts` | Home automation settings type, persistence |
 | `src/tools/control-device.ts` | Home automation tool (Shelly Plug local HTTP API) |
+| `src/llm/lovense-settings.ts` | Lovense settings type, persistence, LAN/Game Mode config |
+| `src/tools/control-lovense.ts` | Lovense device control tool (state-based patterns, speed, presets) |
 | `src/llm/image-gen-settings.ts` | Image generator + captioning config type, persistence, API key masking |
 | `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini), auto-captioning |
 | `src/tools/describe-image.ts` | Image captioning tool (Gemini, OpenRouter), shared caption logic |

@@ -221,7 +221,7 @@ function getAccentColorOverride(): string {
  * Render the full app shell HTML.
  * This is served on initial page load.
  */
-export function renderAppShell(): string {
+export function renderAppShell(lovenseEnabled = false): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -246,7 +246,7 @@ export function renderAppShell(): string {
   <div class="bg-layer"></div>
   <div class="bg-overlay"></div>
   <div class="app">
-    ${renderHeader()}
+    ${renderHeader(lovenseEnabled)}
     <div class="main">
       <div class="sidebar-overlay" onclick="Psycheros.toggleSidebar()"></div>
       ${renderSidebar([])}
@@ -257,6 +257,37 @@ export function renderAppShell(): string {
     </div>
   </div>
   <script src="/js/theme.js"></script>
+  <script>
+  (function() {
+    const btn = document.getElementById('lovense-status-btn');
+    if (!btn || btn.style.display === 'none') return;
+
+    let interval = null;
+
+    async function checkStatus() {
+      try {
+        const resp = await fetch('/api/lovense-status', { signal: AbortSignal.timeout(5000) });
+        const data = await resp.json();
+        if (data.connected) {
+          btn.className = 'header-icon connected';
+          const toy = data.toy;
+          const label = toy ? (toy.nickname || toy.name) : 'Lovense';
+          const battery = toy ? ' (' + toy.battery + '%)' : '';
+          btn.title = 'Connected: ' + label + battery;
+        } else {
+          btn.className = 'header-icon disconnected';
+          btn.title = 'Not connected';
+        }
+      } catch {
+        btn.className = 'header-icon disconnected';
+        btn.title = 'Not connected';
+      }
+    }
+
+    checkStatus();
+    interval = setInterval(checkStatus, 30000);
+  })();
+  </script>
   <script type="module" src="/js/psycheros.js"></script>
 </body>
 </html>`;
@@ -265,7 +296,7 @@ export function renderAppShell(): string {
 /**
  * Render the header component.
  */
-export function renderHeader(): string {
+export function renderHeader(lovenseEnabled = false): string {
   return `<header class="header">
   <div class="header-left">
     <button class="sidebar-toggle" onclick="Psycheros.toggleSidebar()" aria-label="Toggle sidebar">
@@ -290,6 +321,11 @@ export function renderHeader(): string {
     </div>
   </div>
   <div class="header-right">
+    <button id="lovense-status-btn" class="header-icon ${lovenseEnabled ? "disconnected" : ""}" style="${lovenseEnabled ? "display:flex;align-items:center;justify-content:center;width:36px;height:36px;" : "display:none;"}" aria-label="Lovense status">
+      <svg width="20" height="20" viewBox="0 0 24 24" style="color:var(--c-accent);fill:currentColor;stroke:none;">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+      </svg>
+    </button>
     <button class="context-toggle" onclick="Psycheros.toggleContextViewer()" aria-label="Toggle context viewer" title="View LLM Context">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="16 18 22 12 16 6"/>
@@ -4105,7 +4141,7 @@ export function renderConnectionsSettings(discordSettings: DiscordSettings, home
   const channelsContent = renderChannelsTab(discordSettings);
   const homeContent = renderHomeTab(homeSettings);
   const wsSettings = webSearchSettings ?? { provider: "disabled" as const, tavilyApiKey: "", braveApiKey: "" };
-  const lvSettings = lovenseSettings ?? { enabled: false, connection: { domain: "", httpsPort: 34568 } };
+  const lvSettings = lovenseSettings ?? { enabled: false, connection: { domain: "", port: 34568, secure: true } };
 
   return `<div class="settings-view">
   <div class="settings-header">
@@ -4528,7 +4564,7 @@ async function resetDiscordDefaults(event) {
  * Render the Lovense settings tab content (embedded in External Connections).
  */
 function renderLovenseTab(settings: import("../llm/lovense-settings.ts").LovenseSettings): string {
-  const { domain, httpsPort } = settings.connection;
+  const { domain, port, secure } = settings.connection;
 
   return `
     <!-- Enable -->
@@ -4539,7 +4575,8 @@ function renderLovenseTab(settings: import("../llm/lovense-settings.ts").Lovense
         <div class="llm-field">
           <label class="toggle-label">
             <input type="checkbox" id="lovense-enabled" ${settings.enabled ? "checked" : ""}>
-            <span class="toggle-text">Enabled</span>
+            <span class="toggle-slider"></span>
+            <span class="toggle-text">Enable Lovense Control</span>
           </label>
         </div>
       </div>
@@ -4555,11 +4592,18 @@ function renderLovenseTab(settings: import("../llm/lovense-settings.ts").Lovense
           <input type="text" id="lovense-domain" class="input-field llm-input" value="${escapeHtml(domain)}" placeholder="192-168-1-44.lovense.club">
         </div>
         <div class="llm-field">
-          <label for="lovense-port">HTTPS Port</label>
-          <input type="number" id="lovense-port" class="input-field llm-input" value="${httpsPort}" min="1" max="65535" placeholder="34568">
+          <label class="toggle-label">
+            <input type="checkbox" id="lovense-secure" ${secure ? "checked" : ""} onchange="lovenseModeChanged()">
+            <span class="toggle-slider"></span>
+            <span class="toggle-text">HTTPS (Game Mode)</span>
+          </label>
+          <span class="field-hint" id="lovense-mode-hint">${secure ? "Game Mode: HTTPS on port 34568 (mobile) / 30010 (PC)" : "LAN Mode: HTTP on port 20010"}</span>
+        </div>
+        <div class="llm-field">
+          <label for="lovense-port">Port</label>
+          <input type="number" id="lovense-port" class="input-field llm-input" value="${port}" min="1" max="65535" placeholder="20010">
         </div>
       </div>
-      <p class="theme-section-hint">Open Lovense Connect &gt; Discover &gt; Game Mode &gt; Enable LAN. Enter the local address shown there (format: 192-168-X-X.lovense.club).</p>
     </section>
 
     <!-- Test Connection -->
@@ -4584,7 +4628,6 @@ function renderLovenseTab(settings: import("../llm/lovense-settings.ts").Lovense
     <div id="lovense-status" class="llm-status" style="display:none;"></div>
 
     <style>
-      .theme-section-hint { color: var(--text-dim); font-size: 0.85rem; margin-top: var(--sp-1); line-height: 1.4; }
       .lovense-toys-grid { display: flex; flex-direction: column; gap: var(--sp-2); }
       .lovense-toy-card { background: var(--c-bg); border: 1px solid var(--c-border); border-radius: var(--radius-md); padding: var(--sp-3); display: flex; justify-content: space-between; align-items: center; }
       .lovense-toy-name { font-weight: 500; }
@@ -4596,6 +4639,16 @@ function renderLovenseTab(settings: import("../llm/lovense-settings.ts").Lovense
     </style>
 
     <script>
+    function lovenseModeChanged() {
+      const secure = document.getElementById('lovense-secure')?.checked ?? false;
+      const portInput = document.getElementById('lovense-port');
+      const hint = document.getElementById('lovense-mode-hint');
+      if (portInput) portInput.value = secure ? 34568 : 20010;
+      if (hint) hint.textContent = secure
+        ? 'Game Mode: HTTPS on port 34568 (mobile) / 30010 (PC)'
+        : 'LAN Mode: HTTP on port 20010';
+    }
+
     function showLovenseStatus(type, message) {
       const el = document.getElementById('lovense-status');
       if (!el) return;
@@ -4608,17 +4661,19 @@ function renderLovenseTab(settings: import("../llm/lovense-settings.ts").Lovense
       e.preventDefault();
       const enabled = document.getElementById('lovense-enabled')?.checked ?? false;
       const domain = document.getElementById('lovense-domain')?.value?.trim() ?? '';
-      const httpsPort = parseInt(document.getElementById('lovense-port')?.value ?? '34568') || 34568;
+      const port = parseInt(document.getElementById('lovense-port')?.value ?? '20010') || 20010;
+      const secure = document.getElementById('lovense-secure')?.checked ?? false;
 
       fetch('/api/lovense-settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled, connection: { domain, httpsPort } }),
+        body: JSON.stringify({ enabled, connection: { domain, port, secure } }),
       })
         .then(r => r.json())
         .then(data => {
           if (data.success) {
-            showLovenseStatus('success', 'Settings saved. Reload the page to apply tool changes.');
+            showLovenseStatus('success', 'Settings saved. Reloading...');
+            setTimeout(() => location.reload(), 800);
           } else {
             showLovenseStatus('error', data.error || 'Failed to save settings.');
           }
@@ -4640,7 +4695,8 @@ function renderLovenseTab(settings: import("../llm/lovense-settings.ts").Lovense
       toysEl.style.display = 'none';
 
       const domain = document.getElementById('lovense-domain')?.value?.trim() ?? '';
-      const httpsPort = parseInt(document.getElementById('lovense-port')?.value ?? '34568') || 34568;
+      const port = parseInt(document.getElementById('lovense-port')?.value ?? '20010') || 20010;
+      const secure = document.getElementById('lovense-secure')?.checked ?? false;
 
       if (!domain) {
         statusEl.className = 'llm-status error';
@@ -4654,7 +4710,7 @@ function renderLovenseTab(settings: import("../llm/lovense-settings.ts").Lovense
       fetch('/api/lovense-settings/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domain, httpsPort }),
+        body: JSON.stringify({ domain, port, secure }),
         signal: AbortSignal.timeout(10000),
       })
         .then(r => r.json())
