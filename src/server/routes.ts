@@ -990,6 +990,7 @@ export async function handleChat(
         }
 
         // Create EntityTurn instance
+        const activeProfile = ctx.getActiveLLMProfile();
         const turn = new EntityTurn(
           ctx.llm,
           ctx.db,
@@ -1005,6 +1006,8 @@ export async function handleChat(
             homeSettings: ctx.getHomeSettings(),
             lovenseSettings: ctx.getLovenseSettings(),
             imageGenSettings: ctx.getImageGenSettings(),
+            contextLength: activeProfile?.contextLength,
+            maxTokens: activeProfile?.maxTokens,
           }
         );
 
@@ -1168,6 +1171,7 @@ export async function handleChatRetry(
           ctx.pulseEngine.updateLastUserMessage();
         }
 
+        const retryProfile = ctx.getActiveLLMProfile();
         const turn = new EntityTurn(
           ctx.llm,
           ctx.db,
@@ -1183,6 +1187,8 @@ export async function handleChatRetry(
             homeSettings: ctx.getHomeSettings(),
             lovenseSettings: ctx.getLovenseSettings(),
             imageGenSettings: ctx.getImageGenSettings(),
+            contextLength: retryProfile?.contextLength,
+            maxTokens: retryProfile?.maxTokens,
           }
         );
 

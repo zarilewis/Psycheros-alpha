@@ -203,6 +203,12 @@ export interface LLMContextSnapshot {
     systemMessageLength: number;
     totalMessages: number;
     estimatedTokens: number;
+    /** Model context window size in tokens (from active profile) */
+    contextLength?: number;
+    /** Token budget available for history messages after system/tools/reservation */
+    budgetAvailable?: number;
+    /** Number of oldest messages removed by context budget trimming */
+    messagesTruncated?: number;
   };
 }
 

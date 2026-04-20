@@ -51,7 +51,7 @@ The nested `<label class="toggle">` wrapper breaks `input:checked + .toggle-slid
 - **RAG**: All five retrieval sources — memories, chat history, context book entries, data vault, knowledge graph
 - **Messages**: Conversation history sent to the LLM with role badges and collapsible content
 - **Tools**: Available tool definitions with parameters
-- **Metrics**: Per-section size breakdown, token counts, and context window utilization bar
+- **Metrics**: Per-section size breakdown, token counts, context window utilization bar (reads `contextLength` from the active LLM profile — shows e.g. "128k", "200k" — and reports how many oldest messages were trimmed)
 
 **Key types:** `LLMContextSnapshot` (in-memory, `src/types.ts`) and `ContextSnapshotRecord` (persisted, `src/types.ts`). Snapshot built in `EntityTurn.process()` (`src/entity/loop.ts`), persisted via `DBClient.addContextSnapshot()`.
 

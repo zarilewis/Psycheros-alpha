@@ -3192,8 +3192,9 @@ function renderMetricsTab(snap) {
   const totalSystemChars = metrics.systemMessageLength || (snap.systemMessage || '').length;
   const totalSystemTokens = countTokens(snap.systemMessage || '');
   const estimatedTotal = metrics.estimatedTokens || totalSystemTokens;
-  const contextWindow = 128000;
+  const contextWindow = metrics.contextLength || 128000;
   const utilizationPct = Math.min(100, Math.round((estimatedTotal / contextWindow) * 100));
+  const contextLabel = (contextWindow / 1000).toFixed(0) + 'k';
   const tokenLabel = tokenizerReady ? '' : ' (est.)';
 
   let html = `
@@ -3204,14 +3205,14 @@ function renderMetricsTab(snap) {
       </div>
       <div class="context-metrics-row">
         <span>Total Messages</span>
-        <span>${metrics.totalMessages || '—'}</span>
+        <span>${metrics.totalMessages || '—'}${metrics.messagesTruncated ? ` (${metrics.messagesTruncated} oldest trimmed)` : ''}</span>
       </div>
       <div class="context-metrics-row">
         <span>Estimated Total Tokens</span>
         <span>~${estimatedTotal.toLocaleString()}</span>
       </div>
       <div class="context-utilization">
-        <div class="context-utilization-label">Context Window (128k)</div>
+        <div class="context-utilization-label">Context Window (${contextLabel})</div>
         <div class="context-utilization-bar">
           <div class="context-utilization-fill" style="width: ${utilizationPct}%"></div>
         </div>

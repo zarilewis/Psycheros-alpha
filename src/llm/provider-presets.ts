@@ -55,7 +55,7 @@ export interface LLMConnectionProfile {
   presencePenalty: number;
   /** Maximum tokens for response generation */
   maxTokens: number;
-  /** Context window size (informational, not sent to API) */
+  /** Context window size in tokens (used for context budget management) */
   contextLength: number;
   /** Whether chain-of-thought reasoning is enabled */
   thinkingEnabled: boolean;

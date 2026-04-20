@@ -89,6 +89,10 @@ export interface PulseEngineConfig {
   imageGenSettings?: () => ImageGenSettings | undefined;
   /** Getter for Lovense settings (read fresh each pulse execution) */
   lovenseSettings?: () => LovenseSettings | undefined;
+  /** Getter for context window size from active LLM profile */
+  contextLength?: () => number | undefined;
+  /** Getter for max response tokens from active LLM profile */
+  maxTokens?: () => number | undefined;
 }
 
 /**
@@ -582,6 +586,8 @@ export class PulseEngine {
         homeSettings: this.config.homeSettings?.(),
         imageGenSettings: this.config.imageGenSettings?.(),
         lovenseSettings: this.config.lovenseSettings?.(),
+        contextLength: this.config.contextLength?.(),
+        maxTokens: this.config.maxTokens?.(),
       };
 
       const turn = new EntityTurn(this.getLlm(), this.db, this.tools, entityConfig);

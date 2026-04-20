@@ -31,12 +31,13 @@ import type { ImageGenSettings } from "../llm/image-gen-settings.ts";
 import { LLMError } from "../llm/mod.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { ToolRegistry, ToolContext } from "../tools/mod.ts";
-import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics, LLMContextSnapshot } from "../types.ts";
+import type { ToolCall, ToolResult, Message, UIUpdate, TurnMetrics, LLMContextSnapshot, ToolDefinition } from "../types.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
 import type { LorebookManager } from "../lorebook/mod.ts";
 import type { VaultManager } from "../vault/mod.ts";
 import { loadBaseInstructions, loadSelfContent, loadUserContent, loadRelationshipContent, loadCustomContent, buildSystemMessage } from "./context.ts";
+import { applyContextBudget, type BudgetResult } from "./token-budget.ts";
 import { formatChatHistoryForContext, buildGraphContext } from "../rag/mod.ts";
 import { generateUIUpdates } from "../server/ui-updates.ts";
 import { createCollector, finalize, setFinishReason } from "../metrics/mod.ts";
@@ -115,6 +116,10 @@ export interface EntityConfig {
   imageGenSettings?: ImageGenSettings;
   /** Optional Lovense device control settings */
   lovenseSettings?: import("../llm/lovense-settings.ts").LovenseSettings;
+  /** Model context window size in tokens (from active LLM profile) */
+  contextLength?: number;
+  /** Maximum tokens reserved for the response (from active LLM profile) */
+  maxTokens?: number;
 }
 
 /**
@@ -230,6 +235,7 @@ function fadeToolCallArguments(toolCalls: ToolCall[]): ToolCall[] {
 
 export class EntityTurn {
   private readonly maxToolIterations: number;
+  private lastBudgetResult?: BudgetResult;
 
   constructor(
     private llm: LLMClient,
@@ -534,12 +540,12 @@ export class EntityTurn {
       console.log("[EntityTurn] Retry mode: skipping user message persistence");
     }
 
+    // Get tool definitions (needed for context budget estimation)
+    const toolDefinitions = this.tools().getDefinitions();
+
     // Build the messages array for the LLM
     // On retry, history already contains the user message — don't append it again
-    const messages = this.buildMessages(systemMessage, history, displayContent, !options?.retry);
-
-    // Get tool definitions
-    const toolDefinitions = this.tools().getDefinitions();
+    const messages = this.buildMessages(systemMessage, history, displayContent, !options?.retry, toolDefinitions);
 
     // Create and yield context snapshot for debugging
     const contextSnapshot: LLMContextSnapshot = {
@@ -568,8 +574,12 @@ export class EntityTurn {
       metrics: {
         systemMessageLength: systemMessage.length,
         totalMessages: messages.length,
-        estimatedTokens: Math.ceil(systemMessage.length / 4) +
+        estimatedTokens: this.lastBudgetResult?.estimatedTotalTokens ??
+          Math.ceil(systemMessage.length / 4) +
           messages.reduce((acc, m) => acc + Math.ceil((m.content?.length || 0) / 4), 0),
+        contextLength: this.config.contextLength,
+        budgetAvailable: this.lastBudgetResult?.availableBudget,
+        messagesTruncated: this.lastBudgetResult?.messagesRemoved,
       },
     };
 
@@ -975,6 +985,7 @@ export class EntityTurn {
     history: Message[],
     userMessage: string,
     appendUserMessage: boolean = true,
+    toolDefinitions?: ToolDefinition[],
   ): ChatMessage[] {
     const messages: ChatMessage[] = [];
 
@@ -1022,6 +1033,20 @@ export class EntityTurn {
         role: "user",
         content: `${now} ${userMessage}`,
       });
+    }
+
+    // Apply context window budget if configured
+    if (this.config.contextLength && this.config.maxTokens && toolDefinitions) {
+      const result = applyContextBudget(messages, toolDefinitions, this.config.contextLength, this.config.maxTokens);
+      this.lastBudgetResult = result;
+      if (result.truncated) {
+        console.log(
+          `[Context] Truncated ${result.messagesRemoved} oldest messages — ` +
+          `~${result.estimatedTotalTokens}/${result.contextLength} tokens ` +
+          `(system: ~${result.systemMessageTokens}, tools: ~${result.toolTokens}, history: ~${result.historyTokens})`,
+        );
+      }
+      return result.messages;
     }
 
     return messages;

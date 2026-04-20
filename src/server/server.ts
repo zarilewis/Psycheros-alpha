@@ -792,6 +792,8 @@ export class Server {
         homeSettings: () => this.homeSettings,
         lovenseSettings: () => this.lovenseSettings,
         imageGenSettings: () => this.imageGenSettings,
+        contextLength: () => this.getActiveLLMProfile()?.contextLength,
+        maxTokens: () => this.getActiveLLMProfile()?.maxTokens,
       }
     );
     this.pulseEngine.start();

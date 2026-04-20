@@ -39,6 +39,7 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/main.ts` | Entry point, MCP initialization |
 | `src/types.ts` | Shared types (SSEEvent, LLMContextSnapshot, ToolCall) |
 | `src/entity/loop.ts` | Agentic loop — LLM calls, tool execution, context capture, image/tool-arg fading |
+| `src/entity/token-budget.ts` | Context window budget management — FIFO history truncation to fit model context |
 | `src/entity/context.ts` | Context loading (supports MCP client) |
 | `src/server/routes.ts` | API endpoints and handlers |
 | `src/server/state-changes.ts` | Unified state mutations |
@@ -96,6 +97,7 @@ Supported provider presets: **OpenRouter** (default), OpenAI, Alibaba/Qwen, Nano
 - Entity-core LLM credentials are derived from the active profile on startup and dynamically updated when the active profile changes (triggers entity-core restart if connected)
 - Entity-core LLM model/temperature/maxTokens can be overridden independently via Settings > Entity Core > LLM (persists to `.psycheros/entity-core-llm-settings.json`)
 - Worker model (auto-titling, summarization) uses the profile's `workerModel` with thinking disabled
+- Context window budget management: `contextLength` from the active profile controls FIFO truncation of oldest conversation history. System message (identity, RAG, lorebook, vault, graph, SA, image gen) is never truncated. The current user message is always preserved. Budget = `contextLength - maxTokens - 5% safety margin`. Trimming and sanitization in `src/entity/token-budget.ts`, applied in `EntityTurn.buildMessages()`
 
 ## External Connections
 
