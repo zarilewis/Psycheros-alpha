@@ -444,16 +444,39 @@ document.addEventListener('DOMContentLoaded', () => {
   // Mobile browsers drop EventSource connections when the app is backgrounded,
   // so Pulse messages fired while away are missed. This listener ensures the
   // connection is re-established and any missed messages are fetched on return.
+  //
+  // The conversation reload is debounced because some mobile browsers fire a
+  // spurious visibilitychange (hidden→visible) when the virtual keyboard pops
+  // up. Without debouncing, that would destroy the active textarea and cause
+  // ghost input. The SSE is reconnected immediately regardless.
+  let visibilityReloadTimer = null;
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      initPersistentSSE();
+    if (document.visibilityState === 'hidden') {
+      // Cancel any pending reload — the page is going away again (e.g. keyboard
+      // flicker where hidden→visible→hidden→visible resolves quickly).
+      if (visibilityReloadTimer) {
+        clearTimeout(visibilityReloadTimer);
+        visibilityReloadTimer = null;
+      }
+      return;
+    }
 
-      // Don't reload the conversation if the user is viewing settings,
-      // so their in-progress work isn't lost when they switch windows.
-      const viewingSettings = document.getElementById('settings-content') !== null;
+    // visible
+    initPersistentSSE();
 
-      if (currentConversationId && !viewingSettings) {
-        // Preserve unsent message text across the reload
+    // Debounce the reload: only fire if the page stays visible for 500ms.
+    // Brief visibility flickers (keyboard pop) will be cancelled by the
+    // hidden handler above before the timer fires.
+    if (visibilityReloadTimer) clearTimeout(visibilityReloadTimer);
+
+    if (currentConversationId) {
+      visibilityReloadTimer = setTimeout(() => {
+        visibilityReloadTimer = null;
+
+        // Check at reload time, not event time — user may have navigated
+        // to settings during the debounce window.
+        const viewingSettings = document.getElementById('settings-content') !== null;
+        if (viewingSettings) return;
         const input = document.getElementById('message-input');
         const unsentText = input?.value || '';
         loadConversationFromUrl(currentConversationId).then(() => {
@@ -461,13 +484,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const restored = document.getElementById('message-input');
             if (restored) {
               restored.value = unsentText;
-              // Restore textarea auto-resize
               restored.style.height = 'auto';
               restored.style.height = restored.scrollHeight + 'px';
             }
           }
         });
-      }
+      }, 500);
     }
   });
 
