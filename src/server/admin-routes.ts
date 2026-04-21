@@ -12,8 +12,9 @@ import type { RouteContext } from "./routes.ts";
 import { queryLogs, getLogComponents, getLogLevelCounts, type LogLevel } from "./logger.ts";
 import { collectDiagnostics } from "./diagnostics.ts";
 import { getAllJobs, triggerJob } from "./cron-tracker.ts";
-import { renderAdminHub, renderAdminLogs, renderLogEntries, renderAdminDiagnostics, renderAdminJobs, renderAdminJobRows, renderAdminActions } from "./admin-templates.ts";
+import { renderAdminHub, renderAdminLogs, renderLogEntries, renderAdminDiagnostics, renderAdminJobs, renderAdminJobRows, renderAdminActions, renderAdminEntityData } from "./admin-templates.ts";
 import { getActiveProfile } from "../llm/settings.ts";
+import { exportEntityData, importEntityData } from "./entity-data.ts";
 
 const HTML_HEADERS = { "Content-Type": "text/html; charset=utf-8" };
 const JSON_HEADERS = { "Content-Type": "application/json" };
@@ -360,4 +361,49 @@ function hasSuffix(stem: string, granularity: "daily" | "significant"): boolean 
   }
   // Significant: any underscore means it already has a suffix
   return stem.includes("_");
+}
+
+// ===== Entity Data Export & Import =====
+
+/**
+ * GET /fragments/admin/entity-data — Entity Data tab fragment.
+ */
+export function handleAdminEntityDataFragment(_ctx: RouteContext): Response {
+  return new Response(renderAdminEntityData(), { headers: HTML_HEADERS });
+}
+
+/**
+ * POST /api/admin/entity-data/export — Export entity data as a zip download.
+ */
+export async function handleAdminEntityDataExport(ctx: RouteContext): Promise<Response> {
+  try {
+    const zipBytes = await exportEntityData(ctx);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+    return new Response(zipBytes.buffer as ArrayBuffer, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="entity-export-${timestamp}.zip"`,
+      },
+    });
+  } catch (error) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    }), { headers: JSON_HEADERS });
+  }
+}
+
+/**
+ * POST /api/admin/entity-data/import — Import entity data from an uploaded zip.
+ */
+export async function handleAdminEntityDataImport(ctx: RouteContext, body: Uint8Array): Promise<Response> {
+  try {
+    const result = await importEntityData(ctx, body);
+    return new Response(JSON.stringify(result), { headers: JSON_HEADERS });
+  } catch (error) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    }), { headers: JSON_HEADERS });
+  }
 }

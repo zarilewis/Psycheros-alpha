@@ -84,6 +84,18 @@ export function renderAdminHub(): string {
         </svg>
         Actions
       </button>
+      <button class="admin-nav-tab"
+        hx-get="/fragments/admin/entity-data"
+        hx-target="#admin-content"
+        hx-swap="innerHTML"
+        onclick="document.querySelectorAll('.admin-nav-tab').forEach(t => t.classList.remove('active')); this.classList.add('active')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Entity Data
+      </button>
     </div>
     <div id="admin-content">
       <div hx-get="/fragments/admin/diagnostics" hx-trigger="load" hx-swap="outerHTML"></div>
@@ -596,6 +608,63 @@ export function renderAdminActions(): string {
         Run
       </button>
     </div>
+  </div>
+
+</div>`;
+}
+
+/**
+ * Render the entity data tab — export and import entity data.
+ */
+export function renderAdminEntityData(): string {
+  return `<div class="admin-actions">
+
+  <div class="admin-section">
+    <h3 class="admin-section-title">Export Entity Data</h3>
+    <p class="admin-action-desc">
+      Exports all entity data (identity, memories, knowledge graph, conversations,
+      lorebooks, vault documents, images) as a zip file. Entity-core data is
+      fetched via MCP; Psycheros data is exported directly.
+    </p>
+    <div class="admin-action-form">
+      <button id="admin-export-btn" class="admin-action-btn" onclick="window.adminExportEntity()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Export Entity
+      </button>
+    </div>
+  </div>
+
+  <div class="admin-section">
+    <h3 class="admin-section-title">Import Entity Data</h3>
+    <p class="admin-action-desc">
+      Performs a <strong>full overwrite</strong> of all entity data from a zip file.
+      A snapshot is taken before overwriting entity-core data. After import,
+      stale RAG indexes are cleared and will be rebuilt on next access.
+      The import requires MCP to be connected for entity-core data.
+    </p>
+    <div class="admin-action-form">
+      <div class="admin-action-fields">
+        <label class="admin-action-label" for="admin-import-file">Select zip file</label>
+        <input id="admin-import-file" type="file" accept=".zip" class="admin-input" />
+      </div>
+      <button id="admin-import-btn" class="admin-action-btn admin-action-btn-danger" onclick="window.adminImportEntity()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="17 8 12 3 7 8"/>
+          <line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        Full Overwrite Import
+      </button>
+    </div>
+  </div>
+
+  <div class="admin-section" id="admin-entity-output-section" style="display:none">
+    <h3 class="admin-section-title">Output</h3>
+    <div class="admin-action-output" id="admin-entity-output"></div>
   </div>
 
 </div>`;

@@ -199,6 +199,9 @@ import {
   handleAdminJobTriggerAPI,
   handleAdminBatchPopulate,
   handleAdminAddInstanceSuffix,
+  handleAdminEntityDataFragment,
+  handleAdminEntityDataExport,
+  handleAdminEntityDataImport,
 } from "./admin-routes.ts";
 import { setServerStartTime } from "./diagnostics.ts";
 
@@ -1551,6 +1554,17 @@ export class Server {
       return await handleAdminAddInstanceSuffix(ctx, body);
     }
 
+    // POST /api/admin/entity-data/export - Export entity data as zip
+    if (method === "POST" && path === "/api/admin/entity-data/export") {
+      return await handleAdminEntityDataExport(ctx);
+    }
+
+    // POST /api/admin/entity-data/import - Import entity data from zip
+    if (method === "POST" && path === "/api/admin/entity-data/import") {
+      const body = await request.arrayBuffer();
+      return await handleAdminEntityDataImport(ctx, new Uint8Array(body));
+    }
+
     // ========================================
     // Pulse API Routes
     // ========================================
@@ -2021,6 +2035,11 @@ export class Server {
     // GET /fragments/admin/actions - Actions panel
     if (path === "/fragments/admin/actions") {
       return handleAdminActionsFragment(ctx);
+    }
+
+    // GET /fragments/admin/entity-data - Entity Data tab
+    if (path === "/fragments/admin/entity-data") {
+      return handleAdminEntityDataFragment(ctx);
     }
 
     // GET /backgrounds/:filename - Serve background image files

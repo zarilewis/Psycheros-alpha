@@ -268,6 +268,156 @@
     return div.innerHTML;
   }
 
+  /**
+   * Export entity data — fetches zip from the server and triggers a download.
+   */
+  window.adminExportEntity = async function () {
+    var btn = document.getElementById("admin-export-btn");
+    var outputSection = document.getElementById("admin-entity-output-section");
+    var outputEl = document.getElementById("admin-entity-output");
+
+    if (!btn || !outputEl) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="admin-action-spinner"></span> Exporting...';
+
+    if (outputSection) outputSection.style.display = "";
+    outputEl.textContent = "Collecting entity data from entity-core and Psycheros...\n";
+
+    try {
+      var res = await fetch("/api/admin/entity-data/export", { method: "POST" });
+
+      if (!res.ok) {
+        var errorData = await res.json().catch(function () { return { error: res.statusText }; });
+        throw new Error(errorData.error || "Export failed");
+      }
+
+      // Trigger browser download
+      var blob = await res.blob();
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = res.headers.get("Content-Disposition")?.split("filename=")[1]?.replace(/"/g, "") || "entity-export.zip";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      var sizeMB = (blob.size / (1024 * 1024)).toFixed(1);
+      outputEl.innerHTML = '<div class="admin-action-output-header">Export complete — ' + escapeHtmlForOutput(sizeMB + " MB") + '</div>'
+        + '<p>File downloaded to your browser. Keep it in a safe location for backup or migration.</p>';
+    } catch (err) {
+      outputEl.innerHTML = '<div class="admin-action-output-header admin-action-error">Export failed: ' + escapeHtmlForOutput(err.message) + '</div>';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export Entity';
+  };
+
+  /**
+   * Import entity data — shows confirmation dialog, uploads zip to server.
+   */
+  window.adminImportEntity = function () {
+    var fileInput = document.getElementById("admin-import-file");
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+      alert("Please select a zip file first.");
+      return;
+    }
+
+    var file = fileInput.files[0];
+    if (!file.name.endsWith(".zip")) {
+      alert("Please select a .zip file.");
+      return;
+    }
+
+    if (!confirm(
+      "This will FULLY OVERWRITE all entity data:\n\n" +
+      "- Identity files, memories, and knowledge graph (via MCP)\n" +
+      "- Conversations, lorebooks, vault documents, and images\n\n" +
+      "A snapshot is taken before overwriting entity-core data.\n" +
+      "This action cannot be undone.\n\n" +
+      "Proceed with import of " + file.name + " (" + (file.size / (1024 * 1024)).toFixed(1) + " MB)?"
+    )) {
+      return;
+    }
+
+    // Confirmed — run the actual import
+    window.adminConfirmImport(file);
+  };
+
+  /**
+   * Perform the actual import after user confirmation.
+   */
+  window.adminConfirmImport = async function (file) {
+    var btn = document.getElementById("admin-import-btn");
+    var outputSection = document.getElementById("admin-entity-output-section");
+    var outputEl = document.getElementById("admin-entity-output");
+
+    if (!btn || !outputEl) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="admin-action-spinner"></span> Importing...';
+
+    if (outputSection) outputSection.style.display = "";
+    outputEl.textContent = "Importing " + file.name + "...\n(This may take a while)\n";
+
+    try {
+      var formData = new FormData();
+      formData.append("file", file);
+
+      // Read file as ArrayBuffer for the server
+      var arrayBuffer = await file.arrayBuffer();
+      var res = await fetch("/api/admin/entity-data/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: arrayBuffer,
+      });
+
+      var data = await res.json();
+
+      if (data.success) {
+        var lines = ["Import complete."];
+        var d = data.details;
+        if (d) {
+          if (d.psycheros) {
+            if (d.psycheros.conversations_restored !== undefined) {
+              lines.push("Conversations: " + d.psycheros.conversations_restored);
+              lines.push("Messages: " + d.psycheros.messages_restored);
+            }
+            if (d.psycheros.lorebooks_restored !== undefined) {
+              lines.push("Lorebooks: " + d.psycheros.lorebooks_restored);
+              lines.push("Lorebook entries: " + d.psycheros.lorebook_entries_restored);
+            }
+            if (d.psycheros.vault_documents_restored !== undefined) {
+              lines.push("Vault documents: " + d.psycheros.vault_documents_restored);
+            }
+            if (d.psycheros.images_restored !== undefined) {
+              lines.push("Images: " + d.psycheros.images_restored);
+            }
+            if (d.psycheros.anchor_images_restored !== undefined) {
+              lines.push("Anchor images: " + d.psycheros.anchor_images_restored);
+            }
+          }
+          if (d.entity_core) {
+            lines.push("Entity-core: " + (d.entity_core.success ? "OK" : "FAILED — " + (d.entity_core.error || "unknown error")));
+          }
+          if (d.sync_pull) {
+            lines.push("MCP sync pull: completed");
+          }
+        }
+        outputEl.innerHTML = '<div class="admin-action-output-header">Import successful</div>'
+          + '<pre class="admin-action-output-pre">' + escapeHtmlForOutput(lines.join("\n")) + '</pre>';
+      } else {
+        outputEl.innerHTML = '<div class="admin-action-output-header admin-action-error">Import failed: ' + escapeHtmlForOutput(data.error || "unknown error") + '</div>';
+      }
+    } catch (err) {
+      outputEl.innerHTML = '<div class="admin-action-output-header admin-action-error">Request failed: ' + escapeHtmlForOutput(err.message) + '</div>';
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Full Overwrite Import';
+  };
+
   // Format timestamps already on the page
   formatLocalTimes();
 
