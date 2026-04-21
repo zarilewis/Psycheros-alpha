@@ -3839,3 +3839,116 @@ globalThis.deleteAnchor = async function(id) {
   await fetch('/api/anchor-images/' + id, { method: 'DELETE' });
   htmx.ajax('GET', '/fragments/settings/vision', '#chat');
 };
+
+// =============================================================================
+// Gallery (Vision)
+// =============================================================================
+
+let galleryOffset = 0;
+
+globalThis.loadMoreGallery = function() {
+  loadGallery(galleryOffset);
+};
+
+async function loadGallery(offset) {
+  const container = document.getElementById('gallery-container');
+  if (!container) return;
+
+  try {
+    const resp = await fetch('/api/gallery/images?offset=' + offset + '&limit=24');
+    const data = await resp.json();
+
+    galleryOffset = offset + 24;
+    const esc = function(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+    const cardsHtml = data.images.map(function(img) {
+      const sizeStr = img.size >= 1024 * 1024 ? (img.size / (1024 * 1024)).toFixed(1) + ' MB' : (img.size / 1024).toFixed(1) + ' KB';
+      const dateStr = img.createdAt ? new Date(img.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+      const shortName = img.filename.length > 20 ? img.filename.substring(0, 8) + '...' + img.filename.slice(-8) : img.filename;
+      const promptAttr = img.prompt ? ' title="' + esc(img.prompt) + '"' : '';
+      const catLabel = img.category === 'generated' ? 'generated' : 'uploaded';
+      const catClass = img.category === 'generated' ? 'gallery-badge--generated' : 'gallery-badge--user';
+      return '<div class="gallery-card" data-category="' + img.category + '"' + promptAttr + '>'
+        + '<div class="gallery-thumb-wrap">'
+        + '<img src="' + esc(img.url) + '" class="gallery-thumb" loading="lazy" onclick="openLightbox(\'' + esc(img.url) + '\',\'' + esc(img.filename) + '\')"/>'
+        + '<span class="gallery-badge ' + catClass + '">' + catLabel + '</span>'
+        + '</div>'
+        + '<div class="gallery-meta">'
+        + '<span class="gallery-filename" title="' + esc(img.filename) + '">' + esc(shortName) + '</span>'
+        + '<button class="gallery-copy-btn" onclick="event.stopPropagation();copyFilename(\'' + esc(img.filename) + '\',this)" title="Copy filename">'
+        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1 2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
+        + '</button>'
+        + '</div>'
+        + '<div class="gallery-info">' + sizeStr + ' &middot; ' + dateStr + '</div>'
+        + '</div>';
+    }).join('');
+
+    const grid = container.querySelector('.gallery-grid');
+    if (grid) grid.insertAdjacentHTML('beforeend', cardsHtml);
+    const loadMoreDiv = container.querySelector('.gallery-load-more');
+    if (loadMoreDiv) loadMoreDiv.remove();
+    if (data.hasMore) container.insertAdjacentHTML('beforeend', '<div class="gallery-load-more"><button class="btn btn--sm" onclick="loadMoreGallery()">Load more</button></div>');
+  } catch (e) {
+    console.error('Failed to load more gallery images:', e);
+  }
+}
+
+globalThis.copyFilename = async function(filename, btn) {
+  try {
+    await navigator.clipboard.writeText(filename);
+    btn.classList.add('copied');
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
+    setTimeout(function() {
+      btn.classList.remove('copied');
+      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1 2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+    }, 1500);
+  } catch (e) {
+    console.error('Failed to copy:', e);
+  }
+};
+
+globalThis.openLightbox = function(url, filename) {
+  closeLightbox();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'gallery-lightbox';
+  overlay.id = 'gallery-lightbox';
+  overlay.onclick = function(e) { if (e.target === overlay) closeLightbox(); };
+  overlay.innerHTML = '<button class="gallery-lightbox-close" onclick="closeLightbox()">&times;</button>'
+    + '<img src="' + url + '" onclick="event.stopPropagation()"/>'
+    + '<div class="gallery-lightbox-info">' + filename + '</div>';
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', closeLightboxOnEsc);
+
+  // Swipe to dismiss on touch devices
+  let startY = 0;
+  const img = overlay.querySelector('img');
+  if (img) {
+    img.addEventListener('touchstart', function(e) { startY = e.touches[0].clientY; }, { passive: true });
+    img.addEventListener('touchend', function(e) {
+      const dy = e.changedTouches[0].clientY - startY;
+      if (dy > 80) closeLightbox();
+    }, { passive: true });
+  }
+};
+
+function closeLightbox() {
+  const overlay = document.getElementById('gallery-lightbox');
+  if (overlay) overlay.remove();
+  document.removeEventListener('keydown', closeLightboxOnEsc);
+}
+
+function closeLightboxOnEsc(e) {
+  if (e.key === 'Escape') closeLightbox();
+}
+
+// Initialize gallery offset from server-rendered data attribute after HTMX swap
+document.body.addEventListener('htmx:afterSwap', function(e) {
+  const target = e.detail.target;
+  if (target && target.id === 'settings-content') {
+    const gc = document.getElementById('gallery-container');
+    if (gc) {
+      galleryOffset = parseInt(gc.getAttribute('data-gallery-offset') || '0', 10);
+    }
+  }
+});

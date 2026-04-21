@@ -5814,6 +5814,11 @@ export function renderVisionGalleryTab(data: {
     .gallery-load-more { margin-top: var(--sp-4); text-align: center; }
     .gallery-lightbox { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; flex-direction: column; gap: var(--sp-3); cursor: pointer; }
     .gallery-lightbox img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: var(--radius-sm); cursor: default; }
+    @media (max-width: 768px) {
+      .gallery-lightbox img { max-width: 100vw; max-height: 80vh; border-radius: 0; }
+      .gallery-lightbox-close { top: 8px; right: 8px; width: 40px; height: 40px; }
+      .gallery-lightbox-info { padding: 0 12px; }
+    }
     .gallery-lightbox-info { color: #ccc; font-size: var(--font-size-sm); font-family: var(--font-mono, monospace); text-align: center; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .gallery-lightbox-close { position: absolute; top: var(--sp-4); right: var(--sp-4); background: rgba(255,255,255,0.1); border: none; color: #fff; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; }
     .gallery-lightbox-close:hover { background: rgba(255,255,255,0.2); }
@@ -5827,94 +5832,7 @@ export function renderVisionGalleryTab(data: {
     <span><strong>${data.userCount}</strong> uploaded</span>
   </div>
   ${galleryContent}
-</div>
-
-<script>
-let galleryOffset = ${data.images.length};
-
-function loadMoreGallery() {
-  loadGallery(galleryOffset);
-}
-
-async function loadGallery(offset) {
-  const container = document.getElementById('gallery-container');
-  if (!container) return;
-
-  try {
-    const resp = await fetch('/api/gallery/images?offset=' + offset + '&limit=24');
-    const data = await resp.json();
-
-    galleryOffset = offset + 24;
-    const esc = function(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
-
-    const cardsHtml = data.images.map(function(img) {
-      const sizeStr = img.size >= 1024 * 1024 ? (img.size / (1024 * 1024)).toFixed(1) + ' MB' : (img.size / 1024).toFixed(1) + ' KB';
-      const dateStr = img.createdAt ? new Date(img.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-      const shortName = img.filename.length > 20 ? img.filename.substring(0, 8) + '...' + img.filename.slice(-8) : img.filename;
-      const promptAttr = img.prompt ? ' title="' + esc(img.prompt) + '"' : '';
-      const catLabel = img.category === 'generated' ? 'generated' : 'uploaded';
-      const catClass = img.category === 'generated' ? 'gallery-badge--generated' : 'gallery-badge--user';
-      return '<div class="gallery-card" data-category="' + img.category + '"' + promptAttr + '>'
-        + '<div class="gallery-thumb-wrap">'
-        + '<img src="' + esc(img.url) + '" class="gallery-thumb" loading="lazy" onclick="openLightbox(\'' + esc(img.url) + '\',\'' + esc(img.filename) + '\')"/>'
-        + '<span class="gallery-badge ' + catClass + '">' + catLabel + '</span>'
-        + '</div>'
-        + '<div class="gallery-meta">'
-        + '<span class="gallery-filename" title="' + esc(img.filename) + '">' + esc(shortName) + '</span>'
-        + '<button class="gallery-copy-btn" onclick="event.stopPropagation();copyFilename(\'' + esc(img.filename) + '\',this)" title="Copy filename">'
-        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>'
-        + '</button>'
-        + '</div>'
-        + '<div class="gallery-info">' + sizeStr + ' &middot; ' + dateStr + '</div>'
-        + '</div>';
-    }).join('');
-
-    const grid = container.querySelector('.gallery-grid');
-    if (grid) grid.insertAdjacentHTML('beforeend', cardsHtml);
-    const loadMoreDiv = container.querySelector('.gallery-load-more');
-    if (loadMoreDiv) loadMoreDiv.remove();
-    if (data.hasMore) container.insertAdjacentHTML('beforeend', '<div class="gallery-load-more"><button class="btn btn--sm" onclick="loadMoreGallery()">Load more</button></div>');
-  } catch (e) {
-    console.error('Failed to load more gallery images:', e);
-  }
-}
-
-async function copyFilename(filename, btn) {
-  try {
-    await navigator.clipboard.writeText(filename);
-    btn.classList.add('copied');
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>';
-    setTimeout(function() {
-      btn.classList.remove('copied');
-      btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
-    }, 1500);
-  } catch (e) {
-    console.error('Failed to copy:', e);
-  }
-}
-
-function openLightbox(url, filename) {
-  const overlay = document.createElement('div');
-  overlay.className = 'gallery-lightbox';
-  overlay.id = 'gallery-lightbox';
-  overlay.onclick = function(e) { if (e.target === overlay) closeLightbox(); };
-  overlay.innerHTML = '<button class="gallery-lightbox-close" onclick="closeLightbox()">&times;</button>'
-    + '<img src="' + url + '" onclick="event.stopPropagation()"/>'
-    + '<div class="gallery-lightbox-info">' + filename + '</div>';
-  document.body.appendChild(overlay);
-  document.addEventListener('keydown', closeLightboxOnEsc);
-}
-
-function closeLightbox() {
-  const overlay = document.getElementById('gallery-lightbox');
-  if (overlay) overlay.remove();
-  document.removeEventListener('keydown', closeLightboxOnEsc);
-}
-
-function closeLightboxOnEsc(e) {
-  if (e.key === 'Escape') closeLightbox();
-}
-</script>`;
+</div>`;
 }
 
 /**
