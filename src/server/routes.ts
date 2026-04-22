@@ -1255,11 +1255,25 @@ export async function handleChatRetry(
 }
 
 /**
+ * Truncate a string with a descriptive suffix showing how much was cut.
+ */
+function truncateWithNotice(text: string, maxLength: number): string {
+  const omitted = text.length - maxLength;
+  return text.substring(0, maxLength) + `\n\n[... ${omitted.toLocaleString()} characters truncated]`;
+}
+
+/**
+ * Maximum length for tool result content sent to the client via SSE.
+ * The client JSON.parse()s this, so we must truncate BEFORE serialization
+ * to keep the JSON valid. The LLM still gets the full result in its context.
+ */
+const MAX_TOOL_RESULT_CONTENT_LENGTH = 50 * 1024;
+
+/**
  * Truncate SSE data if it exceeds the maximum size.
- * Prevents memory issues and client disconnections from very large payloads.
- *
- * @param data - The data string to potentially truncate
- * @returns The original data or truncated version with suffix
+ * This is a last-resort safety net for non-JSON event types.
+ * JSON events (tool_result, tool_call) truncate their content fields
+ * BEFORE serialization in convertToSSEEvent to keep JSON valid.
  */
 function truncateSSEData(data: string): string {
   if (data.length <= MAX_SSE_MESSAGE_SIZE) {
@@ -1280,7 +1294,9 @@ function truncateSSEData(data: string): string {
  * - 'tool_result' -> SSEEvent 'tool_result', data is JSON of result
  * - StreamChunk 'done' -> SSEEvent 'done', data is finishReason
  *
- * Large payloads (tool results, etc.) are truncated to prevent memory issues.
+ * Large tool result content is truncated BEFORE JSON serialization so the
+ * resulting JSON remains valid and parseable by the client. The LLM always
+ * receives the full content in its context regardless of this truncation.
  *
  * @param chunk - The chunk from EntityTurn
  * @returns The corresponding SSEEvent
@@ -1299,17 +1315,45 @@ function convertToSSEEvent(chunk: EntityYield): SSEEvent {
         data: chunk.content,
       };
 
-    case "tool_call":
+    case "tool_call": {
+      // Truncate tool call arguments before serialization to keep JSON valid.
+      // Tool arguments are typically small, but some tools accept large
+      // content payloads that could exceed the SSE limit.
+      const toolCall = chunk.toolCall;
+      const args = toolCall.function.arguments;
+      const truncatedArgs = args.length > MAX_SSE_MESSAGE_SIZE
+        ? truncateWithNotice(args, MAX_SSE_MESSAGE_SIZE - 200)
+        : args;
       return {
         type: "tool_call",
-        data: truncateSSEData(JSON.stringify(chunk.toolCall)),
+        data: JSON.stringify({
+          ...toolCall,
+          function: { ...toolCall.function, arguments: truncatedArgs },
+        }),
       };
+    }
 
-    case "tool_result":
+    case "tool_result": {
+      // Truncate tool result content BEFORE serialization.
+      // The old approach (truncateSSEData on serialized JSON) produced
+      // invalid JSON, causing JSON.parse to fail silently on the client
+      // and tool results to disappear from the UI with no visible error.
+      // The LLM still gets the full content in its agentic loop context.
+      const result = chunk.result;
+      const content = result.content;
+      const truncatedContent = content.length > MAX_TOOL_RESULT_CONTENT_LENGTH
+        ? truncateWithNotice(content, MAX_TOOL_RESULT_CONTENT_LENGTH)
+        : content;
       return {
         type: "tool_result",
-        data: truncateSSEData(JSON.stringify(chunk.result)),
+        data: JSON.stringify({
+          toolCallId: result.toolCallId,
+          content: truncatedContent,
+          isError: result.isError,
+          affectedRegions: result.affectedRegions,
+        }),
       };
+    }
 
     case "dom_update":
       return {

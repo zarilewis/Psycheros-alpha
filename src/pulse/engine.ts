@@ -641,12 +641,29 @@ export class PulseEngine {
               try { getBroadcaster().broadcastEvent("tool_call", chunk.toolCall, conversationId); } catch { /* no clients */ }
             }
             break;
-          case "tool_result":
+          case "tool_result": {
             toolCallsCount++;
             if (pulse.chatMode === "visible" && conversationId) {
-              try { getBroadcaster().broadcastEvent("tool_result", chunk.result, conversationId); } catch { /* no clients */ }
+              // Truncate tool result content before broadcasting to keep
+              // the JSON valid on the client side. The LLM still receives
+              // the full result in its agentic loop context.
+              const result = chunk.result;
+              const MAX_TOOL_CONTENT = 50 * 1024;
+              const content = result.content;
+              const truncatedContent = content.length > MAX_TOOL_CONTENT
+                ? content.substring(0, MAX_TOOL_CONTENT) + `\n\n[... ${(content.length - MAX_TOOL_CONTENT).toLocaleString()} characters truncated]`
+                : content;
+              try {
+                getBroadcaster().broadcastEvent("tool_result", {
+                  toolCallId: result.toolCallId,
+                  content: truncatedContent,
+                  isError: result.isError,
+                  affectedRegions: result.affectedRegions,
+                }, conversationId);
+              } catch { /* no clients */ }
             }
             break;
+          }
           case "dom_update":
             if (pulse.chatMode === "visible" && conversationId) {
               try { getBroadcaster().broadcastUpdate(chunk.update, conversationId); } catch { /* no clients */ }
