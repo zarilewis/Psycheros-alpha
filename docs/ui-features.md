@@ -530,6 +530,7 @@ When `PSYCHEROS_DISPLAY_TZ` (or `TZ`) is set, daily/weekly/monthly and one-shot 
 - Chat auto-scrolls as Pulse content arrives
 - Pulse message metadata (pulse_id, pulse_name) is stored on messages for traceability
 - **Streaming fallback**: If the persistent SSE connection drops during pulse execution (common during idle periods), a `pulse_complete` event triggers a conversation reload so the response is always visible even when real-time streaming was missed. Recovery is suppressed while viewing settings to avoid interrupting in-progress work — the Pulse response is visible once the user returns to the chat
+- **SSE resilience**: The persistent SSE connection is only reconnected when it enters a bad state (`CLOSED` or `CONNECTING`), not on every visibility change. This prevents disruption of in-flight Pulse streaming when the user switches windows or the virtual keyboard triggers spurious visibility events. If a reconnect does occur mid-stream, the `done` event handler detects the orphaned `pulseStreamingPulseId` and properly exits streaming mode to prevent the UI from getting stuck
 
 **Pulse Chaining:**
 - Pulses can chain into other Pulses for complex workflows

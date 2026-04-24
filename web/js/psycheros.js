@@ -335,9 +335,12 @@ function initPersistentSSE() {
   persistentSSE.addEventListener('done', (event) => {
     try {
       if (!pulseAssistantEl) {
-        // No assistant element — the Pulse may have errored before producing content.
-        // If the done data signals an error, exit streaming mode so the UI isn't stuck.
-        if (event.data === 'error') {
+        // No assistant element on this connection. If the Pulse was streaming
+        // when the old SSE connection was torn down, pulseStreamingPulseId
+        // will still be set at module level. The done event on this new
+        // connection signals the Pulse finished — exit streaming mode.
+        if (pulseStreamingPulseId) {
+          pulseStreamingPulseId = null;
           exitPulseStreamingMode();
         }
         return;
@@ -445,10 +448,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // so Pulse messages fired while away are missed. This listener ensures the
   // connection is re-established and any missed messages are fetched on return.
   //
-  // The conversation reload is debounced because some mobile browsers fire a
-  // spurious visibilitychange (hidden→visible) when the virtual keyboard pops
-  // up. Without debouncing, that would destroy the active textarea and cause
-  // ghost input. The SSE is reconnected immediately regardless.
+  // The conversation reload is debounced (1500ms) and heavily guarded to avoid
+  // destroying the textarea while the user is typing. On Android PWA, the
+  // virtual keyboard can trigger spurious visibilitychange events that would
+  // otherwise dismiss the keyboard and flash-destroy the input. The SSE is
+  // only reconnected if the existing connection is in a bad state, preventing
+  // disruption of in-flight Pulse streaming.
   let visibilityReloadTimer = null;
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
@@ -461,36 +466,54 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // visible
-    initPersistentSSE();
+    // visible — only reconnect SSE if the existing connection is unhealthy
+    const sseHealthy = persistentSSE &&
+      persistentSSE.readyState !== EventSource.CLOSED &&
+      persistentSSE.readyState !== EventSource.CONNECTING;
+    if (!sseHealthy) {
+      initPersistentSSE();
+    }
 
-    // Debounce the reload: only fire if the page stays visible for 500ms.
+    // Skip reload entirely when the user is actively interacting:
+    //   - No conversation loaded
+    //   - Chat or Pulse is actively streaming (DOM is being updated live)
+    //   - The message input is focused (user is typing)
+    //   - The virtual keyboard is open on mobile (visualViewport shrunk)
+    if (!currentConversationId) return;
+    if (isStreaming) return;
+    if (pulseStreamingPulseId) return;
+
+    const input = document.getElementById('message-input');
+    if (input && document.activeElement === input) return;
+
+    // Detect virtual keyboard on mobile: when the keyboard is open,
+    // visualViewport.height is less than window.innerHeight
+    const vv = window.visualViewport;
+    if (vv && vv.height < window.innerHeight * 0.75) return;
+
+    // Debounce the reload: only fire if the page stays visible for 1500ms.
     // Brief visibility flickers (keyboard pop) will be cancelled by the
     // hidden handler above before the timer fires.
     if (visibilityReloadTimer) clearTimeout(visibilityReloadTimer);
 
-    if (currentConversationId) {
-      visibilityReloadTimer = setTimeout(() => {
-        visibilityReloadTimer = null;
+    visibilityReloadTimer = setTimeout(() => {
+      visibilityReloadTimer = null;
 
-        // Check at reload time, not event time — user may have navigated
-        // to settings during the debounce window.
-        const viewingSettings = document.getElementById('settings-content') !== null;
-        if (viewingSettings) return;
-        const input = document.getElementById('message-input');
-        const unsentText = input?.value || '';
-        loadConversationFromUrl(currentConversationId).then(() => {
-          if (unsentText) {
-            const restored = document.getElementById('message-input');
-            if (restored) {
-              restored.value = unsentText;
-              restored.style.height = 'auto';
-              restored.style.height = restored.scrollHeight + 'px';
-            }
-          }
-        });
-      }, 500);
-    }
+      // Re-check conditions at fire time — state may have changed during debounce
+      const viewingSettings = document.getElementById('settings-content') !== null;
+      if (viewingSettings) return;
+      if (isStreaming) return;
+      if (pulseStreamingPulseId) return;
+
+      const inputNow = document.getElementById('message-input');
+      if (inputNow && document.activeElement === inputNow) return;
+      if (inputNow?.value?.trim()) return;
+
+      const vvNow = window.visualViewport;
+      if (vvNow && vvNow.height < window.innerHeight * 0.75) return;
+
+      loadConversationFromUrl(currentConversationId);
+    }, 1500);
   });
 
   // Load general settings (display names)
