@@ -277,10 +277,8 @@ function normalizePath(path: string): string {
  * @param _ctx - Route context (unused, kept for consistency)
  * @returns HTTP Response with the app shell HTML
  */
-export function handleIndex(ctx: RouteContext): Response {
-  const lovenseSettings = ctx.getLovenseSettings();
-  const lovenseEnabled = lovenseSettings.enabled && !!lovenseSettings.connection.domain;
-  const html = renderAppShell(lovenseEnabled);
+export function handleIndex(_ctx: RouteContext): Response {
+  const html = renderAppShell();
   return new Response(html, {
     headers: {
       "Content-Type": "text/html; charset=utf-8",

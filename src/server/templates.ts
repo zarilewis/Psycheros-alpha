@@ -221,7 +221,7 @@ function getAccentColorOverride(): string {
  * Render the full app shell HTML.
  * This is served on initial page load.
  */
-export function renderAppShell(lovenseEnabled = false): string {
+export function renderAppShell(): string {
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -246,7 +246,7 @@ export function renderAppShell(lovenseEnabled = false): string {
   <div class="bg-layer"></div>
   <div class="bg-overlay"></div>
   <div class="app">
-    ${renderHeader(lovenseEnabled)}
+    ${renderHeader()}
     <div class="main">
       <div class="sidebar-overlay" onclick="Psycheros.toggleSidebar()"></div>
       ${renderSidebar([])}
@@ -260,7 +260,7 @@ export function renderAppShell(lovenseEnabled = false): string {
   <script>
   (function() {
     const btn = document.getElementById('lovense-status-btn');
-    if (!btn || btn.style.display === 'none') return;
+    if (!btn) return;
 
     let interval = null;
 
@@ -269,18 +269,17 @@ export function renderAppShell(lovenseEnabled = false): string {
         const resp = await fetch('/api/lovense-status', { signal: AbortSignal.timeout(5000) });
         const data = await resp.json();
         if (data.connected) {
+          btn.style.display = 'flex';
           btn.className = 'header-icon connected';
           const toy = data.toy;
           const label = toy ? (toy.nickname || toy.name) : 'Lovense';
           const battery = toy ? ' (' + toy.battery + '%)' : '';
           btn.title = 'Connected: ' + label + battery;
         } else {
-          btn.className = 'header-icon disconnected';
-          btn.title = 'Not connected';
+          btn.style.display = 'none';
         }
       } catch {
-        btn.className = 'header-icon disconnected';
-        btn.title = 'Not connected';
+        btn.style.display = 'none';
       }
     }
 
@@ -296,7 +295,7 @@ export function renderAppShell(lovenseEnabled = false): string {
 /**
  * Render the header component.
  */
-export function renderHeader(lovenseEnabled = false): string {
+export function renderHeader(): string {
   return `<header class="header">
   <div class="header-left">
     <button class="sidebar-toggle" onclick="Psycheros.toggleSidebar()" aria-label="Toggle sidebar">
@@ -312,7 +311,7 @@ export function renderHeader(lovenseEnabled = false): string {
     </div>
   </div>
   <div class="header-right">
-    <button id="lovense-status-btn" class="header-icon ${lovenseEnabled ? "disconnected" : ""}" style="${lovenseEnabled ? "display:flex;align-items:center;justify-content:center;width:36px;height:36px;" : "display:none;"}" aria-label="Lovense status">
+    <button id="lovense-status-btn" class="header-icon" style="display:none;" aria-label="Lovense status">
       <svg width="20" height="20" viewBox="0 0 24 24" style="color:var(--c-accent);fill:currentColor;stroke:none;">
         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
       </svg>
