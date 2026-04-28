@@ -12,7 +12,7 @@ import type { SSEEvent, TurnMetrics } from "../types.ts";
 import type { DBClient } from "../db/mod.ts";
 import type { LLMClient, LLMSettings, LLMProfileSettings, LLMConnectionProfile } from "../llm/mod.ts";
 import type { WebSearchSettings } from "../llm/mod.ts";
-import type { DiscordSettings, HomeSettings, LovenseSettings } from "../llm/mod.ts";
+import type { DiscordSettings, HomeSettings, LovenseSettings, ButtplugSettings } from "../llm/mod.ts";
 import type { ImageGenSettings, ImageGenConfig, EntityCoreLLMSettings } from "../llm/mod.ts";
 import { maskProfileSettings, createDefaultProfile, getDefaultWebSearchSettings, maskWebSearchSettings, getDefaultDiscordSettings, maskDiscordSettings, getDefaultImageGenSettings, maskImageGenSettings } from "../llm/mod.ts";
 import { getActiveProfile } from "../llm/settings.ts";
@@ -59,6 +59,7 @@ import {
   renderConnectionsDiscordSettings,
   renderHomeSettings,
   renderLovenseSettings,
+  renderButtplugSettings,
   renderVisionSettings,
   renderVisionGeneratorsTab,
   renderVisionAnchorsTab,
@@ -145,6 +146,10 @@ export interface RouteContext {
   getLovenseSettings: () => LovenseSettings;
   /** Update Lovense settings and hot-reload tool registry */
   updateLovenseSettings: (settings: LovenseSettings) => Promise<void>;
+  /** Get current Buttplug settings */
+  getButtplugSettings: () => ButtplugSettings;
+  /** Update Buttplug settings and hot-reload tool registry */
+  updateButtplugSettings: (settings: ButtplugSettings) => Promise<void>;
   /** Get current image gen settings */
   getImageGenSettings: () => ImageGenSettings;
   /** Update image gen settings and hot-reload tool registry */
@@ -1003,6 +1008,7 @@ export async function handleChat(
             discordSettings: ctx.getDiscordSettings(),
             homeSettings: ctx.getHomeSettings(),
             lovenseSettings: ctx.getLovenseSettings(),
+            buttplugSettings: ctx.getButtplugSettings(),
             imageGenSettings: ctx.getImageGenSettings(),
             contextLength: activeProfile?.contextLength,
             maxTokens: activeProfile?.maxTokens,
@@ -1184,6 +1190,7 @@ export async function handleChatRetry(
             discordSettings: ctx.getDiscordSettings(),
             homeSettings: ctx.getHomeSettings(),
             lovenseSettings: ctx.getLovenseSettings(),
+            buttplugSettings: ctx.getButtplugSettings(),
             imageGenSettings: ctx.getImageGenSettings(),
             contextLength: retryProfile?.contextLength,
             maxTokens: retryProfile?.maxTokens,
@@ -4818,6 +4825,7 @@ export function handleConnectionsSettingsFragment(ctx: RouteContext): Response {
     ctx.getHomeSettings(),
     maskWebSearchSettings(ctx.getWebSearchSettings()),
     ctx.getLovenseSettings(),
+    ctx.getButtplugSettings(),
   );
   return new Response(html, {
     headers: {
@@ -5134,6 +5142,181 @@ export async function handleLovenseStatus(ctx: RouteContext): Promise<Response> 
       { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
     );
   }
+}
+
+// =============================================================================
+// Buttplug Settings API Routes
+// =============================================================================
+
+/**
+ * Handle GET /api/buttplug-settings - Return current Buttplug settings.
+ */
+export function handleGetButtplugSettings(ctx: RouteContext): Response {
+  const settings = ctx.getButtplugSettings();
+  return new Response(JSON.stringify(settings), {
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+  });
+}
+
+/**
+ * Handle POST /api/buttplug-settings - Save Buttplug settings.
+ */
+export async function handleSaveButtplugSettings(
+  ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as Partial<import("../llm/buttplug-settings.ts").ButtplugSettings>;
+
+    if (typeof body.enabled !== "boolean") {
+      return new Response(
+        JSON.stringify({ error: "Invalid settings: 'enabled' must be a boolean" }),
+        {
+          status: 400,
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    }
+
+    const updated: import("../llm/buttplug-settings.ts").ButtplugSettings = {
+      enabled: body.enabled,
+      websocketUrl: typeof body.websocketUrl === "string" ? body.websocketUrl.trim() : "ws://127.0.0.1:12345",
+    };
+
+    await ctx.updateButtplugSettings(updated);
+
+    return new Response(JSON.stringify({ success: true }), {
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  } catch (_error) {
+    return new Response(
+      JSON.stringify({ error: "Failed to save settings" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
+}
+
+/**
+ * Handle POST /api/buttplug-settings/test - Test connection to Buttplug server.
+ * Connects to the WebSocket, starts scanning, and returns discovered devices.
+ */
+export async function handleTestButtplugConnection(
+  _ctx: RouteContext,
+  request: Request,
+): Promise<Response> {
+  try {
+    const body = await request.json() as { websocketUrl: string };
+    const websocketUrl = body.websocketUrl?.trim() || "ws://127.0.0.1:12345";
+
+    // Dynamically import to avoid requiring the library if not installed
+    const { ButtplugClient } = await import("@zendrex/buttplug.js");
+
+    const client = new ButtplugClient(websocketUrl);
+    try {
+      await client.connect();
+      await client.startScanning();
+      // Wait for device discovery
+      await new Promise((r) => setTimeout(r, 3000));
+
+      const devices = client.devices;
+      const deviceList = devices.map((d) => {
+        const label = d.displayName || d.name;
+        const caps: string[] = [];
+        for (const type of ["Vibrate", "Rotate", "Position", "Oscillate", "Constrict"] as const) {
+          if (d.canOutput(type)) caps.push(type);
+        }
+        return {
+          index: d.index,
+          name: label,
+          capabilities: caps,
+        };
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, devices: deviceList }),
+        {
+          headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+        },
+      );
+    } finally {
+      try { await client.disconnect(); } catch { /* ignore */ }
+      client.dispose();
+    }
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return new Response(
+      JSON.stringify({ error: `Connection failed: ${msg}` }),
+      {
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      },
+    );
+  }
+}
+
+/**
+ * Handle GET /api/buttplug-status - Quick connection check.
+ * Returns whether devices are connected.
+ */
+export async function handleButtplugStatus(ctx: RouteContext): Promise<Response> {
+  const settings = ctx.getButtplugSettings();
+
+  if (!settings.enabled) {
+    return new Response(
+      JSON.stringify({ connected: false }),
+      { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  }
+
+  try {
+    const { ButtplugClient } = await import("@zendrex/buttplug.js");
+    const client = new ButtplugClient(settings.websocketUrl || "ws://127.0.0.1:12345");
+    try {
+      await client.connect();
+      await client.startScanning();
+      await new Promise((r) => setTimeout(r, 2000));
+
+      const devices = client.devices;
+      const connected = devices.length > 0;
+
+      return new Response(
+        JSON.stringify({
+          connected,
+          deviceCount: devices.length,
+          devices: devices.slice(0, 5).map((d) => ({
+            name: d.displayName || d.name,
+            index: d.index,
+          })),
+        }),
+        { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+      );
+    } finally {
+      try { await client.disconnect(); } catch { /* ignore */ }
+      client.dispose();
+    }
+  } catch {
+    return new Response(
+      JSON.stringify({ connected: false }),
+      { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } },
+    );
+  }
+}
+
+/**
+ * Handle GET /fragments/settings/connections/buttplug - Buttplug settings fragment.
+ */
+export function handleConnectionsButtplugFragment(ctx: RouteContext): Response {
+  const html = renderButtplugSettings(ctx.getButtplugSettings());
+  return new Response(html, {
+    headers: {
+      "Content-Type": "text/html; charset=utf-8",
+    },
+  });
 }
 
 // =============================================================================

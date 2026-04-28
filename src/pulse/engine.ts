@@ -13,6 +13,7 @@ import type { WebSearchSettings } from "../llm/web-search-settings.ts";
 import type { DiscordSettings } from "../llm/discord-settings.ts";
 import type { HomeSettings } from "../llm/home-settings.ts";
 import type { LovenseSettings } from "../llm/lovense-settings.ts";
+import type { ButtplugSettings } from "../llm/buttplug-settings.ts";
 import type { ToolRegistry } from "../tools/mod.ts";
 import type { ConversationRAG } from "../rag/conversation.ts";
 import type { MCPClient } from "../mcp-client/mod.ts";
@@ -89,6 +90,8 @@ export interface PulseEngineConfig {
   imageGenSettings?: () => ImageGenSettings | undefined;
   /** Getter for Lovense settings (read fresh each pulse execution) */
   lovenseSettings?: () => LovenseSettings | undefined;
+  /** Getter for Buttplug settings (read fresh each pulse execution) */
+  buttplugSettings?: () => ButtplugSettings | undefined;
   /** Getter for context window size from active LLM profile */
   contextLength?: () => number | undefined;
   /** Getter for max response tokens from active LLM profile */
@@ -586,6 +589,7 @@ export class PulseEngine {
         homeSettings: this.config.homeSettings?.(),
         imageGenSettings: this.config.imageGenSettings?.(),
         lovenseSettings: this.config.lovenseSettings?.(),
+        buttplugSettings: this.config.buttplugSettings?.(),
         contextLength: this.config.contextLength?.(),
         maxTokens: this.config.maxTokens?.(),
       };

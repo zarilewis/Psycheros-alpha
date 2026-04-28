@@ -66,3 +66,7 @@ export { loadEntityCoreLLMSettings, saveEntityCoreLLMSettings, getDefaultEntityC
 // Re-export Lovense settings
 export type { LovenseSettings } from "./lovense-settings.ts";
 export { loadLovenseSettings, saveLovenseSettings, getDefaultLovenseSettings } from "./lovense-settings.ts";
+
+// Re-export Buttplug settings
+export type { ButtplugSettings } from "./buttplug-settings.ts";
+export { loadButtplugSettings, saveButtplugSettings, getDefaultButtplugSettings } from "./buttplug-settings.ts";

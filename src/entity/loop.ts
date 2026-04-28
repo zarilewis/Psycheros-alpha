@@ -116,6 +116,8 @@ export interface EntityConfig {
   imageGenSettings?: ImageGenSettings;
   /** Optional Lovense device control settings */
   lovenseSettings?: import("../llm/lovense-settings.ts").LovenseSettings;
+  /** Optional Buttplug device control settings */
+  buttplugSettings?: import("../llm/buttplug-settings.ts").ButtplugSettings;
   /** Model context window size in tokens (from active LLM profile) */
   contextLength?: number;
   /** Maximum tokens reserved for the response (from active LLM profile) */

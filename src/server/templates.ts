@@ -259,22 +259,51 @@ export function renderAppShell(): string {
   <script src="/js/theme.js"></script>
   <script>
   (function() {
-    const btn = document.getElementById('lovense-status-btn');
+    const btn = document.getElementById('intimacy-status-btn');
     if (!btn) return;
 
     let interval = null;
 
     async function checkStatus() {
       try {
-        const resp = await fetch('/api/lovense-status', { signal: AbortSignal.timeout(5000) });
-        const data = await resp.json();
-        if (data.connected) {
+        // Check both Lovense and Buttplug (Intiface) in parallel
+        const [lovenseResp, buttplugResp] = await Promise.allSettled([
+          fetch('/api/lovense-status', { signal: AbortSignal.timeout(5000) }),
+          fetch('/api/buttplug-status', { signal: AbortSignal.timeout(5000) }),
+        ]);
+
+        let connected = false;
+        let details: string[] = [];
+
+        if (lovenseResp.status === 'fulfilled') {
+          try {
+            const data = await lovenseResp.value.json();
+            if (data.connected) {
+              connected = true;
+              const toy = data.toy;
+              const label = toy ? (toy.nickname || toy.name) : 'Lovense';
+              const battery = toy ? ' (' + toy.battery + '%)' : '';
+              details.push('Lovense: ' + label + battery);
+            }
+          } catch {}
+        }
+
+        if (buttplugResp.status === 'fulfilled') {
+          try {
+            const data = await buttplugResp.value.json();
+            if (data.connected) {
+              connected = true;
+              const count = data.deviceCount || 0;
+              const names = (data.devices || []).map(d => d.name).join(', ');
+              details.push('Universal: ' + (names || count + ' device(s)'));
+            }
+          } catch {}
+        }
+
+        if (connected) {
           btn.style.display = 'flex';
           btn.className = 'header-icon connected';
-          const toy = data.toy;
-          const label = toy ? (toy.nickname || toy.name) : 'Lovense';
-          const battery = toy ? ' (' + toy.battery + '%)' : '';
-          btn.title = 'Connected: ' + label + battery;
+          btn.title = 'Connected: ' + details.join(' | ');
         } else {
           btn.style.display = 'none';
         }
@@ -311,7 +340,7 @@ export function renderHeader(): string {
     </div>
   </div>
   <div class="header-right">
-    <button id="lovense-status-btn" class="header-icon" style="display:none;" aria-label="Lovense status">
+    <button id="intimacy-status-btn" class="header-icon" style="display:none;" aria-label="Intimacy status">
       <svg width="20" height="20" viewBox="0 0 24 24" style="color:var(--c-accent);fill:currentColor;stroke:none;">
         <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
       </svg>
@@ -4117,11 +4146,12 @@ function renderToolItem(tool: { name: string; description: string; enabled: bool
  * Render External Connections page with tabbed navigation.
  * Tabs: Channels (Discord, etc.), Home (smart devices), and Web Search.
  */
-export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings, webSearchSettings?: import("../llm/web-search-settings.ts").WebSearchSettings, lovenseSettings?: import("../llm/lovense-settings.ts").LovenseSettings): string {
+export function renderConnectionsSettings(discordSettings: DiscordSettings, homeSettings: import("../llm/home-settings.ts").HomeSettings, webSearchSettings?: import("../llm/web-search-settings.ts").WebSearchSettings, lovenseSettings?: import("../llm/lovense-settings.ts").LovenseSettings, buttplugSettings?: import("../llm/buttplug-settings.ts").ButtplugSettings): string {
   const channelsContent = renderChannelsTab(discordSettings);
   const homeContent = renderHomeTab(homeSettings);
   const wsSettings = webSearchSettings ?? { provider: "disabled" as const, tavilyApiKey: "", braveApiKey: "" };
   const lvSettings = lovenseSettings ?? { enabled: false, connection: { domain: "", port: 34568, secure: true } };
+  const bpSettings = buttplugSettings ?? { enabled: false, websocketUrl: "ws://127.0.0.1:12345" };
 
   return `<div class="settings-view">
   <div class="settings-header">
@@ -4157,11 +4187,11 @@ export function renderConnectionsSettings(discordSettings: DiscordSettings, home
         </svg>
         Web Search
       </button>
-      <button class="connections-nav-tab" data-tab="lovense" onclick="switchConnectionsTab('lovense')">
+      <button class="connections-nav-tab" data-tab="intimacy" onclick="switchConnectionsTab('intimacy')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
         </svg>
-        Lovense
+        Intimacy
       </button>
     </nav>
 
@@ -4230,8 +4260,17 @@ export function renderConnectionsSettings(discordSettings: DiscordSettings, home
 
     </div>
 
-    <div id="connections-tab-lovense" class="connections-tab-panel" style="display:none;">
+    <div id="connections-tab-intimacy" class="connections-tab-panel" style="display:none;">
+      <div class="intimacy-section-header">
+        <h2 class="intimacy-section-title">Lovense Connect</h2>
+        <p class="intimacy-section-desc">Control Lovense devices via the official Connect app bridge</p>
+      </div>
       ${renderLovenseTab(lvSettings)}
+      <div class="intimacy-section-header">
+        <h2 class="intimacy-section-title">Universal (Intiface Central)</h2>
+        <p class="intimacy-section-desc">Control any supported device via the universal Buttplug protocol</p>
+      </div>
+      ${renderButtplugTab(bpSettings)}
     </div>
 
   </div>
@@ -4742,6 +4781,200 @@ function renderLovenseTab(settings: import("../llm/lovense-settings.ts").Lovense
     }
     </script>
   `;
+}
+
+/**
+ * Render the Intimacy (buttplug) settings tab content (embedded in External Connections).
+ */
+function renderButtplugTab(settings: import("../llm/buttplug-settings.ts").ButtplugSettings): string {
+  const url = settings.websocketUrl || "ws://127.0.0.1:12345";
+
+  return `
+    <!-- Enable -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Enable Intimacy Control</h3>
+      <p class="theme-section-desc">Allow the entity to control devices via Intiface Central (universal protocol)</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label class="toggle-label">
+            <input type="checkbox" id="buttplug-enabled" ${settings.enabled ? "checked" : ""}>
+            <span class="toggle-slider"></span>
+            <span class="toggle-text">Enable Device Control</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Connection -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Connection</h3>
+      <p class="theme-section-desc">Connect to Intiface Central or any compatible protocol server via WebSocket</p>
+      <div class="llm-fields">
+        <div class="llm-field">
+          <label for="buttplug-url">WebSocket URL</label>
+          <input type="text" id="buttplug-url" class="input-field llm-input" value="${escapeHtml(url)}" placeholder="ws://127.0.0.1:12345">
+          <span class="field-hint">Default Intiface Central address. Change if running on another machine or custom port.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Test Connection -->
+    <section class="theme-section">
+      <h3 class="theme-section-title">Test Connection</h3>
+      <p class="theme-section-desc">Verify the connection to Intiface Central and discover connected devices</p>
+      <button class="btn btn--secondary" id="buttplug-test-btn" onclick="testButtplugConnection()">Test Connection</button>
+      <div id="buttplug-test-status" class="llm-status" style="display:none; margin-top: var(--sp-2);"></div>
+      <div id="buttplug-devices-list" style="display:none; margin-top: var(--sp-2);">
+        <div class="buttplug-devices-grid"></div>
+      </div>
+    </section>
+
+    <!-- Actions -->
+    <div class="llm-actions">
+      <div class="llm-actions-left">
+        <button class="btn btn--primary" onclick="saveButtplugSettings(event)">Save Settings</button>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div id="buttplug-status" class="llm-status" style="display:none;"></div>
+
+    <style>
+      .intimacy-section-header { margin: var(--sp-9) 0 var(--sp-4) 0; padding-bottom: var(--sp-3); border-bottom: 1px solid var(--c-border); }
+      .intimacy-section-header:first-child { margin-top: 0; }
+      .intimacy-section-title { margin: 0; font-size: 18px; font-weight: 700; color: var(--c-fg); }
+      .intimacy-section-desc { margin: var(--sp-1) 0 0 0; font-size: var(--font-size-sm); color: var(--c-fg-muted); }
+      /* Move the divider from above to below the Save buttons in the intimacy tab. */
+      #connections-tab-intimacy .llm-actions { border-top: none; border-bottom: 1px solid var(--c-border); padding-bottom: var(--sp-4); }
+      .buttplug-devices-grid { display: flex; flex-direction: column; gap: var(--sp-2); }
+      .buttplug-device-card { background: var(--c-bg); border: 1px solid var(--c-border); border-radius: var(--radius-md); padding: var(--sp-3); display: flex; justify-content: space-between; align-items: center; }
+      .buttplug-device-name { font-weight: 500; }
+      .buttplug-device-caps { color: var(--c-fg-dim); font-size: 0.8rem; }
+    </style>
+
+    <script>
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function showButtplugStatus(type, message) {
+      const el = document.getElementById('buttplug-status');
+      if (!el) return;
+      el.style.display = 'block';
+      el.className = 'llm-status ' + type;
+      el.textContent = message;
+    }
+
+    function saveButtplugSettings(e) {
+      e.preventDefault();
+      const enabled = document.getElementById('buttplug-enabled')?.checked ?? false;
+      const websocketUrl = document.getElementById('buttplug-url')?.value?.trim() ?? 'ws://127.0.0.1:12345';
+
+      fetch('/api/buttplug-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled, websocketUrl }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            showButtplugStatus('success', 'Settings saved. Reloading...');
+            setTimeout(() => location.reload(), 800);
+          } else {
+            showButtplugStatus('error', data.error || 'Failed to save settings.');
+          }
+        })
+        .catch(err => showButtplugStatus('error', 'Network error: ' + err.message));
+    }
+
+    function testButtplugConnection() {
+      const btn = document.getElementById('buttplug-test-btn');
+      const statusEl = document.getElementById('buttplug-test-status');
+      const devicesEl = document.getElementById('buttplug-devices-list');
+
+      if (!btn || !statusEl || !devicesEl) return;
+      btn.disabled = true;
+      btn.textContent = 'Testing...';
+      statusEl.style.display = 'block';
+      statusEl.className = 'llm-status info';
+      statusEl.textContent = 'Connecting to Intiface Central via backend...';
+      devicesEl.style.display = 'none';
+
+      const websocketUrl = document.getElementById('buttplug-url')?.value?.trim() ?? 'ws://127.0.0.1:12345';
+
+      fetch('/api/buttplug-settings/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ websocketUrl }),
+        signal: AbortSignal.timeout(15000),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) {
+            statusEl.className = 'llm-status error';
+            statusEl.textContent = data.error;
+            btn.disabled = false;
+            btn.textContent = 'Test Connection';
+            return;
+          }
+
+          const devices = data.devices || [];
+          const grid = devicesEl.querySelector('.buttplug-devices-grid');
+
+          if (devices.length === 0) {
+            statusEl.className = 'llm-status warning';
+            statusEl.textContent = 'Connected, but no devices found. Ensure devices are paired in Intiface Central and powered on.';
+            btn.disabled = false;
+            btn.textContent = 'Test Connection';
+            return;
+          }
+
+          statusEl.className = 'llm-status success';
+          statusEl.textContent = 'Connected! Found ' + devices.length + ' device(s).';
+          if (grid) {
+            grid.innerHTML = devices.map(d => {
+              const caps = (d.capabilities || []).join(', ') || 'none';
+              return '<div class="buttplug-device-card">' +
+                '<div><div class="buttplug-device-name">' + escapeHtml(d.name) + '</div>' +
+                '<div class="buttplug-device-caps">Index: ' + d.index + ' &middot; Capabilities: ' + caps + '</div></div>' +
+                '</div>';
+            }).join('');
+          }
+          devicesEl.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Test Connection';
+        })
+        .catch(err => {
+          statusEl.className = 'llm-status error';
+          statusEl.textContent = 'Connection failed. Is Intiface Central running? Error: ' + err.message;
+          btn.disabled = false;
+          btn.textContent = 'Test Connection';
+        });
+    }
+    </script>
+  `;
+}
+
+/**
+ * Render Intimacy settings sub-page (standalone, with page chrome).
+ */
+export function renderButtplugSettings(settings: import("../llm/buttplug-settings.ts").ButtplugSettings): string {
+  return `<div class="settings-view">
+  <div class="settings-header">
+    <div class="settings-header-row">
+      ${renderSettingsBackButton()}
+      <div>
+        <h1 class="settings-title">Intimacy</h1>
+        <p class="settings-desc">Configure universal device control via Intiface Central</p>
+      </div>
+    </div>
+  </div>
+  <div class="settings-content" id="settings-content">
+    ${renderButtplugTab(settings)}
+  </div>
+</div>`;
 }
 
 /**

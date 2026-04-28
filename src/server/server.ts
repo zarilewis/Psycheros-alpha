@@ -8,7 +8,7 @@
  */
 
 import { DBClient } from "../db/mod.ts";
-import { createClientFromProfile, createDefaultClient, type LLMClient, type LLMSettings, type LLMProfileSettings, type LLMConnectionProfile, type WebSearchSettings, type DiscordSettings, type HomeSettings, type ImageGenSettings, type EntityCoreLLMSettings, type LovenseSettings, loadProfileSettings, saveProfileSettings, getActiveProfile, profileToLLMSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings, loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings, loadEntityCoreLLMSettings, saveEntityCoreLLMSettings, loadLovenseSettings, saveLovenseSettings, getDefaultLovenseSettings } from "../llm/mod.ts";
+import { createClientFromProfile, createDefaultClient, type LLMClient, type LLMSettings, type LLMProfileSettings, type LLMConnectionProfile, type WebSearchSettings, type DiscordSettings, type HomeSettings, type ImageGenSettings, type EntityCoreLLMSettings, type LovenseSettings, type ButtplugSettings, loadProfileSettings, saveProfileSettings, getActiveProfile, profileToLLMSettings, loadWebSearchSettings, saveWebSearchSettings, loadDiscordSettings, saveDiscordSettings, loadHomeSettings, saveHomeSettings, loadImageGenSettings, saveImageGenSettings, getDefaultImageGenSettings, loadEntityCoreLLMSettings, saveEntityCoreLLMSettings, loadLovenseSettings, saveLovenseSettings, getDefaultLovenseSettings, loadButtplugSettings, saveButtplugSettings, getDefaultButtplugSettings } from "../llm/mod.ts";
 import { createDefaultRegistry, AVAILABLE_TOOLS, loadToolsSettings, saveToolsSettings, getEnabledToolNames, loadCustomTools, ToolRegistry, type ToolsSettings } from "../tools/mod.ts";
 import { getConversationRAG, type RAGConfig, DEFAULT_RAG_CONFIG } from "../rag/mod.ts";
 import { catchUpSummarization, repairOrphanedSummaries } from "../memory/mod.ts";
@@ -145,6 +145,11 @@ import {
   handleSaveLovenseSettings,
   handleTestLovenseConnection,
   handleLovenseStatus,
+  handleGetButtplugSettings,
+  handleSaveButtplugSettings,
+  handleTestButtplugConnection,
+  handleButtplugStatus,
+  handleConnectionsButtplugFragment,
   handleGetImageGenSettings,
   handleSaveImageGenSettings,
   handleSaveImageGenSlot,
@@ -266,6 +271,7 @@ export class Server {
   private discordSettings: DiscordSettings;
   private homeSettings: HomeSettings;
   private lovenseSettings: LovenseSettings;
+  private buttplugSettings: ButtplugSettings;
   private imageGenSettings: ImageGenSettings;
   private toolSettings: ToolsSettings;
   private entityCoreLLMSettings: EntityCoreLLMSettings;
@@ -307,6 +313,9 @@ export class Server {
 
     // Initialize Lovense settings (will be reloaded from settings in init())
     this.lovenseSettings = getDefaultLovenseSettings();
+
+    // Initialize Buttplug settings (will be reloaded from settings in init())
+    this.buttplugSettings = getDefaultButtplugSettings();
 
     // Initialize Image Gen settings (will be reloaded from settings in init())
     this.imageGenSettings = getDefaultImageGenSettings();
@@ -357,6 +366,7 @@ export class Server {
     this.discordSettings = await loadDiscordSettings(this.config.projectRoot);
     this.homeSettings = await loadHomeSettings(this.config.projectRoot);
     this.lovenseSettings = await loadLovenseSettings(this.config.projectRoot);
+    this.buttplugSettings = await loadButtplugSettings(this.config.projectRoot);
     this.imageGenSettings = await loadImageGenSettings(this.config.projectRoot);
     this.entityCoreLLMSettings = await loadEntityCoreLLMSettings(this.config.projectRoot);
     this.toolSettings = await loadToolsSettings(this.config.projectRoot);
@@ -530,6 +540,22 @@ export class Server {
   }
 
   /**
+   * Get the current Buttplug settings.
+   */
+  getButtplugSettings(): ButtplugSettings {
+    return this.buttplugSettings;
+  }
+
+  /**
+   * Update Buttplug settings, persist to disk, and reload tool registry.
+   */
+  async updateButtplugSettings(settings: ButtplugSettings): Promise<void> {
+    this.buttplugSettings = settings;
+    await saveButtplugSettings(this.config.projectRoot, settings);
+    this.reloadToolRegistry();
+  }
+
+  /**
    * Get the current image gen settings.
    */
   getImageGenSettings(): ImageGenSettings {
@@ -634,6 +660,9 @@ export class Server {
     }
     if (this.lovenseSettings.enabled && this.lovenseSettings.connection.domain) {
       autoEnabled.push("control_lovense");
+    }
+    if (this.buttplugSettings.enabled) {
+      autoEnabled.push("control_toy");
     }
     if (this.imageGenSettings.generators.some((g) => g.enabled)) {
       autoEnabled.push("generate_image");
@@ -794,6 +823,7 @@ export class Server {
         discordSettings: () => this.discordSettings,
         homeSettings: () => this.homeSettings,
         lovenseSettings: () => this.lovenseSettings,
+        buttplugSettings: () => this.buttplugSettings,
         imageGenSettings: () => this.imageGenSettings,
         contextLength: () => this.getActiveLLMProfile()?.contextLength,
         maxTokens: () => this.getActiveLLMProfile()?.maxTokens,
@@ -871,6 +901,8 @@ export class Server {
       updateHomeSettings: (settings) => this.updateHomeSettings(settings),
       getLovenseSettings: () => this.lovenseSettings,
       updateLovenseSettings: (settings) => this.updateLovenseSettings(settings),
+      getButtplugSettings: () => this.buttplugSettings,
+      updateButtplugSettings: (settings) => this.updateButtplugSettings(settings),
       getImageGenSettings: () => this.imageGenSettings,
       updateImageGenSettings: (settings) => this.updateImageGenSettings(settings),
       getToolSettings: () => this.toolSettings,
@@ -1427,6 +1459,30 @@ export class Server {
     }
 
     // ========================================
+    // Buttplug Settings API Routes
+    // ========================================
+
+    // GET /api/buttplug-settings - Get current Buttplug settings
+    if (method === "GET" && path === "/api/buttplug-settings") {
+      return handleGetButtplugSettings(ctx);
+    }
+
+    // POST /api/buttplug-settings - Save Buttplug settings
+    if (method === "POST" && path === "/api/buttplug-settings") {
+      return await handleSaveButtplugSettings(ctx, request);
+    }
+
+    // POST /api/buttplug-settings/test - Test Buttplug connection
+    if (method === "POST" && path === "/api/buttplug-settings/test") {
+      return await handleTestButtplugConnection(ctx, request);
+    }
+
+    // GET /api/buttplug-status - Quick Buttplug connection check
+    if (method === "GET" && path === "/api/buttplug-status") {
+      return await handleButtplugStatus(ctx);
+    }
+
+    // ========================================
     // Image Gen Settings API Routes
     // ========================================
 
@@ -1925,6 +1981,11 @@ export class Server {
     // GET /fragments/settings/connections/lovense - Lovense settings fragment
     if (path === "/fragments/settings/connections/lovense") {
       return handleConnectionsLovenseFragment(ctx);
+    }
+
+    // GET /fragments/settings/connections/buttplug - Buttplug settings fragment
+    if (path === "/fragments/settings/connections/buttplug") {
+      return handleConnectionsButtplugFragment(ctx);
     }
 
     // GET /fragments/settings/vision - Vision settings fragment

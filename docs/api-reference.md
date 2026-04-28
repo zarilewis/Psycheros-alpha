@@ -224,6 +224,17 @@ Settings stored in `.psycheros/home-settings.json`. Shape: `{ "devices": Array<{
 
 Settings stored in `.psycheros/lovense-settings.json`. Shape: `{ "enabled": boolean, "connection": { "domain": string, "port": number, "secure": boolean } }`. Supports two modes: LAN Mode (port 20010, HTTP) and Game Mode (port 34568 mobile / 30010 PC, HTTPS). Domain format: `192-168-X-X.lovense.club` (dashes, not dots). The `control_lovense` tool is auto-enabled when `enabled: true` and domain is set. Settings page auto-reloads after save.
 
+### Buttplug (Universal) Settings
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/buttplug-settings` | Get current Buttplug/WebSocket settings |
+| `POST` | `/api/buttplug-settings` | Save Buttplug settings and hot-reload tool registry |
+| `POST` | `/api/buttplug-settings/test` | Test connection to Intiface Central, returns discovered devices |
+| `GET` | `/api/buttplug-status` | Quick connection check for header icon (2s timeout), returns `{ connected, deviceCount?, devices? }` |
+
+Settings stored in `.psycheros/buttplug-settings.json`. Shape: `{ "enabled": boolean, "websocketUrl": string }`. Connects to Intiface Central over WebSocket (default `ws://127.0.0.1:12345`). The `control_toy` tool is auto-enabled when `enabled: true`. Both Lovense and Buttplug status are polled for the intimacy heart icon in the header.
+
 ### Image Gen Settings
 
 | Method | Path | Description |
@@ -375,7 +386,9 @@ The custom tools upload endpoint accepts a `multipart/form-data` request with a 
 | `src/llm/home-settings.ts` | Home automation settings type, persistence |
 | `src/tools/control-device.ts` | Home automation tool (Shelly Plug local HTTP API) |
 | `src/llm/lovense-settings.ts` | Lovense settings type, persistence, LAN/Game Mode config |
+| `src/llm/buttplug-settings.ts` | Universal toy control settings type, persistence, WebSocket URL config |
 | `src/tools/control-lovense.ts` | Lovense device control tool (state-based patterns, speed, presets) |
+| `src/tools/control-buttplug.ts` | Universal toy control tool (`control_toy`, vibration/rotation/position/oscillate/constrict, pattern engine) |
 | `src/llm/image-gen-settings.ts` | Image generator + captioning config type, persistence, API key masking |
 | `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini), auto-captioning |
 | `src/tools/describe-image.ts` | Image captioning tool (Gemini, OpenRouter), shared caption logic |

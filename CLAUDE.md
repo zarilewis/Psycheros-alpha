@@ -51,7 +51,9 @@ PSYCHEROS_MCP_ENABLED=true deno task dev
 | `src/tools/send-discord-dm.ts` | Discord DM tool (sends DMs via Discord bot API) |
 | `src/tools/control-device.ts` | Home automation tool (smart plug control via Shelly API) |
 | `src/tools/control-lovense.ts` | Lovense device control tool (state-based patterns, speed, presets via LAN) |
+| `src/tools/control-buttplug.ts` | Universal toy control tool (`control_toy`, vibration/rotation/position/oscillate/constrict, pattern engine via WebSocket) |
 | `src/llm/lovense-settings.ts` | Lovense settings type, load/save, connection config |
+| `src/llm/buttplug-settings.ts` | Intimacy/toy control settings type, load/save, WebSocket URL config |
 | `src/tools/generate-image.ts` | Image generation tool (OpenRouter, Gemini), auto-captioning (dual short/long) |
 | `src/tools/describe-image.ts` | Image captioning tool (Gemini, OpenRouter), shared caption logic (dual short/long) |
 | `src/tools/look-closer.ts` | Re-examine images for detailed descriptions after context fade |
@@ -118,7 +120,15 @@ Psycheros supports third-party integrations organized under three tabs in Settin
 
 ### Lovense
 
-- **Device Control** — Entity controls Lovense devices (vibrators, thrusting machines, etc.) via the Lovense Connect app over LAN. Supports two connection modes: **LAN Mode** (HTTP, port 20010) and **Game Mode** (HTTPS, port 34568 mobile / 30010 PC). Both expose the same `/command` API — the only difference is transport. Supports state-based control: fire-and-forget patterns that persist between entity responses, constant speed with loop timing, built-in presets, and immediate stop. Auto-enables the `control_lovense` tool when enabled with a domain configured. Settings persist to `.psycheros/lovense-settings.json`. A heart icon in the header bar appears only when a toy is actively connected (hidden otherwise). Connection status is polled via `GET /api/lovense-status` every 30s. **Note: WSL2 cannot reach LAN devices — must run on native Linux or Windows for LAN integrations to work.**
+- **Device Control** — Entity controls Lovense devices (vibrators, thrusting machines, etc.) via the Lovense Connect app over LAN. Supports two connection modes: **LAN Mode** (HTTP, port 20010) and **Game Mode** (HTTPS, port 34568 mobile / 30010 PC). Both expose the same `/command` API — the only difference is transport. Supports state-based control: fire-and-forget patterns that persist between entity responses, constant speed with loop timing, built-in presets, and immediate stop. Auto-enables the `control_lovense` tool when enabled with a domain configured. Settings persist to `.psycheros/lovense-settings.json`. **Note: WSL2 cannot reach LAN devices — must run on native Linux or Windows for LAN integrations to work.**
+
+### Universal (Intiface Central)
+
+- **Device Control** — Entity controls intimate hardware via the Buttplug protocol through Intiface Central over WebSocket. Supports vibration, rotation, position, oscillation, constriction, and preset patterns (pulse, wave, ramp_up, ramp_down, heartbeat, surge, stroke). All output values normalized 0–1. Universal — works with devices from many manufacturers, not just Lovense. Auto-enables the `control_toy` tool when enabled. Settings persist to `.psycheros/buttplug-settings.json`. Default WebSocket URL: `ws://127.0.0.1:12345`.
+
+### Intimacy (combined UI)
+
+- Both Lovense and Universal settings share a single **Intimacy** tab in External Connections, with stacked sections. A heart icon in the header bar appears when a device is connected via either integration (hidden otherwise). Connection status is polled via `GET /api/lovense-status` and `GET /api/buttplug-status` every 30s.
 
 ## Vision
 Image generation and visual analysis configured via Settings > Vision (top-level settings card with Generators, Anchors, and Gallery tabs).

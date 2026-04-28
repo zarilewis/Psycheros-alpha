@@ -33,6 +33,8 @@ import { sendDiscordDmTool } from "./send-discord-dm.ts";
 import { controlDeviceTool } from "./control-device.ts";
 // Lovense device control tool
 import { controlLovenseTool } from "./control-lovense.ts";
+// Buttplug device control tool
+import { controlButtplugTool } from "./control-buttplug.ts";
 // Image generation tool
 import { generateImageTool } from "./generate-image.ts";
 // Image captioning tool
@@ -77,6 +79,8 @@ export const AVAILABLE_TOOLS: Record<string, Tool> = {
   control_device: controlDeviceTool,
   // Lovense device control tool
   control_lovense: controlLovenseTool,
+  // Universal toy control tool
+  control_toy: controlButtplugTool,
   // Image generation tool
   generate_image: generateImageTool,
   describe_image: describeImageTool,

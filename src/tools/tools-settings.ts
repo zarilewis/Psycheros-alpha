@@ -97,6 +97,12 @@ export const TOOL_CATEGORIES: ToolCategory[] = [
     toolNames: ["control_lovense"],
   },
   {
+    id: "buttplug",
+    name: "Intimacy",
+    description: "Control devices via universal protocol",
+    toolNames: ["control_toy"],
+  },
+  {
     id: "image-gen",
     name: "Image Generation",
     description: "Generate images using configured providers",
