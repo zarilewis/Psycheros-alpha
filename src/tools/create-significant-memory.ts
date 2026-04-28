@@ -113,7 +113,16 @@ export const createSignificantMemoryTool: Tool = {
     const formattedContent = `# ${title.trim()}\n\n${content.trim()}\n`;
 
     try {
-      await ctx.config.mcpClient.createMemory("significant", getCurrentDate(), formattedContent, [], slug);
+      const success = await ctx.config.mcpClient.createMemory("significant", getCurrentDate(), formattedContent, [], slug);
+
+      if (!success) {
+        console.error(`[Memory] entity-core reported failure for significant memory: ${title.trim()}`);
+        return {
+          toolCallId: ctx.toolCallId,
+          content: `Error: entity-core failed to store the significant memory "${title.trim()}". The memory may not have been saved.`,
+          isError: true,
+        };
+      }
 
       console.log(`[Memory] Created significant memory via MCP: ${title.trim()}`);
 

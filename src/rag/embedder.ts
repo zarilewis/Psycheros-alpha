@@ -19,6 +19,9 @@ type PipelineFunction = (inputs: string, options?: { pooling?: "mean" | "cls" | 
 // Singleton pipeline instance
 let extractor: PipelineFunction | null = null;
 
+/** Maximum retries after ONNX runtime failures before giving up. */
+const EMBEDDER_MAX_RETRIES = 1;
+
 /**
  * Local embedder using Hugging Face Transformers.
  * Uses the all-MiniLM-L6-v2 model (384 dimensions, ~80MB download on first use).
@@ -41,6 +44,15 @@ export class LocalEmbedder implements Embedder {
    */
   isReady(): boolean {
     return this.initialized && extractor !== null;
+  }
+
+  /**
+   * Reset the embedder state so the next call will re-initialize.
+   */
+  private reset(): void {
+    extractor = null;
+    this.initialized = false;
+    this.initPromise = null;
   }
 
   /**
@@ -102,34 +114,52 @@ export class LocalEmbedder implements Embedder {
 
   /**
    * Generate an embedding for the given text.
+   * On ONNX runtime failure (e.g. "Cannot read properties of undefined (reading 'constructor')"),
+   * re-initializes the model and retries once.
    *
    * @param text - The text to embed
    * @returns A 384-dimensional embedding vector
    */
   async embed(text: string): Promise<number[]> {
-    if (!this.isReady()) {
-      await this.initialize();
+    for (let attempt = 0; attempt <= EMBEDDER_MAX_RETRIES; attempt++) {
+      if (!this.isReady()) {
+        await this.initialize();
+      }
+
+      if (!extractor) {
+        throw new Error("Embedder not initialized");
+      }
+
+      try {
+        // Generate embedding with mean pooling and normalization
+        const result = await extractor(text, {
+          pooling: "mean",
+          normalize: true,
+        });
+
+        // Convert Float32Array to regular array
+        return Array.from(result.data);
+      } catch (error) {
+        const isONNXFailure = error instanceof Error &&
+          (error.message.includes("reading 'constructor'") ||
+           error.message.includes("onnxruntime") ||
+           error.message.includes("Tensor"));
+
+        if (isONNXFailure && attempt < EMBEDDER_MAX_RETRIES) {
+          console.warn(`[RAG] ONNX runtime error on attempt ${attempt + 1}, re-initializing embedder: ${error.message}`);
+          this.reset();
+          continue;
+        }
+
+        console.error("[RAG] Failed to generate embedding:", error);
+        throw new Error(
+          `Failed to generate embedding: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
 
-    if (!extractor) {
-      throw new Error("Embedder not initialized");
-    }
-
-    try {
-      // Generate embedding with mean pooling and normalization
-      const result = await extractor(text, {
-        pooling: "mean",
-        normalize: true,
-      });
-
-      // Convert Float32Array to regular array
-      return Array.from(result.data);
-    } catch (error) {
-      console.error("[RAG] Failed to generate embedding:", error);
-      throw new Error(
-        `Failed to generate embedding: ${error instanceof Error ? error.message : String(error)}`
-      );
-    }
+    // Should not reach here, but satisfy the type checker
+    throw new Error("Embedder failed after retries");
   }
 }
 
