@@ -290,6 +290,11 @@ See also: [security-audit.md](security-audit.md) for the full security assessmen
 - **Location**: `web/js/psycheros.js` — `visibilitychange` handler, `initPersistentSSE()` `done` event handler
 - **Fix**: The conversation reload is now skipped entirely when the user is actively interacting (input focused, streaming active, virtual keyboard open, or unsent text present). The save/restore logic is removed since the reload no longer fires in those cases. The debounce was increased from 500ms to 1500ms. SSE is only reconnected if the existing connection is unhealthy (`CLOSED` or `CONNECTING` readyState).
 
+### Context Inspector button inaccessible behind iOS status bar (Medium — UX)
+- **Problem**: The Context Inspector toggle (`</>`) in the header was unreachable when the app was installed as an iOS PWA. The safe area inset was handled via `padding-top` on the `.app` grid container, which pushed the header row below the status bar. However, the header's background didn't extend into the safe area, and tap targets in the top-right corner (directly under the battery indicator) were unreliable or obscured.
+- **Location**: `web/css/layout.css` — `.app` grid; `web/css/components.css` — `.header`
+- **Fix**: Moved the `env(safe-area-inset-top)` handling from the grid container's padding into the header element itself. The header now has `padding-top: env(safe-area-inset-top)` and its height expanded to `calc(var(--header-height) + env(safe-area-inset-top))`. The grid row height matches. The header background now extends behind the status bar, and button content sits in the safe `var(--header-height)` zone below it. No change on Android (where the safe area inset is 0).
+
 ### Pulse UI permanently stuck after SSE reconnect during streaming (High — UX)
 - **Problem**: If `initPersistentSSE()` was called while a Pulse was actively streaming, the old SSE connection was closed and the new one started with fresh closure-scoped state (`pulseAssistantEl = null`). However, the module-level `pulseStreamingPulseId` remained set. The new connection's `done` handler saw no `pulseAssistantEl` and returned without clearing `pulseStreamingPulseId` or calling `exitPulseStreamingMode()`. The UI was permanently stuck with a disabled input and stop button.
 - **Location**: `web/js/psycheros.js` — `initPersistentSSE()` `done` event handler

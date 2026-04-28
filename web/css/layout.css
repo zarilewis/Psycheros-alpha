@@ -73,11 +73,10 @@ body.glass-enabled .input-area {
 /* App shell */
 .app {
   display: grid;
-  grid-template-rows: var(--header-height) 1fr;
+  grid-template-rows: calc(var(--header-height) + env(safe-area-inset-top)) 1fr;
   grid-template-columns: 1fr;
   height: 100dvh;
   overflow: hidden;
-  padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }
 
