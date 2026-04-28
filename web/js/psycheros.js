@@ -398,7 +398,7 @@ function initPersistentSSE() {
       const viewingSettings = document.getElementById('settings-content') !== null;
       if (!pulseStreamed && !pulseAssistantEl && conversationId === currentConversationId && !viewingSettings) {
         // Streaming was missed entirely — reload the conversation to show the response
-        loadConversationFromUrl(conversationId);
+        loadConversationFromUrl(conversationId, { silent: true });
       }
       pulseStreamed = false;
     } catch (e) {
@@ -512,7 +512,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const vvNow = window.visualViewport;
       if (vvNow && vvNow.height < window.innerHeight * 0.75) return;
 
-      loadConversationFromUrl(currentConversationId);
+      // Skip reload if the browser reports offline — Android PWA network
+      // may not be ready yet after backgrounding. The SSE reconnection will
+      // handle catching up once connectivity returns.
+      if (!navigator.onLine) return;
+
+      loadConversationFromUrl(currentConversationId, { silent: true });
     }, 1500);
   });
 
@@ -733,7 +738,7 @@ function closeSidebarAfterNav() {
  * Load a conversation from URL on initial page load.
  * Called when user navigates directly to /c/:id
  */
-async function loadConversationFromUrl(conversationId) {
+async function loadConversationFromUrl(conversationId, { silent = false } = {}) {
   currentConversationId = conversationId;
 
   // Clear context inspector state for the new conversation
@@ -746,7 +751,7 @@ async function loadConversationFromUrl(conversationId) {
 
     if (!response.ok) {
       if (response.status === 404) {
-        showToast('Conversation not found');
+        if (!silent) showToast('Conversation not found');
         history.replaceState({}, '', '/');
         return;
       }
@@ -792,7 +797,7 @@ async function loadConversationFromUrl(conversationId) {
 
   } catch (error) {
     console.error('Failed to load conversation:', error);
-    showToast('Failed to load conversation');
+    if (!silent) showToast('Failed to load conversation');
   }
 }
 
