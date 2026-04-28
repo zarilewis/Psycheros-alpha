@@ -305,18 +305,9 @@ export function renderHeader(lovenseEnabled = false): string {
       </svg>
     </button>
     <div class="logo">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 21C12 21 3 14.5 3 8.5C3 5.5 5.5 3 8.5 3C10.4 3 12 4.2 12 4.2C12 4.2 13.6 3 15.5 3C18.5 3 21 5.5 21 8.5C21 14.5 12 21 12 21Z"/>
-        <rect x="9" y="9" width="6" height="6" rx="0.5"/>
-        <line x1="11" y1="9" x2="11" y2="7"/>
-        <line x1="13" y1="9" x2="13" y2="7"/>
-        <line x1="11" y1="15" x2="11" y2="17"/>
-        <line x1="13" y1="15" x2="13" y2="17"/>
-        <line x1="9" y1="11" x2="7" y2="11"/>
-        <line x1="9" y1="13" x2="7" y2="13"/>
-        <line x1="15" y1="11" x2="17" y2="11"/>
-        <line x1="15" y1="13" x2="17" y2="13"/>
-      </svg>
+      <div class="logo-icon">
+        <img src="/psycheros_logo_invert.png" alt=""/>
+      </div>
       <span class="logo-sub" id="header-title"></span>
     </div>
   </div>
@@ -1536,20 +1527,10 @@ export function renderEmptyState(): string {
   return `<div class="messages" id="messages">
   <div class="empty-state" id="empty-state">
     <div class="empty-logo">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 21C12 21 3 14.5 3 8.5C3 5.5 5.5 3 8.5 3C10.4 3 12 4.2 12 4.2C12 4.2 13.6 3 15.5 3C18.5 3 21 5.5 21 8.5C21 14.5 12 21 12 21Z"/>
-        <rect x="9" y="9" width="6" height="6" rx="0.5"/>
-        <line x1="11" y1="9" x2="11" y2="7"/>
-        <line x1="13" y1="9" x2="13" y2="7"/>
-        <line x1="11" y1="15" x2="11" y2="17"/>
-        <line x1="13" y1="15" x2="13" y2="17"/>
-        <line x1="9" y1="11" x2="7" y2="11"/>
-        <line x1="9" y1="13" x2="7" y2="13"/>
-        <line x1="15" y1="11" x2="17" y2="11"/>
-        <line x1="15" y1="13" x2="17" y2="13"/>
-      </svg>
+      <img src="/psycheroslogo_lines_Color.png" alt="Psycheros" width="120" height="120"/>
     </div>
     <div class="empty-title">Psycheros</div>
+    <div class="empty-tagline">seize the means of companionship</div>
     <p class="empty-text">Start a new conversation or select one from the sidebar.</p>
   </div>
 </div>`;
