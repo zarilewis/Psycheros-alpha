@@ -406,9 +406,13 @@ function initPersistentSSE() {
     }
   });
 
-  persistentSSE.onerror = (error) => {
-    console.warn('Persistent SSE error, will reconnect:', error);
-    // EventSource automatically reconnects on error
+  persistentSSE.onerror = () => {
+    // Don't rely on EventSource built-in reconnect — it can silently get
+    // stuck in CONNECTING state. Close explicitly and reconnect ourselves.
+    persistentSSE.close();
+    persistentSSE = null;
+    // Reconnect after a short delay to avoid tight error loops
+    setTimeout(initPersistentSSE, 1000);
   };
 }
 
@@ -452,8 +456,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // destroying the textarea while the user is typing. On Android PWA, the
   // virtual keyboard can trigger spurious visibilitychange events that would
   // otherwise dismiss the keyboard and flash-destroy the input. The SSE is
-  // only reconnected if the existing connection is in a bad state, preventing
-  // disruption of in-flight Pulse streaming.
+  // reconnected on every visible event (unless a Pulse is streaming) to
+  // prevent stuck CONNECTING states from silently dropping Pulse events.
   let visibilityReloadTimer = null;
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
@@ -466,11 +470,14 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // visible — only reconnect SSE if the existing connection is unhealthy
-    const sseHealthy = persistentSSE &&
-      persistentSSE.readyState !== EventSource.CLOSED &&
-      persistentSSE.readyState !== EventSource.CONNECTING;
-    if (!sseHealthy) {
+    // visible — reconnect SSE unless a Pulse is actively streaming on this
+    // connection. When streaming, tearing down the SSE would lose in-flight
+    // content. The pulse_complete fallback reload would recover the data but
+    // the real-time experience would be disrupted.
+    // A connection stuck in CONNECTING (no active streaming) is dead — the
+    // old health check treated CONNECTING as healthy, which is why Pulses
+    // stopped appearing until a manual refresh.
+    if (!pulseStreamingPulseId) {
       initPersistentSSE();
     }
 
