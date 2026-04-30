@@ -71,9 +71,9 @@ RUN printf '%s\n' \
     '# Force agent-friendly env into every child session. Required because' \
     "# Dockerfile ENV doesn't propagate through sshd, and AcceptEnv from the" \
     '# client (e.g. macOS sending LANG=en_US.UTF-8) would otherwise win.' \
-    'SetEnv LANG=C.UTF-8 LC_ALL=C.UTF-8' \
-    'SetEnv EDITOR=vi' \
-    'SetEnv PAGER=cat GIT_PAGER=cat MANPAGER=cat' \
+    '# NOTE: OpenSSH only honors the FIRST SetEnv line at a given scope —' \
+    '# all variables must be on one line.' \
+    'SetEnv LANG=C.UTF-8 LC_ALL=C.UTF-8 EDITOR=vi PAGER=cat GIT_PAGER=cat MANPAGER=cat' \
     > /etc/ssh/sshd_config.d/psycheros.conf
 
 WORKDIR /app
