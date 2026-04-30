@@ -70,6 +70,45 @@ Three persistent volumes needed. Psycheros `identity/` and `memories/` are ephem
 | `PSYCHEROS_MCP_COMMAND` | `deno` |
 | `PSYCHEROS_MCP_ARGS` | `run -A --cached-only --unstable-cron /app/entity-core/src/mod.ts` |
 | `PSYCHEROS_ENTITY_CORE_DATA_DIR` | `/app/entity-core/data` |
+| `PSYCHEROS_SSH_ENABLED` | `false` |
+| `PSYCHEROS_SSH_PORT` | `47291` |
+
+## Debug SSH
+
+For live in-container diagnosis (e.g. an external Claude Code agent attached to a production container), the image bundles `openssh-server` and a small set of tools (`bash`, `git`, `curl`, `jq`, `vim-tiny`, `less`, `procps`, `htop`, `sqlite3`, `ripgrep`, `lsof`, `iproute2`, `iputils-ping`). The sshd binary is inert unless explicitly enabled.
+
+**Enabling:**
+
+```bash
+docker run \
+  -e PSYCHEROS_SSH_ENABLED=true \
+  -e PSYCHEROS_SSH_AUTHORIZED_KEYS="$(cat ~/.ssh/operator.pub)" \
+  -p 3000:3000 \
+  -p 47291:47291 \
+  ghcr.io/zarilewis/psycheros:latest
+```
+
+**Configuration:**
+
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `PSYCHEROS_SSH_ENABLED` | `false` | Master switch. Anything other than `true`/`1`/`yes` (case-insensitive) leaves sshd inert. |
+| `PSYCHEROS_SSH_PORT` | `47291` | Listen port inside the container. Override to relocate. |
+| `PSYCHEROS_SSH_AUTHORIZED_KEYS` | _(unset)_ | Newline-separated authorized public keys. If unset, the entrypoint looks for a pre-mounted `/root/.ssh/authorized_keys`. If neither is present, sshd refuses to start. |
+
+**Security model:**
+
+- Root login, **key-only** (`PermitRootLogin prohibit-password`, `PasswordAuthentication no`).
+- No PAM, no challenge-response, no empty passwords.
+- Refuses to start without authorized keys (fail-closed — never a wide-open sshd).
+- Host keys persist under `/app/Psycheros/.psycheros/ssh/` (the existing `psycheros-db` volume), so fingerprints stay stable across container restarts.
+- Failure to start sshd is non-fatal: the main service continues even if the debug shell can't come up.
+
+**Operational notes:**
+
+- Map the SSH port only on trusted networks. Prefer binding to a private interface, e.g. `-p 10.0.0.5:47291:47291`.
+- Disable when not actively debugging — restart the container with `PSYCHEROS_SSH_ENABLED=false`.
+- The Dockerfile `EXPOSE`s port `47291` as a hint only; actual reachability requires `docker run -p`.
 
 ## Health Check
 

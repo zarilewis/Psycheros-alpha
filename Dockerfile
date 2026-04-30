@@ -8,9 +8,53 @@
 
 FROM denoland/deno:2.6.7
 
-# Install dumb-init for proper PID 1 signal handling
-RUN apt-get update && apt-get install -y --no-install-recommends dumb-init \
+# Install dumb-init for proper PID 1 signal handling, plus an SSH server and a
+# small set of diagnostic tools used when an operator (or an external Claude
+# Code agent) connects via SSH for live in-container debugging. SSH is gated
+# at runtime by PSYCHEROS_SSH_ENABLED (default off) — the binaries are baked
+# in but inert unless explicitly turned on.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        dumb-init \
+        openssh-server \
+        bash \
+        ca-certificates \
+        git \
+        curl \
+        wget \
+        jq \
+        less \
+        vim-tiny \
+        procps \
+        htop \
+        sqlite3 \
+        ripgrep \
+        lsof \
+        iproute2 \
+        iputils-ping \
+    && mkdir -p /var/run/sshd /root/.ssh \
+    && chmod 700 /root/.ssh \
     && rm -rf /var/lib/apt/lists/*
+
+# Hardened sshd drop-in. The entrypoint sets the listen port at runtime and
+# generates / loads host keys from the persistent .psycheros volume so the
+# host key fingerprint is stable across container restarts.
+RUN printf '%s\n' \
+    '# Psycheros debug SSH — runtime-gated, key-only, root login restricted to keys.' \
+    'PermitRootLogin prohibit-password' \
+    'PasswordAuthentication no' \
+    'PermitEmptyPasswords no' \
+    'ChallengeResponseAuthentication no' \
+    'KbdInteractiveAuthentication no' \
+    'PubkeyAuthentication yes' \
+    'UsePAM no' \
+    'X11Forwarding no' \
+    'PrintMotd no' \
+    'AuthorizedKeysFile /root/.ssh/authorized_keys' \
+    'HostKey /app/Psycheros/.psycheros/ssh/ssh_host_ed25519_key' \
+    'HostKey /app/Psycheros/.psycheros/ssh/ssh_host_rsa_key' \
+    'LogLevel VERBOSE' \
+    'Subsystem sftp internal-sftp' \
+    > /etc/ssh/sshd_config.d/psycheros.conf
 
 WORKDIR /app
 
@@ -57,6 +101,11 @@ RUN mkdir -p \
 
 EXPOSE 3000
 
+# Debug SSH (only reachable when PSYCHEROS_SSH_ENABLED=true and the host maps
+# the port). Default is an obscure high port to avoid collision with anything
+# operators may already run; can be overridden with PSYCHEROS_SSH_PORT.
+EXPOSE 47291
+
 # Default environment — MCP wired up for single-container layout
 # Force UTC to prevent local-time Date methods from drifting
 ENV TZ=UTC
@@ -66,6 +115,10 @@ ENV PSYCHEROS_MCP_ENABLED=true
 ENV PSYCHEROS_MCP_COMMAND=deno
 ENV PSYCHEROS_MCP_ARGS="run -A --cached-only --unstable-cron /app/entity-core/src/mod.ts"
 ENV PSYCHEROS_ENTITY_CORE_DATA_DIR=/app/entity-core/data
+
+# Debug SSH defaults — disabled unless explicitly enabled at runtime.
+ENV PSYCHEROS_SSH_ENABLED=false
+ENV PSYCHEROS_SSH_PORT=47291
 
 # Health check (start-period accounts for embedding model load time)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
