@@ -64,10 +64,20 @@ if [ "$SSH_ENABLED" = "true" ] || [ "$SSH_ENABLED" = "1" ] || [ "$SSH_ENABLED" =
 
   # Materialize authorized_keys from env var if provided. A pre-mounted
   # /root/.ssh/authorized_keys is also accepted (env var wins).
+  #
+  # The env var accepts multiple keys separated by commas — required because
+  # UnRAID's variable input is single-line and strips literal newlines. We
+  # translate "," → newline before writing, then strip leading/trailing
+  # whitespace per line. Single-key (no comma) usage is unaffected.
   if [ -n "${PSYCHEROS_SSH_AUTHORIZED_KEYS:-}" ]; then
-    printf '%s\n' "$PSYCHEROS_SSH_AUTHORIZED_KEYS" > "$AUTH_KEYS_FILE"
+    printf '%s\n' "$PSYCHEROS_SSH_AUTHORIZED_KEYS" \
+      | tr ',' '\n' \
+      | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' \
+      | grep -v '^$' \
+      > "$AUTH_KEYS_FILE"
     chmod 600 "$AUTH_KEYS_FILE"
-    echo "[Entrypoint] SSH: wrote authorized_keys from PSYCHEROS_SSH_AUTHORIZED_KEYS"
+    key_count=$(wc -l < "$AUTH_KEYS_FILE" | tr -d ' ')
+    echo "[Entrypoint] SSH: wrote $key_count key(s) to authorized_keys from PSYCHEROS_SSH_AUTHORIZED_KEYS"
   fi
 
   if [ ! -s "$AUTH_KEYS_FILE" ]; then

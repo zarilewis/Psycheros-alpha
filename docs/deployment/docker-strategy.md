@@ -102,7 +102,7 @@ docker run \
 |----------|---------|-------|
 | `PSYCHEROS_SSH_ENABLED` | `false` | Master switch. Anything other than `true`/`1`/`yes` (case-insensitive) leaves sshd inert. |
 | `PSYCHEROS_SSH_PORT` | `47291` | Listen port inside the container. Override to relocate. |
-| `PSYCHEROS_SSH_AUTHORIZED_KEYS` | _(unset)_ | Newline-separated authorized public keys. If unset, the entrypoint looks for a pre-mounted `/root/.ssh/authorized_keys`. If neither is present, sshd refuses to start. |
+| `PSYCHEROS_SSH_AUTHORIZED_KEYS` | _(unset)_ | Authorized public keys. **Multiple keys are separated by commas** (single-line env vars are required for UnRAID-style UIs that strip newlines). Each comma-separated entry is a full `ssh-<type> <blob> <comment>` line. If unset, the entrypoint looks for a pre-mounted `/root/.ssh/authorized_keys`. If neither is present, sshd refuses to start. |
 
 **Security model:**
 
