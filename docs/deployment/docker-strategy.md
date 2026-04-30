@@ -75,7 +75,15 @@ Three persistent volumes needed. Psycheros `identity/` and `memories/` are ephem
 
 ## Debug SSH
 
-For live in-container diagnosis (e.g. an external Claude Code agent attached to a production container), the image bundles `openssh-server` and a small set of tools (`bash`, `git`, `curl`, `jq`, `vim-tiny`, `less`, `procps`, `htop`, `sqlite3`, `ripgrep`, `lsof`, `iproute2`, `iputils-ping`). The sshd binary is inert unless explicitly enabled.
+For live in-container diagnosis (primary audience: an external Claude Code agent attached to a production container), the image bundles `openssh-server` and a small toolkit: `bash`, `git`, `curl`, `wget`, `jq`, `vim`/`vi`, `less`, `tree`, `file`, `procps`, `htop`, `sqlite3`, `ripgrep`, `lsof`, `iproute2`, `iputils-ping`. The sshd binary is inert unless explicitly enabled.
+
+The shell environment is tuned for non-interactive AI-agent use:
+
+- `LANG=C.UTF-8`, `LC_ALL=C.UTF-8` — predictable UTF-8 with no locale warnings (no `locales` package needed).
+- `PAGER=cat`, `GIT_PAGER=cat`, `MANPAGER=cat` — pagers disabled so commands never hang waiting on a non-existent TTY.
+- `EDITOR=vi`.
+- An orientation brief at `/root/AGENT_BRIEF.md` covers layout, process model, log location, useful debug queries, and the "do not touch" rules. Connecting agents should `cat ~/AGENT_BRIEF.md` first.
+- Color aliases (`ls`, `grep`) are wired into `/etc/profile.d/psycheros-debug.sh` for interactive humans; they don't activate for non-TTY agent sessions, so output stays parse-clean.
 
 **Enabling:**
 

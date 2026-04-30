@@ -31,9 +31,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         lsof \
         iproute2 \
         iputils-ping \
+        tree \
+        file \
+    && ln -sf /usr/bin/vim.tiny /usr/local/bin/vim \
     && mkdir -p /var/run/sshd /root/.ssh \
     && chmod 700 /root/.ssh \
     && rm -rf /var/lib/apt/lists/*
+
+# Interactive-shell niceties for human operators (only fires for login shells;
+# agent sessions over non-TTY ssh are unaffected because aliases don't apply).
+RUN printf '%s\n' \
+    '# Psycheros debug shell — interactive niceties' \
+    'if command -v dircolors >/dev/null 2>&1; then eval "$(dircolors -b)"; fi' \
+    "alias ls='ls --color=auto'" \
+    "alias ll='ls --color=auto -lh'" \
+    "alias la='ls --color=auto -lhA'" \
+    "alias grep='grep --color=auto'" \
+    > /etc/profile.d/psycheros-debug.sh
 
 # Hardened sshd drop-in. The entrypoint sets the listen port at runtime and
 # generates / loads host keys from the persistent .psycheros volume so the
@@ -65,6 +79,11 @@ COPY entity-core/ ./entity-core/
 # Copy entrypoint script
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
+
+# Drop the agent orientation brief into root's home so an AI agent that
+# connects via SSH can `cat ~/AGENT_BRIEF.md` for layout, process model,
+# and rules of engagement before doing anything.
+RUN cp /app/Psycheros/scripts/AGENT_BRIEF.md /root/AGENT_BRIEF.md
 
 # Enable nodeModulesDir + vendor in both projects (Docker only, not in source repos).
 # nodeModulesDir: npm packages go to local node_modules/ instead of /deno-dir
@@ -109,6 +128,16 @@ EXPOSE 47291
 # Default environment — MCP wired up for single-container layout
 # Force UTC to prevent local-time Date methods from drifting
 ENV TZ=UTC
+
+# Shell environment defaults. Tuned for AI-agent debug sessions: predictable
+# UTF-8, no pagers (which would hang a non-TTY ssh session), sensible editor.
+ENV LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
+    EDITOR=vi \
+    PAGER=cat \
+    GIT_PAGER=cat \
+    MANPAGER=cat
+
 ENV PSYCHEROS_HOST=0.0.0.0
 ENV PSYCHEROS_PORT=3000
 ENV PSYCHEROS_MCP_ENABLED=true
