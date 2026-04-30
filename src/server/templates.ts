@@ -273,7 +273,7 @@ export function renderAppShell(): string {
         ]);
 
         let connected = false;
-        let details: string[] = [];
+        let details = [];
 
         if (lovenseResp.status === 'fulfilled') {
           try {
