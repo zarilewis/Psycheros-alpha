@@ -68,6 +68,12 @@ RUN printf '%s\n' \
     'HostKey /app/Psycheros/.psycheros/ssh/ssh_host_rsa_key' \
     'LogLevel VERBOSE' \
     'Subsystem sftp internal-sftp' \
+    '# Force agent-friendly env into every child session. Required because' \
+    "# Dockerfile ENV doesn't propagate through sshd, and AcceptEnv from the" \
+    '# client (e.g. macOS sending LANG=en_US.UTF-8) would otherwise win.' \
+    'SetEnv LANG=C.UTF-8 LC_ALL=C.UTF-8' \
+    'SetEnv EDITOR=vi' \
+    'SetEnv PAGER=cat GIT_PAGER=cat MANPAGER=cat' \
     > /etc/ssh/sshd_config.d/psycheros.conf
 
 WORKDIR /app
